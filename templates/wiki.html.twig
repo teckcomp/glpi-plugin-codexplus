@@ -1,0 +1,162 @@
+{# Codex+ — tela Documentos (estante + filtros + listagem). Etapa 0 → 2b.
+
+   O CSS base é carregado pelo hook ADD_CSS (public/css/codexplus.css). Os
+   estilos específicos da listagem 2b estão inline abaixo — migrar para o CSS
+   na próxima vez que tocarmos aquele arquivo (mesmo TODO da Etapa 1.1). #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-header">
+        <h2><i class="ti ti-book-2"></i> {{ __('Codex+', 'codexplus') }}</h2>
+        <span>{{ __('Base de conhecimento e procedimentos operacionais', 'codexplus') }}</span>
+    </div>
+
+    <nav class="codexplus-nav">
+        <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
+        <a href="wiki.php" class="is-active">{{ __('Documentos', 'codexplus') }}</a>
+        <a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>
+    </nav>
+
+    <div class="codexplus-layout">
+
+        {# ================= ESQUERDA: estante de livros ================= #}
+        <aside class="codexplus-shelf">
+            <div class="codexplus-shelf-title">{{ __('Estante', 'codexplus') }}</div>
+
+            <a href="?" class="codexplus-book {{ category_id is null ? 'is-active' : '' }}">
+                <i class="ti ti-books"></i>
+                <span class="codexplus-book-name">{{ __('Todos os artigos', 'codexplus') }}</span>
+            </a>
+
+            {% for shelf in shelves %}
+                <a href="?cat={{ shelf.id }}"
+                   class="codexplus-book {{ category_id == shelf.id ? 'is-active' : '' }}"
+                   style="--book-indent: {{ shelf.level > 1 ? (shelf.level - 1) * 14 : 0 }}px"
+                   title="{{ shelf.completename }}">
+                    <i class="ti ti-book"></i>
+                    <span class="codexplus-book-name">{{ shelf.name }}</span>
+                    <span class="codexplus-count">{{ shelf.total }}</span>
+                </a>
+            {% else %}
+                <p class="codexplus-empty">{{ __('Nenhuma categoria com artigos visíveis.', 'codexplus') }}</p>
+            {% endfor %}
+        </aside>
+
+        {# ================= DIREITA: filtros + listagem ================= #}
+        <section class="codexplus-pages">
+            <div class="codexplus-pages-head">
+                <h3>
+                    {% if category_name %}{{ category_name }}
+                    {% else %}{{ __('Documentos', 'codexplus') }}{% endif %}
+                </h3>
+                <div class="codexplus-pages-head-right">
+                    <span class="codexplus-total">
+                        {{ documents|length }} {{ __('documento(s)', 'codexplus') }}
+                    </span>
+                    <a href="newdocument.php" class="cx-btn cx-btn-primary">
+                        <i class="ti ti-plus"></i> {{ __('Novo documento', 'codexplus') }}
+                    </a>
+                </div>
+            </div>
+
+            {# ---- barra de filtros (GET, preserva a categoria) ---- #}
+            <form method="get" class="codexplus-filters">
+                {% if category_id is not null %}
+                    <input type="hidden" name="cat" value="{{ category_id }}">
+                {% endif %}
+
+                <div class="cx-field">
+                    <label>{{ __('Tipo', 'codexplus') }}</label>
+                    <select name="doctype">
+                        <option value="">{{ __('Todos', 'codexplus') }}</option>
+                        {% for key, label in doctypes %}
+                            <option value="{{ key }}" {{ f_doctype == key ? 'selected' : '' }}>{{ key }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="cx-field">
+                    <label>{{ __('Status', 'codexplus') }}</label>
+                    <select name="status">
+                        <option value="">{{ __('Todos', 'codexplus') }}</option>
+                        {% for key, label in statuses %}
+                            <option value="{{ key }}" {{ f_status == key ? 'selected' : '' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="cx-field cx-field-grow">
+                    <label>{{ __('Buscar (título ou código)', 'codexplus') }}</label>
+                    <input type="text" name="q" value="{{ f_q }}"
+                           placeholder="{{ __('ex.: POP0001 ou parte do título', 'codexplus') }}">
+                </div>
+
+                <button type="submit" class="cx-btn cx-btn-primary">{{ __('Filtrar', 'codexplus') }}</button>
+                {% if f_doctype or f_status or f_q %}
+                    <a class="cx-btn cx-btn-ghost"
+                       href="?{{ category_id is not null ? 'cat=' ~ category_id : '' }}">
+                        {{ __('Limpar', 'codexplus') }}
+                    </a>
+                {% endif %}
+            </form>
+
+            {# ---- listagem ---- #}
+            {% if documents is not empty %}
+                <table class="codexplus-table">
+                    <thead>
+                        <tr>
+                            <th>{{ __('Código', 'codexplus') }}</th>
+                            <th>{{ __('Documento', 'codexplus') }}</th>
+                            <th>{{ __('Categoria', 'codexplus') }}</th>
+                            <th>{{ __('Responsável', 'codexplus') }}</th>
+                            <th>{{ __('Atualizado', 'codexplus') }}</th>
+                            <th>{{ __('Status', 'codexplus') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in documents %}
+                            <tr>
+                                <td>
+                                    {% if doc.code %}
+                                        <span class="codexplus-code">{{ doc.code }}</span>
+                                    {% else %}
+                                        <span class="codexplus-code is-empty">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a class="codexplus-doc-link" href="article.php?id={{ doc.id }}">{{ doc.name }}</a>
+                                    {% if doc.is_faq %} <span class="codexplus-tag">FAQ</span>{% endif %}
+                                </td>
+                                <td>{% if doc.category %}{{ doc.category }}{% else %}<span class="codexplus-muted">—</span>{% endif %}</td>
+                                <td>{% if doc.owner %}{{ doc.owner }}{% else %}<span class="codexplus-muted">—</span>{% endif %}</td>
+                                <td>{% if doc.date_mod %}{{ doc.date_mod|date('d/m/Y') }}{% else %}<span class="codexplus-muted">—</span>{% endif %}</td>
+                                <td>
+                                    {% if doc.status == 'publicado' %}
+                                        <span class="codexplus-status codexplus-status--publicado">{{ __('Publicado', 'codexplus') }}</span>
+                                    {% elseif doc.status == 'rascunho' %}
+                                        <span class="codexplus-status codexplus-status--rascunho">{{ __('Rascunho', 'codexplus') }}</span>
+                                    {% elseif doc.status == 'obsoleto' %}
+                                        <span class="codexplus-status codexplus-status--obsoleto">{{ __('Obsoleto', 'codexplus') }}</span>
+                                    {% else %}
+                                        <span class="codexplus-status codexplus-status--none">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="codexplus-empty">
+                    {{ __('Nenhum documento encontrado com esses filtros.', 'codexplus') }}
+                    {% if not (f_doctype or f_status or f_q or category_id) %}
+                        <br><small>
+                            [diagnóstico] artigos na tabela glpi_knowbaseitems, ignorando permissões:
+                            <strong>{{ diag_total_kb }}</strong>
+                        </small>
+                    {% endif %}
+                </p>
+            {% endif %}
+        </section>
+
+    </div>
+</div>

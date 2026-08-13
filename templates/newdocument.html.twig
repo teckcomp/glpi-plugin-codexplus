@@ -1,0 +1,101 @@
+{# Codex+ — Novo documento (Etapa 3b): tipo + modelo + título. #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-header">
+        <h2><i class="ti ti-book-2"></i> {{ __('Codex+', 'codexplus') }}</h2>
+        <span>{{ __('Base de conhecimento e procedimentos operacionais', 'codexplus') }}</span>
+    </div>
+
+    <nav class="codexplus-nav">
+        <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
+        <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
+        <a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>
+    </nav>
+
+    <h3>{{ __('Novo documento', 'codexplus') }}</h3>
+
+    <div class="codexplus-form">
+        <form method="post" action="newdocument.form.php">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+
+            <div class="codexplus-form-row">
+                <label for="cx-doctype">{{ __('Tipo de documento', 'codexplus') }}</label>
+                <select name="doctype" id="cx-doctype" required>
+                    <option value="">{{ __('Selecione…', 'codexplus') }}</option>
+                    {% for key, label in doctypes %}
+                        <option value="{{ key }}" {{ preset == key ? 'selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <div class="codexplus-form-hint">
+                    {{ __('O tipo define o prefixo do código (ex.: POP0001:00) e se o documento vence.', 'codexplus') }}
+                </div>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label for="cx-template">{{ __('Modelo', 'codexplus') }}</label>
+                <select name="templates_id" id="cx-template">
+                    <option value="0" data-doctype="">{{ __('Em branco (sem modelo)', 'codexplus') }}</option>
+                    {% for t in templates %}
+                        <option value="{{ t.id }}"
+                                data-doctype="{{ t.doctype }}"
+                                data-default="{{ t.is_default ? '1' : '0' }}">
+                            {{ t.name }}{{ t.is_default ? ' ★' : '' }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <div class="codexplus-form-hint">
+                    {{ __('A lista mostra apenas os modelos do tipo escolhido. ★ é o modelo padrão.', 'codexplus') }}
+                </div>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label for="cx-name">{{ __('Título do documento', 'codexplus') }}</label>
+                <input type="text" name="name" id="cx-name" required
+                       placeholder="{{ __('ex.: Instalação de CFTV em lojista', 'codexplus') }}">
+                <div class="codexplus-form-hint">
+                    {{ __('A categoria é definida depois, na tela de edição do artigo.', 'codexplus') }}
+                </div>
+            </div>
+
+            <div class="codexplus-form-actions">
+                <button type="submit" class="cx-btn cx-btn-primary">{{ __('Criar e editar', 'codexplus') }}</button>
+                <a href="wiki.php" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    var typeSel = document.getElementById('cx-doctype');
+    var tplSel  = document.getElementById('cx-template');
+    if (!typeSel || !tplSel) { return; }
+
+    // Guarda todas as opções de modelo para poder refiltrar a cada troca.
+    var allOptions = Array.prototype.slice.call(tplSel.options);
+
+    function refresh() {
+        var type = typeSel.value;
+
+        // Remonta a lista só com "em branco" + modelos do tipo escolhido.
+        tplSel.innerHTML = '';
+        var preferred = null;
+        allOptions.forEach(function (opt) {
+            var optType = opt.getAttribute('data-doctype') || '';
+            if (optType === '' || optType === type) {
+                tplSel.appendChild(opt);
+                if (optType === type && opt.getAttribute('data-default') === '1' && !preferred) {
+                    preferred = opt;
+                }
+            }
+        });
+
+        // Pré-seleciona o modelo padrão do tipo, se houver.
+        tplSel.value = preferred ? preferred.value : '0';
+    }
+
+    typeSel.addEventListener('change', refresh);
+    refresh();
+})();
+</script>

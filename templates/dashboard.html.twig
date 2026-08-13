@@ -1,0 +1,259 @@
+{# Codex+ — Painel (Etapas 6b/6c).
+   Zonas A–E da Parte 1.1 do documento de layout, com o refinamento visual
+   aprovado em 23/07: chip de ícone e linha de contexto nos indicadores,
+   proporção por tipo, recentes em tabela e estado vazio.
+   Estilos em public/css/codexplus.css (seção 11). #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-header">
+        <h2><i class="ti ti-book-2"></i> {{ __('Codex+', 'codexplus') }}</h2>
+        <span>{{ __('Base de conhecimento e procedimentos operacionais', 'codexplus') }}</span>
+    </div>
+
+    {# ============ ZONA A — navegação e ação ============ #}
+    <nav class="codexplus-nav">
+        <a href="dashboard.php" class="is-active">{{ __('Painel', 'codexplus') }}</a>
+        <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
+        <a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>
+    </nav>
+
+    <div class="cx-dash-actionbar">
+        <form method="get" action="wiki.php" class="cx-dash-search">
+            <i class="ti ti-search"></i>
+            <input type="text" name="q"
+                   placeholder="{{ __('Buscar por título, código ou conteúdo…', 'codexplus') }}">
+        </form>
+        {% if can_create %}
+            <a href="newdocument.php" class="cx-btn cx-btn-primary">
+                <i class="ti ti-plus"></i> {{ __('Novo documento', 'codexplus') }}
+            </a>
+        {% endif %}
+    </div>
+
+    {% if counters.total == 0 %}
+
+        {# ---- Estado vazio: quatro zeros pareceriam defeito. Convida a criar. ---- #}
+        <div class="cx-dash-blank">
+            <i class="ti ti-book-2"></i>
+            <h3>{{ __('Comece seu acervo', 'codexplus') }}</h3>
+            <p>{{ __('Crie o primeiro documento a partir de um modelo. Os indicadores aparecem assim que houver acervo.', 'codexplus') }}</p>
+        </div>
+
+    {% else %}
+
+        {# ============ ZONA B — indicadores com contexto ============ #}
+        <div class="cx-dash-stats">
+
+            <a class="cx-stat" href="wiki.php?status=publicado">
+                <div class="cx-stat-head">
+                    <span class="cx-stat-chip cx-chip-accent"><i class="ti ti-circle-check"></i></span>
+                    <span class="cx-stat-label">{{ __('Publicados', 'codexplus') }}</span>
+                </div>
+                <div class="cx-stat-value">{{ counters.publicados }}</div>
+                <div class="cx-stat-context">
+                    {{ __('de', 'codexplus') }} {{ counters.total }} {{ __('documentos', 'codexplus') }}
+                </div>
+            </a>
+
+            <a class="cx-stat" href="wiki.php?status=publicado">
+                <div class="cx-stat-head">
+                    <span class="cx-stat-chip cx-chip-warn"><i class="ti ti-clock"></i></span>
+                    <span class="cx-stat-label">{{ __('A vencer (30 d)', 'codexplus') }}</span>
+                </div>
+                <div class="cx-stat-value cx-stat-warn">{{ counters.avencer }}</div>
+                <div class="cx-stat-context">
+                    {% if counters.proximo_dias is not null %}
+                        {{ __('o mais próximo em', 'codexplus') }} {{ counters.proximo_dias }} {{ __('dia(s)', 'codexplus') }}
+                    {% else %}
+                        {{ __('nada vencendo agora', 'codexplus') }}
+                    {% endif %}
+                </div>
+            </a>
+
+            <a class="cx-stat" href="wiki.php?status=publicado">
+                <div class="cx-stat-head">
+                    <span class="cx-stat-chip cx-chip-danger"><i class="ti ti-alert-triangle"></i></span>
+                    <span class="cx-stat-label">{{ __('Vencidos', 'codexplus') }}</span>
+                </div>
+                <div class="cx-stat-value cx-stat-danger">{{ counters.vencidos }}</div>
+                <div class="cx-stat-context">
+                    {% if counters.vencidos_tipo %}
+                        {{ counters.vencidos_tipo_n }} {{ __('são', 'codexplus') }} {{ counters.vencidos_tipo }}
+                    {% else %}
+                        {{ __('tudo em dia', 'codexplus') }}
+                    {% endif %}
+                </div>
+            </a>
+
+            <a class="cx-stat" href="wiki.php?status=rascunho">
+                <div class="cx-stat-head">
+                    <span class="cx-stat-chip cx-chip-neutral"><i class="ti ti-pencil"></i></span>
+                    <span class="cx-stat-label">{{ __('Rascunhos', 'codexplus') }}</span>
+                </div>
+                <div class="cx-stat-value cx-stat-neutral">{{ counters.rascunhos }}</div>
+                <div class="cx-stat-context">
+                    {% if counters.rascunhos_parados > 0 %}
+                        {{ counters.rascunhos_parados }} {{ __('parado(s) há 30 dias', 'codexplus') }}
+                    {% else %}
+                        {{ __('nenhum parado', 'codexplus') }}
+                    {% endif %}
+                </div>
+            </a>
+
+        </div>
+
+        {# ============ ZONA C — por tipo (proporção) + atenção ============ #}
+        <div class="cx-dash-cards">
+
+            <section class="cx-card">
+                <h3 class="cx-card-title">{{ __('Por tipo', 'codexplus') }}</h3>
+                <div class="cx-bars">
+                    {% for t in by_type %}
+                        <a class="cx-bar-row" href="wiki.php?doctype={{ t.key }}">
+                            <div class="cx-bar-head">
+                                <span class="cx-bar-name">{{ t.name }}</span>
+                                <span class="cx-bar-total">{{ t.total }}</span>
+                            </div>
+                            <div class="cx-bar-track">
+                                <div class="cx-bar-fill" style="width: {{ t.pct }}%"></div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="cx-card">
+                <h3 class="cx-card-title">{{ __('Precisa de atenção', 'codexplus') }}</h3>
+                <ul class="cx-card-list">
+                    <li>
+                        <a href="wiki.php?status=publicado">
+                            <i class="ti ti-alert-triangle cx-ico-danger"></i>
+                            <span class="cx-card-item-name">{{ __('Revisão vencida', 'codexplus') }}</span>
+                            <span class="cx-card-item-count cx-count-danger">{{ attention.revisao_vencida }}</span>
+                            <i class="ti ti-chevron-right cx-card-go"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="wiki.php">
+                            <i class="ti ti-hash cx-ico-warn"></i>
+                            <span class="cx-card-item-name">{{ __('Sem código', 'codexplus') }}</span>
+                            <span class="cx-card-item-count cx-count-warn">{{ attention.sem_codigo }}</span>
+                            <i class="ti ti-chevron-right cx-card-go"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="wiki.php">
+                            <i class="ti ti-folder-off cx-ico-warn"></i>
+                            <span class="cx-card-item-name">{{ __('Sem categoria', 'codexplus') }}</span>
+                            <span class="cx-card-item-count cx-count-warn">{{ attention.sem_categoria }}</span>
+                            <i class="ti ti-chevron-right cx-card-go"></i>
+                        </a>
+                    </li>
+                    <li class="is-disabled"
+                        title="{{ __('Disponível a partir da Etapa 5 (relação PSG → POPs)', 'codexplus') }}">
+                        <span>
+                            <i class="ti ti-unlink"></i>
+                            <span class="cx-card-item-name">{{ __('PSG sem POP vinculado', 'codexplus') }}</span>
+                            <span class="cx-count-soon">{{ __('etapa 5', 'codexplus') }}</span>
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
+        </div>
+
+        {# ============ ZONA D — atualizados recentemente (tabela) ============ #}
+        <section class="cx-card cx-card-wide">
+            <div class="cx-card-head">
+                <h3 class="cx-card-title">{{ __('Atualizados recentemente', 'codexplus') }}</h3>
+                <a href="wiki.php" class="cx-card-more">{{ __('Ver todos', 'codexplus') }}</a>
+            </div>
+
+            {% if recent is not empty %}
+                <table class="codexplus-table cx-recent-table">
+                    <thead>
+                        <tr>
+                            <th>{{ __('Código', 'codexplus') }}</th>
+                            <th>{{ __('Documento', 'codexplus') }}</th>
+                            <th>{{ __('Categoria', 'codexplus') }}</th>
+                            <th>{{ __('Quando', 'codexplus') }}</th>
+                            <th>{{ __('Status', 'codexplus') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in recent %}
+                            <tr>
+                                <td>
+                                    {% if d.code %}
+                                        <span class="codexplus-code cx-code-chip cx-code-{{ d.expiry ?: 'plain' }}">{{ d.code }}</span>
+                                    {% else %}
+                                        <span class="codexplus-code cx-code-chip is-empty">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="cx-cell-clip">
+                                    <a class="codexplus-doc-link" href="article.php?id={{ d.id }}">{{ d.name }}</a>
+                                </td>
+                                <td class="cx-cell-clip">
+                                    {% if d.context %}{{ d.context }}{% else %}<span class="codexplus-muted">—</span>{% endif %}
+                                </td>
+                                <td class="cx-cell-when">{{ d.ago }}</td>
+                                <td>
+                                    {% if d.doctype == 'PRP' %}
+                                        {# Proposta não vence: não exibe etiqueta de status. #}
+                                        <span class="codexplus-muted">—</span>
+                                    {% elseif d.expiry == 'vencido' %}
+                                        <span class="codexplus-status codexplus-status--vencido">{{ __('vencido', 'codexplus') }}</span>
+                                    {% elseif d.expiry == 'avencer' %}
+                                        <span class="codexplus-status codexplus-status--avencer">{{ __('a vencer', 'codexplus') }}</span>
+                                    {% elseif d.expiry == 'emdia' %}
+                                        <span class="codexplus-status codexplus-status--emdia">{{ __('em dia', 'codexplus') }}</span>
+                                    {% elseif d.status == 'rascunho' %}
+                                        <span class="codexplus-status codexplus-status--rascunho">{{ __('rascunho', 'codexplus') }}</span>
+                                    {% elseif d.status == 'obsoleto' %}
+                                        <span class="codexplus-status codexplus-status--obsoleto">{{ __('obsoleto', 'codexplus') }}</span>
+                                    {% else %}
+                                        <span class="codexplus-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="codexplus-empty">{{ __('Nenhum documento ainda.', 'codexplus') }}</p>
+            {% endif %}
+        </section>
+
+    {% endif %}
+
+    {# ============ ZONA E — criar a partir de um modelo ============ #}
+    {% if can_create %}
+        <section class="cx-card cx-card-wide">
+            <h3 class="cx-card-title">{{ __('Criar a partir de um modelo', 'codexplus') }}</h3>
+            <div class="cx-tpl-grid">
+                <a class="cx-tpl-card" href="newdocument.php?doctype=POP">
+                    <i class="ti ti-list-numbers"></i>
+                    <span class="cx-tpl-card-name">POP</span>
+                    <span class="cx-tpl-card-desc">{{ __('Objetivo, passos, revisão', 'codexplus') }}</span>
+                </a>
+                <a class="cx-tpl-card" href="newdocument.php?doctype=PSG">
+                    <i class="ti ti-sitemap"></i>
+                    <span class="cx-tpl-card-name">PSG</span>
+                    <span class="cx-tpl-card-desc">{{ __('Regimento e POPs do setor', 'codexplus') }}</span>
+                </a>
+                <a class="cx-tpl-card" href="newdocument.php?doctype=MAN">
+                    <i class="ti ti-book"></i>
+                    <span class="cx-tpl-card-name">Manual</span>
+                    <span class="cx-tpl-card-desc">{{ __('Requisitos e uso', 'codexplus') }}</span>
+                </a>
+                <a class="cx-tpl-card" href="newdocument.php?doctype=PRP">
+                    <i class="ti ti-file-text"></i>
+                    <span class="cx-tpl-card-name">Proposta</span>
+                    <span class="cx-tpl-card-desc">{{ __('Escopo, materiais, execução', 'codexplus') }}</span>
+                </a>
+            </div>
+        </section>
+    {% endif %}
+
+</div>

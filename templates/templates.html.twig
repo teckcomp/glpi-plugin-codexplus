@@ -1,0 +1,112 @@
+{# Codex+ — tela Modelos (Etapa 3a). Estilos inline (mesmo TODO da 1.1/2b:
+   migrar para public/css/codexplus.css quando tocarmos o CSS). #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-header">
+        <h2><i class="ti ti-book-2"></i> {{ __('Codex+', 'codexplus') }}</h2>
+        <span>{{ __('Base de conhecimento e procedimentos operacionais', 'codexplus') }}</span>
+    </div>
+
+    <nav class="codexplus-nav">
+        <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
+        <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
+        <a href="templates.php" class="is-active">{{ __('Modelos', 'codexplus') }}</a>
+    </nav>
+
+    {% if mode == 'edit' %}
+        {# ================= EDIÇÃO / CRIAÇÃO ================= #}
+        <h3>{{ is_new ? __('Novo modelo', 'codexplus') : __('Editar modelo', 'codexplus') }}</h3>
+
+        <form method="post" action="template.form.php">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+            {% if not is_new %}<input type="hidden" name="id" value="{{ tpl.id }}">{% endif %}
+
+            <div class="codexplus-form-row">
+                <label>{{ __('Nome do modelo', 'codexplus') }}</label>
+                <input type="text" name="name" value="{{ tpl.name|default('') }}" required>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label>{{ __('Tipo', 'codexplus') }}</label>
+                <select name="doctype" required>
+                    <option value="">{{ __('Selecione…', 'codexplus') }}</option>
+                    {% for key, label in doctypes %}
+                        <option value="{{ key }}" {{ tpl.doctype == key ? 'selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label>
+                    <input type="checkbox" name="is_default" value="1" {{ tpl.is_default ? 'checked' : '' }}>
+                    {{ __('Modelo padrão deste tipo', 'codexplus') }}
+                </label>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label>{{ __('Conteúdo (seções do documento)', 'codexplus') }}</label>
+                {{ editor_html|raw }}
+            </div>
+
+            <div class="codexplus-form-actions">
+                <button type="submit" name="{{ is_new ? 'add' : 'update' }}" class="cx-btn cx-btn-primary">
+                    {{ __('Salvar', 'codexplus') }}
+                </button>
+                <a href="templates.php" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
+            </div>
+        </form>
+
+    {% else %}
+        {# ================= LISTA ================= #}
+        <div class="codexplus-section-head">
+            <h3>{{ __('Modelos', 'codexplus') }}</h3>
+            {% if can_edit %}
+                <a href="templates.php?new=1" class="cx-btn cx-btn-primary"><i class="ti ti-plus"></i> {{ __('Novo modelo', 'codexplus') }}</a>
+            {% endif %}
+        </div>
+
+        {% if templates is not empty %}
+            <table class="codexplus-table">
+                <thead>
+                    <tr>
+                        <th>{{ __('Nome', 'codexplus') }}</th>
+                        <th>{{ __('Tipo', 'codexplus') }}</th>
+                        <th>{{ __('Padrão', 'codexplus') }}</th>
+                        {% if can_edit %}<th class="cx-col-actions">{{ __('Ações', 'codexplus') }}</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in templates %}
+                        <tr>
+                            <td>{{ t.name }}</td>
+                            <td><span class="codexplus-type">{{ t.doctype ?: '—' }}</span></td>
+                            <td>{% if t.is_default %}<span class="codexplus-pill-default">{{ __('Padrão', 'codexplus') }}</span>{% endif %}</td>
+                            {% if can_edit %}
+                                <td>
+                                    <div class="cx-row-actions">
+                                        <a class="cx-btn cx-btn-mini" href="templates.php?id={{ t.id }}">{{ __('Editar', 'codexplus') }}</a>
+                                        <form method="post" action="template.form.php">
+                                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                                            <input type="hidden" name="id" value="{{ t.id }}">
+                                            <button type="submit" name="duplicate" class="cx-btn cx-btn-mini">{{ __('Duplicar', 'codexplus') }}</button>
+                                        </form>
+                                        <form method="post" action="template.form.php"
+                                              onsubmit="return confirm('{{ __('Excluir este modelo?', 'codexplus') }}');">
+                                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                                            <input type="hidden" name="id" value="{{ t.id }}">
+                                            <button type="submit" name="delete" class="cx-btn cx-btn-mini cx-btn-mini-danger">{{ __('Excluir', 'codexplus') }}</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="codexplus-empty">{{ __('Nenhum modelo cadastrado ainda.', 'codexplus') }}</p>
+        {% endif %}
+    {% endif %}
+
+</div>

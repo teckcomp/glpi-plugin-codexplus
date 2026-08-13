@@ -1,0 +1,165 @@
+{# Codex+ — configuração de marca do documento (Etapa 4a).
+   Estilos em public/css/codexplus.css, seção 12. #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-header">
+        <h2><i class="ti ti-settings"></i> {{ __('Codex+ — configuração', 'codexplus') }}</h2>
+        <span>{{ __('Marca aplicada ao PDF dos documentos', 'codexplus') }}</span>
+    </div>
+
+    <form method="post" action="config.form.php" enctype="multipart/form-data" class="codexplus-form cx-cfg">
+        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+
+        {# ---------------------------------------------------------------- #}
+        <fieldset class="cx-cfg-block">
+            <legend>{{ __('Identificação', 'codexplus') }}</legend>
+
+            <div class="codexplus-form-row">
+                <label for="cx-company">{{ __('Nome da empresa', 'codexplus') }}</label>
+                <input type="text" id="cx-company" name="company_name"
+                       value="{{ cfg.company_name }}"
+                       placeholder="{{ __('Ex.: Resolutto IT Solutions', 'codexplus') }}">
+                <p class="codexplus-form-hint">
+                    {{ __('Disponível no rodapé pelo marcador {empresa}.', 'codexplus') }}
+                </p>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label>{{ __('Logo', 'codexplus') }}</label>
+
+                <div class="cx-cfg-logo">
+                    <div class="cx-cfg-logo-preview {{ has_logo ? '' : 'is-empty' }}">
+                        {% if has_logo %}
+                            <img src="{{ logo_url }}" alt="{{ __('Logo atual', 'codexplus') }}">
+                        {% else %}
+                            <span><i class="ti ti-photo-off"></i> {{ __('Nenhum logo enviado', 'codexplus') }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="cx-cfg-logo-actions">
+                        <input type="file" name="logo" accept="image/png,image/jpeg">
+                        <p class="codexplus-form-hint">
+                            {{ __('PNG com fundo transparente é o ideal. JPG também serve. Até', 'codexplus') }}
+                            {{ max_mb }} MB.
+                        </p>
+                        {% if has_logo %}
+                            <button type="submit" name="delete_logo" value="1"
+                                    class="cx-btn cx-btn-mini cx-btn-mini-danger">
+                                <i class="ti ti-trash"></i> {{ __('Remover logo', 'codexplus') }}
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        {# ---------------------------------------------------------------- #}
+        <fieldset class="cx-cfg-block">
+            <legend>{{ __('Cabeçalho do PDF', 'codexplus') }}</legend>
+
+            <div class="codexplus-form-row cx-cfg-check">
+                <label>
+                    <input type="checkbox" name="header_show_logo" value="1"
+                           {{ cfg.header_show_logo == '1' ? 'checked' : '' }}>
+                    {{ __('Exibir o logo no cabeçalho', 'codexplus') }}
+                </label>
+            </div>
+
+            <div class="codexplus-form-row cx-cfg-check">
+                <label>
+                    <input type="checkbox" name="header_repeat" value="1"
+                           {{ cfg.header_repeat == '1' ? 'checked' : '' }}>
+                    {{ __('Repetir o logo em todas as páginas', 'codexplus') }}
+                </label>
+                <p class="codexplus-form-hint">
+                    {{ __('Desmarcado, o logo aparece só na primeira página.', 'codexplus') }}
+                </p>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label for="cx-logopos">{{ __('Posição do logo', 'codexplus') }}</label>
+                <select id="cx-logopos" name="header_logo_position">
+                    {% for key, label in logo_positions %}
+                        <option value="{{ key }}" {{ cfg.header_logo_position == key ? 'selected' : '' }}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label for="cx-logoh">{{ __('Altura do logo (mm)', 'codexplus') }}</label>
+                <input type="number" id="cx-logoh" name="header_logo_height"
+                       value="{{ cfg.header_logo_height }}" min="6" max="30" step="1">
+                <p class="codexplus-form-hint">
+                    {{ __('Entre 6 e 30 mm. Acima disso o cabeçalho invade o texto.', 'codexplus') }}
+                </p>
+            </div>
+
+            <div class="codexplus-form-row cx-cfg-check">
+                <label>
+                    <input type="checkbox" name="title_uppercase" value="1"
+                           {{ cfg.title_uppercase == '1' ? 'checked' : '' }}>
+                    {{ __('Título do documento em caixa alta', 'codexplus') }}
+                </label>
+            </div>
+        </fieldset>
+
+        {# ---------------------------------------------------------------- #}
+        <fieldset class="cx-cfg-block">
+            <legend>{{ __('Rodapé do PDF', 'codexplus') }}</legend>
+
+            <div class="codexplus-form-row cx-cfg-check">
+                <label>
+                    <input type="checkbox" name="footer_show" value="1"
+                           {{ cfg.footer_show == '1' ? 'checked' : '' }}>
+                    {{ __('Exibir rodapé', 'codexplus') }}
+                </label>
+            </div>
+
+            <div class="codexplus-form-row">
+                <label for="cx-footer">{{ __('Texto do rodapé', 'codexplus') }}</label>
+                <input type="text" id="cx-footer" name="footer_text" value="{{ cfg.footer_text }}">
+                <p class="codexplus-form-hint">
+                    {{ __('Texto livre. Os marcadores abaixo são trocados pelo valor real de cada documento.', 'codexplus') }}
+                </p>
+
+                <ul class="cx-cfg-markers">
+                    {% for marker, desc in markers %}
+                        <li>
+                            <code class="codexplus-code">{{ marker }}</code>
+                            <span>{{ desc }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="codexplus-form-row cx-cfg-check">
+                <label>
+                    <input type="checkbox" name="footer_show_pagination" value="1"
+                           {{ cfg.footer_show_pagination == '1' ? 'checked' : '' }}>
+                    {{ __('Exibir paginação à direita do rodapé', 'codexplus') }}
+                </label>
+                <p class="codexplus-form-hint">
+                    {{ __('Formato 1 / 2. Independe dos marcadores {pagina} e {total}, que servem para colocar a página dentro do texto livre.', 'codexplus') }}
+                </p>
+            </div>
+        </fieldset>
+
+        <div class="codexplus-form-actions">
+            <button type="submit" name="update" value="1" class="cx-btn cx-btn-primary">
+                <i class="ti ti-device-floppy"></i> {{ __('Salvar', 'codexplus') }}
+            </button>
+            <a href="{{ glpi_root }}/plugins/codexplus/front/dashboard.php" class="cx-btn cx-btn-ghost">
+                {{ __('Ir para o Codex+', 'codexplus') }}
+            </a>
+        </div>
+    </form>
+
+    <p class="codexplus-form-hint cx-cfg-note">
+        <i class="ti ti-info-circle"></i>
+        {{ __('Esta configuração ainda não afeta o PDF — o cabeçalho e o rodapé passam a ser aplicados na Etapa 4b.', 'codexplus') }}
+    </p>
+
+</div>

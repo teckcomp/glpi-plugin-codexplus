@@ -1,0 +1,1074 @@
+/* =========================================================================
+   Codex+ — folha de estilo única do plugin
+   -------------------------------------------------------------------------
+   Etapa 6a (consolidação): até aqui cada template Twig carregava seu próprio
+   bloco <style> inline. Isso duplicava .codexplus-nav em 3 arquivos e os
+   botões em 4, o que gera inconsistência silenciosa quando o visual muda.
+   Tudo passou para cá.
+
+   ORGANIZAÇÃO
+     1. Tokens (:root)        — fonte de verdade de cor/espaço/raio
+     2. Base e navegação
+     3. Botões
+     4. Estante e listagem
+     5. Tabelas de dados
+     6. Etiquetas de status e código
+     7. Formulários
+     8. Leitura do documento
+     9. Anexos
+    10. Aba Codex+ na ficha nativa
+
+   ESCOPO: as regras visuais ficam sob .codexplus-app (telas do plugin) ou
+   .codexplus-meta-tab (aba dentro da ficha nativa do artigo). Os TOKENS
+   ficam em :root porque a aba nativa vive FORA de .codexplus-app e também
+   precisa deles. O prefixo --cx- evita colisão com as variáveis do GLPI.
+   ========================================================================= */
+
+/* =========================================================================
+   1. TOKENS
+   ========================================================================= */
+
+:root {
+    /* Marca */
+    --cx-accent:        #0c447c;
+    --cx-accent-strong: #0a3663;
+    --cx-accent-soft:   #e6f1fb;
+
+    /* Texto e superfícies */
+    --cx-text:      #1f2937;
+    --cx-text-read: #24292f;
+    --cx-muted:     #6b7280;
+    --cx-faint:     #9ca3af;
+    --cx-border:    #e5e7eb;
+    --cx-border-soft: #eef0f2;
+    --cx-surface:   #ffffff;
+    --cx-surface-1: #f9fafb;
+    --cx-surface-2: #f3f4f6;
+
+    /* Status — usados nas etiquetas, nos códigos e (Etapa 6) nos
+       indicadores do Painel. Mesma paleta do mockup aprovado. */
+    --cx-ok:        #1b7a45;
+    --cx-ok-bg:     #e3f5e9;
+    --cx-warn:      #b45309;
+    --cx-warn-bg:   #fef3c7;
+    --cx-danger:    #b42318;
+    --cx-danger-bg: #fcebeb;
+    --cx-neutral:   #6b7280;
+    --cx-neutral-bg:#f3f4f6;
+
+    /* Métrica */
+    --cx-radius:    10px;
+    --cx-radius-sm: 8px;
+    --cx-radius-pill: 20px;
+    --cx-gap:       12px;
+
+    /* Fonte monoespaçada dos códigos (POP0001:00) */
+    --cx-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* =========================================================================
+   2. BASE E NAVEGAÇÃO
+   ========================================================================= */
+
+.codexplus-app {
+    color: var(--cx-text);
+    padding: 4px 0 24px;
+}
+
+.codexplus-header { margin-bottom: 18px; }
+.codexplus-header h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.codexplus-header span {
+    color: var(--cx-muted);
+    font-size: 13px;
+}
+
+/* Abas Painel · Documentos · Modelos */
+.codexplus-nav {
+    display: flex;
+    gap: 4px;
+    margin: 0 0 18px;
+    border-bottom: 1px solid var(--cx-border);
+}
+.codexplus-nav a {
+    padding: 8px 16px;
+    text-decoration: none;
+    color: var(--cx-muted);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .12s ease, border-color .12s ease;
+}
+.codexplus-nav a:hover { color: var(--cx-text); }
+.codexplus-nav a.is-active {
+    color: var(--cx-accent);
+    border-bottom-color: var(--cx-accent);
+}
+
+/* =========================================================================
+   3. BOTÕES
+   Sistema único. Antes existiam .codexplus-btn, .cx-btn, .cx-btn-new e
+   .cx-mini espalhados por templates diferentes, com valores divergentes.
+   ========================================================================= */
+
+.codexplus-app .cx-btn,
+.codexplus-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+    color: var(--cx-text);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s ease, border-color .12s ease, opacity .12s ease;
+}
+.codexplus-app .cx-btn:hover,
+.codexplus-btn:hover {
+    background: var(--cx-surface-1);
+    border-color: #d1d5db;
+    color: var(--cx-text);
+}
+
+/* Primário — ação principal da tela */
+.codexplus-app .cx-btn-primary,
+.codexplus-btn-primary {
+    background: var(--cx-accent);
+    border-color: var(--cx-accent);
+    color: #fff;
+}
+.codexplus-app .cx-btn-primary:hover,
+.codexplus-btn-primary:hover {
+    background: var(--cx-accent-strong);
+    border-color: var(--cx-accent-strong);
+    color: #fff;
+}
+
+/* Fantasma — ação secundária (Cancelar, Limpar) */
+.codexplus-app .cx-btn-ghost {
+    background: transparent;
+    color: var(--cx-muted);
+}
+.codexplus-app .cx-btn-ghost:hover { background: var(--cx-surface-2); }
+
+/* Miniatura — ações dentro de linha de tabela */
+.codexplus-app .cx-btn-mini {
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    gap: 4px;
+}
+.codexplus-app .cx-btn-mini-danger {
+    color: var(--cx-danger);
+    border-color: #f3c1bd;
+}
+.codexplus-app .cx-btn-mini-danger:hover {
+    background: var(--cx-danger-bg);
+    border-color: var(--cx-danger);
+    color: var(--cx-danger);
+}
+
+.codexplus-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--cx-muted);
+    text-decoration: none;
+    font-size: 13px;
+}
+.codexplus-back:hover { color: var(--cx-accent); }
+
+.codexplus-actions { display: flex; gap: 8px; }
+
+/* =========================================================================
+   4. ESTANTE E LISTAGEM
+   ========================================================================= */
+
+.codexplus-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .codexplus-layout { grid-template-columns: 1fr; }
+}
+
+.codexplus-shelf {
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    padding: 10px;
+    position: sticky;
+    top: 12px;
+}
+.codexplus-shelf-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--cx-muted);
+    padding: 4px 8px 10px;
+}
+.codexplus-book {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-left: var(--book-indent, 0);
+    border-radius: var(--cx-radius-sm);
+    color: var(--cx-text);
+    text-decoration: none;
+    font-size: 14px;
+    transition: background .12s ease;
+}
+.codexplus-book:hover {
+    background: var(--cx-surface-2);
+    color: var(--cx-text);
+}
+.codexplus-book.is-active {
+    background: var(--cx-accent-soft);
+    color: var(--cx-accent);
+    font-weight: 500;
+}
+.codexplus-book i { color: var(--cx-accent); flex: 0 0 auto; }
+.codexplus-book-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.codexplus-count {
+    background: var(--cx-surface-2);
+    color: var(--cx-muted);
+    border-radius: var(--cx-radius-pill);
+    padding: 1px 8px;
+    font-size: 12px;
+}
+.codexplus-book.is-active .codexplus-count {
+    background: var(--cx-surface);
+    color: var(--cx-accent);
+}
+
+.codexplus-pages {
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    padding: 6px 14px 14px;
+}
+.codexplus-pages-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--cx-border);
+    margin-bottom: 6px;
+}
+.codexplus-pages-head h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--cx-accent);
+}
+.codexplus-pages-head-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.codexplus-total { color: var(--cx-muted); font-size: 13px; }
+
+.codexplus-empty {
+    color: var(--cx-muted);
+    font-size: 13px;
+    padding: 16px 10px;
+    margin: 0;
+}
+
+/* Barra de filtros (tipo · status · busca) */
+.codexplus-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--cx-gap);
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    background: var(--cx-surface-1);
+}
+.codexplus-filters .cx-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.codexplus-filters .cx-field-grow { flex: 1; }
+.codexplus-filters label {
+    font-size: 12px;
+    color: var(--cx-muted);
+}
+.codexplus-filters select,
+.codexplus-filters input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    font-size: 14px;
+    background: var(--cx-surface);
+}
+.codexplus-filters input[type="text"] { min-width: 240px; }
+
+/* =========================================================================
+   5. TABELAS DE DADOS
+   Uma só definição para a listagem de documentos e a de modelos.
+   ========================================================================= */
+
+.codexplus-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.codexplus-table th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--cx-muted);
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--cx-border);
+    white-space: nowrap;
+}
+.codexplus-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--cx-border-soft);
+    vertical-align: middle;
+}
+.codexplus-table tbody tr:hover td { background: var(--cx-accent-soft); }
+.codexplus-table .cx-col-actions { text-align: right; }
+.codexplus-table .cx-row-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+.codexplus-table .cx-row-actions form {
+    display: inline;
+    margin: 0;
+}
+
+.codexplus-doc-link {
+    color: #111827;
+    text-decoration: none;
+    font-weight: 500;
+}
+.codexplus-doc-link:hover { color: var(--cx-accent); }
+
+.codexplus-muted { color: var(--cx-faint); }
+
+/* =========================================================================
+   6. ETIQUETAS DE STATUS E CÓDIGO
+   ========================================================================= */
+
+/* Código do documento (POP0001:00) — sempre monoespaçado */
+.codexplus-code {
+    font-family: var(--cx-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    white-space: nowrap;
+}
+.codexplus-code.is-empty {
+    color: var(--cx-faint);
+    font-weight: 400;
+}
+
+.codexplus-status {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: var(--cx-radius-pill);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.codexplus-status--publicado { background: var(--cx-ok-bg);      color: var(--cx-ok); }
+.codexplus-status--rascunho  { background: var(--cx-neutral-bg); color: var(--cx-neutral); }
+.codexplus-status--obsoleto  { background: var(--cx-danger-bg);  color: var(--cx-danger); }
+.codexplus-status--none      { background: transparent;          color: var(--cx-faint); }
+
+/* Vencimento (calculado a partir de date_published + validity_months).
+   Já definido aqui para o Painel da Etapa 6 usar sem reinventar. */
+.codexplus-status--emdia   { background: var(--cx-ok-bg);     color: var(--cx-ok); }
+.codexplus-status--avencer { background: var(--cx-warn-bg);   color: var(--cx-warn); }
+.codexplus-status--vencido { background: var(--cx-danger-bg); color: var(--cx-danger); }
+
+/* Etiqueta FAQ e tipo de modelo */
+.codexplus-tag {
+    background: var(--cx-warn-bg);
+    color: #92400e;
+    border-radius: var(--cx-radius-pill);
+    padding: 1px 8px;
+    font-size: 11px;
+}
+.codexplus-type {
+    font-family: var(--cx-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    background: var(--cx-accent-soft);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.codexplus-pill-default {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: var(--cx-radius-pill);
+    background: var(--cx-ok-bg);
+    color: var(--cx-ok);
+}
+
+/* =========================================================================
+   7. FORMULÁRIOS (modelos, novo documento)
+   ========================================================================= */
+
+.codexplus-form { max-width: 640px; }
+.codexplus-form-row { margin: 0 0 18px; }
+.codexplus-form-row > label {
+    display: block;
+    font-weight: 500;
+    margin: 0 0 6px;
+}
+.codexplus-form-row input[type="text"],
+.codexplus-form-row select {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+}
+.codexplus-form-row input[type="number"] {
+    padding: 7px 10px;
+    font-size: 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+    max-width: 130px;
+}
+.codexplus-form-hint {
+    font-size: 12px;
+    color: var(--cx-muted);
+    margin-top: 5px;
+}
+.codexplus-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+.codexplus-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 14px;
+}
+
+/* =========================================================================
+   8. LEITURA DO DOCUMENTO
+   -------------------------------------------------------------------------
+   ATENÇÃO — CONTRATO COM O JAVASCRIPT.
+   public/js/codexplus.js depende dos seletores abaixo para montar o PDF:
+       #codexplus-doc  .codexplus-doc-title  .codexplus-doc-meta
+       .codexplus-content  #codexplus-pdf
+   Eles são INTERFACE, não decoração. Renomear qualquer um faz o botão
+   "Exportar PDF" parar de funcionar SEM erro visível. Se precisar mudar,
+   mude junto no JS.
+   ========================================================================= */
+
+.codexplus-article-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cx-gap);
+    margin-bottom: 14px;
+}
+
+.codexplus-doc {
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    padding: 30px 38px 38px;
+    max-width: 900px;
+}
+.codexplus-doc-head {
+    border-bottom: 1px solid var(--cx-border);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+}
+.codexplus-doc-title {
+    margin: 0 0 10px;
+    font-size: 27px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    line-height: 1.25;
+}
+.codexplus-doc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    color: var(--cx-muted);
+    font-size: 12px;
+}
+.codexplus-badge {
+    background: var(--cx-accent-soft);
+    color: var(--cx-accent);
+    border-radius: var(--cx-radius-pill);
+    padding: 3px 11px;
+    text-decoration: none;
+    font-size: 12px;
+}
+.codexplus-badge:hover { background: #d4e6f8; color: var(--cx-accent); }
+
+/* Tipografia de leitura confortável (largura e ritmo vertical) */
+.codexplus-content {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--cx-text-read);
+}
+.codexplus-content h1,
+.codexplus-content h2,
+.codexplus-content h3 { color: var(--cx-accent); margin: 26px 0 10px; }
+.codexplus-content h2 { font-size: 20px; }
+.codexplus-content h3 { font-size: 17px; }
+.codexplus-content p { margin: 0 0 14px; }
+.codexplus-content ul,
+.codexplus-content ol { margin: 0 0 14px; padding-left: 24px; }
+.codexplus-content li { margin-bottom: 5px; }
+.codexplus-content img { max-width: 100%; height: auto; border-radius: 6px; }
+.codexplus-content table { border-collapse: collapse; width: 100%; margin: 0 0 16px; }
+.codexplus-content th,
+.codexplus-content td { border: 1px solid var(--cx-border); padding: 8px 10px; }
+.codexplus-content th { background: var(--cx-surface-1); text-align: left; }
+.codexplus-content pre {
+    background: #f6f8fa;
+    padding: 12px;
+    border-radius: var(--cx-radius-sm);
+    overflow-x: auto;
+}
+.codexplus-content blockquote {
+    margin: 0 0 14px;
+    padding: 8px 16px;
+    border-left: 4px solid var(--cx-accent-soft);
+    color: var(--cx-muted);
+}
+
+/* =========================================================================
+   9. ANEXOS (Etapa 1.1)
+   Fica FORA de #codexplus-doc de propósito: anexo é link de download e não
+   deve entrar no PDF.
+   ========================================================================= */
+
+.codexplus-attachments {
+    max-width: 820px;
+    margin: 28px auto 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--cx-border);
+}
+.codexplus-attachments-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cx-muted);
+}
+.codexplus-attachments-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.codexplus-attachment {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    transition: border-color .15s ease, background .15s ease;
+}
+.codexplus-attachment:hover {
+    border-color: var(--cx-accent);
+    background: var(--cx-accent-soft);
+}
+.codexplus-attachment > a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--cx-accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+.codexplus-attachment > a i { flex: 0 0 auto; font-size: 18px; }
+.codexplus-attachment-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.codexplus-attachment-meta {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--cx-muted);
+}
+.codexplus-attachment-mime {
+    padding: 2px 8px;
+    border-radius: var(--cx-radius-pill);
+    background: var(--cx-surface-2);
+}
+
+/* =========================================================================
+   10. ABA CODEX+ NA FICHA NATIVA DO ARTIGO
+   Vive FORA de .codexplus-app (dentro do formulário nativo do GLPI), por
+   isso é escopada em .codexplus-meta-tab. Antes usava hex fixo no PHP.
+   ========================================================================= */
+
+.codexplus-meta-tab {
+    max-width: 760px;
+    margin: 14px auto;
+}
+.codexplus-meta-code {
+    display: flex;
+    align-items: center;
+    gap: var(--cx-gap);
+    margin-bottom: 18px;
+    padding: 10px 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+}
+.codexplus-meta-code-label {
+    font-size: 13px;
+    color: var(--cx-muted);
+}
+.codexplus-meta-code-value {
+    font-family: var(--cx-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--cx-accent);
+}
+.codexplus-meta-code-empty { color: var(--cx-faint); }
+.codexplus-meta-hint {
+    font-size: 12px;
+    color: var(--cx-muted);
+    margin-top: 4px;
+}
+.codexplus-meta-tab input[type="number"] { max-width: 130px; }
+.codexplus-meta-tab input[type="text"] { max-width: 380px; }
+
+/* =========================================================================
+   11. PAINEL (Etapas 6b/6c)
+   Zonas A–E da Parte 1.1 do documento de layout, com o refinamento aprovado
+   em 23/07. Usa exclusivamente os tokens da seção 1 — cor aqui é SEMÂNTICA
+   (âmbar = a vencer, vermelho = vencido), nunca decorativa.
+   ========================================================================= */
+
+/* ---- Zona A: busca + ação ---- */
+.cx-dash-actionbar {
+    display: flex;
+    gap: var(--cx-gap);
+    align-items: stretch;
+    margin: 0 0 18px;
+}
+.cx-dash-search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+}
+.cx-dash-search i { color: var(--cx-faint); flex: 0 0 auto; }
+.cx-dash-search input[type="text"] {
+    flex: 1;
+    border: 0;
+    outline: none;
+    background: transparent;
+    padding: 12px 0;
+    font-size: 15px;
+    color: var(--cx-text);
+}
+.cx-dash-actionbar .cx-btn { padding: 0 20px; font-size: 14px; }
+
+/* ---- Estado vazio ---- */
+.cx-dash-blank {
+    text-align: center;
+    padding: 46px 20px;
+    margin: 0 0 18px;
+    background: var(--cx-surface-1);
+    border-radius: var(--cx-radius);
+}
+.cx-dash-blank i { font-size: 34px; color: var(--cx-faint); }
+.cx-dash-blank h3 {
+    margin: 12px 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--cx-text);
+}
+.cx-dash-blank p {
+    margin: 0 auto;
+    max-width: 440px;
+    font-size: 13.5px;
+    color: var(--cx-muted);
+    line-height: 1.6;
+}
+
+/* ---- Zona B: indicadores com chip e contexto ---- */
+.cx-dash-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--cx-gap);
+    margin: 0 0 18px;
+}
+@media (max-width: 900px) {
+    .cx-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.cx-stat {
+    display: block;
+    padding: 14px 16px;
+    border-radius: var(--cx-radius);
+    background: var(--cx-surface-1);
+    text-decoration: none;
+    color: var(--cx-text);
+    transition: background .12s ease;
+}
+.cx-stat:hover { background: var(--cx-surface-2); color: var(--cx-text); }
+.cx-stat-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.cx-stat-chip {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+.cx-chip-accent  { background: var(--cx-accent-soft); color: var(--cx-accent); }
+.cx-chip-warn    { background: var(--cx-warn-bg);     color: var(--cx-warn); }
+.cx-chip-danger  { background: var(--cx-danger-bg);   color: var(--cx-danger); }
+.cx-chip-neutral { background: var(--cx-neutral-bg);  color: var(--cx-neutral); }
+.cx-stat-label { font-size: 12.5px; color: var(--cx-muted); }
+.cx-stat-value {
+    font-size: 27px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--cx-text);
+}
+.cx-stat-context {
+    font-size: 11.5px;
+    color: var(--cx-faint);
+    margin-top: 3px;
+}
+.cx-stat-warn    { color: var(--cx-warn); }
+.cx-stat-danger  { color: var(--cx-danger); }
+.cx-stat-neutral { color: var(--cx-neutral); }
+
+/* ---- Cartões (zonas C, D, E) ---- */
+.cx-dash-cards {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: var(--cx-gap);
+    margin: 0 0 18px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .cx-dash-cards { grid-template-columns: 1fr; }
+}
+.cx-card {
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    padding: 16px 20px;
+}
+.cx-card-wide { margin: 0 0 18px; }
+.cx-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--cx-gap);
+}
+.cx-card-title {
+    margin: 0 0 12px;
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--cx-text);
+}
+.cx-card-more {
+    font-size: 13px;
+    color: var(--cx-accent);
+    text-decoration: none;
+}
+.cx-card-more:hover { text-decoration: underline; }
+
+/* ---- Zona C: barras de proporção por tipo ---- */
+.cx-bars { display: flex; flex-direction: column; gap: 11px; }
+.cx-bar-row { display: block; text-decoration: none; color: var(--cx-text); }
+.cx-bar-row:hover { color: var(--cx-accent); }
+.cx-bar-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.cx-bar-name  { font-size: 13.5px; }
+.cx-bar-total { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cx-bar-track {
+    height: 5px;
+    border-radius: 3px;
+    background: var(--cx-surface-2);
+    overflow: hidden;
+}
+.cx-bar-fill {
+    height: 100%;
+    background: var(--cx-accent);
+    border-radius: 3px;
+    transition: width .2s ease;
+}
+
+/* ---- Zona C: precisa de atenção ---- */
+.cx-card-list { list-style: none; margin: 0; padding: 0; }
+.cx-card-list li { border-top: 1px solid var(--cx-border-soft); }
+.cx-card-list li:first-child { border-top: 0; }
+.cx-card-list li > a,
+.cx-card-list li > span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 2px;
+    text-decoration: none;
+    color: var(--cx-text);
+    font-size: 13.5px;
+}
+.cx-card-list li > a:hover { color: var(--cx-accent); }
+.cx-card-list li.is-disabled > span { opacity: .5; cursor: default; }
+.cx-card-list i { flex: 0 0 auto; color: var(--cx-muted); font-size: 17px; }
+.cx-ico-danger { color: var(--cx-danger) !important; }
+.cx-ico-warn   { color: var(--cx-warn) !important; }
+.cx-card-item-name { flex: 1; min-width: 0; }
+.cx-card-item-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cx-count-danger { color: var(--cx-danger); }
+.cx-count-warn   { color: var(--cx-warn); }
+.cx-count-soon {
+    font-size: 11.5px;
+    font-style: italic;
+    color: var(--cx-faint);
+}
+/* A seta sinaliza que a linha leva a algum lugar. */
+.cx-card-go { font-size: 15px !important; color: var(--cx-faint) !important; }
+
+/* ---- Zona D: recentes em tabela ---- */
+.cx-recent-table { table-layout: fixed; }
+.cx-recent-table th:nth-child(1),
+.cx-recent-table td:nth-child(1) { width: 112px; }
+.cx-recent-table th:nth-child(3),
+.cx-recent-table td:nth-child(3) { width: 20%; }
+.cx-recent-table th:nth-child(4),
+.cx-recent-table td:nth-child(4) { width: 96px; }
+.cx-recent-table th:nth-child(5),
+.cx-recent-table td:nth-child(5) { width: 92px; }
+.cx-cell-clip {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cx-cell-when { color: var(--cx-muted); font-size: 12.5px; white-space: nowrap; }
+
+/* Código como chip, colorido pelo vencimento */
+.cx-code-chip {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--cx-accent-soft);
+}
+.cx-code-vencido { background: var(--cx-danger-bg); color: var(--cx-danger); }
+.cx-code-avencer { background: var(--cx-warn-bg);   color: var(--cx-warn); }
+.cx-code-chip.is-empty { background: var(--cx-surface-2); }
+
+/* ---- Zona E: atalhos de modelo ---- */
+.cx-tpl-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--cx-gap);
+}
+@media (max-width: 900px) {
+    .cx-tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.cx-tpl-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 14px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    text-decoration: none;
+    color: var(--cx-text);
+    transition: border-color .12s ease, background .12s ease;
+}
+.cx-tpl-card:hover {
+    border-color: var(--cx-accent);
+    background: var(--cx-accent-soft);
+    color: var(--cx-text);
+}
+.cx-tpl-card i { font-size: 20px; color: var(--cx-accent); }
+.cx-tpl-card-name { font-weight: 600; margin-top: 4px; font-size: 13.5px; }
+.cx-tpl-card-desc { font-size: 12px; color: var(--cx-muted); }
+
+/* =========================================================================
+   12. CONFIGURAÇÃO DE MARCA (Etapa 4a)
+   ========================================================================= */
+
+.cx-cfg { max-width: 700px; }
+
+.cx-cfg-block {
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+    padding: 16px 18px 4px;
+    margin: 0 0 20px;
+}
+.cx-cfg-block > legend {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 0 6px;
+    width: auto;
+    margin: 0;
+}
+
+/* Caixas de seleção: rótulo na mesma linha, não empilhado como nos campos
+   de texto (a regra global de .codexplus-form-row > label é display:block). */
+.cx-cfg-check > label {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    font-weight: 400;
+    cursor: pointer;
+}
+.cx-cfg-check input[type="checkbox"] { margin: 0; }
+
+.cx-cfg-logo {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.cx-cfg-logo-preview {
+    flex: 0 0 auto;
+    width: 240px;
+    min-height: 82px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    /* Xadrez claro: sem isso, um PNG transparente sobre fundo branco não
+       revela se a transparência realmente existe. */
+    background-color: var(--cx-surface);
+    background-image:
+        linear-gradient(45deg, var(--cx-surface-2) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--cx-surface-2) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--cx-surface-2) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--cx-surface-2) 75%);
+    background-size: 14px 14px;
+    background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+}
+.cx-cfg-logo-preview img {
+    max-width: 100%;
+    max-height: 90px;
+    height: auto;
+}
+.cx-cfg-logo-preview.is-empty {
+    background-image: none;
+    background: var(--cx-surface-1);
+    color: var(--cx-faint);
+    font-size: 12.5px;
+}
+.cx-cfg-logo-preview.is-empty i { margin-right: 5px; }
+
+.cx-cfg-logo-actions { flex: 1 1 240px; }
+.cx-cfg-logo-actions input[type="file"] {
+    font-size: 13px;
+    max-width: 100%;
+}
+.cx-cfg-logo-actions .cx-btn-mini { margin-top: 8px; }
+
+.cx-cfg-markers {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    background: var(--cx-surface-1);
+    border-radius: var(--cx-radius-sm);
+    font-size: 12.5px;
+}
+.cx-cfg-markers li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 3px 0;
+}
+.cx-cfg-markers li span { color: var(--cx-muted); }
+
+.cx-cfg-note {
+    margin-top: 18px;
+    padding: 10px 12px;
+    background: var(--cx-accent-soft);
+    border-radius: var(--cx-radius-sm);
+    color: var(--cx-accent);
+}
+
+/* =========================================================================
+   13. IDENTIFICAÇÃO DO DOCUMENTO NA LEITURA (Etapa 4b)
+   ========================================================================= */
+
+.codexplus-doc-ident {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.cx-doctype {
+    font-size: 12.5px;
+    color: var(--cx-muted);
+}
+
+/* A situação reusa .codexplus-status--* (definida na seção 4 desde a Etapa
+   2b, já com os estados de vencimento). Nada de classe nova aqui. */
+
+/* O JSON de impressão não é conteúdo visível; garante que nenhum tema o
+   revele como texto solto no fim da página. */
+#codexplus-print-config { display: none; }

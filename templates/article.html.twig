@@ -1,0 +1,113 @@
+{# Codex+ — Etapa 1: leitura do artigo dentro do plugin #}
+{# Etapa 1.1: seção "Anexos" abaixo do documento (fora de #codexplus-doc,
+   portanto NÃO entra na exportação de PDF — anexo é link de download,
+   inútil no papel). #}
+
+{# TODO(codexplus): migrar este bloco de estilo para public/css/codexplus.css
+   na próxima vez que tocarmos o CSS. Está inline aqui só para a Etapa 1.1
+   subir por overlay de 2 arquivos, sem precisar reenviar o CSS inteiro. #}
+<div class="codexplus-app">
+
+    <div class="codexplus-article-bar">
+        <a href="wiki.php" class="codexplus-back">
+            <i class="ti ti-arrow-left"></i> {{ __('Codex+', 'codexplus') }}
+        </a>
+
+        <div class="codexplus-actions">
+            {% if article.can_update %}
+                <a class="codexplus-btn"
+                   href="{{ glpi_root }}/front/knowbaseitem.form.php?id={{ article.id }}">
+                    <i class="ti ti-pencil"></i> {{ __('Editar', 'codexplus') }}
+                </a>
+            {% endif %}
+            <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">
+                <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
+            </button>
+        </div>
+    </div>
+
+    <article class="codexplus-doc" id="codexplus-doc">
+
+        <header class="codexplus-doc-head">
+            {# Etapa 4b: código e situação do documento controlado. Só aparece
+               em artigo classificado — artigo comum da base segue sem selo. #}
+            {% if article.meta.has_meta %}
+                <div class="codexplus-doc-ident">
+                    <span class="codexplus-code cx-code-chip{% if article.meta.expiry in ['vencido', 'avencer'] %} cx-code-{{ article.meta.expiry }}{% endif %}">{{ article.meta.code }}</span>
+
+                    {% if article.meta.doctype_label %}
+                        <span class="cx-doctype">{{ article.meta.doctype_label }}</span>
+                    {% endif %}
+
+                    {% if article.meta.expiry %}
+                        <span class="codexplus-status codexplus-status--{{ article.meta.expiry }}">
+                            {% if article.meta.expiry == 'vencido' %}{{ __('Vencido', 'codexplus') }}
+                            {% elseif article.meta.expiry == 'avencer' %}{{ __('A vencer', 'codexplus') }}
+                            {% else %}{{ __('Em dia', 'codexplus') }}{% endif %}
+                            {% if article.meta.due_ts %}
+                                · {{ article.meta.due_ts|date('d/m/Y') }}
+                            {% endif %}
+                        </span>
+                    {% elseif article.meta.status != 'publicado' %}
+                        <span class="codexplus-status codexplus-status--{{ article.meta.status }}">{{ article.meta.status_label }}</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <h1 class="codexplus-doc-title">{{ article.subject }}</h1>
+
+            <div class="codexplus-doc-meta">
+                {% for cat in article.categories %}
+                    <a class="codexplus-badge" href="wiki.php?cat={{ cat.id }}">{{ cat.name }}</a>
+                {% endfor %}
+                {% if article.is_faq %}<span class="codexplus-tag">FAQ</span>{% endif %}
+                {% if article.meta.owner %}
+                    <span><i class="ti ti-user-check"></i> {{ article.meta.owner }}</span>
+                {% elseif article.writer %}
+                    <span><i class="ti ti-user"></i> {{ article.writer }}</span>
+                {% endif %}
+                {% if article.meta.client_name %}
+                    <span><i class="ti ti-building"></i> {{ article.meta.client_name }}</span>
+                {% endif %}
+                {% if article.date_mod %}
+                    <span><i class="ti ti-clock"></i> {{ article.date_mod|date('d/m/Y H:i') }}</span>
+                {% endif %}
+                <span><i class="ti ti-eye"></i> {{ article.view }}</span>
+            </div>
+        </header>
+
+        {# O conteúdo já vem tratado por KnowbaseItem::getAnswer()
+           (tradução, imagens inline e âncoras), então é inserido cru. #}
+        <div class="codexplus-content rich_text_container">
+            {{ article.answer|raw }}
+        </div>
+
+    </article>
+
+    {# Anexos — fica FORA de #codexplus-doc de propósito (não vai pro PDF). #}
+    {% if article.attachments is not empty %}
+        <section class="codexplus-attachments">
+            <h2 class="codexplus-attachments-title">
+                <i class="ti ti-paperclip"></i> {{ __('Anexos', 'codexplus') }}
+            </h2>
+            <ul class="codexplus-attachments-list">
+                {% for att in article.attachments %}
+                    <li class="codexplus-attachment">
+                        <a href="{{ att.url }}" target="_blank" rel="noopener">
+                            <i class="ti ti-file-download"></i>
+                            <span class="codexplus-attachment-name">{{ att.name }}</span>
+                        </a>
+                        <span class="codexplus-attachment-meta">
+                            {% if att.date %}<span>{{ att.date|date('d/m/Y') }}</span>{% endif %}
+                            {% if att.mime %}<span class="codexplus-attachment-mime">{{ att.mime }}</span>{% endif %}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    {# Etapa 4b: bagagem do PDF. Já escapado no PHP com JSON_HEX_*, por isso
+       o |raw. O motor de paginação (Etapa 4c) lê daqui. #}
+    <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
+</div>

@@ -15,9 +15,17 @@
 
         <div class="codexplus-actions">
             {% if article.can_update %}
+                {# Etapa 4d: edição embutida (título, corpo, cabeçalho, rodapé)
+                   sem sair do Codex+. Categoria, FAQ e anexos continuam só na
+                   ficha nativa — link "Ficha nativa" logo ao lado. #}
                 <a class="codexplus-btn"
-                   href="{{ glpi_root }}/front/knowbaseitem.form.php?id={{ article.id }}">
+                   href="article.form.php?id={{ article.id }}">
                     <i class="ti ti-pencil"></i> {{ __('Editar', 'codexplus') }}
+                </a>
+                <a class="cx-btn cx-btn-ghost"
+                   href="{{ glpi_root }}/front/knowbaseitem.form.php?id={{ article.id }}"
+                   title="{{ __('Categoria, FAQ, anexos e outras opções da ficha nativa', 'codexplus') }}">
+                    <i class="ti ti-adjustments"></i> {{ __('Ficha nativa', 'codexplus') }}
                 </a>
             {% endif %}
             <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">

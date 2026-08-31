@@ -10,7 +10,7 @@
 use Glpi\Plugin\Hooks;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\Wiki;
-define('PLUGIN_CODEXPLUS_VERSION', '0.5.2-alpha');
+define('PLUGIN_CODEXPLUS_VERSION', '0.5.4-alpha');
 // Versões mínima/máxima do GLPI suportadas
 define('PLUGIN_CODEXPLUS_MIN_GLPI', '11.0.0');
 define('PLUGIN_CODEXPLUS_MAX_GLPI', '11.0.99');

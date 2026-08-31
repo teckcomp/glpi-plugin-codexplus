@@ -17,6 +17,8 @@
      8. Leitura do documento
      9. Anexos
     10. Aba Codex+ na ficha nativa
+    11. Painel
+    12. Edição embutida (Etapa 4d)
 
    ESCOPO: as regras visuais ficam sob .codexplus-app (telas do plugin) ou
    .codexplus-meta-tab (aba dentro da ficha nativa do artigo). Os TOKENS
@@ -505,6 +507,12 @@
     border-radius: var(--cx-radius);
     padding: 30px 38px 38px;
     max-width: 900px;
+    /* Etapa 4d: moldura de folha — centraliza e dá sombra de "papel", sem
+       fixar largura em pixel de A4 (isso encolheria demais em tela grande;
+       o objetivo aqui é sugestão visual de página, não medida exata — quem
+       precisa de medida exata é o PDF, que já usa 794×1123 no JS). */
+    margin: 0 auto;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .05);
 }
 .codexplus-doc-head {
     border-bottom: 1px solid var(--cx-border);
@@ -943,6 +951,67 @@
 .cx-tpl-card i { font-size: 20px; color: var(--cx-accent); }
 .cx-tpl-card-name { font-weight: 600; margin-top: 4px; font-size: 13.5px; }
 .cx-tpl-card-desc { font-size: 12px; color: var(--cx-muted); }
+
+/* =========================================================================
+   12. EDIÇÃO EMBUTIDA (Etapa 4d)
+   -------------------------------------------------------------------------
+   .codexplus-doc-edit reaproveita o visual de .codexplus-doc (moldura de
+   folha) mas é um seletor SEPARADO — de propósito. #codexplus-doc é
+   contrato com o motor de PDF (ver aviso na seção 8); a tela de edição
+   NÃO deve ser lida por aquele JS, então usa outra classe.
+   ========================================================================= */
+
+.codexplus-doc-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+.codexplus-doc-edit-title label,
+.codexplus-doc-edit-zone-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--cx-muted);
+    margin-bottom: 8px;
+}
+.codexplus-doc-title-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--cx-accent);
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+}
+.codexplus-doc-edit-zone {
+    padding: 14px;
+    border: 1px dashed var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface-1);
+}
+.codexplus-doc-edit-body {
+    /* Corpo é a zona principal — sem tracejado, para não competir
+       visualmente com cabeçalho/rodapé (que são zonas novas e menores). */
+    border-style: solid;
+    background: var(--cx-surface);
+}
+.codexplus-doc-edit-footer-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: var(--cx-mono);
+    font-size: 13px;
+    border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+    resize: vertical;
+}
+.codexplus-doc-edit-actions {
+    max-width: 900px;
+    margin: 18px auto 0;
+}
 
 /* =========================================================================
    12. CONFIGURAÇÃO DE MARCA (Etapa 4a)

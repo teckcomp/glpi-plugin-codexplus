@@ -1,0 +1,66 @@
+{# Codex+ — Etapa 4d: edição embutida do artigo (sem sair do Codex+) #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-article-bar">
+        <a href="{{ article_url }}" class="codexplus-back">
+            <i class="ti ti-arrow-left"></i> {{ __('Cancelar', 'codexplus') }}
+        </a>
+
+        <div class="codexplus-actions">
+            <a class="codexplus-btn"
+               href="{{ glpi_root }}/front/knowbaseitem.form.php?id={{ article_id }}">
+                <i class="ti ti-adjustments"></i> {{ __('Mais opções (categoria, FAQ, anexos)', 'codexplus') }}
+            </a>
+        </div>
+    </div>
+
+    <form method="post" action="{{ glpi_root }}/plugins/codexplus/front/article.form.php">
+        <input type="hidden" name="id" value="{{ article_id }}">
+        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+
+        <article class="codexplus-doc codexplus-doc-edit">
+
+            <div class="codexplus-form-row codexplus-doc-edit-title">
+                <label for="codexplus-edit-name">{{ __('Título', 'codexplus') }}</label>
+                <input type="text" id="codexplus-edit-name" name="name"
+                       value="{{ title }}" class="codexplus-doc-title-input" required>
+            </div>
+
+            <div class="codexplus-doc-edit-zone codexplus-doc-edit-header">
+                <label class="codexplus-doc-edit-zone-label">
+                    <i class="ti ti-layout-navbar"></i> {{ __('Cabeçalho', 'codexplus') }}
+                </label>
+                {{ header_editor_html|raw }}
+            </div>
+
+            <div class="codexplus-doc-edit-zone codexplus-doc-edit-body">
+                <label class="codexplus-doc-edit-zone-label">
+                    <i class="ti ti-article"></i> {{ __('Corpo do documento', 'codexplus') }}
+                </label>
+                {{ answer_editor_html|raw }}
+            </div>
+
+            <div class="codexplus-doc-edit-zone codexplus-doc-edit-footer">
+                <label class="codexplus-doc-edit-zone-label" for="codexplus-edit-footer">
+                    <i class="ti ti-layout-navbar-inactive"></i> {{ __('Rodapé', 'codexplus') }}
+                </label>
+                <textarea id="codexplus-edit-footer" name="footer_text" class="codexplus-doc-edit-footer-input"
+                          rows="2">{{ footer_text }}</textarea>
+                <div class="codexplus-form-hint">
+                    {{ __('Texto simples. Marcadores disponíveis: {codigo} {revisao} {titulo} {empresa} {data} {pagina} {total}', 'codexplus') }}
+                    <br>
+                    {{ __('Por enquanto este rodapé fica salvo e visível só aqui — a exportação em PDF ainda usa o rodapé geral (Configurar → Codex+); a integração vem numa etapa futura.', 'codexplus') }}
+                </div>
+            </div>
+
+        </article>
+
+        <div class="codexplus-form-actions codexplus-doc-edit-actions">
+            <button type="submit" name="update" value="1" class="codexplus-btn codexplus-btn-primary">
+                <i class="ti ti-device-floppy"></i> {{ __('Salvar', 'codexplus') }}
+            </button>
+            <a href="{{ article_url }}" class="codexplus-btn">{{ __('Cancelar', 'codexplus') }}</a>
+        </div>
+    </form>
+</div>

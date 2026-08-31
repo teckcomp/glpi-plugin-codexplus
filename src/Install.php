@@ -61,6 +61,21 @@ class Install
             $DB->doQueryOrDie($sql, "Codex+ (Etapa 2a): erro ao criar a tabela $table");
         }
 
+        // --- Cabeçalho e rodapé por documento (Etapa 4d) ---
+        // header_html: rich text (TinyMCE), independente do corpo do artigo.
+        // footer_text: texto simples com marcadores, mesma sintaxe já usada
+        // em Branding::footer_text (global) — aqui é a versão por documento.
+        // addField() é idempotente (verifica fieldExists internamente), por
+        // isso não precisa do guard tableExists como a criação da tabela.
+        $migration->addField($table, 'header_html', 'longtext', [
+            'null'  => true,
+            'after' => 'client_name',
+        ]);
+        $migration->addField($table, 'footer_text', 'longtext', [
+            'null'  => true,
+            'after' => 'header_html',
+        ]);
+
         // --- Tabela de modelos por tipo (Etapa 3a) ---
         $tpl_table = self::TEMPLATES_TABLE;
         if (!$DB->tableExists($tpl_table)) {

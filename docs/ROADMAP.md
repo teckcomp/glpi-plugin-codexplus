@@ -1,6 +1,6 @@
 # Codex+ — roadmap
 
-> Estado em `v0.5.2-alpha` · atualizado em 13/08/2026.
+> Estado em `v0.5.4-alpha` · atualizado em 31/08/2026.
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -18,6 +18,8 @@
 | 6a · 6b · 6c | CSS consolidado em arquivo único com tokens `--cx-`; **Painel** completo nas cinco zonas (busca, 4 indicadores, "Por tipo" + "Precisa de atenção", recentes, atalhos de modelo) | — |
 | 4a | Tela de **configuração de marca**: upload de logo, posição e altura, toggles de cabeçalho, rodapé em texto livre com marcadores | v0.5.0 |
 | 4b | Código, tipo, situação, responsável e cliente na tela de leitura; regra de vencimento centralizada em `DocumentMeta::expiryState()`; JSON de impressão embutido | v0.5.2 |
+| 4c | Motor de paginação manual do PDF (folhas 794×1123 em `.cx-page`), logo repetido por página, rodapé com marcadores resolvidos e paginação `1 / N`. Único arquivo alterado: `public/js/codexplus.js` | v0.5.3 |
+| 4d | Edição embutida no Codex+ (`article.form.php`, TinyMCE nativo via `Html::textarea`), sem sair para a ficha nativa; cabeçalho por documento (rich text) e rodapé por documento (texto com marcadores); moldura de folha (A4) na leitura. Ficha nativa continua acessível para categoria/FAQ/anexos | v0.5.4 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -25,52 +27,10 @@
 
 ---
 
-## ▶ Etapa 4c — motor de paginação e a marca no PDF
+## ▶ Etapa 3c — modelos de verdade
 
-**A próxima. É a etapa de maior retorno visível — é o documento que chega ao
-cliente.**
-
-Tudo o que ela precisa já está pronto: a configuração é gravada pela 4a, e a
-4b já entrega os dados no HTML, em
-`<script type="application/json" id="codexplus-print-config">`, com esta
-forma:
-
-```json
-{
-  "brand": {
-    "company": "", "logo_url": "", "show_logo": true, "repeat_logo": true,
-    "logo_pos": "right", "logo_mm": 14, "title_upper": true,
-    "footer_show": true, "footer_text": "{codigo} · rev. {revisao}",
-    "footer_pages": true
-  },
-  "document": {
-    "title": "", "code": "POP0001:00", "revision": "00",
-    "client": "", "date_mod": "2026-07-21 22:20:00"
-  }
-}
-```
-
-**Entrega:**
-
-- Fatiar o conteúdo em páginas dentro do iframe de impressão (794×1123 px)
-- Logo no cabeçalho, na posição e altura configuradas, repetido conforme
-  `repeat_logo`
-- Rodapé com o texto livre, resolvendo os marcadores `{codigo}`, `{revisao}`,
-  `{titulo}`, `{empresa}`, `{data}`, `{pagina}`, `{total}`
-- Paginação `1 / 2` à direita quando `footer_pages` estiver ligado
-- Regras de quebra: não partir bloco de passo nem tabela no meio
-
-**Aceite:** exportar uma proposta e obter um PDF com logo em todas as
-páginas, rodapé correto e paginação coerente.
-
-**Atenção:** o único arquivo que muda é `public/js/codexplus.js` — o do
-contrato dos cinco seletores. Leia `docs/CONTEXTO.md` seção 6 antes.
-Lembre também de orientar o usuário a **desmarcar** "Cabeçalhos e rodapés"
-no diálogo de impressão do Chrome, senão os nativos brigam com os nossos.
-
----
-
-## Etapa 3c — modelos de verdade
+**A próxima**, agora que a 4c está entregue e dá para calibrar as seções de
+cada modelo vendo como elas caem no PDF real.
 
 **Por quê:** com a decisão de 08/2026 de produzir *todos* os documentos dentro
 do Codex+, modelo fraco vira atrito diário. Os quatro modelos semeados na 3a
@@ -85,6 +45,35 @@ apresentável ao cliente com pouca edição.
 
 > Vem **depois** da 4c de propósito: só dá para calibrar as seções vendo como
 > elas caem no PDF real.
+
+---
+
+## Etapa 4e — cabeçalho/rodapé no PDF vindo do conteúdo (futura)
+
+**Registrada em 31/08/2026, a partir da 4d.** Decisão do usuário: abolir a
+estrutura atual de `public/js/codexplus.js` que *desenha* cabeçalho/rodapé
+por página a partir de config (`cfg.brand` / `cfg.document`, ver Etapa 4b/4c).
+No lugar, o corpo do documento passa a **vir com cabeçalho/rodapé
+pré-definidos**, prontos no próprio conteúdo — não sintetizados pelo JS a
+cada página impressa.
+
+**Por quê depois, e não junto com a 4d:** redesenhar o motor de paginação
+inteiro é mudança grande; fazer isso antes de ter os campos de cabeçalho
+(4d) rodando de verdade arriscaria retrabalho. A 4d já entrega os campos
+(`header_html`, `footer_text` por documento) — só não os leva ainda ao PDF.
+
+**Entrega (a definir em detalhe quando a etapa for aberta):**
+
+- Repensar como `codexplus.js` monta `.cx-page-header` / `.cx-page-footer`
+  por página sem depender de JS sintetizar a partir de marcadores/config
+- Decidir se o rodapé continua com marcadores dinâmicos (`{pagina}`,
+  `{total}`) ou se isso muda de abordagem junto
+- Migrar o PDF a ler `header_html`/`footer_text` por documento, com fallback
+  para a configuração global (`Branding`) quando o documento não tiver os
+  seus próprios
+
+**Aceite:** exportar em PDF um documento com cabeçalho/rodapé próprios e ver
+exatamente o que foi editado na Etapa 4d aparecer, repetido, em cada página.
 
 ---
 
@@ -105,7 +94,8 @@ apresentável ao cliente com pouca edição.
 sumário.
 
 > É a função que nenhuma das referências (BookStack, GLPI nativo) entrega.
-> Depende da 4c — reusa o mesmo motor de paginação.
+> Depende da 4c (concluída) — reusa o mesmo motor de paginação, chamando
+> `layoutPages()` uma vez por documento vinculado dentro do mesmo `#cx-stage`.
 > Destrava também o indicador "PSG sem POP vinculado" do Painel, que hoje
 > exibe `—` justamente por falta desta tabela.
 

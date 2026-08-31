@@ -2,7 +2,7 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.5.2-alpha` · atualizado em 13/08/2026.
+> Estado: `v0.5.4-alpha` · atualizado em 31/08/2026.
 
 ---
 
@@ -59,6 +59,7 @@ desta tabela sem alinhar antes.**
 | Metadados (tipo, código, status…) | Tabela satélite própria, ligada por `knowbaseitems_id`. **Nenhuma tabela nativa é alterada** |
 | Permissões | `KnowbaseItem::canViewItem()` e `getVisibilityCriteria()` — os mesmos helpers das telas nativas |
 | Telas | Próprias, em Twig, com menu em Ferramentas |
+| Edição | **Desde a Etapa 4d, embutida no Codex+** (`front/article.form.php`), reaproveitando o TinyMCE nativo via `Html::textarea(['enable_richtext' => true])` — não é editor próprio, não é reskin da ficha nativa. Categoria, FAQ e anexos continuam só na ficha nativa (`front/knowbaseitem.form.php`) |
 | PDF | Impressão client-side pelo navegador (**não** TCPDF) |
 | Configuração | `Config::setConfigurationValues()` no contexto `plugin:codexplus` — sem tabela própria |
 | Logo | Arquivo em `GLPI_PLUGIN_DOC_DIR/codexplus/` — dado de instância, **fora do repositório** |
@@ -78,6 +79,8 @@ desta tabela sem alinhar antes.**
 | `users_id_owner` | INT UNSIGNED | responsável |
 | `validity_months` | INT UNSIGNED | 0 = não vence (propostas) |
 | `client_name` | VARCHAR(255) | só propostas |
+| `header_html` | LONGTEXT NULL | cabeçalho por documento, rich text (TinyMCE) — Etapa 4d. Ainda não entra no PDF (ver Etapa 4e no roadmap) |
+| `footer_text` | LONGTEXT NULL | rodapé por documento, texto com marcadores (mesma sintaxe de `Branding::footer_text`, mas por documento) — Etapa 4d. Ainda não entra no PDF |
 | `date_published` | TIMESTAMP | base do cálculo de vencimento |
 | `date_creation` / `date_mod` | TIMESTAMP | |
 
@@ -184,6 +187,23 @@ depender do comportamento errático de `position: fixed` na impressão.
     manual.
 16. **`plugin:install` desativa o plugin.** Todo bloco de deploy que o inclua
     precisa de `plugin:activate` logo em seguida.
+17. **Motor de paginação manual (Etapa 4c) — decisões que não são bug:**
+    - A capacidade de conteúdo por página (`geo.contentH`) é **constante**
+      em todas as páginas, ligue ou não `repeat_logo`/`footer_show` de
+      forma variável entre elas. Calcular uma capacidade por página
+      exigiria reempacotar o conteúdo página a página; a capacidade fixa
+      custa, no pior caso, um respiro a mais em página sem logo — troca
+      aceita pela simplicidade e previsibilidade.
+    - O `counter-reset: cx-step` saiu de `.codexplus-content` (Etapa 1) e
+      foi para `body`: a partir da 4c os blocos `.cx-step` ficam
+      espalhados entre várias `.cx-page`, sem um contêiner comum só do
+      conteúdo — o contador precisa de um ancestro comum a *todas* as
+      páginas, e `body` é o único que serve.
+    - Bloco isolado mais alto que uma página inteira (tabela ou imagem
+      gigante) ainda assim vai sozinho para sua própria `.cx-page` e pode
+      transbordar visualmente para a folha seguinte. Não dá para evitar
+      sem partir o bloco, o que fere a regra "não partir passo nem tabela
+      no meio". Não acontece em documento comum (POP, manual, proposta).
 
 ---
 

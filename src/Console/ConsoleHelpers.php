@@ -25,6 +25,7 @@ trait ConsoleHelpers
             throw new InvalidArgumentException('Informe --username=<login> (o usuário que executa).');
         }
         $this->loadUserSession($login);
+        \GlpiPlugin\Codexplus\SectorMember::resetCache();
 
         $profileName = (string) ($input->getOption('profile') ?? '');
         if ($profileName !== '') {
@@ -33,6 +34,7 @@ trait ConsoleHelpers
                 throw new InvalidArgumentException("O usuário $login não tem o perfil \"$profileName\".");
             }
             Session::changeProfile($pid);
+            \GlpiPlugin\Codexplus\SectorMember::resetCache();
         }
     }
 
@@ -79,6 +81,31 @@ trait ConsoleHelpers
             throw new InvalidArgumentException("Perfil não encontrado: $name");
         }
         return (int) $p->getID();
+    }
+
+    protected static function sectorId(string $name): int
+    {
+        $s = new \GlpiPlugin\Codexplus\Sector();
+        if (ctype_digit($name) && $s->getFromDB((int) $name)) {
+            return (int) $name;
+        }
+        if (!$s->getFromDBByCrit(['name' => $name])) {
+            throw new InvalidArgumentException("Setor não encontrado: $name");
+        }
+        return (int) $s->getID();
+    }
+
+    /** Categoria por ID ou por nome (nome completo "Pai > Filha" também vale). */
+    protected static function categoryId(string $name): int
+    {
+        $c = new \GlpiPlugin\Codexplus\Category();
+        if (ctype_digit($name) && $c->getFromDB((int) $name)) {
+            return (int) $name;
+        }
+        if ($c->getFromDBByCrit(['completename' => $name]) || $c->getFromDBByCrit(['name' => $name])) {
+            return (int) $c->getID();
+        }
+        throw new InvalidArgumentException("Categoria não encontrada: $name");
     }
 
     /** Mensagens que o GLPI acumulou na sessão (erros de validação etc.). */

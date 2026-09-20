@@ -2,14 +2,20 @@
 namespace GlpiPlugin\Codexplus;
 
 use CommonDBRelation;
+use Session;
 
 /**
  * Documento <-> categoria, N:N (Etapa R3a). Tabela criada na R1:
  * glpi_plugin_codexplus_documents_categories (única por par).
  *
- * Categoria NÃO é controle de acesso: ligar/desligar exige poder atualizar o
- * documento (checagem padrão do CommonDBRelation sobre o item 1); da
- * categoria só se exige que exista.
+ * Desde a R3c a categoria define o SETOR do documento, e o setor define
+ * gestores e validadores. Por isso ligar/desligar categoria:
+ *   - é de quem gere o documento (Document::canManage: gestor ou Ver todos);
+ *   - só em rascunho (trocar de setor no meio da validação mudaria quem
+ *     valida);
+ *   - a categoria nova precisa estar em setor que o usuário gere (senão um
+ *     gestor jogaria o documento para o setor de outro).
+ * Na criação, as categorias entram por Document::post_addItem, já checadas.
  */
 class Document_Category extends CommonDBRelation
 {
@@ -20,6 +26,39 @@ class Document_Category extends CommonDBRelation
 
     public static $checkItem_2_Rights = self::DONT_CHECK_ITEM_RIGHTS;
     public static $logs_for_item_2    = false;
+
+    private function linkedDocument(): ?Document
+    {
+        $key = static::$items_id_1;
+        $id  = (int) ($this->fields[$key] ?? $this->input[$key] ?? 0);
+        $doc = new Document();
+        return ($id > 0 && $doc->getFromDB($id)) ? $doc : null;
+    }
+
+    public function canCreateItem(): bool
+    {
+        $doc = $this->linkedDocument();
+        if ($doc === null || !$doc->canManage() || $doc->fields['status'] !== Document::STATUS_DRAFT) {
+            return false;
+        }
+        $cid = (int) ($this->fields[static::$items_id_2] ?? $this->input[static::$items_id_2] ?? 0);
+        if (Session::haveRight(Rights::NAME, Rights::VIEWALL)) {
+            return $cid > 0;
+        }
+        $sector = Category::getSectorOf($cid);
+        return $sector > 0 && in_array($sector, SectorMember::mySectors(SectorMember::ROLE_MANAGER), true);
+    }
+
+    public function canPurgeItem(): bool
+    {
+        $doc = $this->linkedDocument();
+        return $doc !== null && $doc->canManage() && $doc->fields['status'] === Document::STATUS_DRAFT;
+    }
+
+    public function canUpdateItem(): bool
+    {
+        return false;
+    }
 
     /**
      * IDs das categorias de um documento.

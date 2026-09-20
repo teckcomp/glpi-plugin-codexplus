@@ -10,7 +10,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * R3a — o que o usuário de --username enxerga entre os documentos próprios.
+ * R3a/R3c — o que o usuário de --username enxerga entre os documentos próprios.
  *
  * Para cada documento compara as DUAS formas da regra: a consulta SQL
  * (Document::getVisibilityCriteria, que as listagens da R5 vão usar) e o
@@ -71,6 +71,13 @@ class DocumentVisibilityCommand extends AbstractCommand
             $item = $doc->can($id, READ);
             $sql  = isset($bySql[$id]);
             $edit = $doc->can($id, UPDATE);
+            $val  = $doc->canValidate();
+            $roles = array_filter([
+                $doc->isManager() ? 'G' : '',
+                $doc->isValidator() ? 'V' : '',
+                $doc->isEditor() ? 'E' : '',
+                $doc->isContributor() ? 'alterou' : '',
+            ]);
             if ($item !== $sql) {
                 $diverge++;
             }
@@ -82,19 +89,22 @@ class DocumentVisibilityCommand extends AbstractCommand
                 mb_strimwidth((string) $doc->fields['name'], 0, 28, '…'),
                 $doc->fields['status'],
                 sprintf('%dP %dG %dU', count($t['profiles']), count($t['groups']), count($t['users'])),
+                $roles ? implode(' ', $roles) : '-',
                 $item ? 'VÊ' : '-',
                 $edit ? 'EDITA' : '-',
+                $val ? 'VALIDA' : '-',
                 $item === $sql ? 'ok' : '<error>DIVERGE</error>',
             ];
         }
 
         (new Table($output))
-            ->setHeaders(['ID', 'Código', 'Título', 'Status', 'Alvos', 'Leitura', 'Edição', 'SQL=item'])
+            ->setHeaders(['ID', 'Código', 'Título', 'Status', 'Alvos', 'Papéis', 'Leitura', 'Edição', 'Validação', 'SQL=item'])
             ->setRows($rows)
             ->render();
 
         $legacy = countElementsInTable($table, ['knowbaseitems_id' => ['>', 0]]);
         $output->writeln(sprintf('(%d linha(s) de artigo nativo na mesma tabela, fora desta lista até a R4)', $legacy));
+        $output->writeln('Papéis: G = gestor do setor, V = validador do setor, E = editor; "alterou" = mexeu nesta revisão (não pode validar).');
 
         if ($diverge > 0) {
             $output->writeln("<error>$diverge divergência(s) entre SQL e canViewItem.</error>");

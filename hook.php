@@ -37,6 +37,13 @@ function plugin_codexplus_getDropdown(): array
  * tabela não corresponde a um itemtype (DbUtils::getDbRelations, achado 31).
  * A ligação documento–categoria entrou na R3a, junto com Document_Category:
  * categoria usada por documento passa a dar o aviso "em uso".
+ *
+ * R3c: sectormembers e documenteditors NÃO entram aqui. As classes
+ * (SectorMember, DocumentEditor) têm maiúscula no meio, e o GLPI deduz a
+ * classe pela tabela em minúsculas ("Sectormember"), que o autoloader PSR-4
+ * não acha em disco que diferencia maiúsculas (achado 38) — a relação daria
+ * aviso. A limpeza é feita por Sector::cleanDBonPurge e
+ * Document::cleanDBonPurge.
  */
 function plugin_codexplus_getDatabaseRelations(): array
 {

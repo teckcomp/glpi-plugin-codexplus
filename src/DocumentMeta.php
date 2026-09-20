@@ -258,13 +258,17 @@ class DocumentMeta extends CommonDBTM
 
     /**
      * Normaliza tipo/status para os valores permitidos.
+     *
+     * @param ?array $statusKeys status aceitos (padrão: os do modelo antigo;
+     *                           Document passa os seus, com "validacao")
      */
-    public static function sanitizeFields(array $input): array
+    public static function sanitizeFields(array $input, ?array $statusKeys = null): array
     {
+        $statusKeys ??= self::STATUS_KEYS;
         if (isset($input['doctype']) && !in_array($input['doctype'], self::DOCTYPE_KEYS, true)) {
             $input['doctype'] = '';
         }
-        if (isset($input['status']) && !in_array($input['status'], self::STATUS_KEYS, true)) {
+        if (isset($input['status']) && !in_array($input['status'], $statusKeys, true)) {
             $input['status'] = 'rascunho';
         }
         return $input;

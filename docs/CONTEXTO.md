@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.2-alpha` · atualizado em 20/09/2026 (Etapa R3a: classe
-> Document, alvos de leitura e visibilidade, sem telas novas).
+> Estado: `v0.6.3-alpha` · atualizado em 20/09/2026 (Etapa R3c: papéis por
+> setor e por documento, validação antes de publicar, sem telas novas).
 
 ---
 
@@ -55,8 +55,8 @@ desta tabela sem alinhar antes.**
 
 | Item | Por que não |
 |---|---|
-| Fluxo de aprovação multi-etapa | Não há intenção de certificar ISO 9001; autor e aprovador são a mesma pessoa |
-| Caixa de tarefas pendentes | Só faz sentido com várias pessoas no fluxo |
+| Fluxo de aprovação multi-etapa | Não há intenção de certificar ISO 9001. **Desde 20/09/2026 (Claudio) existe validação de UMA etapa** antes de publicar (Etapa R3c); várias etapas continuam fora |
+| Caixa de tarefas pendentes | "Aguardando validação" e "Revisão atrasada" são indicadores do "Precisa de atenção" do Painel (R5), não caixa de tarefas |
 | Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações. O histórico de revisão com resumo (Etapa R6) é do documento, não aparato de auditoria |
 | Permissão separada de ver / imprimir / baixar | O GLPI já controla visibilidade por perfil, grupo e entidade |
 | Editor Markdown | O TinyMCE nativo atende |
@@ -141,9 +141,9 @@ dias) · `vencido`.
 |---|---|
 | Documento | Classe própria `GlpiPlugin\Codexplus\Document`, tabela `glpi_plugin_codexplus_documents` (a mesma de hoje, ampliada): título, conteúdo, entidade/recursivo, autor, responsável, tipo, sequencial, revisão, status, validade, cliente, datas. `dohistory` ligado: a aba Histórico nativa registra status, responsável e revisão (fecha o achado 20). Nome colide com o `Document` do núcleo: dentro do namespace, o do núcleo é `\Document` |
 | Categorias | Lista própria em árvore (CommonTreeDropdown). **Um documento pode estar em várias categorias** (tabela de ligação N:N) |
-| Setores | Lista própria (CommonDropdown). **A categoria pertence a um setor**; subcategorias herdam. Documento em categorias de setores diferentes mostra todos os setores. Setor é **organização**, não controle de acesso |
-| Leitura | **Mesma rotina da Base de Conhecimento:** alvos por documento — **perfis, grupos e usuários**. Documento sem alvo: só autor, responsável e quem tem "Ver todos". Rascunho: só quem pode editar |
-| Criação e edição | **Só por direitos de perfil** (aba Codex+ em Perfis): Ler, Criar, Atualizar, Excluir, Ver todos, Publicar para acesso anônimo, Gerenciar modelos. Uma matriz só, sem conflito com a base nativa |
+| Setores | Lista própria (CommonDropdown). **A categoria pertence a um setor**; subcategorias herdam. Documento em categorias de setores diferentes mostra todos os setores. Desde a R3c o setor também define **quem cria, edita e valida** (gestores e validadores do setor) — decisão de Claudio, 20/09/2026 |
+| Leitura | Alvos por documento — **perfis, grupos e usuários**, como na base nativa — e só da versão publicada. Quem tem papel no documento lê em qualquer status |
+| Permissões | **Duas camadas** (Claudio, 20/09/2026): o perfil (aba Codex+ em Perfis) diz **o que** a pessoa pode fazer; o plugin diz **em quais documentos** (gestores e validadores do setor, editores do documento, alvos de leitura). Detalhe na subseção R3c |
 | Versões | Tabela própria: cópia do conteúdo a cada **revisão publicada** (:00 → :01), com resumo obrigatório do que mudou. Alimenta o histórico de revisão impresso no PDF |
 | Anexos e imagens | Mecanismo nativo genérico (`Document_Item`, imagens coladas via `addFiles`) — funciona com qualquer objeto |
 | Acesso anônimo | Link secreto por documento (só publicados, revogável), com entrega própria e controlada de imagens e anexos |
@@ -235,13 +235,8 @@ próprio (`knowbaseitems_id = 0`). As telas atuais partem de
   `Document_User` (alvos, trait `TargetRelation`) e `Document_Category`.
   Ligar ou desligar exige poder atualizar o documento. Alvo de perfil ou
   grupo sem entidade informada = sem restrição de entidade (achado 34).
-- **Leitura** (`canViewItem`, espelho de `KnowbaseItem::canViewItem`):
-  entidade do documento acessível; "Ver todos" vê tudo; autor e responsável
-  sempre; rascunho só para quem pode editar; publicado/obsoleto = Ler + alvo.
-- **Edição** (proposta de Claude, 20/09/2026, **a confirmar por Claudio**;
-  igual à base nativa e coerente com "documento sem alvo: só autor,
-  responsável e Ver todos"): Atualizar + (Ver todos, autor, responsável ou alvo).
-  Quem edita sempre consegue ler. Excluir = lixeira; purgar desligado.
+- **Leitura e edição:** as regras da R3a foram substituídas pelas da R3c
+  (subseção seguinte). Excluir = lixeira; purgar desligado.
 - **A regra existe duas vezes** — por item (`canViewItem`) e em SQL
   (`Document::getVisibilityCriteria()`, para as listagens da R5, com
   `DISTINCT`). O comando `plugins:codexplus:document:visibility` compara as
@@ -256,6 +251,51 @@ próprio (`knowbaseitems_id = 0`). As telas atuais partem de
   (categoria usada por documento dá o aviso "em uso").
 - **Lista de Categorias** mostra a coluna Setor por padrão (preferência
   gravada no Install só se ainda não houver nenhuma para Category).
+
+#### Papéis e validação (R3c, `v0.6.3-alpha`)
+
+Decisões de Claudio, 20/09/2026. **Duas camadas:** o perfil diz o que; o
+plugin diz em quais documentos. A ação só vale quando as duas concordam.
+"Ver todos" dispensa os papéis, sempre dentro dos outros bits do perfil. O
+Super-Admin (perfis com Configurar > Atualizar) recebe todos os bits no
+Install, por OU bit a bit (reinstalar nunca tira bit).
+
+| Ação | Perfil (bit) | Plugin (onde vale) |
+|---|---|---|
+| Ler | Ler | Alvo de leitura, só publicado/obsoleto. Papel no documento (gestor ou validador do setor, editor, autor, responsável) lê em qualquer status |
+| Criar | Criar | Gestor do setor de **todas** as categorias informadas (categoria obrigatória) |
+| Editar | Atualizar | Editor do documento ou gestor do setor, **só em rascunho** |
+| Gerir (editores, alvos, responsável, obsoleto) | Atualizar | Gestor do setor. Categorias só em rascunho e só para setor que ele gere |
+| Enviar para validação | Atualizar | Quem pode editar; exige categoria com setor (salvo Ver todos) |
+| Validar ou devolver | **Validar** (8192) | Validador do setor que **não alterou** o documento na revisão atual |
+| Excluir (lixeira) | Excluir | Gestor do setor |
+| Setores, categorias, papéis de setor, modelos | Gerenciar modelos, setores e categorias | — |
+
+- **Ciclo:** rascunho → validacao → publicado → obsoleto. Devolver volta a
+  rascunho com motivo obrigatório (`validation_comment`). Documento nasce
+  rascunho; o status só muda por `submit()`, `approve()`, `reject()` e
+  `markObsolete()` — `update()` com `status` é recusado.
+- **Fora de rascunho, conteúdo não muda.** Publicado só volta a ser editável
+  na R6 (revisão com a versão publicada visível até a aprovação).
+- **Tabelas:** `sectormembers` (setor, papel `gestor`/`validador`, usuário
+  OU grupo), `documenteditors` (documento, usuário OU grupo),
+  `documentcontributors` (quem alterou o documento em cada revisão: é o que
+  impede quem editou de validar). Campos novos no documento: quem enviou,
+  quando, quem validou, quando, motivo da devolução — todos no Histórico.
+- **Setor do documento** = setores das categorias dele (Category guarda o
+  setor já herdado da raiz). Documento em setores diferentes: valem os
+  papéis de todos.
+- **Comandos:** `plugins:codexplus:sector:member` (papéis de setor),
+  `document:create` (com `--category`, `--editor`), `document:set` (edição e
+  `--action=enviar|validar|devolver|obsoleto`), `document:visibility`
+  (colunas Papéis, Leitura, Edição, Validação e SQL=item).
+
+**Decididos para a R6** (Claudio, 20/09/2026): durante a revisão de um
+documento publicado, os leitores continuam vendo a versão publicada com o
+aviso **"Em atualização"** (tela, estante e link anônimo; não no PDF);
+a revisão aberta tem **prazo** (padrão 30 dias, configurável), com indicador
+"Revisão atrasada", prorrogação com motivo ou cancelamento pelo gestor;
+"**revisado sem alteração**" renova a validade sem subir a revisão.
 
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
@@ -462,6 +502,26 @@ depender do comportamento errático de `position: fixed` na impressão.
     outro usuário e os direitos valem de verdade (no console `isCron()` é
     falso). `plugin:uninstall` pede confirmação: no roteiro, use `-n`.
 
+38. **Plugin: classe com maiúscula no meio não é achada pela tabela.**
+    `getItemTypeForTable('glpi_plugin_codexplus_sectormembers')` deduz
+    `GlpiPlugin\Codexplus\Sectormember`; o autoloader PSR-4 do plugin
+    procura `src/Sectormember.php` e não acha `SectorMember.php` (Linux
+    diferencia maiúsculas). Só funciona se a classe já tiver sido carregada
+    na requisição. Consequência: não declarar em
+    `plugin_codexplus_getDatabaseRelations` tabela de classe assim
+    (`SectorMember`, `DocumentEditor`); a limpeza vai no `cleanDBonPurge`.
+    `Document_Category` e afins funcionam porque cada parte do nome é uma
+    palavra só.
+39. **`Migration::addRight()` só insere, nunca atualiza:** perfil que já tem
+    a linha do direito não ganha bit novo por ele. Para dar bit a perfil
+    existente (Super-Admin na R3c), ler e gravar `glpi_profilerights` com OU
+    bit a bit.
+40. **Pacote velho em `/tmp` é risco.** Em 20/09/2026 um
+    `codexplus-docs-0.5.7-1.tar.gz` extraído depois da 0.6.2 (histórico do
+    shell, linha 498) devolveu os documentos da 0.5.7 ao commit `5d528e4`;
+    corrigido em `6c64b4d`. Regra no `DEPLOY.md`: apagar o pacote depois do
+    commit.
+
 ---
 
 ## 6. Contrato de código — não quebrar
@@ -541,6 +601,9 @@ codexplus/
 │   ├── Document.php           documento próprio, direitos, visibilidade (R3a)
 │   ├── Document_*.php         ligações: categoria, perfil, grupo, usuário (R3a)
 │   ├── TargetRelation.php     comum aos três alvos de leitura (R3a)
+│   ├── SectorMember.php       gestores e validadores do setor (R3c)
+│   ├── DocumentEditor.php     editores do documento (R3c)
+│   ├── DocumentContributor.php quem alterou cada revisão (R3c)
 │   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
 ├── front/                     controllers (rodam em escopo de função!)
 ├── templates/                 Twig

@@ -3,7 +3,7 @@ namespace GlpiPlugin\Codexplus\Console;
 
 use Glpi\Console\AbstractCommand;
 use GlpiPlugin\Codexplus\Document;
-use GlpiPlugin\Codexplus\Document_Category;
+use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\Document_Group;
 use GlpiPlugin\Codexplus\Document_Profile;
 use GlpiPlugin\Codexplus\Document_User;
@@ -13,11 +13,15 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * R3a — cria um documento próprio com alvos de leitura, como o usuário de
- * --username (valida os direitos dele: Criar; e Atualizar para os alvos).
+ * R3a/R3c — cria um documento próprio (sempre em rascunho) numa ou mais
+ * categorias, como o usuário de --username. Valida os direitos dele:
+ * Criar + gestor do setor de cada categoria. Alvos de leitura e editores
+ * informados aqui exigem que ele também GERA o documento (Atualizar +
+ * gestor do setor ou Ver todos).
  *
- *   php bin/console plugins:codexplus:document:create --username=glpi \
- *       --name="POP de teste" --doctype=POP --status=publicado --group="TI"
+ *   php bin/console plugins:codexplus:document:create --username=gestor \
+ *       --name="POP de teste" --category="Procedimentos" --group="Qualidade" \
+ *       --editor=joao
  */
 class DocumentCreateCommand extends AbstractCommand
 {
@@ -32,13 +36,14 @@ class DocumentCreateCommand extends AbstractCommand
         $this->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Perfil a usar (nome); padrão: o do usuário');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Título');
         $this->addOption('doctype', null, InputOption::VALUE_REQUIRED, 'POP, PSG, MAN ou PRP', 'POP');
-        $this->addOption('status', null, InputOption::VALUE_REQUIRED, 'rascunho, publicado ou obsoleto', 'rascunho');
         $this->addOption('owner', null, InputOption::VALUE_REQUIRED, 'Login do responsável');
         $this->addOption('recursive', null, InputOption::VALUE_NONE, 'Visível nas entidades filhas');
         $this->addOption('group', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: grupo (nome), repetível');
         $this->addOption('target-profile', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: perfil (nome), repetível');
         $this->addOption('user', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: usuário (login), repetível');
-        $this->addOption('category', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Categoria (ID), repetível');
+        $this->addOption('category', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Categoria (nome ou ID), repetível — obrigatória');
+        $this->addOption('editor', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Editor: usuário (login), repetível');
+        $this->addOption('editor-group', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Editor: grupo (nome), repetível');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -49,7 +54,7 @@ class DocumentCreateCommand extends AbstractCommand
         $data = [
             'name'         => (string) $input->getOption('name'),
             'doctype'      => strtoupper((string) $input->getOption('doctype')),
-            'status'       => (string) $input->getOption('status'),
+            '_categories'  => array_map(fn ($c) => self::categoryId((string) $c), (array) $input->getOption('category')),
             'is_recursive' => $input->getOption('recursive') ? 1 : 0,
         ];
         if ($input->getOption('owner')) {
@@ -58,7 +63,7 @@ class DocumentCreateCommand extends AbstractCommand
 
         $doc = new Document();
         if (!$doc->can(-1, CREATE, $data)) {
-            $output->writeln('<error>SEM DIREITO de criar documento (bit Criar na aba Codex+ do perfil).</error>');
+            $output->writeln('<error>SEM DIREITO de criar documento: precisa do bit Criar E ser gestor do setor de cada categoria (ou Ver todos).</error>');
             return Command::FAILURE;
         }
         $id = $doc->add($data);
@@ -67,7 +72,14 @@ class DocumentCreateCommand extends AbstractCommand
             return Command::FAILURE;
         }
         $doc->getFromDB($id);
-        $output->writeln(sprintf('<info>Criado: #%d %s "%s" (%s)</info>', $id, $doc->getCode(), $doc->fields['name'], $doc->fields['status']));
+        $output->writeln(sprintf(
+            '<info>Criado: #%d %s "%s" (%s) — setores: %s</info>',
+            $id,
+            $doc->getCode(),
+            $doc->fields['name'],
+            $doc->fields['status'],
+            implode(', ', array_map(fn ($s) => \Dropdown::getDropdownName('glpi_plugin_codexplus_sectors', $s), $doc->getSectorIds())) ?: '(nenhum)'
+        ));
 
         $links = [];
         foreach ((array) $input->getOption('group') as $n) {
@@ -79,14 +91,22 @@ class DocumentCreateCommand extends AbstractCommand
         foreach ((array) $input->getOption('user') as $n) {
             $links[] = [new Document_User(), ['users_id' => self::userId($n)], "usuário $n"];
         }
-        foreach ((array) $input->getOption('category') as $n) {
-            $links[] = [new Document_Category(), ['plugin_codexplus_categories_id' => (int) $n], "categoria #$n"];
+        foreach ((array) $input->getOption('editor') as $n) {
+            $links[] = [new DocumentEditor(), ['users_id' => self::userId($n)], "editor $n"];
+        }
+        foreach ((array) $input->getOption('editor-group') as $n) {
+            $links[] = [new DocumentEditor(), ['groups_id' => self::groupId($n)], "editor grupo $n"];
         }
 
         $ok = true;
         foreach ($links as [$rel, $row, $label]) {
             $row['plugin_codexplus_documents_id'] = $id;
-            if (!$rel->can(-1, CREATE, $row) || !$rel->add($row)) {
+            if (!$rel->can(-1, CREATE, $row)) {
+                $output->writeln("<error>Não ligou $label: SEM DIREITO (gerir o documento exige Atualizar + gestor do setor).</error>");
+                $ok = false;
+                continue;
+            }
+            if (!$rel->add($row)) {
                 $output->writeln("<error>Não ligou $label: sem direito ou erro. " . self::flushMessages() . '</error>');
                 $ok = false;
                 continue;

@@ -29,4 +29,10 @@ class Sector extends CommonDropdown
     {
         return 'ti ti-building';
     }
+
+    /** Papéis do setor (R3c) saem junto com o setor. */
+    public function cleanDBonPurge()
+    {
+        $this->deleteChildrenAndRelationsFromDb([SectorMember::class]);
+    }
 }

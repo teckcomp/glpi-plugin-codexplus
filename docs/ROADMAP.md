@@ -1,7 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.2-alpha` · atualizado em 20/09/2026 (R1 e R2 concluídos;
-> R3a entregue, em teste na homologação).
+> Estado em `v0.6.3-alpha` · atualizado em 20/09/2026 (R1, R2 e R3a
+> concluídos; R3c entregue, em teste na homologação).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -48,6 +48,7 @@ Depois: marco **Pronto para produção** (fim deste documento).
 | 0.5.8 | Pós-auditoria: logo volta a sair no PDF (espera dupla de imagens); cabeçalho corrido montado na impressão (título + logo, uma linha), título grande e linha de identificação só na 1ª página, sem visualizações; âncoras dos títulos fora do PDF e discretas na tela; arquivo sugerido `código - título`; prévia do cabeçalho na edição sem a 2ª linha | v0.5.8 |
 | R1 | Schema dos documentos próprios (documento ampliado, setores, categorias, documento–categoria, alvos de leitura, versões) e aba **Codex+ em Perfis** com a matriz de direitos. Commit `330da62` | v0.6.0 |
 | R2 | Setores e categorias cadastráveis (listas suspensas), categoria ligada a setor, setor herdado na árvore; cadastro por "Gerenciar modelos, setores e categorias". Commit `26a114f` | v0.6.1 |
+| R3a | Classe `Document`, ligações (categoria, perfil, grupo, usuário), visibilidade por item e em SQL, Histórico, comandos de console. Commits `5d528e4` + `6c64b4d` (restauração dos docs) | v0.6.2 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -65,7 +66,10 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 - Setor > Categoria: setor é lista própria; a categoria pertence a um setor
 - Documento pode estar em **várias categorias**
 - Leitura: **alvos por documento — perfis, grupos e usuários**, como na base
-  nativa. Criação e edição: **só direitos de perfil**
+  nativa
+- Permissões em **duas camadas** (Claudio, 20/09/2026): perfil = o que;
+  plugin = em quais documentos (gestores e validadores do setor, editores do
+  documento). Publicar exige **validação**; quem editou não valida
 - Acesso anônimo por **link secreto por documento** (só publicados, revogável)
 - **Migrar** os 5 documentos de teste atuais
 
@@ -73,11 +77,12 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 |---|---|---|
 | R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando. ✅ **Concluído na 0.6.0-alpha** | Aba aparece em Perfis e grava |
 | R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore. Cadastro por quem tem "Gerenciar modelos" (decisão de Claudio, 20/09/2026). ✅ **Concluído na 0.6.1-alpha** | Criar setor e subcategoria e ver o setor herdado |
-| R3a | Classe `Document` e ligações (categoria, perfil, grupo, usuário), leitura e edição pelos bits da R1, visibilidade por item e em SQL, Histórico ligado; comandos de console para testar. Sem telas novas. **Entregue na 0.6.2-alpha, em teste** | Criar documento com alvo num grupo e conferir quem vê e quem não vê; telas atuais inalteradas |
-| R3b | Formulário (TinyMCE, categorias múltiplas, alvos, anexos, imagens coladas), leitura e PDF no modelo novo | Criar um POP do zero, restringir a um grupo, exportar |
+| R3a | Classe `Document` e ligações (categoria, perfil, grupo, usuário), leitura e edição pelos bits da R1, visibilidade por item e em SQL, Histórico ligado; comandos de console para testar. Sem telas novas. ✅ **Concluído na 0.6.2-alpha** | Criar documento com alvo num grupo e conferir quem vê e quem não vê; telas atuais inalteradas |
+| R3c | Papéis: bit Validar; Super-Admin com todos os bits; gestores e validadores por setor; editores por documento; estado "em validação"; regras refeitas (alvo de leitura deixa de dar edição); comandos `sector:member` e fluxo no `document:set`. Sem telas novas. **Entregue na 0.6.3-alpha, em teste** | Pelo console: gestor cria, editor edita, quem editou não valida, validador do setor publica, leitor só vê depois de publicado |
+| R3b | Formulário (TinyMCE, categorias múltiplas, editores, alvos, anexos, imagens coladas), leitura e PDF no modelo novo; botões Enviar / Validar / Devolver; aba de papéis no Setor. Só a primeira publicação — editar publicado fica para a R6. Somem "Novo documento" pela base, "Mais opções" e "Ficha nativa" | Criar um POP do zero, validar, exportar |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
-| R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
-| R6 | Publicar revisão com resumo; versões guardadas; histórico de revisão impresso no fim do PDF; responsável editável na tela de edição; indicador "Sem responsável" | Publicar a :01 e ver a tabela no PDF e a troca na aba Histórico |
+| R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; indicadores "Aguardando validação" e "Revisão atrasada"; etiqueta "em atualização" na estante; lixeira; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
+| R6 | Revisão de documento publicado: a publicada segue visível com o aviso **"Em atualização"** (tela e link anônimo, não no PDF) até a nova ser validada; **prazo de revisão** (padrão 30 dias, configurável) com prorrogação motivada ou cancelamento pelo gestor; "**revisado sem alteração**" (renova a validade, mantém a revisão); versões com resumo; histórico de revisão no fim do PDF; indicador "Sem responsável" | Abrir a :01, ver o aviso para o leitor, validar e ver a tabela no PDF |
 | R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
 
 **Candidatos, a decidir durante a Etapa R:** quadro **Atividade** no fim da

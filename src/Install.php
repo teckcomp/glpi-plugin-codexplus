@@ -38,6 +38,11 @@ class Install
     public const DOC_USERS_TABLE      = 'glpi_plugin_codexplus_documents_users';
     public const VERSIONS_TABLE       = 'glpi_plugin_codexplus_documentversions';
 
+    // Etapa R3c — papéis (decisão de Claudio, 20/09/2026)
+    public const SECTOR_MEMBERS_TABLE = 'glpi_plugin_codexplus_sectormembers';
+    public const DOC_EDITORS_TABLE    = 'glpi_plugin_codexplus_documenteditors';
+    public const DOC_CONTRIB_TABLE    = 'glpi_plugin_codexplus_documentcontributors';
+
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
      *
@@ -46,6 +51,9 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::DOC_CONTRIB_TABLE,
+            self::DOC_EDITORS_TABLE,
+            self::SECTOR_MEMBERS_TABLE,
             self::VERSIONS_TABLE,
             self::DOC_USERS_TABLE,
             self::DOC_GROUPS_TABLE,
@@ -151,6 +159,9 @@ class Install
 
         // --- Etapa R3a: coluna Setor visível na lista de Categorias ---
         self::installR3a($migration);
+
+        // --- Etapa R3c: papéis, validação, Super-Admin com todos os bits ---
+        self::installR3c($migration);
 
         $migration->executeMigration();
         return true;
@@ -354,6 +365,118 @@ class Install
                 'users_id'  => 0,
                 'interface' => 'central',
             ]);
+        }
+    }
+
+    /**
+     * Etapa R3c — papéis e validação (decisão de Claudio, 20/09/2026).
+     *
+     *  - sectormembers: gestores e validadores do setor (usuário OU grupo);
+     *  - documenteditors: editores/revisores do documento (usuário OU grupo);
+     *  - documentcontributors: quem alterou o documento em cada revisão —
+     *    é o que impede quem editou de validar o próprio documento;
+     *  - campos de validação no documento (quem enviou, quem validou,
+     *    quando, motivo da devolução);
+     *  - todos os bits do Codex+ nos perfis com Configurar > Atualizar
+     *    (Super-Admin): "o Super-Admin herda tudo". OR bit a bit, então
+     *    reinstalar nunca tira bit de ninguém.
+     */
+    private static function installR3c(Migration $migration): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $opts = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC';
+
+        $doc = self::DOCUMENTS_TABLE;
+        $migration->addField($doc, 'users_id_submitter', 'fkey');
+        $migration->addField($doc, 'date_submitted', 'timestamp');
+        $migration->addField($doc, 'users_id_validator', 'fkey');
+        $migration->addField($doc, 'date_validated', 'timestamp');
+        $migration->addField($doc, 'validation_comment', 'text');
+        $migration->addKey($doc, 'users_id_submitter');
+        $migration->addKey($doc, 'users_id_validator');
+
+        $t = self::SECTOR_MEMBERS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_sectors_id` int unsigned NOT NULL DEFAULT '0',
+                `role` varchar(16) NOT NULL DEFAULT '',
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `groups_id` int unsigned NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unicity` (`plugin_codexplus_sectors_id`, `role`, `users_id`, `groups_id`),
+                KEY `users_id` (`users_id`),
+                KEY `groups_id` (`groups_id`)
+            ) $opts", "Codex+ (R3c): erro ao criar $t");
+        }
+
+        $t = self::DOC_EDITORS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `groups_id` int unsigned NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `users_id`, `groups_id`),
+                KEY `users_id` (`users_id`),
+                KEY `groups_id` (`groups_id`)
+            ) $opts", "Codex+ (R3c): erro ao criar $t");
+        }
+
+        $t = self::DOC_CONTRIB_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `revision` int unsigned NOT NULL DEFAULT '0',
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `revision`, `users_id`),
+                KEY `users_id` (`users_id`)
+            ) $opts", "Codex+ (R3c): erro ao criar $t");
+        }
+
+        // Super-Admin herda tudo: perfis com Configurar > Atualizar.
+        $admins = [];
+        foreach ($DB->request([
+            'SELECT' => ['profiles_id', 'rights'],
+            'FROM'   => 'glpi_profilerights',
+            'WHERE'  => ['name' => 'config'],
+        ]) as $row) {
+            if (((int) $row['rights'] & UPDATE) === UPDATE) {
+                $admins[] = (int) $row['profiles_id'];
+            }
+        }
+        foreach ($admins as $pid) {
+            $cur = 0;
+            $exists = false;
+            foreach ($DB->request([
+                'SELECT' => ['rights'],
+                'FROM'   => 'glpi_profilerights',
+                'WHERE'  => ['profiles_id' => $pid, 'name' => Rights::NAME],
+            ]) as $row) {
+                $cur    = (int) $row['rights'];
+                $exists = true;
+            }
+            if (!$exists) {
+                $DB->insert('glpi_profilerights', [
+                    'profiles_id' => $pid,
+                    'name'        => Rights::NAME,
+                    'rights'      => Rights::ALL,
+                ]);
+            } elseif (($cur | Rights::ALL) !== $cur) {
+                $DB->update(
+                    'glpi_profilerights',
+                    ['rights' => $cur | Rights::ALL],
+                    ['profiles_id' => $pid, 'name' => Rights::NAME]
+                );
+            }
         }
     }
 

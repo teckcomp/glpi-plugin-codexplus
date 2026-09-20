@@ -104,6 +104,10 @@ git log --oneline -1
 
 - O `git status --short` tem que listar **só** os arquivos do pacote. Coisa
   a mais é sinal de edição manual no servidor: pare e investigue.
+- **Depois do commit, apague o pacote de `/tmp`**
+  (`rm -f /tmp/codexplus-<versao>*.tar.gz`). Pacote velho à mão é
+  extraído por engano (seta para cima no terminal) — foi assim que o commit
+  `5d528e4` levou os documentos da 0.5.7 (achado 40).
 - No `push`, a senha é um **token de acesso pessoal** do GitHub. Nunca cole
   token em chat nem em arquivo do repositório.
 - A versão na mensagem do commit tem que ser a mesma do `setup.php`.

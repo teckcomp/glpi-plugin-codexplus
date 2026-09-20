@@ -30,6 +30,38 @@ trait TargetRelation
     }
 
     /**
+     * Documento da ligação (item 1), a partir do registro ou do input.
+     */
+    protected function linkedDocument(): ?Document
+    {
+        $key = static::$items_id_1;
+        $id  = (int) ($this->fields[$key] ?? $this->input[$key] ?? 0);
+        $doc = new Document();
+        return ($id > 0 && $doc->getFromDB($id)) ? $doc : null;
+    }
+
+    /**
+     * Alvo de leitura é decisão de quem GERE o documento (gestor do setor
+     * ou Ver todos, com Atualizar) — não do editor. Decisão de Claudio,
+     * 20/09/2026 (R3c). Vale em qualquer status: é acesso, não conteúdo.
+     */
+    public function canCreateItem(): bool
+    {
+        $doc = $this->linkedDocument();
+        return $doc !== null && $doc->canManage();
+    }
+
+    public function canPurgeItem(): bool
+    {
+        return $this->canCreateItem();
+    }
+
+    public function canUpdateItem(): bool
+    {
+        return false;
+    }
+
+    /**
      * No formulário nativo, "sem restrição de entidade" chega como
      * entities_id = -1 (front/knowbaseitem.form.php, GLPI 11.0.6). Aqui a
      * mesma conversão vale para qualquer origem (console, R3b), e entidade

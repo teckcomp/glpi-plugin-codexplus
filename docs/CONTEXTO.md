@@ -2,7 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.5.6-alpha` · atualizado em 14/09/2026.
+> Estado: `v0.5.7-alpha` · atualizado em 19/09/2026 (revisão geral após
+> auditoria do servidor e do repositório).
 
 ---
 
@@ -30,6 +31,13 @@ do Codex+** — inclusive manuais e propostas —, com upload de material
 adicional quando necessário. Isso promove o editor e a qualidade do PDF de
 "desejável" a requisito.
 
+**Decisão de 09/2026:** o Codex+ ganha um módulo de **diagramas
+institucionais** (organogramas, fluxogramas, matrizes de escalonamento e
+RACI), como mais um tipo de documento (`DIA`). Requisitos: visível a toda a
+instituição de forma fácil e rápida, criação intuitiva para não técnicos e
+resultado final sem perda em relação ao protótipo aprovado. Detalhes na
+Etapa 9 do `ROADMAP.md`.
+
 ---
 
 ## 2. Escopo — o que está fora, e por quê
@@ -44,10 +52,12 @@ desta tabela sem alinhar antes.**
 | Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações |
 | Permissão separada de ver / imprimir / baixar | O GLPI já controla visibilidade por perfil, grupo e entidade |
 | Editor Markdown | O TinyMCE nativo atende |
-| draw.io embutido | Reavaliar depois da Etapa 5; hoje croqui entra como imagem anexada |
 | Hierarquia livro → capítulo → página | Categoria → subcategoria resolve; o PSG cobre o agrupamento por setor |
 | PDF via TCPDF (server-side) | Testado e descartado — ver seção 4 |
 | Reskin por CSS sobre telas nativas | Abordagem original, **abandonada** — ver seção 4 |
+
+> **Saiu desta tabela em 09/2026:** draw.io embutido. Entra na Etapa 9,
+> hospedado no próprio plugin, enxugado e estilizado, **só para fluxograma**.
 
 ---
 
@@ -220,6 +230,29 @@ depender do comportamento errático de `position: fixed` na impressão.
       de logo de canto) — bug pego e corrigido durante a própria
       implementação da 4f, antes de qualquer teste no ambiente real.
 
+18. **`Html::textarea()` no 11.0.6** (confirmado no fonte, `src/Html.php`):
+    com `display` padrão (`true`) ele **imprime** o HTML e devolve `true`;
+    com `display => false` devolve a string. O `article.form.php` captura a
+    saída com `ob_start()`, o que funciona.
+19. **Toda gravação de `KnowbaseItem` gera revisão nativa**, inclusive pela
+    edição do Codex+: `KnowbaseItem::pre_updateInDB()` chama
+    `KnowbaseItem_Revision::createNew()`. Detalhe: a revisão grava o
+    `users_id` do **autor original**, não de quem editou; quem editou fica
+    na aba **Histórico** (`glpi_logs`).
+20. **`DocumentMeta` não tem histórico ligado.** Trocar status,
+    responsável, validade ou revisão do Codex+ não deixa rastro. Registrado
+    como Etapa 10.
+21. **Imagens inseridas durante `layoutPages()` não são esperadas.** O motor
+    do PDF aguarda as imagens do conteúdo **antes** de paginar; a logo do
+    cabeçalho só é criada **durante** a paginação e a impressão dispara sem
+    ela. Causa da logo ausente no PDF — correção no pacote 0.5.8.
+22. **`cp -r pasta/* destino` não copia arquivos ocultos.** Foi assim que o
+    `.gitignore` sumiu do repositório em 31/08 (restaurado em 19/09). Usar
+    sempre `cp -rf pasta/. destino/`.
+23. **`scp` no cmd do Windows: destino sem barra final.**
+    `"%USERPROFILE%\Downloads\"` falha porque `\"` vira aspa escapada; usar
+    `"%USERPROFILE%\Downloads"`.
+
 ---
 
 ## 6. Contrato de código — não quebrar
@@ -258,12 +291,17 @@ contêiner inteiro.
 
 | Item | Valor |
 |---|---|
-| Servidor de homologação | `192.168.1.50` (Debian, acesso via PuTTY, usuário `teckcomp`) |
+| Homologação | `177.87.230.179`, SSH na porta **2078** (Debian, GLPI 11.0.6) |
+| Usuário de acesso | `resolutto` — **sem sudo**. Deploy como root via `su -` |
 | Caminho do GLPI | `/var/www/html/glpi` |
-| Dono dos arquivos | `www-data:www-data` |
-| PC de desenvolvimento | `192.168.1.2` (Windows, sem Git local) |
-| Versão do GLPI | 11.0.6 · PHP 8.2+ · MySQL (`glpidb`) |
-| Repositório | `github.com/teckcomp/glpi-plugin-codexplus` |
+| Dono dos arquivos do plugin | `www-data:www-data` |
+| Repositório no servidor | `~/glpi-plugin-codexplus` (usuário `resolutto`), separado da pasta implantada |
+| Repositório remoto | `github.com/teckcomp/glpi-plugin-codexplus` (público) |
+| PC de desenvolvimento | Windows, sem Git local; transferência por `scp` (OpenSSH do Windows) |
+| Ferramentas no servidor | `git` sim; `zip`/`unzip` **não** — pacotes em `.tar.gz` |
+| Produção | **Codex+ não instalado.** Só sobe ao atingir o marco "Pronto para produção" (ver `ROADMAP.md`) |
+
+O servidor antigo `192.168.1.50` não é mais usado (substituído em 09/2026).
 
 Ver `docs/DEPLOY.md` para o fluxo completo de publicação e teste.
 
@@ -281,9 +319,27 @@ codexplus/
 │   ├── DocumentMeta.php       metadados, código derivado, vencimento
 │   ├── Template.php           modelos por tipo
 │   ├── Dashboard.php          indicadores do painel
-│   └── Branding.php           configuração de marca (Etapa 4a)
+│   └── Branding.php           configuração de marca (4a), cabeçalho (4f)
 ├── front/                     controllers (rodam em escopo de função!)
 ├── templates/                 Twig
 ├── public/                    CSS e JS (única pasta servida como estático)
 └── docs/                      esta documentação
 ```
+
+---
+
+## 9. Colaboração
+
+Mais de uma pessoa trabalha no plugin. Regras (definidas em 19/09/2026):
+
+1. **O GitHub é a fonte da verdade.** Nada vai para o servidor sem estar
+   antes no repositório. Em 09/2026 três etapas (4e, 4f e a correção da
+   logo) ficaram duas semanas só no servidor, sem cópia versionada.
+2. **`git pull` antes de começar** qualquer trabalho.
+3. **Um commit por etapa**, com a mesma versão do `setup.php` na mensagem e
+   no `README.md`.
+4. **Decisão de produto registrada com o nome de quem decidiu.** "Decisão do
+   usuário" é ambíguo com mais de uma pessoa no projeto.
+5. Seguir o `docs/DEPLOY.md` à risca, inclusive o comando de cópia com
+   `pasta/.` (achado 22).
+

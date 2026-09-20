@@ -1,35 +1,49 @@
 # Codex+ — deploy e teste
 
-Ambiente de homologação: `192.168.1.50`, GLPI em `/var/www/html/glpi`.
+> Atualizado em 19/09/2026: servidor novo, `scp` no lugar do `pscp`, pacotes
+> em `.tar.gz`, cópia que preserva arquivos ocultos.
+
+| Item | Valor |
+|---|---|
+| Homologação | `177.87.230.179`, SSH porta **2078**, usuário `resolutto` |
+| GLPI | `/var/www/html/glpi` |
+| Repositório no servidor | `~/glpi-plugin-codexplus` (usuário `resolutto`) |
+| Produção | Codex+ **não instalado** |
+
+`resolutto` **não tem sudo**. Aplicar pacote exige root (`su -`); versionar
+é com o próprio `resolutto`, para o repositório não ficar com dono root.
 
 ---
 
-## Enviar o pacote
-
-O desenvolvimento é feito em PC Windows sem Git local; o Git roda **no
-servidor**. Envio por `pscp`:
+## 1. Enviar o pacote (cmd do Windows)
 
 ```cmd
-pscp "%USERPROFILE%\Downloads\codexplus-<etapa>.zip" teckcomp@192.168.1.50:/tmp/
+scp -P 2078 "%USERPROFILE%\Downloads\codexplus-<versao>.tar.gz" resolutto@177.87.230.179:/tmp/
 ```
 
-(No PowerShell, `$env:USERPROFILE`.)
-
-Nomeie o zip **sempre com a versão ou a etapa** — dois arquivos de mesmo nome
-colidem no Downloads e o `pscp` acaba reenviando o antigo.
-
-O zip deve conter a pasta `codexplus/` na raiz, para extrair a partir de
-`plugins/`.
+- Porta com **P maiúsculo** no `scp` (no `ssh` é minúsculo).
+- Destino local **sem barra final** quando for baixar do servidor:
+  `"%USERPROFILE%\Downloads"`. Com barra, o Windows lê `\"` como aspa
+  escapada e o comando falha.
+- Nome do pacote **sempre com a versão**: dois arquivos de mesmo nome
+  colidem no Downloads e o antigo é reenviado sem ninguém perceber.
+- O pacote tem a pasta `codexplus/` na raiz. O servidor **não tem**
+  `zip`/`unzip`: pacotes vêm em `.tar.gz`.
 
 ---
 
-## Aplicar no servidor
+## 2. Aplicar no servidor (root)
 
-### Quando `setup.php` (versão) ou `Install.php` mudou
+```bash
+ssh -p 2078 resolutto@177.87.230.179
+su -
+```
+
+### Quando `setup.php` (versão) ou `src/Install.php` mudou
 
 ```bash
 cd /var/www/html/glpi/plugins
-unzip -o /tmp/codexplus-<etapa>.zip
+tar -xzf /tmp/codexplus-<versao>.tar.gz
 chown -R www-data:www-data /var/www/html/glpi/plugins/codexplus
 
 cd /var/www/html/glpi
@@ -41,15 +55,15 @@ systemctl restart apache2
 sudo -u www-data php bin/console plugin:list | grep -i codexplus
 ```
 
-> **Regra do projeto:** todo bloco que inclui `plugin:install` **precisa** de
-> `plugin:activate` logo em seguida — o install **desativa** o plugin — e deve
-> terminar com `plugin:list | grep` para confirmar estado e versão.
+> **Regra do projeto:** todo bloco com `plugin:install` **precisa** de
+> `plugin:activate` logo em seguida (o install **desativa** o plugin) e
+> termina com `plugin:list | grep` para confirmar estado e versão.
 
-### Quando mudou só Twig, CSS ou PHP de `src/`/`front/`
+### Quando mudou só Twig, CSS, JS ou PHP de `src/`/`front/`
 
 ```bash
 cd /var/www/html/glpi/plugins
-unzip -o /tmp/codexplus-<etapa>.zip
+tar -xzf /tmp/codexplus-<versao>.tar.gz
 chown -R www-data:www-data /var/www/html/glpi/plugins/codexplus
 
 cd /var/www/html/glpi
@@ -65,17 +79,49 @@ Não reinstale por precaução.
 | `templates/*.twig` | `cache:clear`; se não atualizar, purgar `files/_cache/templates/*` |
 | `public/` (CSS/JS) | **Ctrl+F5** no navegador |
 | `setup.php` (versão), `src/Install.php` | bloco completo acima |
+| só `docs/` ou `README.md` | extrair e `chown`; nada mais |
 
-Como root puro o console recusa — use sempre `sudo -u www-data`.
+O console recusa rodar como root puro: use sempre `sudo -u www-data` (como
+root, o `sudo` funciona).
 
 ---
 
-## Diagnóstico
+## 3. Versionar (usuário `resolutto`, depois do teste aprovado)
+
+Saia do root (`exit`) antes. O GitHub é a fonte da verdade: **nada fica só
+no servidor**.
+
+```bash
+cd ~/glpi-plugin-codexplus
+git pull
+rm -rf /tmp/cx && mkdir /tmp/cx && tar -xzf /tmp/codexplus-<versao>.tar.gz -C /tmp/cx
+cp -rf /tmp/cx/codexplus/. ~/glpi-plugin-codexplus/
+git status
+git add -A
+git commit -m "Codex+ v<versao>: <resumo sem acentos>"
+git push origin master
+git log --oneline -1
+```
+
+- **`codexplus/.` e não `codexplus/*`**: o `*` não copia arquivos ocultos, e
+  o `git add -A` registra a ausência como exclusão. Foi assim que o
+  `.gitignore` sumiu em 31/08.
+- No `push`, a senha é um **token de acesso pessoal** do GitHub, não a senha
+  da conta. Nunca cole token em chat nem em arquivo do repositório.
+- Se houve commit pela interface web do GitHub, `git pull` antes do push.
+- A versão na mensagem do commit tem que ser a mesma do `setup.php`.
+
+> O **logo não entra no commit**: mora em `files/_plugins/codexplus/`, fora
+> da pasta do plugin. Dado de instância não se versiona.
+
+---
+
+## 4. Diagnóstico
 
 "Ocorreu um erro inesperado" → o log útil é o interno do GLPI:
 
 ```bash
-sudo tail -n 100 /var/www/html/glpi/files/_log/php-errors.log
+tail -n 100 /var/www/html/glpi/files/_log/php-errors.log
 ```
 
 O log do Apache normalmente só tem ruído de inicialização.
@@ -88,30 +134,9 @@ grep -c "<trecho_que_só_existe_na_versão_nova>" \
   /var/www/html/glpi/plugins/codexplus/<arquivo>
 ```
 
-Não há PHP no ambiente de quem gera os pacotes, então `php -l` não roda antes
-do envio: erros de sintaxe aparecem só na ativação.
+Para um retrato completo do estado (plugin implantado, repositório, banco,
+direitos, erros), existe o script de auditoria somente leitura usado em
+19/09/2026: `bash /tmp/codexplus-auditoria-2.sh`, rodado como root.
 
----
-
-## Fechar no Git
-
-Depois do teste aprovado, e **só** depois:
-
-```bash
-cd ~/glpi-plugin-codexplus
-git pull
-rm -rf /tmp/cx && unzip -o /tmp/codexplus-<versao>.zip -d /tmp/cx
-cp -rf /tmp/cx/codexplus/* ~/glpi-plugin-codexplus/
-git status && git add -A
-git commit -m "<mensagem sem acentos>"
-git push origin master
-git log --oneline -1
-```
-
-A pasta do repositório é **separada** da pasta do plugin implantado.
-
-Se houve commit pela interface web do GitHub, rode `git pull` antes do push.
-
-> O **logo não entra no commit**: ele mora em `files/_plugins/codexplus/`,
-> fora da pasta do plugin. Foi essa a razão da decisão — dado de instância não
-> se versiona, e assim não há risco de publicar a marca por acidente.
+Não há PHP no ambiente de quem gera os pacotes: `php -l` não roda antes do
+envio, e erros de sintaxe aparecem só na ativação.

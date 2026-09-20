@@ -27,6 +27,8 @@ Arquivos que já foram consultados e o que responderam:
 | `src/Document.php` | Padrão `return $doc->getAsResponse()` usado pelo núcleo |
 | `src/KnowbaseItem.php` | `getAnswer()`, `canViewItem()`, `getVisibilityCriteria()` |
 | `front/document.send.php` | Modelo de endpoint que serve arquivo |
+| `src/Html.php` | `textarea()`: com `display` padrão imprime e devolve `true` (achado 18) |
+| `src/KnowbaseItem.php` · `src/KnowbaseItem_Revision.php` | `pre_updateInDB()` cria revisão a cada gravação; revisão guarda o autor original (achado 19) |
 
 ---
 

@@ -4,7 +4,7 @@ Plugin que transforma a base de conhecimento do GLPI 11 em um sistema de
 **documentos controlados**: wiki, base de conhecimento e produção de POPs,
 manuais e propostas, com exportação em PDF com a marca da empresa.
 
-> **Estado:** `v0.5.3-alpha` — em desenvolvimento, homologação interna.
+> **Estado:** `v0.5.7-alpha` — em desenvolvimento, homologação interna.
 > Não recomendado para produção ainda.
 
 ## O que já faz
@@ -20,8 +20,9 @@ manuais e propostas, com exportação em PDF com a marca da empresa.
   status, responsável, validade
 - **Exportação em PDF** pelo navegador, com imagens, paginação automática,
   logo repetido por página e rodapé com código, revisão e paginação
-- **Configuração de marca:** logo, cabeçalho e rodapé em texto livre com
-  marcadores
+- **Edição dentro do Codex+**, com o editor nativo do GLPI
+- **Configuração de marca:** logo, cabeçalho estruturado (título e logo) e
+  rodapé com marcadores, com rodapé próprio por documento
 
 ## Tipos de documento
 
@@ -67,7 +68,7 @@ Quem for dar andamento ao plugin deve ler, nesta ordem:
 |---|---|
 | [`docs/CONTEXTO.md`](docs/CONTEXTO.md) | **Comece aqui.** Escopo, arquitetura, achados técnicos do GLPI 11 e o contrato de código que não pode ser quebrado |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | O que está pronto, o que vem a seguir e com que critério de aceite |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Como publicar no servidor de homologação e diagnosticar erro |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Como publicar no servidor de homologação, versionar e diagnosticar erro |
 | [`docs/REFERENCIAS.md`](docs/REFERENCIAS.md) | O que foi consultado, aproveitado e descartado — e por quê |
 
 ## Licença

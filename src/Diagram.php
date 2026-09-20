@@ -251,10 +251,12 @@ class Diagram
                 'id'    => $id !== '' ? $id : 'e' . (count($edges) + 1),
                 'from'  => $from,
                 'to'    => $to,
+                'boss'  => !empty($e['boss']),
                 'style' => ($e['style'] ?? '') === 'tracejada' ? 'tracejada' : 'solida',
                 'label' => self::text($e['label'] ?? '', 120),
             ];
         }
+        $edges = self::normalizeBoss($edges);
         if (self::hasCycle($edges)) {
             return null;
         }
@@ -334,7 +336,7 @@ class Diagram
             $copy['id'] = $id;
             $nodes[] = $copy;
             if ($parentId !== null) {
-                $edges[] = ['id' => 'e' . count($edges), 'from' => $parentId, 'to' => $id];
+                $edges[] = ['id' => 'e' . count($edges), 'from' => $parentId, 'to' => $id, 'boss' => true];
             }
             foreach ((array) ($n['kids'] ?? []) as $k) {
                 if (!$walk($k, $id, $depth + 1)) {
@@ -347,17 +349,51 @@ class Diagram
     }
 
     /**
-     * Ciclo (A manda em B que manda em A) travaria o desenho: o layout anda
-     * pelas ligações. Só a PRIMEIRA ligação que chega a cada nó é hierárquica,
-     * então é sobre essas que a verificação corre.
+     * Cada elemento tem NO MÁXIMO UM chefe (decisão de Claudio, 20/09/2026):
+     * a ligação de chefia é quem define o time e a posição no arranjo; as
+     * demais são reporte e não mexem em nada. Diagramas gravados antes disso
+     * não trazem a marca: a primeira ligação que chega vira a chefia, que é
+     * exatamente como eles eram desenhados.
      *
-     * @param array<int, array<string, string>> $edges
+     * @param array<int, array<string, mixed>> $edges
+     * @return array<int, array<string, mixed>>
+     */
+    private static function normalizeBoss(array $edges): array
+    {
+        // Nenhuma marca no conjunto INTEIRO = diagrama gravado antes da
+        // chefia explícita. Só nesse caso a primeira ligação que chega vira
+        // chefia; com marcas presentes, vale exatamente o que foi marcado,
+        // senão um reporte de volta viraria chefia e fecharia um ciclo.
+        $legado = true;
+        foreach ($edges as $e) {
+            if (!empty($e['boss'])) {
+                $legado = false;
+                break;
+            }
+        }
+        $visto = [];
+        foreach ($edges as $i => $e) {
+            $to = $e['to'];
+            if (!empty($e['boss']) || $legado) {
+                // Segundo chefe do mesmo elemento vira reporte: um só manda.
+                $edges[$i]['boss'] = empty($visto[$to]);
+                $visto[$to] = true;
+            }
+        }
+        return $edges;
+    }
+
+    /**
+     * Ciclo (A manda em B que manda em A) travaria o desenho: o arranjo anda
+     * pela cadeia de chefia. Só as ligações de chefia entram na verificação.
+     *
+     * @param array<int, array<string, mixed>> $edges
      */
     private static function hasCycle(array $edges): bool
     {
         $parent = [];
         foreach ($edges as $e) {
-            if (!isset($parent[$e['to']])) {
+            if (!empty($e['boss']) && !isset($parent[$e['to']])) {
                 $parent[$e['to']] = $e['from'];
             }
         }

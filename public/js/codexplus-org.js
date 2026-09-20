@@ -135,7 +135,7 @@
         var title = root.getAttribute('data-title') || '';
         var code = root.getAttribute('data-code') || '';
 
-        var S = null, sel = null, drag = null, z = 1, uid = 0, dirty = false, query = '';
+        var S = null, sel = null, selEdge = null, drag = null, z = 1, uid = 0, dirty = false, query = '';
         // Histórico de desfazer/refazer (0.6.7-7, Claudio, 20/09/2026): guarda o
         // ESTADO INTEIRO em JSON a cada mudança. O organograma tem poucas
         // dezenas de kB, e a cópia inteira evita o risco de um desfazer
@@ -202,6 +202,16 @@
                 '<button type="button" class="cx-org-btn cx-org-btn--danger" data-act="eddel">Excluir</button></div>' +
                 '<p class="cx-org-hint">Ao excluir, os subordinados passam a responder ao superior de quem saiu; se não houver superior, eles ficam como blocos independentes. As mudanças só ficam gravadas ao clicar em Salvar.</p>' +
             '</aside>' : '') +
+            (editable ?
+            '<aside class="cx-org-editor cx-org-ledit" data-el="ledit" hidden aria-label="Editar ligação">' +
+                '<div class="cx-org-edtop"><h3>Ligação</h3><button type="button" class="cx-org-btn" data-act="lclose">Fechar</button></div>' +
+                '<p class="cx-org-hint" data-el="lwho"></p>' +
+                '<label class="cx-org-check"><input type="checkbox" data-l="boss"> É a chefia (define o time e a posição)</label>' +
+                '<label class="cx-org-check"><input type="checkbox" data-l="dash"> Linha tracejada</label>' +
+                '<label>Rótulo<input data-l="label" maxlength="120" autocomplete="off" placeholder="Ex.: reporte funcional"></label>' +
+                '<div class="cx-org-btns"><button type="button" class="cx-org-btn cx-org-btn--danger" data-act="ldel">Excluir ligação</button></div>' +
+                '<p class="cx-org-hint" data-el="lmsg"></p>' +
+            '</aside>' : '') +
             '<section class="cx-org-esc">' +
                 '<h3>Matriz de escalonamento</h3>' +
                 '<div class="cx-org-tablewrap"><table><thead><tr><th>Nível</th><th>Papel</th><th>Escala para o próximo nível quando</th><th>Tempo alvo</th>' +
@@ -217,6 +227,16 @@
                 '<button type="button" class="cx-org-btn" data-act="iocopy">Copiar</button>' +
                 '<button type="button" class="cx-org-btn" data-act="ioclose">Fechar</button></div>' +
             '</dialog>' +
+            (editable ?
+            '<dialog class="cx-org-io cx-org-move" data-el="bossdlg">' +
+                '<h3>Quem é o chefe?</h3>' +
+                '<p data-el="bossText"></p>' +
+                '<p>Cada elemento responde a um só. Trocando, ele e o time dele passam para debaixo do novo chefe.</p>' +
+                '<div class="cx-org-btns">' +
+                '<button type="button" class="cx-org-btn cx-org-btn--primary" data-act="btrocar"></button>' +
+                '<button type="button" class="cx-org-btn" data-act="breporte">Deixar como reporte</button>' +
+                '<button type="button" class="cx-org-btn" data-act="bcancel">Cancelar</button></div>' +
+            '</dialog>' : '') +
             '<dialog class="cx-org-io cx-org-move" data-el="movedlg">' +
                 '<h3 data-el="mvTitle">Mover</h3>' +
                 '<p data-el="mvText"></p>' +
@@ -273,9 +293,9 @@
             S.nodes.forEach(function (n) { n.kids = []; byId[n.id] = n; });
             S.edges.forEach(function (e) {
                 var f = byId[e.from], t = byId[e.to];
-                // Só a PRIMEIRA ligação que chega a um nó é hierárquica; as
-                // demais são ligações extras (desenhadas a partir do 2c).
-                if (!f || !t || parentOf[e.to]) { return; }
+                // Quem manda é a ligação marcada como CHEFIA (2d-1). As demais
+                // são reporte: aparecem no desenho e não mexem no arranjo.
+                if (!f || !t || !e.boss || parentOf[e.to]) { return; }
                 parentOf[e.to] = e.from;
                 f.kids.push(t);
             });
@@ -300,8 +320,10 @@
             })(tree, null);
             return { nodes: nodes, edges: edges };
         }
+        // Índice da ligação de CHEFIA que chega ao elemento: é ela que define
+        // a ordem entre irmãos e é ela que sai quando o elemento muda de chefe.
         function edgeIndexTo(id) {
-            for (var i = 0; i < S.edges.length; i++) { if (S.edges[i].to === id) { return i; } }
+            for (var i = 0; i < S.edges.length; i++) { if (S.edges[i].to === id && S.edges[i].boss) { return i; } }
             return -1;
         }
         function detach(id) {
@@ -309,7 +331,7 @@
             if (i >= 0) { S.edges.splice(i, 1); }
         }
         function attach(from, to, at) {
-            var e = { id: 'e' + Date.now().toString(36) + S.edges.length, from: from, to: to, style: 'solida', label: '' };
+            var e = { id: 'e' + Date.now().toString(36) + S.edges.length, from: from, to: to, boss: true, style: 'solida', label: '' };
             if (at === undefined || at < 0 || at > S.edges.length) { S.edges.push(e); } else { S.edges.splice(at, 0, e); }
         }
         // Tira o nó e sobe os filhos dele para o lugar que ele ocupava entre
@@ -324,7 +346,7 @@
             S.edges.forEach(function (e) {
                 if (pid && e.to === id && e.from === pid && !done) {
                     S.edges.forEach(function (k) {
-                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, style: k.style, label: k.label }); }
+                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, boss: k.boss, style: k.style, label: k.label }); }
                     });
                     done = true; return;
                 }
@@ -365,19 +387,27 @@
             uid = m;
             // Ligação órfã, laço, repetida ou que fecharia ciclo é descartada:
             // o desenho anda pelas ligações e um ciclo o travaria.
+            // Diagrama sem marca nenhuma = gravado antes da chefia explícita:
+            // a primeira ligação que chega vira a chefia, que é como ele já era
+            // desenhado. Com marcas presentes, vale o que está marcado.
+            var semMarca = !s.edges.some(function (e) { return e && e.boss; });
             var pai = {}, vistos = {};
             s.edges = s.edges.filter(function (e) {
                 if (!e || !ids[e.from] || !ids[e.to] || e.from === e.to) { return false; }
                 var par = e.from + '>' + e.to;
                 if (vistos[par]) { return false; }
                 vistos[par] = true;
-                if (pai[e.to]) { return true; }      // ligação extra, não hierárquica
-                var at = e.from, guard = 0;
-                while (pai[at] && guard++ < 5000) { if (at === e.to) { return false; } at = pai[at]; }
-                if (at === e.to) { return false; }
-                pai[e.to] = e.from;
+                e.id = e.id || ('e' + Object.keys(vistos).length + Date.now().toString(36));
                 e.style = e.style === 'tracejada' ? 'tracejada' : 'solida';
                 e.label = e.label || '';
+                e.boss = !!e.boss || semMarca;
+                if (!e.boss) { return true; }
+                // Um chefe por elemento, e sem ciclo: o arranjo anda por aqui.
+                if (pai[e.to]) { e.boss = false; return true; }
+                var at = e.from, guard = 0;
+                while (pai[at] && guard++ < 5000) { if (at === e.to) { break; } at = pai[at]; }
+                if (at === e.to) { e.boss = false; return true; }
+                pai[e.to] = e.from;
                 return true;
             });
             if (!Array.isArray(s.esc)) { s.esc = []; }
@@ -532,7 +562,10 @@
             treeEl.innerHTML = '<div class="cx-org-canvas" data-el="canvas">' +
                 '<svg class="cx-org-links" data-el="links" aria-hidden="true"><g data-el="guides"></g></svg>' +
                 list.map(function (n) {
-                    return '<div class="cx-org-box' + (isFree(n) ? ' is-free' : '') + '" data-box="' + escHtml(n.id) + '">' + cardInner(n) + '</div>';
+                    return '<div class="cx-org-box' + (isFree(n) ? ' is-free' : '') + '" data-box="' + escHtml(n.id) + '">' + cardInner(n) +
+                        (editable ? ['t', 'r', 'b', 'l'].map(function (p) {
+                            return '<span class="cx-org-port is-' + p + '" data-port="' + escHtml(n.id) + '" title="Puxe daqui para ligar a outro elemento"></span>';
+                        }).join('') : '') + '</div>';
                 }).join('') +
                 '</div>';
             var canvas = treeEl.querySelector('[data-el="canvas"]');
@@ -612,21 +645,28 @@
             canvas.style.width = Math.ceil(W) + 'px';
             canvas.style.height = Math.ceil(H) + 'px';
 
-            var d = [];
-            list.forEach(function (n) {
-                var b = box[n.id];
-                if (!b) { return; }
-                branchesOf(n).forEach(function (k) {
-                    var c = box[k.id];
-                    if (c) { d.push(linkPath(b, c)); }
-                });
+            geomTmp = box;
+            var linhas = '';
+            S.edges.forEach(function (e) {
+                var ai = boxOf(e.from), bi = boxOf(e.to);
+                if (!ai || !bi || ai === bi) { return; }
+                var b = box[ai], c = box[bi];
+                if (!b || !c) { return; }
+                var p = linkPath(b, c);
+                var cls = 'cx-org-link' + (e.boss ? '' : ' is-rep') + (e.style === 'tracejada' ? ' is-dash' : '') +
+                    (selEdge === e.id ? ' is-sel' : '');
+                linhas += '<path class="' + cls + '" d="' + p.d + '"/>' +
+                    '<path class="cx-org-hit" data-edge="' + escHtml(e.id) + '" d="' + p.d + '"/>';
+                if (e.label) {
+                    linhas += '<text class="cx-org-elabel" x="' + p.mx + '" y="' + (p.my - 4) + '" text-anchor="middle">' + escHtml(e.label) + '</text>';
+                }
             });
             var svg = canvas.querySelector('[data-el="links"]');
             svg.setAttribute('width', Math.ceil(W));
             svg.setAttribute('height', Math.ceil(H));
             svg.setAttribute('viewBox', '0 0 ' + Math.ceil(W) + ' ' + Math.ceil(H));
             svg.innerHTML = '<g transform="translate(' + origin.x + ',' + origin.y + ')">' +
-                '<g data-el="guides"></g>' + (d.length ? '<path d="' + d.join(' ') + '" />' : '') + '</g>';
+                '<g data-el="guides"></g>' + linhas + '</g>';
             geom = box;
         }
 
@@ -640,23 +680,32 @@
             var cx = c.x + c.w / 2, cy = c.y + c.h / 2;
             if (c.y >= b.y + b.h + folga) {                       // abaixo
                 var ym = R(b.y + b.h + (c.y - b.y - b.h) / 2);
-                return 'M' + R(bx) + ' ' + R(b.y + b.h) + 'V' + ym + 'H' + R(cx) + 'V' + R(c.y);
+                return { d: 'M' + R(bx) + ' ' + R(b.y + b.h) + 'V' + ym + 'H' + R(cx) + 'V' + R(c.y), mx: R((bx + cx) / 2), my: ym };
             }
             if (c.y + c.h + folga <= b.y) {                       // acima
                 var ya = R(c.y + c.h + (b.y - c.y - c.h) / 2);
-                return 'M' + R(bx) + ' ' + R(b.y) + 'V' + ya + 'H' + R(cx) + 'V' + R(c.y + c.h);
+                return { d: 'M' + R(bx) + ' ' + R(b.y) + 'V' + ya + 'H' + R(cx) + 'V' + R(c.y + c.h), mx: R((bx + cx) / 2), my: ya };
             }
             if (c.x >= b.x + b.w) {                               // à direita
                 var xm = R(b.x + b.w + (c.x - b.x - b.w) / 2);
-                return 'M' + R(b.x + b.w) + ' ' + R(by) + 'H' + xm + 'V' + R(cy) + 'H' + R(c.x);
+                return { d: 'M' + R(b.x + b.w) + ' ' + R(by) + 'H' + xm + 'V' + R(cy) + 'H' + R(c.x), mx: xm, my: R((by + cy) / 2) };
             }
             if (c.x + c.w <= b.x) {                               // à esquerda
                 var xe = R(c.x + c.w + (b.x - c.x - c.w) / 2);
-                return 'M' + R(b.x) + ' ' + R(by) + 'H' + xe + 'V' + R(cy) + 'H' + R(c.x + c.w);
+                return { d: 'M' + R(b.x) + ' ' + R(by) + 'H' + xe + 'V' + R(cy) + 'H' + R(c.x + c.w), mx: xe, my: R((by + cy) / 2) };
             }
             // Sobrepostos: reta entre os centros, para a ligação não sumir.
-            return 'M' + R(bx) + ' ' + R(by) + 'L' + R(cx) + ' ' + R(cy);
+            return { d: 'M' + R(bx) + ' ' + R(by) + 'L' + R(cx) + ' ' + R(cy), mx: R((bx + cx) / 2), my: R((by + cy) / 2) };
         }
+        // Ligação que chega a quem é linha dentro de um cartão encosta no
+        // cartão que o contém: é o que está desenhado na tela.
+        function boxOf(id) {
+            var at = id, guard = 0;
+            while (at && !geomHas(at) && guard++ < 100) { at = parentOf[at]; }
+            return at || null;
+        }
+        function geomHas(id) { return Object.prototype.hasOwnProperty.call(geomTmp, id); }
+        var geomTmp = {};
 
         // ---- guias de alinhamento (bloco 2c-1) --------------------------
         // Alinhar "no olho" não funciona: 3 px de diferença já aparecem. Ao
@@ -784,6 +833,72 @@
             $('fullCorner').title = on ? 'Sair da tela cheia' : 'Tela cheia';
             setTimeout(fit, 60);
         }
+        // ---- ligações (bloco 2d-1) -------------------------------------
+        function L(name) { return root.querySelector('[data-l="' + name + '"]'); }
+        function edgeById(id) { return S.edges.filter(function (e) { return e.id === id; })[0] || null; }
+        function bossOf(id) { for (var i = 0; i < S.edges.length; i++) { if (S.edges[i].to === id && S.edges[i].boss) { return S.edges[i]; } } return null; }
+        // Marcar como chefe alguém que já está abaixo na mesma cadeia fecharia
+        // um ciclo, e o arranjo anda por essa cadeia.
+        function viraCiclo(from, to) {
+            var at = from, guard = 0, pai = {};
+            S.edges.forEach(function (e) { if (e.boss && !pai[e.to]) { pai[e.to] = e.from; } });
+            while (at && guard++ < 5000) { if (at === to) { return true; } at = pai[at]; }
+            return false;
+        }
+        function avisaLigacao(txt) {
+            var el = $('lmsg');
+            if (el) { el.textContent = txt; el.className = 'cx-org-hint' + (txt ? ' is-erro' : ''); }
+            if (txt && $('dragHint')) {
+                $('dragHint').textContent = txt; $('dragHint').hidden = false;
+                setTimeout(function () { if ($('dragHint')) { $('dragHint').hidden = true; } }, 4000);
+            }
+        }
+        var pendLink = null;
+        function criaLigacao(from, to) {
+            if (!from || !to || from === to) { return; }
+            if (S.edges.some(function (e) { return e.from === from && e.to === to; })) { avisaLigacao('Esses dois já estão ligados.'); return; }
+            if (viraCiclo(from, to)) {
+                novaLigacao(from, to, false);
+                avisaLigacao('Como chefia isso fecharia um ciclo (' + label(byId[to]) + ' já está acima de ' + label(byId[from]) + '), então a ligação entrou como reporte.');
+                return;
+            }
+            if (bossOf(to)) {
+                pendLink = { from: from, to: to };
+                $('bossText').textContent = label(byId[to]) + ' já responde a ' + label(byId[bossOf(to).from]) + '.';
+                root.querySelector('[data-act="btrocar"]').textContent = 'Passar a responder a ' + label(byId[from]);
+                $('bossdlg').showModal();
+                return;
+            }
+            novaLigacao(from, to, true);
+        }
+        function novaLigacao(from, to, boss) {
+            var e = { id: 'e' + Date.now().toString(36) + S.edges.length, from: from, to: to, boss: !!boss, style: boss ? 'solida' : 'tracejada', label: '' };
+            if (boss) {
+                var atual = bossOf(to);
+                if (atual) { atual.boss = false; atual.style = 'tracejada'; }
+                S.edges.splice(edgeIndexTo(to) >= 0 ? edgeIndexTo(to) : S.edges.length, 0, e);
+            } else {
+                S.edges.push(e);
+            }
+            commit(); render(); selectEdge(e.id);
+        }
+        function selectEdge(id) {
+            var e = edgeById(id);
+            selEdge = e ? id : null;
+            if (ed) { ed.hidden = true; }
+            sel = null;
+            var pane = $('ledit');
+            if (!pane) { return; }
+            if (!e) { pane.hidden = true; render(); return; }
+            pane.hidden = false;
+            $('lwho').textContent = label(byId[e.from]) + '  →  ' + label(byId[e.to]);
+            L('boss').checked = !!e.boss;
+            L('dash').checked = e.style === 'tracejada';
+            L('label').value = e.label || '';
+            avisaLigacao('');
+            render();
+        }
+
         // ---- salvamento automático (bloco 1b) --------------------------
         // Grava SÓ o organograma, sem recarregar. Existe por dois motivos: não
         // perder trabalho, e permitir salvar em tela cheia (recarregar derruba
@@ -885,7 +1000,7 @@
         // ---- edição ----------------------------------------------------
         function select(id) {
             if (!editable) { return; }
-            sel = id;
+            sel = id; selEdge = null;
             // Sem redesenhar a árvore: trocar o DOM debaixo do cursor mata o
             // gesto de arraste que o usuário acabou de começar (relato de
             // Claudio em 20/09: "preciso clicar muitas vezes para pegar").
@@ -984,7 +1099,7 @@
                 out.push(e);
                 if (!done && e.to === id && e.from === pid) {
                     S.edges.forEach(function (k) {
-                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, style: k.style, label: k.label }); }
+                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, boss: k.boss, style: k.style, label: k.label }); }
                     });
                     done = true;
                 }
@@ -1046,6 +1161,30 @@
             F('dashed').addEventListener('change', function () { cur().dashed = F('dashed').checked; commit(); render(); });
             F('parent').addEventListener('change', function () { move(sel, F('parent').value); fill(); });
 
+            if (L('label')) {
+                L('label').addEventListener('input', function () {
+                    var e = edgeById(selEdge); if (!e) { return; }
+                    e.label = L('label').value; commit('lab:' + selEdge); render();
+                });
+                L('dash').addEventListener('change', function () {
+                    var e = edgeById(selEdge); if (!e) { return; }
+                    e.style = L('dash').checked ? 'tracejada' : 'solida'; commit(); render();
+                });
+                L('boss').addEventListener('change', function () {
+                    var e = edgeById(selEdge); if (!e) { return; }
+                    if (!L('boss').checked) { e.boss = false; commit(); render(); avisaLigacao(''); return; }
+                    if (viraCiclo(e.from, e.to)) {
+                        L('boss').checked = false;
+                        avisaLigacao('Não dá: ' + label(byId[e.to]) + ' já está acima de ' + label(byId[e.from]) + ' na cadeia de chefia.');
+                        return;
+                    }
+                    var atual = bossOf(e.to);
+                    if (atual && atual !== e) { atual.boss = false; atual.style = 'tracejada'; }
+                    e.boss = true; e.style = 'solida';
+                    commit(); render(); avisaLigacao('');
+                });
+            }
+
             // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (0.6.7-8). Dentro do organograma
             // o desfazer é SEMPRE o do organograma, campo de texto incluído: o
             // histórico já agrupa a digitação num passo, e depender do desfazer
@@ -1103,6 +1242,12 @@
 
             root.addEventListener('pointerdown', function (e) {
                 if (e.button !== 0 || !editable) { return; }
+                var porta = e.target.closest && e.target.closest('[data-port]');
+                if (porta) {
+                    gest = { ligando: porta.getAttribute('data-port'), sx: e.clientX, sy: e.clientY, moveu: false };
+                    e.preventDefault();
+                    return;
+                }
                 var chip = e.target.closest && e.target.closest('[data-new]');
                 var t = e.target.closest && e.target.closest('[data-id]');
                 if (chip) {
@@ -1123,6 +1268,21 @@
 
             document.addEventListener('pointermove', function (e) {
                 if (!gest) { return; }
+                if (gest.ligando) {
+                    if (!gest.moveu && Math.abs(e.clientX - gest.sx) + Math.abs(e.clientY - gest.sy) < LIMIAR) { return; }
+                    gest.moveu = true;
+                    var pl = pointOf(e), bo = geom[gest.ligando];
+                    if (!pl || !bo) { return; }
+                    clearZones();
+                    var sobL = alvoSob(e), tl = sobL && boxOf(sobL.getAttribute('data-id'));
+                    if (tl && tl !== gest.ligando) { sobL.classList.add('is-drop-in'); }
+                    var g = treeEl.querySelector('[data-el="guides"]');
+                    if (g) {
+                        g.innerHTML = '<path class="cx-org-linking" d="M' + Math.round(bo.x + bo.w / 2) + ' ' +
+                            Math.round(bo.y + bo.h / 2) + 'L' + Math.round(pl.x) + ' ' + Math.round(pl.y) + '"/>';
+                    }
+                    return;
+                }
                 if (!gest.moveu) {
                     if (Math.abs(e.clientX - gest.sx) + Math.abs(e.clientY - gest.sy) < LIMIAR) { return; }
                     gest.moveu = true;
@@ -1161,6 +1321,13 @@
             document.addEventListener('pointerup', function (e) {
                 if (!gest) { return; }
                 if (!gest.moveu) { gest = null; return; }   // foi clique, não arraste
+                if (gest.ligando) {
+                    var de = gest.ligando, alvo = alvoSob(e);
+                    gest = null; clearZones();
+                    var para = alvo && boxOf(alvo.getAttribute('data-id'));
+                    if (para && para !== de) { criaLigacao(de, para); }
+                    return;
+                }
                 var g = gest, sob = alvoSob(e), tid = sob && sob.getAttribute('data-id');
                 var d = g.id ? { id: g.id } : { kind: g.kind };
                 fimGesto();
@@ -1220,7 +1387,12 @@
             });
         }
 
-        treeEl.addEventListener('click', function (e) { var t = e.target.closest('[data-id]'); if (t) { select(t.getAttribute('data-id')); } });
+        treeEl.addEventListener('click', function (e) {
+            var l = e.target.closest && e.target.closest('[data-edge]');
+            if (l && editable) { selectEdge(l.getAttribute('data-edge')); return; }
+            var t = e.target.closest('[data-id]');
+            if (t) { selEdge = null; if ($('ledit')) { $('ledit').hidden = true; } select(t.getAttribute('data-id')); }
+        });
         treeEl.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter' && e.key !== ' ') { return; }
             var t = e.target.closest('[data-id]'); if (t && editable) { e.preventDefault(); select(t.getAttribute('data-id')); }
@@ -1267,6 +1439,17 @@
             else if (act === 'zin') { setZ(z + 0.1); }
             else if (act === 'zout') { setZ(z - 0.1); }
             else if (act === 'save') { saveForm(); }
+            else if (act === 'lclose') { selectEdge(null); }
+            else if (act === 'ldel') {
+                var eid = selEdge;
+                S.edges = S.edges.filter(function (x) { return x.id !== eid; });
+                selEdge = null; $('ledit').hidden = true; commit(); render();
+            }
+            else if (act === 'btrocar' || act === 'breporte') {
+                var pl = pendLink; pendLink = null; $('bossdlg').close();
+                if (pl) { novaLigacao(pl.from, pl.to, act === 'btrocar'); }
+            }
+            else if (act === 'bcancel') { pendLink = null; $('bossdlg').close(); }
             else if (act === 'fit') { fit(); }
             else if (act === 'tidy') {
                 S.nodes.forEach(function (n) { delete n.x; delete n.y; });
@@ -1391,6 +1574,10 @@
             free: function (id, x, y) { var f = find(id); if (f) { f.n.x = snap(x); f.n.y = snap(y); commit(); render(); } },
             origin: function () { return { x: origin.x, y: origin.y }; },
             save: function (cb) { salvaAgora(cb); },
+            link: function (from, to) { criaLigacao(from, to); },
+            pickEdge: function (id) { selectEdge(id); },
+            edgeState: function () { var e = edgeById(selEdge); return e ? { id: e.id, boss: e.boss, style: e.style, label: e.label } : null; },
+            msg: function () { var m = $('lmsg'); return m ? m.textContent : ''; },
             state: function () { var e = $('savestate'); return e ? e.textContent : ''; },
             preview: function (id, x, y) { return dropSpot(id, { x: x, y: y }, { dx: 0, dy: 0 }); },
             guides: function () {

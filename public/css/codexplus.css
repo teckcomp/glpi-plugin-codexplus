@@ -1524,6 +1524,27 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-box.is-free:hover .cx-org-card::after { opacity: 1; }
 .cx-org-tree.is-drop-free { background: color-mix(in srgb, var(--cx-accent) 5%, transparent); }
 .cx-org-guide { stroke: var(--cx-accent); stroke-width: 1; stroke-dasharray: 4 3; }
+/* Ligações (bloco 2d-1): chefia cheia, reporte tracejado e mais clara. A
+   trilha invisivel por cima e a area de clique — 2 px de linha nao se acerta. */
+.cx-org-link { fill: none; stroke: var(--cx-org-line); stroke-width: 2; }
+.cx-org-link.is-rep { stroke-dasharray: 6 4; opacity: .75; }
+.cx-org-link.is-dash { stroke-dasharray: 6 4; }
+.cx-org-link.is-sel { stroke: var(--cx-accent); stroke-width: 3; }
+.cx-org-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.cx-org-linking { fill: none; stroke: var(--cx-accent); stroke-width: 2; stroke-dasharray: 5 4; }
+.cx-org-elabel { font-size: 11px; fill: var(--cx-muted); paint-order: stroke; stroke: var(--cx-surface); stroke-width: 3px; }
+.cx-org-port {
+    position: absolute; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--cx-accent); border: 2px solid var(--cx-surface);
+    opacity: 0; transition: opacity .12s; cursor: crosshair; z-index: 4; touch-action: none;
+}
+.cx-org-box:hover .cx-org-port, .cx-org-port:hover { opacity: 1; }
+.cx-org-port.is-t { top: -6px; left: 50%; margin-left: -5px; }
+.cx-org-port.is-b { bottom: -6px; left: 50%; margin-left: -5px; }
+.cx-org-port.is-l { left: -6px; top: 50%; margin-top: -5px; }
+.cx-org-port.is-r { right: -6px; top: 50%; margin-top: -5px; }
+.cx-org-ledit { top: 96px; }
+.cx-org-hint.is-erro { color: var(--cx-danger); }
 /* Cópia que segue o cursor durante o arraste (bloco 2c-3). */
 .cx-org-ghost {
     position: absolute; z-index: 6; pointer-events: none; opacity: .92;

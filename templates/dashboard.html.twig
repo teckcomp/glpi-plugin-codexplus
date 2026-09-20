@@ -31,6 +31,38 @@
         {% endif %}
     </div>
 
+    {# ============ R3b1 — modelo novo, em teste até a R5 ============ #}
+    {% if can_create_new or new_docs is not empty %}
+        <section class="cx-card cx-card-wide cx-newmodel">
+            <div class="cx-card-head">
+                <h3 class="cx-card-title">
+                    {{ __('Documentos do modelo novo', 'codexplus') }}
+                    <span class="cx-newmodel-tag">{{ __('em teste', 'codexplus') }}</span>
+                </h3>
+                {% if can_create_new %}
+                    <a href="document.form.php" class="cx-btn cx-btn-primary">
+                        <i class="ti ti-plus"></i> {{ __('Novo documento (modelo novo)', 'codexplus') }}
+                    </a>
+                {% endif %}
+            </div>
+            {% if new_docs is not empty %}
+                <table class="codexplus-table cx-recent-table">
+                    <tbody>
+                        {% for d in new_docs %}
+                            <tr>
+                                <td><span class="codexplus-code cx-code-chip">{{ d.code }}</span></td>
+                                <td class="cx-cell-clip"><a class="codexplus-doc-link" href="document.form.php?id={{ d.id }}">{{ d.name }}</a></td>
+                                <td><span class="codexplus-status codexplus-status--{{ d.status }}">{{ d.status_label }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="codexplus-muted">{{ __('Nenhum documento do modelo novo visível para você ainda.', 'codexplus') }}</p>
+            {% endif %}
+        </section>
+    {% endif %}
+
     {% if counters.total == 0 %}
 
         {# ---- Estado vazio: quatro zeros pareceriam defeito. Convida a criar. ---- #}

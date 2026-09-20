@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.3-alpha` · atualizado em 20/09/2026 (Etapa R3c: papéis por
-> setor e por documento, validação antes de publicar, sem telas novas).
+> Estado: `v0.6.4-alpha` · atualizado em 20/09/2026 (Etapa R3b1: página do
+> documento no modelo novo — criar, editar, enviar, validar, devolver).
 
 ---
 
@@ -297,6 +297,26 @@ a revisão aberta tem **prazo** (padrão 30 dias, configurável), com indicador
 "Revisão atrasada", prorrogação com motivo ou cancelamento pelo gestor;
 "**revisado sem alteração**" renova a validade sem subir a revisão.
 
+#### Página do documento (R3b1, `v0.6.4-alpha`)
+
+`front/document.form.php` + `templates/document-form.html.twig` (CSS seção
+14). Uma página só: sem `id` cria; com `id` edita (rascunho, editor/gestor)
+ou mostra só leitura com os botões do fluxo que o usuário pode usar. **Não
+tem regra própria**: tudo vem de `Document::can*()` e dos métodos do fluxo;
+POST forjado é recusado pelas mesmas checagens (testado).
+
+- Categorias em select múltiplo filtrado pelos setores que o usuário gere
+  (`condition`; Ver todos vê todas). O servidor confere de novo. O documento
+  não fica sem categoria (salvo Ver todos).
+- Responsável editável só por quem gere o documento.
+- TinyMCE com `enable_images = false` até a R3b3 (imagem colada ainda não
+  teria onde ser guardada).
+- Painel: quadro "Documentos do modelo novo (em teste)" com o botão "Novo
+  documento (modelo novo)" (só para quem tem Criar e é gestor de algum setor,
+  ou Ver todos) e os 10 mais recentes visíveis. Sai na R5, quando o Painel
+  inteiro passa a ler o modelo novo.
+- Editores e alvos de leitura ainda só pelo console (R3b2).
+
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
 
@@ -522,6 +542,18 @@ depender do comportamento errático de `position: fixed` na impressão.
     corrigido em `6c64b4d`. Regra no `DEPLOY.md`: apagar o pacote depois do
     commit.
 
+41. **Select múltiplo por AJAX (`Dropdown::show` com `multiple`) usa o
+    `name` como veio**: sem `"[]"` no nome, o PHP recebe só o último valor.
+    Mas no modo `readonly` o próprio GLPI acrescenta `"[]"`. Por isso
+    `document.form.php` passa `_categories[]` editável e `_categories`
+    somente leitura. E as opções já escolhidas vão em **`value`**, não em
+    `values`: com `multiple`, `Dropdown::show` faz
+    `$params['values'] = $params['value'] ?? []` e apaga o que veio em
+    `values` (o campo abria vazio e o Salvar reclamava de categoria).
+42. **`Html::textarea` nasce com `enable_images = true`**: sem um destino
+    para os arquivos (`filecontainer`/`addFiles`), imagem colada no TinyMCE
+    se perde. Desligar até existir o destino (R3b3).
+
 ---
 
 ## 6. Contrato de código — não quebrar
@@ -606,6 +638,7 @@ codexplus/
 │   ├── DocumentContributor.php quem alterou cada revisão (R3c)
 │   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
 ├── front/                     controllers (rodam em escopo de função!)
+│   └── document.form.php      documento no modelo novo (R3b1)
 ├── templates/                 Twig
 ├── public/                    CSS e JS (única pasta servida como estático)
 └── docs/                      esta documentação

@@ -403,6 +403,7 @@
 .codexplus-status--publicado { background: var(--cx-ok-bg);      color: var(--cx-ok); }
 .codexplus-status--rascunho  { background: var(--cx-neutral-bg); color: var(--cx-neutral); }
 .codexplus-status--obsoleto  { background: var(--cx-danger-bg);  color: var(--cx-danger); }
+.codexplus-status--validacao { background: var(--cx-warn-bg);    color: var(--cx-warn); }   /* R3c */
 .codexplus-status--none      { background: transparent;          color: var(--cx-faint); }
 
 /* Vencimento (calculado a partir de date_published + validity_months).
@@ -1232,5 +1233,48 @@
 .codexplus-content :is(h1, h2, h3, h4, h5, h6):hover > a[href^="#"]:first-child,
 .codexplus-content :is(h1, h2, h3, h4, h5, h6) > a[href^="#"]:first-child:focus {
     opacity: .6;
+}
+
+/* =========================================================================
+   14. DOCUMENTO NO MODELO NOVO (Etapa R3b1)
+   front/document.form.php + templates/document-form.html.twig, e o quadro
+   "Documentos do modelo novo" no Painel. Reaproveita .codexplus-doc-edit*,
+   .codexplus-status--*, .cx-code-chip e .cx-card; aqui só o que faltava.
+   ========================================================================= */
+.cx-docform-ident { display: flex; align-items: center; gap: 8px; }
+.cx-docform-title { font-size: 1.25rem; font-weight: 600; }
+.cx-docform-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px 18px;
+}
+.cx-docform-field > label { display: block; font-weight: 600; margin-bottom: 4px; }
+.cx-docform-field--wide { grid-column: 1 / -1; }
+.cx-docform-roles {
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+    color: var(--cx-muted); font-size: .9em;
+}
+.cx-docform-view-title { margin: 0 0 8px; }
+.cx-docform-roles + .codexplus-content { margin-top: 18px; }
+
+.cx-notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    max-width: 900px; margin: 0 auto 14px; padding: 10px 14px;
+    border-radius: 8px; background: var(--cx-neutral-bg); color: var(--cx-text, inherit);
+}
+.cx-notice--warn { background: var(--cx-warn-bg); }
+.cx-notice > i { font-size: 1.2em; margin-top: 2px; }
+.cx-notice-text { margin-top: 4px; white-space: pre-line; }
+
+.cx-flow {
+    max-width: 900px; margin: 18px auto; padding: 14px 18px;
+    border: 1px solid var(--cx-border, #e5e7eb); border-radius: 10px; background: var(--cx-surface, #fff);
+}
+.cx-flow-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.cx-flow-reject textarea { flex: 1; }
+
+.cx-newmodel-tag {
+    margin-left: 8px; padding: 1px 8px; border-radius: 10px; font-size: .75em; font-weight: 500;
+    background: var(--cx-warn-bg); color: var(--cx-warn);
 }
 

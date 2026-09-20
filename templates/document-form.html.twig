@@ -1,0 +1,196 @@
+{# Codex+ — Etapa R3b1: página do documento no modelo novo.
+   Criar, editar (só rascunho, para editor/gestor) e mover no fluxo
+   (Enviar, Validar, Devolver, Obsoleto). Regras em src/Document.php;
+   aqui só se mostra o que o controller liberou.
+   Estilos: public/css/codexplus.css, seção 14. #}
+
+<div class="codexplus-app">
+
+    <div class="codexplus-article-bar">
+        <a href="{{ glpi_root }}/plugins/codexplus/front/dashboard.php" class="codexplus-back">
+            <i class="ti ti-arrow-left"></i> {{ __('Codex+', 'codexplus') }}
+        </a>
+        {% if not is_new %}
+            <div class="cx-docform-ident">
+                <span class="codexplus-code cx-code-chip">{{ code }}</span>
+                <span class="codexplus-muted">{{ doctype_label }}</span>
+                <span class="codexplus-status codexplus-status--{{ status }}">{{ status_label }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    {# ---------------- Avisos do fluxo ---------------- #}
+    {% if not is_new and status == 'rascunho' and validation_comment %}
+        <div class="cx-notice cx-notice--warn">
+            <i class="ti ti-arrow-back-up"></i>
+            <div>
+                <strong>{{ __('Devolvido pela validação', 'codexplus') }}</strong>
+                {% if validator_name %}— {{ validator_name }}{% endif %}
+                {% if date_validated %}, {{ date_validated|date('d/m/Y H:i') }}{% endif %}
+                <div class="cx-notice-text">{{ validation_comment }}</div>
+            </div>
+        </div>
+    {% endif %}
+    {% if is_blocked_contributor %}
+        <div class="cx-notice">
+            <i class="ti ti-user-exclamation"></i>
+            <div>{{ __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo.', 'codexplus') }}</div>
+        </div>
+    {% endif %}
+    {% if not is_new and status == 'validacao' and not can_validate and not is_blocked_contributor %}
+        <div class="cx-notice">
+            <i class="ti ti-hourglass"></i>
+            <div>{{ __('Em validação. Nenhuma alteração até o validador aprovar ou devolver.', 'codexplus') }}</div>
+        </div>
+    {% endif %}
+
+    {% if can_edit %}
+        {# ================= EDIÇÃO / CRIAÇÃO ================= #}
+        <form method="post" action="{{ self }}">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+            {% if not is_new %}<input type="hidden" name="id" value="{{ id }}">{% endif %}
+
+            <article class="codexplus-doc codexplus-doc-edit">
+
+                <div class="codexplus-doc-edit-zone">
+                    <label class="codexplus-doc-edit-zone-label" for="cx-docform-name">
+                        <i class="ti ti-heading"></i> {{ __('Título', 'codexplus') }}
+                    </label>
+                    <input type="text" id="cx-docform-name" name="name" value="{{ name }}"
+                           class="form-control cx-docform-title" required
+                           placeholder="{{ __('Título do documento', 'codexplus') }}">
+                </div>
+
+                <div class="codexplus-doc-edit-zone cx-docform-grid">
+                    {% if is_new %}
+                        <div class="cx-docform-field">
+                            <label>{{ __('Tipo', 'codexplus') }}</label>
+                            {{ widgets.doctype|raw }}
+                            <div class="codexplus-form-hint">{{ __('O tipo forma o código e não muda depois.', 'codexplus') }}</div>
+                        </div>
+                    {% endif %}
+
+                    <div class="cx-docform-field cx-docform-field--wide">
+                        <label>{{ __('Categorias', 'codexplus') }}</label>
+                        {{ widgets.categories|raw }}
+                        <div class="codexplus-form-hint">
+                            {{ __('A categoria define o setor — e o setor define quem valida. Só aparecem as categorias dos setores que você gere.', 'codexplus') }}
+                        </div>
+                    </div>
+
+                    {% if widgets.owner is defined %}
+                        <div class="cx-docform-field">
+                            <label>{{ __('Responsável', 'codexplus') }}</label>
+                            {{ widgets.owner|raw }}
+                            <div class="codexplus-form-hint">{{ __('Recebe o aviso de vencimento.', 'codexplus') }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if is_new or doctype == 'PRP' %}
+                        <div class="cx-docform-field">
+                            <label for="cx-docform-client">{{ __('Cliente (só propostas)', 'codexplus') }}</label>
+                            <input type="text" id="cx-docform-client" name="client_name" value="{{ client_name }}" class="form-control">
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="codexplus-doc-edit-zone codexplus-doc-edit-body">
+                    <label class="codexplus-doc-edit-zone-label">
+                        <i class="ti ti-article"></i> {{ __('Corpo do documento', 'codexplus') }}
+                    </label>
+                    {{ widgets.content|raw }}
+                    <div class="codexplus-form-hint">
+                        {{ __('Imagens coladas e anexos chegam na próxima etapa (R3b3).', 'codexplus') }}
+                    </div>
+                </div>
+
+                {% if not is_new %}
+                    <div class="codexplus-doc-edit-zone cx-docform-roles">
+                        <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
+                        <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
+                        <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                    </div>
+                {% endif %}
+            </article>
+
+            <div class="codexplus-form-actions codexplus-doc-edit-actions">
+                {% if is_new %}
+                    <button type="submit" name="add" value="1" class="codexplus-btn codexplus-btn-primary">
+                        <i class="ti ti-plus"></i> {{ __('Criar rascunho', 'codexplus') }}
+                    </button>
+                {% else %}
+                    <button type="submit" name="update" value="1" class="codexplus-btn codexplus-btn-primary">
+                        <i class="ti ti-device-floppy"></i> {{ __('Salvar', 'codexplus') }}
+                    </button>
+                {% endif %}
+                <a href="{{ is_new ? glpi_root ~ '/plugins/codexplus/front/dashboard.php' : self ~ '?id=' ~ id }}" class="codexplus-btn">{{ __('Cancelar', 'codexplus') }}</a>
+            </div>
+        </form>
+
+    {% else %}
+        {# ================= VISÃO (sem edição) ================= #}
+        <article class="codexplus-doc">
+            <h1 class="cx-docform-view-title">{{ name }}</h1>
+            <div class="cx-docform-roles">
+                <span><strong>{{ __('Categorias', 'codexplus') }}:</strong> {{ category_names ? category_names|join(', ') : '—' }}</span>
+                <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
+                <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
+                <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
+                <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                {% if status == 'publicado' and validator_name %}
+                    <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
+                {% endif %}
+            </div>
+            <div class="codexplus-content">{{ content_html|raw }}</div>
+        </article>
+    {% endif %}
+
+    {# ================= FLUXO ================= #}
+    {% if not is_new and (can_submit or can_validate or can_obsolete) %}
+        <section class="cx-flow">
+            <h3 class="cx-card-title">{{ __('Fluxo do documento', 'codexplus') }}</h3>
+
+            {% if can_submit %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
+                        <i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}
+                    </button>
+                    <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Em validação, o documento fica travado.', 'codexplus') }}</span>
+                </form>
+            {% endif %}
+
+            {% if can_validate %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="approve" value="1" class="codexplus-btn codexplus-btn-primary"
+                            onclick="return confirm('{{ __('Validar e publicar este documento?', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-circle-check"></i> {{ __('Validar e publicar', 'codexplus') }}
+                    </button>
+                </form>
+                <form method="post" action="{{ self }}" class="cx-flow-row cx-flow-reject">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <textarea name="validation_comment" rows="2" class="form-control" required
+                              placeholder="{{ __('Motivo da devolução (obrigatório)', 'codexplus') }}"></textarea>
+                    <button type="submit" name="reject" value="1" class="codexplus-btn">
+                        <i class="ti ti-arrow-back-up"></i> {{ __('Devolver para rascunho', 'codexplus') }}
+                    </button>
+                </form>
+            {% endif %}
+
+            {% if can_obsolete %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="obsolete" value="1" class="codexplus-btn"
+                            onclick="return confirm('{{ __('Tornar este documento obsoleto?', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-archive"></i> {{ __('Tornar obsoleto', 'codexplus') }}
+                    </button>
+                </form>
+            {% endif %}
+        </section>
+    {% endif %}
+</div>

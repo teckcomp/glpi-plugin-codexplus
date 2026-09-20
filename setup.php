@@ -11,7 +11,7 @@ use Glpi\Plugin\Hooks;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\ProfileTab;
 use GlpiPlugin\Codexplus\Wiki;
-define('PLUGIN_CODEXPLUS_VERSION', '0.6.4-alpha');
+define('PLUGIN_CODEXPLUS_VERSION', '0.6.7-alpha');
 // Versões mínima/máxima do GLPI suportadas
 define('PLUGIN_CODEXPLUS_MIN_GLPI', '11.0.0');
 define('PLUGIN_CODEXPLUS_MAX_GLPI', '11.0.99');
@@ -54,7 +54,7 @@ function plugin_init_codexplus(): void
     // Os estáticos ficam em public/ — no GLPI 11 o roteador só serve
     // arquivos não-PHP a partir dessa pasta.
     $PLUGIN_HOOKS[Hooks::ADD_CSS]['codexplus']        = 'css/codexplus.css';
-    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = 'js/codexplus.js';
+    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = ['js/codexplus.js', 'js/codexplus-org.js'];
 }
 /**
  * Metadados do plugin.

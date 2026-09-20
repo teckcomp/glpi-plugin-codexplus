@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.4-alpha` · atualizado em 20/09/2026 (Etapa R3b1: página do
-> documento no modelo novo — criar, editar, enviar, validar, devolver).
+> Estado: `v0.6.7-alpha` · atualizado em 20/09/2026 (identidade visual,
+> Painel no modelo novo e demonstração de diagramas).
 
 ---
 
@@ -320,7 +320,105 @@ POST forjado é recusado pelas mesmas checagens (testado).
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
 
+### 3.2 Identidade visual (`v0.6.5-alpha`)
+
+Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
+o próprio CSS em `codexplus.js` e continua em Arial.
+
+- **Paleta:** a do protótipo do organograma (Etapa 9), nos tokens `--cx-` da
+  seção 1 do CSS. Cada tipo tem cor própria (`--cx-type-POP` etc., com `-bg`
+  e `-ink`) e os níveis do organograma já têm tokens (`--cx-l-*`). Cor de
+  status continua semântica.
+- **Fontes:** IBM Plex Sans, Sans Condensed (títulos, números) e Mono
+  (códigos), só o subconjunto latino, em `public/fonts/` com a licença OFL.
+  Nada de Google Fonts: o servidor não chama nada externo.
+- **Marca do produto:** "monograma C+", SVG embutido em
+  `templates/parts/brand.html.twig`, incluído no cabeçalho de todas as telas
+  (`include ... with {title, subtitle} only`). A marca é do produto e fica no
+  repositório; a **logo da empresa** continua dado da instalação e sai no PDF.
+  O menu do GLPI mantém o ícone Tabler `ti ti-book-2` (ícone próprio ali
+  exigiria mexer no núcleo).
+- **Painel:** donuts "Por tipo" e "Situação" (conic-gradient montado no
+  Twig, sem biblioteca) no lugar das barras de proporção; "Em dia" =
+  publicado que não está a vencer nem vencido (inclui proposta); "Outros" =
+  obsoleto ou sem metadados, só aparece se houver. Código dos recentes
+  colorido pelo tipo (`.cx-code-type-*`); a situação fica na última coluna.
+- **Painel no modelo novo (0.6.6, Claudio):** `Dashboard::loadAllNew()` lê
+  `Document` com `Document::getVisibilityCriteria()` e devolve o mesmo formato
+  de `loadAll()` mais `sector` e `owner`, para `getCounters`, `getByType`,
+  `getAttention` e `getRecent` servirem aos dois modelos até a R5. "Em
+  revisão" = status `validacao` (a R6 soma a revisão aberta). Indicadores e
+  legendas não são links enquanto a tela Documentos listar o modelo antigo.
+  Os atalhos "Criar a partir de um modelo" saíram do Painel até a R3b4.
+- **Menu:** "Codex+" com o ícone Tabler `ti ti-square-rounded-letter-c-filled`
+  (`Wiki::getIcon()`), o mais próximo da marca. Aparece só depois de sair e
+  entrar (achado 32).
+
 ---
+
+### 3.3 Diagramas — demonstração (`v0.6.7-alpha`)
+
+Pacote enxuto da Etapa 9 (9a–9c) para a apresentação à gestão de 21/09
+(Claudio, 20/09/2026).
+
+- **Tipo `DIA`** em `DocumentMeta::DOCTYPE_KEYS`, só no modelo novo
+  (`NEW_MODEL_ONLY`: o fluxo antigo de "Novo documento" usa
+  `getLegacyDoctypes()` e não o oferece). Validade padrão por tipo em
+  `DocumentMeta::VALIDITY_BY_TYPE` / `defaultValidity()`: POP e PSG 12,
+  Manual 6, DIA 3, Proposta 0 (até a escolha na publicação existir).
+- **Tabela** `glpi_plugin_codexplus_diagrams`: um por documento
+  (`plugin_codexplus_documents_id` único), `subtype` (`organograma`), `data`
+  (JSON). `src/Diagram.php` lê, grava e **valida** (forma, níveis, limites de
+  tamanho e profundidade). Não é CommonDBTM: a permissão é sempre a do
+  documento, checada antes em `front/document.form.php`. Purga junto com o
+  documento (`Document::cleanDBonPurge`).
+- **Motor** `public/js/codexplus-org.js` (carregado pelo hook, como o
+  `codexplus.js`), adaptado do protótipo aprovado. `[data-cx-org]` monta
+  edição (`data-editable="1"`, grava o JSON num hidden `_diagram` que vai no
+  Salvar) ou leitura (zoom, ajustar, busca de pessoa sem acento). Todos os
+  botões são `type="button"` e Enter nos campos não envia o formulário (o
+  editor vive dentro do form do documento). CSS na seção 16, cores de nível
+  nos tokens `--cx-l-*`.
+- **Salvar** um diagrama alterado registra quem alterou
+  (`DocumentContributor`: quem editou não valida) e atualiza `date_mod`.
+- **PDF:** iframe fora da tela com o CSS do plugin, A4 paisagem, árvore
+  ajustada para caber numa página e matriz na seguinte; nome sugerido
+  `código - título` (achado 24).
+- **0.6.7-3 (Claudio, 20/09/2026):** botão **Tela cheia** (edição e leitura;
+  API de tela cheia do navegador, com classe `is-full` de reserva); zoom com
+  Ctrl + roda centrado no ponteiro; arrastar o fundo para navegar; soltar
+  um cartão **à esquerda ou à direita** de outro (vira colega, na ordem) ou
+  **em cima** (vira subordinado), com marca de posição, e a árvore se
+  reorganiza; **paleta** (Pessoa, Equipe, Vaga, Coringa NOC) arrastável;
+  **Modelos** genéricos (estrutura funcional, suporte de TI com matriz ITIL,
+  escritório de projetos, clínica, em branco), aplicados com dois cliques.
+  Ligações extras (reporte funcional pontilhado) ficam para depois.
+- **0.6.7-5 (Claudio, 20/09/2026): elementos padrão de mercado.** Paleta:
+  Cargo, Área ou equipe, Vaga em aberto, Assessoria e Terceiro ou consultor
+  (tracejado). Cada organograma guarda os **próprios níveis** em `levels`
+  (chave, nome, cor), editáveis pelo botão **Níveis** (renomear, cor, criar,
+  subir; nível em uso não se exclui), e os **elementos criados** em
+  `elements` (nome, pessoa ou equipe, nível fixo ou "conforme a posição",
+  tracejado), pelo "Criar elemento" da paleta. Padrão dos novos: Conselho,
+  Diretoria, Gerência, Coordenação, Supervisão, Especialista, Operacional
+  (`Diagram::starter()` e `STD_LEVELS` no motor: manter iguais). Organograma
+  salvo antes, sem `levels`, abre com os níveis que já usava (N1, N2, NOC) e o
+  NOC continua tracejado. Nó ganha `kind` (vaga, assessoria, terceiro,
+  `el:<id>`) e `dashed`. `Diagram::validate()` aceita as chaves de nível do
+  próprio diagrama e cor só em `#rrggbb` (a cor vai para um `style`).
+  Biblioteca de elementos da empresa inteira = Etapa 9g (banco).
+- **Regra de desenho:** quem não tem subordinados é **linha** no cartão do
+  chefe; quem tem é **cartão próprio**. **0.6.7-6 (Claudio, 20/09/2026):**
+  arrastar alguém com equipe e soltar numa lista (linha de um cartão, ou no
+  meio de um cartão) abre a escolha: **deixar a equipe com o chefe atual**
+  (os subordinados diretos sobem para o lugar dele, cada um com a própria
+  equipe, e ele entra na lista como linha) ou **levar a equipe junto** (vira
+  cartão). Ao lado de um cartão não pergunta. Durante o arraste, uma faixa
+  avisa quantos subordinados a pessoa tem.
+- **Desvio aprovado:** a leitura desenha do JSON publicado; o SVG da versão
+  publicada, desfazer/refazer e o salvamento automático ficam para completar
+  a 9a–9c. Sem nomes de pessoas no código (repositório público): o DIA nasce
+  só com o topo, e o organograma real entra por "Importar ou exportar".
 
 ## 4. Decisões de arquitetura que já custaram caro
 
@@ -636,11 +734,12 @@ codexplus/
 │   ├── SectorMember.php       gestores e validadores do setor (R3c)
 │   ├── DocumentEditor.php     editores do documento (R3c)
 │   ├── DocumentContributor.php quem alterou cada revisão (R3c)
+│   ├── Diagram.php            diagrama do documento DIA: ler, gravar, validar (0.6.7)
 │   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
 ├── front/                     controllers (rodam em escopo de função!)
 │   └── document.form.php      documento no modelo novo (R3b1)
-├── templates/                 Twig
-├── public/                    CSS e JS (única pasta servida como estático)
+├── templates/                 Twig (parts/brand.html.twig: cabeçalho com a marca, 0.6.5)
+├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
 └── docs/                      esta documentação
 ```
 

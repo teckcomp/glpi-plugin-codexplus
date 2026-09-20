@@ -31,7 +31,7 @@ Html::header(
 );
 
 // Tipo pré-selecionado (vem dos atalhos "criar a partir de modelo").
-$preset = isset($_GET['doctype']) && in_array($_GET['doctype'], DocumentMeta::DOCTYPE_KEYS, true)
+$preset = isset($_GET['doctype']) && array_key_exists($_GET['doctype'], DocumentMeta::getLegacyDoctypes())
     ? (string) $_GET['doctype']
     : '';
 
@@ -50,7 +50,7 @@ foreach ($DB->request([
 
 TemplateRenderer::getInstance()->display('@codexplus/newdocument.html.twig', [
     'glpi_root' => $CFG_GLPI['root_doc'],
-    'doctypes'  => DocumentMeta::getDoctypes(),
+    'doctypes'  => DocumentMeta::getLegacyDoctypes(),
     'templates' => $templates,
     'preset'    => $preset,
     'csrf'      => Session::getNewCSRFToken(),

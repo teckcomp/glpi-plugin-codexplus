@@ -18,7 +18,11 @@
      9. Anexos
     10. Aba Codex+ na ficha nativa
     11. Painel
-    12. Edição embutida (Etapa 4d)
+    12. Edição embutida (Etapa 4d) e configuração de marca (4a)
+    13. Identificação na leitura (4b)
+    14. Documento no modelo novo (R3b1)
+    15. Identidade visual (0.6.5)
+    16. Organograma (Etapa 9, 0.6.7)
 
    ESCOPO: as regras visuais ficam sob .codexplus-app (telas do plugin) ou
    .codexplus-meta-tab (aba dentro da ficha nativa do artigo). Os TOKENS
@@ -31,32 +35,49 @@
    ========================================================================= */
 
 :root {
-    /* Marca */
-    --cx-accent:        #0c447c;
-    --cx-accent-strong: #0a3663;
-    --cx-accent-soft:   #e6f1fb;
+    /* Marca — paleta do protótipo do organograma, aprovada como identidade
+       do Codex+ em 20/09/2026 (Claudio). */
+    --cx-accent:        #1f5fbf;
+    --cx-accent-strong: #174a94;
+    --cx-accent-soft:   #e4edfa;
 
     /* Texto e superfícies */
-    --cx-text:      #1f2937;
-    --cx-text-read: #24292f;
-    --cx-muted:     #6b7280;
-    --cx-faint:     #9ca3af;
-    --cx-border:    #e5e7eb;
-    --cx-border-soft: #eef0f2;
+    --cx-text:      #17202d;
+    --cx-text-read: #17202d;
+    --cx-muted:     #5a6575;
+    --cx-faint:     #8e9aaa;
+    --cx-border:    #d3d9e0;
+    --cx-border-soft: #edf0f3;
     --cx-surface:   #ffffff;
-    --cx-surface-1: #f9fafb;
-    --cx-surface-2: #f3f4f6;
+    --cx-surface-1: #f6f8fa;
+    --cx-surface-2: #edf0f3;
 
-    /* Status — usados nas etiquetas, nos códigos e (Etapa 6) nos
-       indicadores do Painel. Mesma paleta do mockup aprovado. */
+    /* Status — etiquetas, códigos e indicadores do Painel. */
     --cx-ok:        #1b7a45;
     --cx-ok-bg:     #e3f5e9;
-    --cx-warn:      #b45309;
-    --cx-warn-bg:   #fef3c7;
-    --cx-danger:    #b42318;
-    --cx-danger-bg: #fcebeb;
-    --cx-neutral:   #6b7280;
-    --cx-neutral-bg:#f3f4f6;
+    --cx-warn:      #8a5500;
+    --cx-warn-bg:   #fbf0dc;
+    --cx-warn-mark: #d4940a;   /* preenchimento (donut); texto usa --cx-warn */
+    --cx-danger:    #b3261e;
+    --cx-danger-bg: #fbe4e2;
+    --cx-neutral:   #3f4a5a;
+    --cx-neutral-bg:#eef1f4;
+
+    /* Tipos de documento (donut, chips de código). 0.6.5 */
+    --cx-type-POP: #1f5fbf;  --cx-type-POP-bg: #e4edfa;  --cx-type-POP-ink: #174a94;
+    --cx-type-PSG: #1f7f6c;  --cx-type-PSG-bg: #e0f2ee;  --cx-type-PSG-ink: #17624f;
+    --cx-type-MAN: #7a4fb5;  --cx-type-MAN-bg: #efe8f8;  --cx-type-MAN-ink: #5e3a92;
+    --cx-type-PRP: #c4860e;  --cx-type-PRP-bg: #fbf0dc;  --cx-type-PRP-ink: #8a5500;
+    --cx-type-DIA: #cf4b66;  --cx-type-DIA-bg: #fbe6eb;  --cx-type-DIA-ink: #a3304b;
+
+    /* Níveis do organograma (Etapa 9), do protótipo aprovado. */
+    --cx-l-diretoria:  #22314f;
+    --cx-l-gestao:     #3e6aa8;
+    --cx-l-supervisao: #c4860e;
+    --cx-l-n3:         #7a4fb5;
+    --cx-l-n2:         #1f7f6c;
+    --cx-l-n1:         #2e86d1;
+    --cx-l-noc:        #cf4b66;
 
     /* Métrica */
     --cx-radius:    10px;
@@ -64,8 +85,10 @@
     --cx-radius-pill: 20px;
     --cx-gap:       12px;
 
-    /* Fonte monoespaçada dos códigos (POP0001:00) */
-    --cx-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* Tipografia — IBM Plex, servida de public/fonts (seção 15). */
+    --cx-font:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --cx-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+    --cx-mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* =========================================================================
@@ -806,10 +829,10 @@
 /* ---- Cartões (zonas C, D, E) ---- */
 .cx-dash-cards {
     display: grid;
-    grid-template-columns: 1.05fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--cx-gap);
     margin: 0 0 18px;
-    align-items: start;
+    align-items: stretch;
 }
 @media (max-width: 900px) {
     .cx-dash-cards { grid-template-columns: 1fr; }
@@ -840,30 +863,60 @@
 }
 .cx-card-more:hover { text-decoration: underline; }
 
-/* ---- Zona C: barras de proporção por tipo ---- */
-.cx-bars { display: flex; flex-direction: column; gap: 11px; }
-.cx-bar-row { display: block; text-decoration: none; color: var(--cx-text); }
-.cx-bar-row:hover { color: var(--cx-accent); }
-.cx-bar-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 4px;
-}
-.cx-bar-name  { font-size: 13.5px; }
-.cx-bar-total { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.cx-bar-track {
-    height: 5px;
-    border-radius: 3px;
+/* ---- Zona C: donuts (0.6.5, substituem as barras) ---- */
+/* O anel é um conic-gradient montado no template com as cores dos tokens;
+   o miolo é um círculo branco por cima (mask não precisa de prefixo). */
+.cx-donut-card { display: flex; align-items: center; gap: 22px; }
+.cx-donut {
+    position: relative;
+    flex: 0 0 auto;
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
     background: var(--cx-surface-2);
-    overflow: hidden;
 }
-.cx-bar-fill {
-    height: 100%;
-    background: var(--cx-accent);
-    border-radius: 3px;
-    transition: width .2s ease;
+.cx-donut::after {
+    content: "";
+    position: absolute;
+    inset: 17px;
+    border-radius: 50%;
+    background: var(--cx-surface);
 }
+.cx-donut-center {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.cx-donut-value {
+    font-family: var(--cx-font-display);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--cx-text);
+}
+.cx-donut-label { font-size: 12px; color: var(--cx-muted); }
+.cx-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.cx-legend a, .cx-legend span.cx-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--cx-text);
+    text-decoration: none;
+}
+.cx-legend a:hover { color: var(--cx-accent); }
+.cx-legend-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 3px; }
+.cx-legend-name { flex: 1; min-width: 0; }
+.cx-legend-total { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cx-dot-emdia   { background: var(--cx-ok); }
+.cx-dot-avencer { background: var(--cx-warn-mark); }
+.cx-dot-vencido { background: var(--cx-danger); }
+.cx-dot-rascunho{ background: var(--cx-faint); }
+.cx-dot-outros  { background: var(--cx-border); }
 
 /* ---- Zona C: precisa de atenção ---- */
 .cx-card-list { list-style: none; margin: 0; padding: 0; }
@@ -1278,3 +1331,387 @@
     background: var(--cx-warn-bg); color: var(--cx-warn);
 }
 
+/* =========================================================================
+   15. IDENTIDADE VISUAL (0.6.5)
+   Aprovada por Claudio em 20/09/2026: paleta do protótipo do organograma
+   (tokens da seção 1), IBM Plex servida do próprio plugin (sem Google
+   Fonts: nada sai do servidor), marca "monograma C+" no cabeçalho
+   (templates/parts/brand.html.twig). Só a tela: o PDF monta o próprio CSS
+   em codexplus.js e continua em Arial.
+   ========================================================================= */
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+    font-family: "IBM Plex Sans Condensed";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-sans-condensed-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+    font-family: "IBM Plex Mono";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+}
+
+.codexplus-app { font-family: var(--cx-font); }
+.codexplus-app h2, .codexplus-app h3,
+.cx-card-title, .cx-stat-value { font-family: var(--cx-font-display); }
+
+/* ---- Cabeçalho com a marca ---- */
+.codexplus-header.cx-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.cx-brand-mark { flex: 0 0 auto; width: 46px; height: 46px; display: block; }
+.cx-brand-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.codexplus-header.cx-brand h2 {
+    font-size: 26px;
+    line-height: 1.1;
+    color: var(--cx-text);
+    letter-spacing: -.01em;
+}
+.codexplus-header.cx-brand span { font-size: 13.5px; }
+
+/* ---- Menu do Codex+ ---- */
+.codexplus-nav a { padding: 10px 16px; }
+.codexplus-nav a.is-active { font-weight: 600; border-bottom-width: 2.5px; }
+
+/* ---- Indicadores: cartão branco com borda, número grande ---- */
+.cx-stat {
+    background: var(--cx-surface);
+    border: 1px solid var(--cx-border);
+    padding: 16px 18px;
+    transition: border-color .12s ease, box-shadow .12s ease;
+}
+.cx-stat:hover {
+    background: var(--cx-surface);
+    border-color: var(--cx-faint);
+    box-shadow: 0 1px 4px rgba(23, 32, 45, .06);
+}
+.cx-stat-chip { width: 32px; height: 32px; border-radius: 8px; font-size: 17px; }
+.cx-stat-label { font-size: 14px; font-weight: 500; }
+.cx-stat-value { font-size: 38px; margin-top: 4px; }
+.cx-stat-context { font-size: 13px; color: var(--cx-muted); }
+
+/* ---- Código do documento colorido pelo tipo ---- */
+.cx-code-type-POP { background: var(--cx-type-POP-bg); color: var(--cx-type-POP-ink); }
+.cx-code-type-PSG { background: var(--cx-type-PSG-bg); color: var(--cx-type-PSG-ink); }
+.cx-code-type-MAN { background: var(--cx-type-MAN-bg); color: var(--cx-type-MAN-ink); }
+.cx-code-type-PRP { background: var(--cx-type-PRP-bg); color: var(--cx-type-PRP-ink); }
+.cx-code-type-DIA { background: var(--cx-type-DIA-bg); color: var(--cx-type-DIA-ink); }
+.cx-dot-POP { background: var(--cx-type-POP); }
+.cx-dot-PSG { background: var(--cx-type-PSG); }
+.cx-dot-MAN { background: var(--cx-type-MAN); }
+.cx-dot-PRP { background: var(--cx-type-PRP); }
+.cx-dot-DIA { background: var(--cx-type-DIA); }
+
+/* ---- 0.6.6: cinco indicadores, legenda sem link, recentes com setor ---- */
+.cx-dash-stats--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1200px) {
+    .cx-dash-stats--5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+    .cx-dash-stats--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border); }
+.cx-stat-accent { color: var(--cx-accent); }
+.cx-dot-emrevisao { background: var(--cx-accent); }
+.cx-recent-table--new th:nth-child(3), .cx-recent-table--new td:nth-child(3) { width: 18%; }
+.cx-recent-table--new th:nth-child(4), .cx-recent-table--new td:nth-child(4) { width: 13%; }
+.cx-recent-table--new th:nth-child(5), .cx-recent-table--new td:nth-child(5) { width: 14%; }
+.cx-recent-table--new th:nth-child(6), .cx-recent-table--new td:nth-child(6) { width: 96px; }
+.cx-recent-table--new th:nth-child(7), .cx-recent-table--new td:nth-child(7) { width: 104px; }
+
+/* =========================================================================
+   16. ORGANOGRAMA (Etapa 9, 0.6.7)
+   Visual do protótipo aprovado ("Organograma técnico Resolutto"), escopado
+   em .cx-org e com as cores de nível nos tokens --cx-l-* (seção 1). O motor
+   é public/js/codexplus-org.js; o mesmo CSS serve a tela e a janela de
+   impressão (A4 paisagem).
+   ========================================================================= */
+
+.cx-org { --cx-org-line: #8e9aaa; font-family: var(--cx-font); color: var(--cx-text); }
+.cx-org-btn {
+    font: inherit; font-size: 13.5px; font-weight: 500;
+    border: 1px solid var(--cx-border); background: var(--cx-surface); color: var(--cx-text);
+    border-radius: 6px; padding: 7px 12px; cursor: pointer; line-height: 1.2;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.cx-org-btn:hover { border-color: var(--cx-faint); }
+.cx-org-btn:disabled { opacity: .45; cursor: not-allowed; }
+.cx-org-btn--primary { background: var(--cx-accent); border-color: var(--cx-accent); color: #fff; }
+.cx-org-btn--primary:hover { background: var(--cx-accent-strong); }
+.cx-org-btn--danger { color: var(--cx-danger); }
+.cx-org-btn.is-armed { background: var(--cx-danger); border-color: var(--cx-danger); color: #fff; }
+
+.cx-org-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
+.cx-org-zoom { display: inline-flex; align-items: center; border: 1px solid var(--cx-border); border-radius: 6px; background: var(--cx-surface); }
+.cx-org-zoom .cx-org-btn { border: 0; background: none; padding: 7px 10px; }
+.cx-org-zoom output { font-size: 13px; min-width: 44px; text-align: center; color: var(--cx-muted); }
+.cx-org-search { display: inline-flex; align-items: center; gap: 8px; margin: 0; flex: 1 1 220px; max-width: 360px; }
+.cx-org-search input {
+    width: 100%; font: inherit; font-size: 13.5px; padding: 7px 10px;
+    border: 1px solid var(--cx-border); border-radius: 6px; background: var(--cx-surface); color: var(--cx-text);
+}
+.cx-org-qcount { font-size: 12.5px; color: var(--cx-muted); white-space: nowrap; }
+.cx-org-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.cx-org-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; font-size: 13px; color: var(--cx-muted); }
+.cx-org-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cx-org-legend i { width: 16px; height: 6px; border-radius: 2px; background: var(--lc); }
+.cx-org-legend i.is-dash { background: none; border: 1.5px dashed var(--cx-org-line); height: 8px; }
+.cx-org-legend b { color: var(--cx-text); font-weight: 600; }
+
+.cx-org-stage {
+    border: 1px solid var(--cx-border); border-radius: 10px; overflow: auto; max-width: 100%;
+    background: var(--cx-surface-1) radial-gradient(var(--cx-border) 1px, transparent 1.3px) 0 0 / 20px 20px;
+}
+.cx-org-tree { padding: 28px 24px 40px; width: max-content; min-width: 100%; box-sizing: border-box; }
+.cx-org-tree ul { display: flex; justify-content: center; margin: 0; padding: 24px 0 0; position: relative; }
+.cx-org-tree > ul { padding-top: 0; }
+.cx-org-tree ul > li { list-style: none; position: relative; padding: 24px 7px 0; display: flex; flex-direction: column; align-items: center; }
+.cx-org-tree ul > li::before, .cx-org-tree ul > li::after {
+    content: ""; position: absolute; top: 0; right: 50%; width: 50%; height: 24px; border-top: 2px solid var(--cx-org-line);
+}
+.cx-org-tree ul > li::after { right: auto; left: 50%; border-left: 2px solid var(--cx-org-line); }
+.cx-org-tree ul > li:only-child::before, .cx-org-tree ul > li:only-child::after { display: none; }
+.cx-org-tree ul > li:only-child { padding-top: 0; }
+.cx-org-tree ul > li:first-child::before, .cx-org-tree ul > li:last-child::after { border: 0; }
+.cx-org-tree ul > li:last-child::before { border-right: 2px solid var(--cx-org-line); border-radius: 0 7px 0 0; }
+.cx-org-tree ul > li:first-child::after { border-radius: 7px 0 0 0; }
+.cx-org-tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; height: 24px; border-left: 2px solid var(--cx-org-line); }
+.cx-org-tree > ul > li { padding-top: 0; }
+.cx-org-tree > ul > li::before, .cx-org-tree > ul > li::after { display: none; }
+
+.cx-org-card {
+    position: relative; background: var(--cx-surface); border: 1px solid var(--cx-border); border-left: 6px solid var(--lc);
+    border-radius: 8px; min-width: 178px; max-width: 230px; text-align: left; cursor: pointer; box-shadow: 0 1px 0 var(--cx-border);
+    transition: opacity .15s;
+}
+.cx-org-card.is-group { background: color-mix(in srgb, var(--lc) 8%, var(--cx-surface)); }
+.cx-org-card.is-dashed { border-style: dashed; border-left-style: solid; border-color: var(--lc); }
+.cx-org-row.is-dashed::before { background: transparent; border: 1.5px dashed var(--lc); }
+.cx-org-head { padding: 9px 12px 8px; }
+.cx-org-head strong { display: block; font-family: var(--cx-font-display); font-weight: 600; font-size: 15.5px; line-height: 1.2; }
+.cx-org-role { display: block; font-size: 12.5px; color: var(--cx-muted); line-height: 1.3; margin-top: 2px; }
+.cx-org-head .cx-org-pend { display: inline-block; margin-top: 5px; }
+.cx-org-rows { border-top: 1px solid var(--cx-border); padding: 4px 0 5px; }
+.cx-org-row { display: flex; align-items: center; gap: 8px; padding: 3px 12px; font-size: 13.5px; line-height: 1.35; transition: opacity .15s; }
+.cx-org-row::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--lc); flex: none; }
+.cx-org-row:hover { background: color-mix(in srgb, var(--lc) 12%, transparent); }
+.cx-org .is-vaga { color: var(--cx-muted); font-style: italic; }
+.cx-org-row.is-vaga::before { background: transparent; border: 1.5px dashed var(--lc); }
+.cx-org-pend {
+    font-size: 11px; font-weight: 500; font-style: normal; color: var(--cx-warn); border: 1px solid currentColor;
+    border-radius: 99px; padding: 0 6px; margin-left: auto; white-space: nowrap;
+}
+.cx-org .is-sel { outline: 2px solid var(--cx-accent); outline-offset: 2px; }
+.cx-org-row.is-sel { outline-offset: -2px; }
+.cx-org .is-drop { outline: 2px dashed var(--cx-accent) !important; outline-offset: 3px; }
+.cx-org .is-dragging { opacity: .4; }
+.cx-org .is-dim { opacity: .28; }
+.cx-org .is-hit { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cx-accent) 45%, transparent); }
+.cx-org-row.is-hit { background: color-mix(in srgb, var(--cx-accent) 14%, transparent); box-shadow: none; }
+.cx-org-card[draggable="true"], .cx-org-row[draggable="true"] { cursor: grab; }
+
+.cx-org-editor {
+    position: fixed; right: 16px; top: 96px; width: 320px; max-height: calc(100vh - 120px); overflow: auto;
+    background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: 10px; padding: 16px;
+    box-shadow: 0 14px 36px rgba(12, 20, 32, .22); z-index: 1040;
+}
+.cx-org-editor[hidden] { display: none; }
+.cx-org-editor h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.cx-org-edtop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cx-org-editor label { display: block; font-size: 12.5px; color: var(--cx-muted); margin: 10px 0 0; }
+.cx-org-editor label small { font-size: 11.5px; }
+.cx-org-editor input:not([type="checkbox"]), .cx-org-editor select, .cx-org-editor textarea {
+    display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 14px; padding: 7px 9px;
+    border: 1px solid var(--cx-border); border-radius: 6px; background: var(--cx-surface-1); color: var(--cx-text); box-sizing: border-box;
+}
+.cx-org-editor textarea { resize: vertical; }
+.cx-org-check { display: flex !important; gap: 8px; align-items: center; color: var(--cx-text) !important; font-size: 14px !important; }
+.cx-org-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.cx-org-hint { font-size: 12.5px; color: var(--cx-muted); margin: 12px 0 0; }
+@media (max-width: 720px) {
+    .cx-org-editor { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 72vh; border-radius: 12px 12px 0 0; }
+}
+
+.cx-org-esc { margin-top: 26px; }
+.cx-org-esc h3 { font-family: var(--cx-font-display); font-weight: 600; font-size: 19px; margin: 0 0 10px; }
+.cx-org-tablewrap { overflow-x: auto; border: 1px solid var(--cx-border); border-radius: 10px; background: var(--cx-surface); }
+.cx-org-esc table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+.cx-org-esc th { text-align: left; font-weight: 600; font-size: 13px; color: var(--cx-muted); padding: 10px 12px; border-bottom: 1px solid var(--cx-border); }
+.cx-org-esc td { padding: 10px 12px; border-bottom: 1px solid var(--cx-border); vertical-align: top; }
+.cx-org-esc td:first-child { font-weight: 600; border-left: 5px solid var(--lc); min-width: 150px; }
+.cx-org-esc td.cx-org-empty { border-left: 0; font-weight: 400; color: var(--cx-muted); }
+.cx-org-esc td.x, .cx-org-esc th.x { width: 1%; white-space: nowrap; }
+.cx-org-esc td.x .cx-org-btn { font-size: 12.5px; padding: 4px 8px; }
+.cx-org-esc td[contenteditable]:focus { outline: 2px solid var(--cx-accent); outline-offset: -2px; background: var(--cx-surface-1); }
+.cx-org-esc tr:last-child td { border-bottom: 0; }
+
+.cx-org-io { border: 1px solid var(--cx-border); border-radius: 10px; background: var(--cx-surface); color: var(--cx-text); width: min(680px, 92vw); padding: 18px; }
+.cx-org-io::backdrop { background: rgba(8, 14, 24, .5); }
+.cx-org-io h3 { margin: 0 0 4px; font-size: 17px; }
+.cx-org-io p { margin: 0 0 10px; color: var(--cx-muted); font-size: 13.5px; }
+.cx-org-io textarea { width: 100%; height: 320px; font-family: var(--cx-mono); font-size: 12.5px; box-sizing: border-box; }
+.cx-org-iomsg { color: var(--cx-danger); font-size: 13px; min-height: 1.2em; margin-top: 6px; }
+
+/* Janela de impressão (A4 paisagem; o @page vem do próprio documento). */
+.cx-org-printdoc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cx-org--print .cx-org-printhead { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 6px; }
+.cx-org--print .cx-org-printhead strong { font-family: var(--cx-font-display); font-size: 20px; }
+.cx-org--print .cx-org-printhead span { font-family: var(--cx-mono); font-size: 13px; color: var(--cx-muted); }
+.cx-org--print .cx-org-stage { border: 0; overflow: visible; background: none; }
+.cx-org--print .cx-org-tree { padding: 8px 0 0; min-width: 0; }
+.cx-org--print .cx-org-card, .cx-org--print .cx-org-rows { break-inside: avoid; }
+.cx-org--print .cx-org-esc { break-before: page; margin-top: 0; }
+.cx-org--print .cx-org-esc table { min-width: 0; }
+
+/* Página do documento DIA */
+.cx-docform-diagram { margin-top: 4px; }
+
+/* Painel: quadro "Diagramas" (0.6.7) */
+.cx-card-title .ti { color: var(--cx-type-DIA); }
+.cx-diagram-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--cx-gap); }
+.cx-diagram-tile {
+    display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm); background: var(--cx-surface-1); color: var(--cx-text); text-decoration: none;
+    transition: border-color .12s ease;
+}
+.cx-diagram-tile:hover { border-color: var(--cx-type-DIA); color: var(--cx-text); }
+.cx-diagram-mini { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0; }
+.cx-diagram-mini span { display: flex; gap: 6px; }
+.cx-diagram-mini i { display: block; width: 44px; height: 12px; border-radius: 3px; background: var(--lc); }
+.cx-diagram-mini > i { width: 64px; }
+.cx-diagram-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cx-diagram-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-notice--info { background: var(--cx-type-DIA-bg); }
+.cx-notice--info > i { color: var(--cx-type-DIA); }
+.cx-notice[hidden], .codexplus-doc-edit-zone[hidden] { display: none; }
+
+/* ---- 0.6.8: paleta, marcas de posição, tela cheia, modelos ---- */
+.cx-org-palette {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px;
+    font-size: 12.5px; color: var(--cx-muted);
+}
+.cx-org-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 13px; font-weight: 500;
+    color: var(--cx-text); background: var(--cx-surface); border: 1px dashed var(--cx-faint); border-radius: 99px;
+    cursor: grab; user-select: none;
+}
+.cx-org-chip:hover { border-color: var(--cx-accent); color: var(--cx-accent); }
+.cx-org-chip .ti { font-size: 15px; }
+
+/* Onde o item vai cair: barra à esquerda/direita (ao lado) ou contorno (subordinado).
+   Linha dentro de cartão: barra em cima/embaixo. */
+.cx-org .is-drop-in { outline: 2px dashed var(--cx-accent) !important; outline-offset: 3px; }
+.cx-org-card.is-drop-before, .cx-org-card.is-drop-after { outline: 0; }
+.cx-org-card.is-drop-before::after, .cx-org-card.is-drop-after::after,
+.cx-org-row.is-drop-before::after, .cx-org-row.is-drop-after::after {
+    content: ""; position: absolute; background: var(--cx-accent); border-radius: 3px; pointer-events: none;
+}
+.cx-org-card.is-drop-before::after { left: -11px; top: -4px; bottom: -4px; width: 4px; }
+.cx-org-card.is-drop-after::after  { right: -11px; top: -4px; bottom: -4px; width: 4px; }
+.cx-org-row { position: relative; }
+.cx-org-row.is-drop-before::after { left: 8px; right: 8px; top: -2px; height: 3px; }
+.cx-org-row.is-drop-after::after  { left: 8px; right: 8px; bottom: -2px; height: 3px; }
+
+.cx-org-stage { cursor: grab; }
+.cx-org-stage.is-panning { cursor: grabbing; user-select: none; }
+.cx-org-stage [data-id] { cursor: pointer; }
+.cx-org-stage [draggable="true"] { cursor: grab; }
+
+/* Tela cheia (API do navegador ou classe de reserva) */
+.cx-org.is-full {
+    position: fixed; inset: 0; z-index: 1050; margin: 0; padding: 16px 20px;
+    background: var(--cx-surface-1); display: flex; flex-direction: column; overflow: auto;
+}
+.cx-org.is-full .cx-org-stage { flex: 1 0 60vh; min-height: 60vh; }
+.cx-org.is-full .cx-org-editor { top: 16px; max-height: calc(100vh - 32px); }
+.cx-org:fullscreen { background: var(--cx-surface-1); }
+
+/* Modelos */
+.cx-org-tpl { width: min(760px, 94vw); }
+.cx-org-tplgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.cx-org-tplcard {
+    display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; font: inherit;
+    background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: 8px; cursor: pointer; color: var(--cx-text);
+}
+.cx-org-tplcard strong { font-size: 14.5px; }
+.cx-org-tplcard span { font-size: 12.5px; color: var(--cx-muted); line-height: 1.4; }
+.cx-org-tplcard:hover { border-color: var(--cx-accent); }
+.cx-org-tplcard.is-armed { border-color: var(--cx-accent); background: var(--cx-accent-soft); }
+.cx-org-tplcard.is-armed strong::after { content: " · clique de novo para usar"; font-weight: 500; color: var(--cx-accent); font-size: 12.5px; }
+
+/* ---- Tela cheia em destaque (0.6.7-4) ---- */
+.cx-org-btn--full { background: var(--cx-text); border-color: var(--cx-text); color: #fff; }
+.cx-org-btn--full:hover { background: #2b3747; border-color: #2b3747; }
+.cx-org-stagewrap { position: relative; }
+.cx-org-corner {
+    position: absolute; top: 10px; right: 10px; z-index: 2; width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center; font-size: 19px;
+    background: var(--cx-surface); color: var(--cx-text); border: 1px solid var(--cx-border); border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(23, 32, 45, .12); cursor: pointer;
+}
+.cx-org-corner:hover { border-color: var(--cx-accent); color: var(--cx-accent); }
+.cx-org.is-full .cx-org-stagewrap { flex: 1 0 60vh; display: flex; }
+.cx-org.is-full .cx-org-stagewrap .cx-org-stage { flex: 1; }
+.cx-org--print .cx-org-corner { display: none; }
+
+/* ---- 0.6.7-5: níveis por organograma, elementos padrão e criados ---- */
+.cx-org-tag {
+    display: inline-block; margin: 5px 4px 0 0; font-size: 11px; font-weight: 500; color: var(--cx-muted);
+    border: 1px solid var(--cx-border); border-radius: 99px; padding: 0 6px; white-space: nowrap;
+}
+.cx-org-row .cx-org-tag { margin: 0 0 0 auto; }
+.cx-org-chip.is-custom { border-style: solid; border-left: 4px solid var(--lc, var(--cx-faint)); }
+.cx-org-chip.is-custom.is-dashed { border-style: dashed; border-left-style: solid; }
+.cx-org-chipdel {
+    border: 0; background: none; padding: 0 0 0 4px; margin: 0; font-size: 15px; line-height: 1; color: var(--cx-muted); cursor: pointer;
+}
+.cx-org-chipdel:hover { color: var(--cx-danger); }
+.cx-org-chip--new { font: inherit; font-size: 13px; font-weight: 500; border-style: solid; color: var(--cx-accent); border-color: var(--cx-accent); background: var(--cx-accent-soft); cursor: pointer; }
+.cx-org-lvlist { display: flex; flex-direction: column; gap: 8px; margin: 0 0 4px; }
+.cx-org-lvrow { display: flex; gap: 8px; align-items: center; }
+.cx-org-lvrow input[type="color"] { width: 40px; height: 34px; padding: 2px; border: 1px solid var(--cx-border); border-radius: 6px; background: var(--cx-surface); }
+.cx-org-lvrow input[type="text"], .cx-org-field input, .cx-org-field select {
+    flex: 1; font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid var(--cx-border); border-radius: 6px;
+    background: var(--cx-surface-1); color: var(--cx-text); box-sizing: border-box;
+}
+.cx-org-field { display: block; font-size: 12.5px; color: var(--cx-muted); margin: 10px 0 0; }
+.cx-org-field input, .cx-org-field select { display: block; width: 100%; margin-top: 4px; }
+.cx-org-io .cx-org-check { margin-top: 10px; }
+
+/* ---- 0.6.7-6: mover quem tem equipe ---- */
+.cx-org-draghint {
+    margin: 0 0 10px; padding: 7px 12px; font-size: 13px; border-radius: 8px;
+    background: var(--cx-accent-soft); color: var(--cx-accent-strong);
+}
+.cx-org-draghint[hidden] { display: none; }
+.cx-org-move { width: min(560px, 92vw); }
+.cx-org-move .cx-org-btns { flex-direction: column; align-items: stretch; }

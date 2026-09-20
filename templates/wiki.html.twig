@@ -6,10 +6,10 @@
 
 <div class="codexplus-app">
 
-    <div class="codexplus-header">
-        <h2><i class="ti ti-book-2"></i> {{ __('Codex+', 'codexplus') }}</h2>
-        <span>{{ __('Base de conhecimento e procedimentos operacionais', 'codexplus') }}</span>
-    </div>
+    {% include '@codexplus/parts/brand.html.twig' with {
+        title: __('Codex+', 'codexplus'),
+        subtitle: __('Documentos controlados, procedimentos e diagramas institucionais', 'codexplus'),
+    } only %}
 
     <nav class="codexplus-nav">
         <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>

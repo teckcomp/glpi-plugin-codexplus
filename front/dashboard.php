@@ -26,45 +26,21 @@ Html::header(
     Wiki::class
 );
 
-$docs = Dashboard::loadAll();
+// 0.6.6 (Claudio, 20/09/2026): o Painel lê o MODELO NOVO. O quadro
+// provisório da R3b1 saiu; "Novo documento" cria direto no modelo novo.
+$docs = Dashboard::loadAllNew();
 
-// Etapa R3b1 — documentos do MODELO NOVO (em teste até a R5, quando a
-// estante e o Painel passam a ler só dele). Lista curta, com a mesma
-// visibilidade da R3c (Document::getVisibilityCriteria).
-$newDocs = [];
-if (Document::canView()) {
-    $t   = Document::getTable();
-    $vis = Document::getVisibilityCriteria();
-    foreach ($DB->request([
-        'SELECT'    => [$t . '.id', $t . '.name', $t . '.doctype', $t . '.sequence', $t . '.revision', $t . '.status', $t . '.date_mod'],
-        'DISTINCT'  => true,
-        'FROM'      => $t,
-        'LEFT JOIN' => $vis['LEFT JOIN'],
-        'WHERE'     => [$t . '.knowbaseitems_id' => 0, $t . '.is_deleted' => 0] + $vis['WHERE'],
-        'ORDER'     => [$t . '.date_mod DESC'],
-        'LIMIT'     => 10,
-    ]) as $row) {
-        $newDocs[] = [
-            'id'     => (int) $row['id'],
-            'name'   => $row['name'],
-            'code'   => sprintf('%s%04d:%02d', $row['doctype'], $row['sequence'], $row['revision']),
-            'status' => $row['status'],
-            'status_label' => Document::getStatuses()[$row['status']] ?? $row['status'],
-        ];
-    }
-}
-$canCreateNew = Document::canCreate()
+$canCreate = Document::canCreate()
     && (Session::haveRight(Rights::NAME, Rights::VIEWALL) || SectorMember::mySectors(SectorMember::ROLE_MANAGER) !== []);
 
 TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
-    'glpi_root'  => $CFG_GLPI['root_doc'],
     'counters'   => Dashboard::getCounters($docs),
     'by_type'    => Dashboard::getByType($docs),
     'attention'  => Dashboard::getAttention($docs),
-    'recent'     => Dashboard::getRecent($docs),
-    'can_create' => KnowbaseItem::canCreate(),
-    'new_docs'       => $newDocs,
-    'can_create_new' => $canCreateNew,
+    'recent'     => Dashboard::getRecent($docs, 8),
+    // Etapa 9: os diagramas mais recentes, para o quadro "Diagramas".
+    'diagrams'   => Dashboard::getRecent(array_filter($docs, static fn ($d) => $d['doctype'] === 'DIA'), 6),
+    'can_create' => $canCreate,
 ]);
 
 Html::footer();

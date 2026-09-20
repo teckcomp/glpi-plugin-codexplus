@@ -23,7 +23,7 @@ if (!KnowbaseItem::canCreate()) {
     Html::displayRightError();
 }
 
-$doctype = isset($_POST['doctype']) && in_array($_POST['doctype'], DocumentMeta::DOCTYPE_KEYS, true)
+$doctype = isset($_POST['doctype']) && array_key_exists($_POST['doctype'], DocumentMeta::getLegacyDoctypes())
     ? (string) $_POST['doctype']
     : '';
 $templateId = isset($_POST['templates_id']) ? (int) $_POST['templates_id'] : 0;
@@ -72,7 +72,7 @@ $meta->add([
     'status'           => 'rascunho',
     'revision'         => 0,
     'users_id_owner'   => Session::getLoginUserID(),
-    'validity_months'  => $doctype === 'PRP' ? 0 : DocumentMeta::DEFAULT_VALIDITY_MONTHS,
+    'validity_months'  => DocumentMeta::defaultValidity($doctype),
     'client_name'      => '',
 ]);
 

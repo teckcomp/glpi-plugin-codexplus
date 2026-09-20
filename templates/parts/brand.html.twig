@@ -1,0 +1,17 @@
+{# Codex+ — cabeçalho com a marca (0.6.5, identidade visual aprovada por
+   Claudio em 20/09/2026: "monograma C+"). Incluído por todas as telas com
+   `{% include '@codexplus/parts/brand.html.twig' with {title: ..., subtitle: ...} only %}`.
+   O SVG vai embutido (não é <img>): herda nada, não depende de caminho e
+   aparece mesmo com o cache do navegador frio. A marca é do PRODUTO e mora
+   no repositório; a logo da EMPRESA continua dado da instalação (PDF). #}
+<div class="codexplus-header cx-brand">
+    <svg class="cx-brand-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <rect x="3" y="3" width="42" height="42" rx="10" fill="#17202D"/>
+        <path d="M28.5 16.2A10 10 0 1 0 28.5 31.8" fill="none" stroke="#FFFFFF" stroke-width="4.6" stroke-linecap="round"/>
+        <path d="M35 19.5v9M30.5 24h9" stroke="#6EA2F0" stroke-width="3.8" stroke-linecap="round"/>
+    </svg>
+    <div class="cx-brand-text">
+        <h2>{{ title }}</h2>
+        <span>{{ subtitle }}</span>
+    </div>
+</div>

@@ -28,9 +28,15 @@ class Wiki extends CommonGLPI
         return __('Codex+', 'codexplus');
     }
 
+    /** 0.6.6: ícone do menu e da trilha de navegação (Tabler do GLPI). */
+    public static function getIcon()
+    {
+        return 'ti ti-square-rounded-letter-c-filled';
+    }
+
     public static function getMenuName()
     {
-        return __('Codex+ (Base de Conhecimento)', 'codexplus');
+        return __('Codex+', 'codexplus');
     }
 
     public static function getMenuContent()
@@ -44,7 +50,7 @@ class Wiki extends CommonGLPI
         return [
             'title' => self::getMenuName(),
             'page'  => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/dashboard.php',
-            'icon'  => 'ti ti-book-2',
+            'icon'  => self::getIcon(), // 0.6.6: o mais próximo da marca C+ entre os ícones Tabler
         ];
     }
 

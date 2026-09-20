@@ -153,6 +153,118 @@ class Dashboard
     }
 
     /**
+     * 0.6.6 — o Painel passa a ler o MODELO NOVO (Document), antecipando a
+     * parte do Painel da R5 (decisão de Claudio, 20/09/2026). Mesmo formato
+     * de loadAll(), mais setor e responsável, para os métodos abaixo
+     * servirem aos dois modelos até a R5 aposentar loadAll().
+     *
+     * Visibilidade: Document::getVisibilityCriteria() (mesma regra das
+     * telas do documento; conferida pelo comando document:visibility).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function loadAllNew(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        if (!Document::canView()) {
+            return [];
+        }
+
+        $t   = Document::getTable();
+        $vis = Document::getVisibilityCriteria();
+
+        $docs   = [];
+        $owners = [];
+
+        foreach ($DB->request([
+            'SELECT'    => [
+                $t . '.id', $t . '.name', $t . '.date_mod', $t . '.doctype',
+                $t . '.sequence', $t . '.revision', $t . '.status',
+                $t . '.users_id_owner', $t . '.validity_months',
+                $t . '.client_name', $t . '.date_published',
+            ],
+            'DISTINCT'  => true,
+            'FROM'      => $t,
+            'LEFT JOIN' => $vis['LEFT JOIN'],
+            'WHERE'     => [$t . '.knowbaseitems_id' => 0, $t . '.is_deleted' => 0] + $vis['WHERE'],
+            'ORDER'     => [$t . '.date_mod DESC'],
+        ]) as $r) {
+            $id      = (int) $r['id'];
+            $status  = (string) $r['status'];
+            $expiry  = self::expiry($r['date_published'] ?? null, (int) $r['validity_months'], $status);
+            $ownerId = (int) $r['users_id_owner'];
+            if ($ownerId > 0) {
+                $owners[$ownerId] = true;
+            }
+
+            $docs[$id] = [
+                'id'           => $id,
+                'name'         => (string) $r['name'],
+                'date_mod'     => $r['date_mod'],
+                'date_mod_ts'  => $r['date_mod'] ? (strtotime($r['date_mod']) ?: 0) : 0,
+                'doctype'      => (string) $r['doctype'],
+                'status'       => $status,
+                'code'         => sprintf('%s%04d:%02d', $r['doctype'], (int) $r['sequence'], (int) $r['revision']),
+                'client_name'  => (string) ($r['client_name'] ?? ''),
+                'category'     => '',
+                'has_category' => false,
+                'sector'       => '',
+                'owner_id'     => $ownerId,
+                'owner'        => '',
+                'expiry'       => $expiry['state'],
+                'due_ts'       => $expiry['due'],
+            ];
+        }
+
+        if ($docs) {
+            // Categorias e setores de todos os documentos numa query só.
+            $dc  = Document_Category::getTable();
+            $cat = Category::getTable();
+            $sec = Sector::getTable();
+            $cats = [];
+            $secs = [];
+            foreach ($DB->request([
+                'SELECT'     => [
+                    $dc . '.' . Document_Category::$items_id_1 . ' AS did',
+                    $cat . '.completename AS catname',
+                    $sec . '.name AS secname',
+                ],
+                'FROM'       => $dc,
+                'INNER JOIN' => [
+                    $cat => ['ON' => [$dc => Document_Category::$items_id_2, $cat => 'id']],
+                ],
+                'LEFT JOIN'  => [
+                    $sec => ['ON' => [$cat => Category::SECTOR_FIELD, $sec => 'id']],
+                ],
+                'WHERE'      => [$dc . '.' . Document_Category::$items_id_1 => array_keys($docs)],
+            ]) as $r) {
+                $did = (int) $r['did'];
+                $cats[$did][(string) $r['catname']] = true;
+                if (!empty($r['secname'])) {
+                    $secs[$did][(string) $r['secname']] = true;
+                }
+            }
+            foreach ($docs as $id => &$d) {
+                if (isset($cats[$id])) {
+                    $d['has_category'] = true;
+                    $d['category']     = implode(', ', array_keys($cats[$id]));
+                }
+                if (isset($secs[$id])) {
+                    $d['sector'] = implode(', ', array_keys($secs[$id]));
+                }
+                if ($d['owner_id'] > 0) {
+                    $d['owner'] = (string) \User::getFriendlyNameById($d['owner_id']);
+                }
+            }
+            unset($d);
+        }
+
+        return $docs;
+    }
+
+    /**
      * Zona B — os quatro indicadores, cada um com sua linha de contexto.
      *
      * O contexto é o ponto da Etapa 6c: "12 vencidos" avisa que há problema,
@@ -169,6 +281,7 @@ class Dashboard
             'avencer'           => 0,
             'vencidos'          => 0,
             'rascunhos'         => 0,
+            'emrevisao'         => 0,   // 0.6.6: status validacao (R6 soma a revisão aberta)
             'total'             => count($docs),
             'proximo_dias'      => null,
             'vencidos_tipo'     => '',
@@ -184,6 +297,10 @@ class Dashboard
         foreach ($docs as $d) {
             if ($d['status'] === 'publicado') {
                 $c['publicados']++;
+            }
+
+            if ($d['status'] === 'validacao') {
+                $c['emrevisao']++;
             }
 
             if ($d['status'] === 'rascunho') {
@@ -274,6 +391,7 @@ class Dashboard
             'psg_sem_pop'     => null,
             'sem_codigo'      => 0,
             'sem_categoria'   => 0,
+            'sem_responsavel' => 0,   // 0.6.6, só o modelo novo informa owner_id
         ];
 
         foreach ($docs as $d) {
@@ -285,6 +403,9 @@ class Dashboard
             }
             if (!$d['has_category']) {
                 $a['sem_categoria']++;
+            }
+            if (($d['owner_id'] ?? -1) === 0) {
+                $a['sem_responsavel']++;
             }
         }
 

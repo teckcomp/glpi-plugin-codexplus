@@ -33,7 +33,32 @@ class DocumentMeta extends CommonDBTM
     public const EXPIRY_WINDOW_DAYS = 30;
 
     /** Prefixos válidos (viram o começo do código, gravado no sequencial). */
-    public const DOCTYPE_KEYS = ['POP', 'PSG', 'MAN', 'PRP'];
+    public const DOCTYPE_KEYS = ['POP', 'PSG', 'MAN', 'PRP', 'DIA'];
+
+    /**
+     * Tipos que só existem no MODELO NOVO (Document). O fluxo antigo de
+     * "Novo documento" (artigo da Base de Conhecimento) não os oferece.
+     * DIA: diagrama institucional, Etapa 9 (0.6.7).
+     */
+    public const NEW_MODEL_ONLY = ['DIA'];
+
+    /**
+     * Validade padrão por tipo, em meses (Claudio, 20/09/2026). 0 = não
+     * vence. Proposta: definida por quem publica (ainda não implementado:
+     * até lá, 0). Tipo fora da lista: DEFAULT_VALIDITY_MONTHS.
+     */
+    public const VALIDITY_BY_TYPE = ['POP' => 12, 'PSG' => 12, 'MAN' => 6, 'PRP' => 0, 'DIA' => 3];
+
+    public static function defaultValidity(string $doctype): int
+    {
+        return self::VALIDITY_BY_TYPE[$doctype] ?? self::DEFAULT_VALIDITY_MONTHS;
+    }
+
+    /** Tipos oferecidos pelo fluxo antigo (artigo da Base de Conhecimento). */
+    public static function getLegacyDoctypes(): array
+    {
+        return array_diff_key(self::getDoctypes(), array_flip(self::NEW_MODEL_ONLY));
+    }
     public const STATUS_KEYS  = ['rascunho', 'publicado', 'obsoleto'];
 
     /**
@@ -63,6 +88,7 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('PSG — Procedimento do Sistema de Gestão', 'codexplus'),
             'MAN' => __('MAN — Manual', 'codexplus'),
             'PRP' => __('PRP — Proposta', 'codexplus'),
+            'DIA' => __('DIA — Diagrama (organograma)', 'codexplus'),
         ];
     }
 
@@ -81,6 +107,7 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('PSG', 'codexplus'),
             'MAN' => __('Manual', 'codexplus'),
             'PRP' => __('Proposta', 'codexplus'),
+            'DIA' => __('Diagrama', 'codexplus'),
         ];
     }
 
@@ -102,6 +129,7 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('Procedimento do Sistema de Gestão', 'codexplus'),
             'MAN' => __('Manual', 'codexplus'),
             'PRP' => __('Proposta', 'codexplus'),
+            'DIA' => __('Diagrama institucional', 'codexplus'),
         ];
     }
 

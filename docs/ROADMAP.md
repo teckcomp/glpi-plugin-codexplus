@@ -1,7 +1,8 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.4-alpha` · atualizado em 20/09/2026 (R1, R2, R3a, R3c e
-> R3b1 concluídos; próximo bloco a decidir: R3b2 ou núcleo da revisão).
+> Estado em `v0.6.7-alpha` · atualizado em 20/09/2026 (R1, R2, R3a, R3c,
+> R3b1, identidade visual, Painel no modelo novo e demonstração de
+> diagramas concluídos; próximo: completar 9a–9c ou a estante).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -9,17 +10,41 @@
 
 ## Ordem de execução
 
-Revisada por Claudio em 19/09/2026, após a decisão de independência da Base
-de Conhecimento:
+**Revisada por Claudio em 20/09/2026**, para apresentar o Codex+ à gestão
+em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 
 1. ~~Pacote 0.5.8 — manutenção e PDF~~ ✅
-2. **Etapa R** — reestruturação: documentos próprios (R1–R7)
-3. **Etapa 9a–9c** — diagramas: tipo `DIA`, leitura e editor de organograma
-4. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
-5. **Etapa 5** — PSG e seus POPs
-6. **Etapa 7** — alerta de vencimento
-7. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
-8. **Etapa 8** — personalização completa do PDF
+2. ~~R1, R2, R3a, R3c, R3b1~~ ✅
+3. ~~**Identidade visual**~~ ✅ 0.6.5 — paleta, fontes, marca, Painel com donuts
+   · ~~**Painel no modelo novo**~~ ✅ 0.6.6 — parte do Painel da R5 antecipada,
+   indicador "Em revisão", colunas Setor e Responsável, menu "Codex+"
+4. ~~**Diagramas, pacote de demonstração**~~ ✅ 0.6.7 — 9a, 9b e 9c enxutos: tipo `DIA`
+   (subtipo organograma), motor do protótipo embutido, edição em rascunho,
+   leitura a partir do **JSON publicado** (o SVG fica para o item 5, desvio
+   aprovado por Claudio), zoom e busca, fluxo de validação atual, PDF
+   paisagem. Leva junto as validades novas (Manual 6, DIA 3)
+5. **Completar 9a–9c** — desfazer/refazer, salvamento automático, SVG publicado,
+   **ligações extras** (reporte funcional pontilhado entre cartões) e
+   **trocar com o superior pelo arraste** (Claudio, 20/09/2026: natural, sem
+   botão): soltar um cartão na borda de cima de outro faz dele o novo
+   superior; cada um leva a própria equipe e quem estava abaixo continua
+   abaixo. Ex.: Conselho → Nahun → José vira Nahun → Conselho → José. Já
+   entregues na 0.6.7-3: tela cheia, zoom com Ctrl + roda, arrastar o fundo,
+   mover com marca de posição, paleta de componentes e modelos de organograma;
+   na 0.6.7-5: elementos padrão de mercado, níveis editáveis por organograma e
+   "Criar elemento"
+6. **Estante** (parte da R5, pedida por Claudio em 20/09/2026) — tela
+   Documentos como prateleira, agrupada por **Setor → Categoria**, no modelo
+   novo. **Modelos** no mesmo formato (exige setor e categoria no modelo:
+   schema, junto com a R3b4)
+7. **Núcleo da revisão** (parte da R6) — organograma publicado atualizável
+8. **R3b2** — liberar a leitura pela tela (decidir antes: Self-Service vê o Codex+?)
+9. **R3b3 → R3b4 → R4 → R5 → resto da R6 → R7** — fecha a Etapa R
+10. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
+11. **Etapa 5** — PSG e seus POPs
+12. **Etapa 7** — alerta de vencimento
+13. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
+14. **Etapa 8** — personalização completa do PDF
 
 A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
 "permissões e acesso anônimo".
@@ -51,6 +76,9 @@ Depois: marco **Pronto para produção** (fim deste documento).
 | R3a | Classe `Document`, ligações (categoria, perfil, grupo, usuário), visibilidade por item e em SQL, Histórico, comandos de console. Commits `5d528e4` + `6c64b4d` (restauração dos docs) | v0.6.2 |
 | R3c | Papéis (gestores e validadores por setor, editores por documento), bit Validar, Super-Admin com todos os bits, validação antes de publicar. Commit `daf8941` | v0.6.3 |
 | R3b1 | Página do documento no modelo novo (criar, editar, enviar, validar, devolver, obsoleto) e quadro "Documentos do modelo novo" no Painel. Commit `0f0119f` | v0.6.4 |
+| Identidade visual | Paleta do protótipo do organograma nos tokens `--cx-`, IBM Plex servida do plugin (`public/fonts`), marca "monograma C+" no cabeçalho de todas as telas, Painel com donuts Por tipo e Situação (no lugar das barras) e código colorido pelo tipo | v0.6.5 |
+| Painel no modelo novo | Painel lê `Document` (indicadores, donuts, atenção, recentes); indicador e fatia "Em revisão"; recentes com Categoria, Setor, Responsável e Situação; "Sem responsável" no lugar de "Sem código"; sai o quadro provisório da R3b1; "Novo documento" cria no modelo novo; menu "Codex+" com ícone `ti-square-rounded-letter-c-filled` | v0.6.6 |
+| Diagramas (demonstração) | Tipo `DIA` (validade 3 meses; Manual passa a 6), tabela `glpi_plugin_codexplus_diagrams` (JSON por documento), motor do organograma (`public/js/codexplus-org.js`) na página do documento: edição em rascunho (cartões, arrastar, matriz de escalonamento, importar/exportar), leitura com zoom, ajustar e busca de pessoa, PDF em A4 paisagem; "Novo diagrama" e quadro "Diagramas" no Painel | v0.6.7 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -89,6 +117,12 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; indicadores "Aguardando validação" e "Revisão atrasada"; etiqueta "em atualização" na estante; lixeira; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
 | R6 | Revisão de documento publicado: a publicada segue visível com o aviso **"Em atualização"** (tela e link anônimo, não no PDF) até a nova ser validada; **prazo de revisão** (padrão 30 dias, configurável) com prorrogação motivada ou cancelamento pelo gestor; "**revisado sem alteração**" (renova a validade, mantém a revisão); versões com resumo; histórico de revisão no fim do PDF; indicador "Sem responsável" | Abrir a :01, ver o aviso para o leitor, validar e ver a tabela no PDF |
 | R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
+
+**Importar documento pronto** (pedido de Claudio, 20/09/2026): trazer um
+POP ou manual feito fora (Word `.docx`, Markdown, texto de um chat) para um
+documento novo, que segue editável. Hoje já funciona colando no corpo
+(TinyMCE mantém títulos, listas e tabelas); arquivo `.docx`/`.md` e imagens
+dependem da R3b3 (onde a imagem é guardada). Entra logo depois da R3b3.
 
 **Candidatos, a decidir durante a Etapa R:** quadro **Atividade** no fim da
 leitura (quem, quando, o quê); indicador "Sem setor" no Painel.
@@ -253,3 +287,11 @@ os critérios abaixo estiverem cumpridos:
 - [x] Repositório = pasta do plugin, trabalho como root — 19/09/2026
 - [x] Manuais e propostas escritos dentro do Codex+ — 08/2026
 - [x] Validade padrão de 12 meses; siglas `POP` `PSG` `MAN` `PRP`
+- [x] **Validades por tipo** (Claudio, 20/09/2026): POP e PSG 12 meses;
+      Manual **6**; diagramas (organograma, fluxograma, matrizes) **3**;
+      Proposta e "documentos diversos" **definida por quem publica**. Manual
+      e DIA entram no pacote de diagramas; a escolha na publicação e o tipo
+      "documentos diversos" (sigla e nome a definir) ficam para depois
+- [x] **Identidade visual** (Claudio, 20/09/2026): mockup do Painel aprovado;
+      donuts voltam no lugar das barras de proporção de 07/2026; marca do
+      produto = monograma C+ (a logo da empresa continua no PDF)

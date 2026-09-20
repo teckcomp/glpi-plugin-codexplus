@@ -43,6 +43,9 @@ class Install
     public const DOC_EDITORS_TABLE    = 'glpi_plugin_codexplus_documenteditors';
     public const DOC_CONTRIB_TABLE    = 'glpi_plugin_codexplus_documentcontributors';
 
+    // Etapa 9 (0.6.7) — diagrama institucional ligado ao documento DIA
+    public const DIAGRAMS_TABLE       = 'glpi_plugin_codexplus_diagrams';
+
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
      *
@@ -51,6 +54,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::DIAGRAMS_TABLE,
             self::DOC_CONTRIB_TABLE,
             self::DOC_EDITORS_TABLE,
             self::SECTOR_MEMBERS_TABLE,
@@ -440,6 +444,24 @@ class Install
                 UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `revision`, `users_id`),
                 KEY `users_id` (`users_id`)
             ) $opts", "Codex+ (R3c): erro ao criar $t");
+        }
+
+        // Etapa 9 (0.6.7): um diagrama por documento DIA. `data` guarda o
+        // JSON editável (árvore + matriz de escalonamento). O SVG da versão
+        // publicada entra no bloco seguinte da Etapa 9 (desvio aprovado por
+        // Claudio em 20/09/2026: a leitura desenha do JSON).
+        $t = self::DIAGRAMS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `subtype` varchar(16) NOT NULL DEFAULT 'organograma',
+                `data` longtext NULL,
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `plugin_codexplus_documents_id` (`plugin_codexplus_documents_id`)
+            ) $opts", "Codex+ (9a): erro ao criar $t");
         }
 
         // Super-Admin herda tudo: perfis com Configurar > Atualizar.

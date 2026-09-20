@@ -26,7 +26,7 @@
             <div>
                 <strong>{{ __('Devolvido pela validação', 'codexplus') }}</strong>
                 {% if validator_name %}— {{ validator_name }}{% endif %}
-                {% if date_validated %}, {{ date_validated|date('d/m/Y H:i') }}{% endif %}
+                {%- if date_validated %}, {{ date_validated|date('d/m/Y H:i') }}{% endif %}
                 <div class="cx-notice-text">{{ validation_comment }}</div>
             </div>
         </div>
@@ -94,7 +94,23 @@
                     {% endif %}
                 </div>
 
-                <div class="codexplus-doc-edit-zone codexplus-doc-edit-body">
+                {% if is_diagram %}
+                    {# Etapa 9: organograma no lugar do corpo. O motor grava o
+                       JSON em _diagram a cada mudança; vai no Salvar. #}
+                    <div class="codexplus-doc-edit-zone cx-docform-diagram">
+                        <label class="codexplus-doc-edit-zone-label">
+                            <i class="ti ti-sitemap"></i> {{ __('Organograma', 'codexplus') }}
+                        </label>
+                        <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
+                        <input type="hidden" name="_diagram" id="cx-org-input" value="">
+                        <div data-cx-org data-editable="1" data-source="cx-org-data" data-input="cx-org-input"
+                             data-title="{{ name }}" data-code="{{ code }}"></div>
+                        <div class="codexplus-form-hint">
+                            {{ __('Clique numa pessoa para editar; arraste um cartão ou um nome sobre outro para mudar a quem responde. Para trazer o organograma do protótipo, use "Importar ou exportar". Nada fica gravado até clicar em Salvar.', 'codexplus') }}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="codexplus-doc-edit-zone codexplus-doc-edit-body" id="cx-docform-body">
                     <label class="codexplus-doc-edit-zone-label">
                         <i class="ti ti-article"></i> {{ __('Corpo do documento', 'codexplus') }}
                     </label>
@@ -103,6 +119,34 @@
                         {{ __('Imagens coladas e anexos chegam na próxima etapa (R3b3).', 'codexplus') }}
                     </div>
                 </div>
+                    {% if is_new %}
+                        {# 0.6.7-2: com o tipo DIA escolhido, o corpo de texto some
+                           (não é usado) e fica só o aviso do próximo passo. #}
+                        <div class="cx-notice cx-notice--info" id="cx-docform-dia-hint" hidden>
+                            <i class="ti ti-sitemap"></i>
+                            <div>
+                                <strong>{{ __('Diagrama', 'codexplus') }}</strong>
+                                <div class="cx-notice-text">{{ __('Informe o título e a categoria e clique em "Criar rascunho". Na página seguinte aparece o organograma, com o botão "Importar ou exportar" para colar um organograma pronto.', 'codexplus') }}</div>
+                            </div>
+                        </div>
+                        <script>
+                        (function () {
+                            var sel  = document.querySelector('select[name="doctype"]');
+                            var body = document.getElementById('cx-docform-body');
+                            var hint = document.getElementById('cx-docform-dia-hint');
+                            if (!sel || !body || !hint) { return; }
+                            var upd = function () {
+                                var dia = sel.value === 'DIA';
+                                body.hidden = dia;
+                                hint.hidden = !dia;
+                            };
+                            sel.addEventListener('change', upd);
+                            if (window.jQuery) { window.jQuery(sel).on('change', upd); }
+                            upd();
+                        })();
+                        </script>
+                    {% endif %}
+                {% endif %}
 
                 {% if not is_new %}
                     <div class="codexplus-doc-edit-zone cx-docform-roles">
@@ -141,7 +185,13 @@
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
                 {% endif %}
             </div>
-            <div class="codexplus-content">{{ content_html|raw }}</div>
+            {% if is_diagram %}
+                <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
+                <div class="cx-docform-diagram" data-cx-org data-editable="0" data-source="cx-org-data"
+                     data-title="{{ name }}" data-code="{{ code }}"></div>
+            {% else %}
+                <div class="codexplus-content">{{ content_html|raw }}</div>
+            {% endif %}
         </article>
     {% endif %}
 

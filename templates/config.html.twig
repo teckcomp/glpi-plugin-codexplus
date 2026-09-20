@@ -3,10 +3,10 @@
 
 <div class="codexplus-app">
 
-    <div class="codexplus-header">
-        <h2><i class="ti ti-settings"></i> {{ __('Codex+ — configuração', 'codexplus') }}</h2>
-        <span>{{ __('Marca aplicada ao PDF dos documentos', 'codexplus') }}</span>
-    </div>
+    {% include '@codexplus/parts/brand.html.twig' with {
+        title: __('Codex+ — configuração', 'codexplus'),
+        subtitle: __('Marca aplicada ao PDF dos documentos', 'codexplus'),
+    } only %}
 
     <form method="post" action="config.form.php" enctype="multipart/form-data" class="codexplus-form cx-cfg">
         <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">

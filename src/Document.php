@@ -582,7 +582,7 @@ class Document extends CommonDBTM
         $input['revision']         = 0;
         $input['users_id']         = (int) Session::getLoginUserID();
         if (!isset($input['validity_months'])) {
-            $input['validity_months'] = $input['doctype'] === 'PRP' ? 0 : DocumentMeta::DEFAULT_VALIDITY_MONTHS;
+            $input['validity_months'] = DocumentMeta::defaultValidity((string) $input['doctype']);
         }
         unset($input['date_published'], $input['users_id_validator'], $input['date_validated'],
             $input['users_id_submitter'], $input['date_submitted'], $input['validation_comment']);
@@ -667,6 +667,7 @@ class Document extends CommonDBTM
             DocumentEditor::class,
         ]);
         DocumentContributor::purgeDocument((int) $this->fields['id']);
+        Diagram::purgeDocument((int) $this->fields['id']);
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */

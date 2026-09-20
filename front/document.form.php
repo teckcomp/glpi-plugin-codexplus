@@ -25,6 +25,8 @@
 use Glpi\Application\View\TemplateRenderer;
 use Glpi\RichText\RichText;
 use GlpiPlugin\Codexplus\Category;
+use GlpiPlugin\Codexplus\Diagram;
+use GlpiPlugin\Codexplus\DocumentContributor;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentEditor;
@@ -75,6 +77,10 @@ if (isset($_POST['add'])) {
         Html::back();
     }
     $newId = $doc->add($input);
+    if ($newId && $input['doctype'] === 'DIA') {
+        // Etapa 9: o DIA nasce com o diagrama inicial (só o topo).
+        Diagram::save((int) $newId, Diagram::starter());
+    }
     if ($newId) {
         Session::addMessageAfterRedirect(__('Documento criado como rascunho.', 'codexplus'));
         Html::redirect($self . '?id=' . $newId);
@@ -153,6 +159,21 @@ if ($id > 0 && isset($_POST['update'])) {
         }
     }
 
+    // Etapa 9: o diagrama vem em _diagram (JSON), validado no servidor.
+    // A permissão já foi conferida acima (can UPDATE = rascunho + editor ou
+    // gestor). Mudou o desenho: conta como alteração do documento (quem
+    // editou não valida) e atualiza a data.
+    if ($doc->fields['doctype'] === 'DIA' && isset($_POST['_diagram'])) {
+        $diagram = Diagram::validate(json_decode((string) $_POST['_diagram'], true));
+        if ($diagram === null) {
+            Session::addMessageAfterRedirect(__('Diagrama não gravado: conteúdo inválido.', 'codexplus'), false, ERROR);
+            $ok = false;
+        } elseif (Diagram::save($id, $diagram)) {
+            DocumentContributor::record($id, (int) $doc->fields['revision'], (int) Session::getLoginUserID());
+            $DB->update(Document::getTable(), ['date_mod' => date('Y-m-d H:i:s')], ['id' => $id]);
+        }
+    }
+
     if ($doc->update($data) && $ok) {
         Session::addMessageAfterRedirect(__('Documento salvo.', 'codexplus'));
     }
@@ -196,6 +217,17 @@ if ($isNew && !(Document::canCreate() && ($allowedSectors === null || $allowedSe
 
 $canEdit = $isNew || $doc->can($id, UPDATE);
 
+// Etapa 9: documento DIA desenha o organograma no lugar do corpo de texto.
+$isDiagram   = !$isNew && $doc->fields['doctype'] === 'DIA';
+$diagramJson = '';
+if ($isDiagram) {
+    $diagram     = Diagram::load($id) ?? ['data' => Diagram::starter()];
+    $diagramJson = json_encode(
+        $diagram['data'],
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
+    );
+}
+
 Html::header(Wiki::getMenuName(), $_SERVER['PHP_SELF'], 'tools', Wiki::class);
 
 $categoryIds = $isNew ? [] : Document_Category::getCategoryIds($id);
@@ -226,9 +258,10 @@ if ($canEdit) {
     $widgets['categories'] = Category::dropdown($catParams);
 
     if ($isNew) {
+        $preset = (string) ($_GET['doctype'] ?? 'POP');
         $widgets['doctype'] = Dropdown::showFromArray('doctype', DocumentMeta::getDoctypes(), [
             'display' => false,
-            'value'   => 'POP',
+            'value'   => array_key_exists($preset, DocumentMeta::getDoctypes()) ? $preset : 'POP',
             'width'   => '100%',
         ]);
     }
@@ -241,7 +274,7 @@ if ($canEdit) {
             'width'   => '100%',
         ]);
     }
-    $widgets['content'] = Html::textarea([
+    $widgets['content'] = $isDiagram ? '' : Html::textarea([
         'name'            => 'content',
         'value'           => (string) ($isNew ? '' : ($doc->fields['content'] ?? '')),
         'editor_id'       => 'codexplus-doc-content',
@@ -297,6 +330,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'validator_name'     => $isNew || (int) ($doc->fields['users_id_validator'] ?? 0) <= 0 ? '' : getUserName((int) $doc->fields['users_id_validator']),
     'date_validated'     => $isNew ? '' : (string) ($doc->fields['date_validated'] ?? ''),
     'widgets'     => $widgets,
+    'is_diagram'   => $isDiagram,
+    'diagram_json' => $diagramJson,
     'can_submit'   => !$isNew && $doc->canSubmit(),
     'can_validate' => !$isNew && $doc->canValidate(),
     'is_blocked_contributor' => !$isNew

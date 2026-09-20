@@ -130,6 +130,8 @@
         var editable = root.getAttribute('data-editable') === '1';
         var input = root.getAttribute('data-input') ? document.getElementById(root.getAttribute('data-input')) : null;
         var srcEl = root.getAttribute('data-source') ? document.getElementById(root.getAttribute('data-source')) : null;
+        var saveUrl = root.getAttribute('data-save') || '';
+        var docId = root.getAttribute('data-doc') || '';
         var title = root.getAttribute('data-title') || '';
         var code = root.getAttribute('data-code') || '';
 
@@ -159,6 +161,8 @@
         root.innerHTML =
             '<div class="cx-org-tools">' +
                 '<button type="button" class="cx-org-btn cx-org-btn--full" data-act="full" data-el="fullBtn"><i class="ti ti-maximize"></i> Tela cheia</button>' +
+                (editable ? '<button type="button" class="cx-org-btn cx-org-btn--primary cx-org-btn--save" data-act="save"><i class="ti ti-device-floppy"></i> Salvar</button>' : '') +
+                (editable ? '<output class="cx-org-savestate" data-el="savestate" aria-live="polite"></output>' : '') +
                 (editable ? '<button type="button" class="cx-org-btn cx-org-btn--primary" data-act="add">Nova pessoa</button>' : '') +
                 (editable ? '<span class="cx-org-zoom">' +
                     '<button type="button" class="cx-org-btn" data-act="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled><i class="ti ti-arrow-back-up"></i></button>' +
@@ -168,6 +172,7 @@
                 '<output data-el="zlbl">100%</output>' +
                 '<button type="button" class="cx-org-btn" data-act="zin" aria-label="Aumentar zoom">+</button></span>' +
                 '<button type="button" class="cx-org-btn" data-act="fit">Ajustar à tela</button>' +
+                (editable ? '<button type="button" class="cx-org-btn" data-act="tidy" title="Devolve todos os elementos ao arranjo automático"><i class="ti ti-layout-distribute-vertical"></i> Arrumar</button>' : '') +
                 '<label class="cx-org-search"><span class="cx-org-sr">Buscar pessoa</span>' +
                     '<input type="search" data-el="q" placeholder="Buscar pessoa ou cargo…" autocomplete="off">' +
                     '<span data-el="qcount" class="cx-org-qcount"></span></label>' +
@@ -193,8 +198,9 @@
                 '<label class="cx-org-check"><input type="checkbox" data-f="group"> É uma área ou equipe, não uma pessoa</label>' +
                 '<label class="cx-org-check"><input type="checkbox" data-f="dashed"> Borda tracejada (externo ou temporário)</label>' +
                 '<div class="cx-org-btns"><button type="button" class="cx-org-btn cx-org-btn--primary" data-act="edadd">Adicionar subordinado</button>' +
+                '<button type="button" class="cx-org-btn" data-act="unpin" data-el="unpin" hidden>Devolver ao arranjo automático</button>' +
                 '<button type="button" class="cx-org-btn cx-org-btn--danger" data-act="eddel">Excluir</button></div>' +
-                '<p class="cx-org-hint">Ao excluir, os subordinados passam a responder ao superior de quem saiu. As mudanças só ficam gravadas ao clicar em Salvar.</p>' +
+                '<p class="cx-org-hint">Ao excluir, os subordinados passam a responder ao superior de quem saiu; se não houver superior, eles ficam como blocos independentes. As mudanças só ficam gravadas ao clicar em Salvar.</p>' +
             '</aside>' : '') +
             '<section class="cx-org-esc">' +
                 '<h3>Matriz de escalonamento</h3>' +
@@ -308,12 +314,15 @@
         }
         // Tira o nó e sobe os filhos dele para o lugar que ele ocupava entre
         // os irmãos — uma passada só, sem conta de índice deslocado.
+        // Exclui qualquer elemento, menos o último que sobrar. Com superior,
+        // os subordinados passam a responder a ele, no lugar de quem saiu; sem
+        // superior (topo ou elemento solto), viram blocos independentes.
         function removeNode(id) {
             var f = find(id);
-            if (!f || !f.p) { return; }
-            var pid = f.p.id, out = [], done = false;
+            if (!f || S.nodes.length < 2) { return; }
+            var pid = f.p ? f.p.id : null, out = [], done = false;
             S.edges.forEach(function (e) {
-                if (e.to === id && e.from === pid && !done) {
+                if (pid && e.to === id && e.from === pid && !done) {
                     S.edges.forEach(function (k) {
                         if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, style: k.style, label: k.label }); }
                     });
@@ -394,6 +403,7 @@
             rebuild();
             if (input) { input.value = ser(); dirty = true; }
             pushHist(key);
+            agendaAuto();
         }
         // `key` agrupa alterações seguidas do mesmo campo do mesmo nó: um
         // caractere digitado não é um passo de desfazer. Sem `key`, cada
@@ -440,13 +450,16 @@
         // ---- desenho ---------------------------------------------------
         // Filhos sem equipe viram LINHAS dentro do cartão do chefe; filhos com
         // equipe viram cartão próprio. Essa regra é a mesma na tela e no PDF.
-        function leavesOf(n) { return n.kids.filter(function (k) { return !k.kids.length; }); }
-        function branchesOf(n) { return n.kids.filter(function (k) { return k.kids.length; }); }
+        // Caixa própria: quem tem equipe, quem não tem chefe, e quem foi
+        // posicionado à mão. Os demais são linhas dentro do cartão do chefe.
+        function isBox(n) { return !parentOf[n.id] || n.kids.length > 0 || isFree(n); }
+        function leavesOf(n) { return n.kids.filter(function (k) { return !isBox(k); }); }
+        function branchesOf(n) { return n.kids.filter(isBox); }
         function cardInner(n) {
             var cls = 'cx-org-card' + (n.group ? ' is-group' : '') + (n.dashed ? ' is-dashed' : '') + (sel === n.id ? ' is-sel' : '') + hit(n);
             var leaves = leavesOf(n);
             return '<div class="' + cls + '" style="' + lc(n.lvl) + '" data-id="' + escHtml(n.id) + '" tabindex="0"' +
-                (editable ? ' draggable="true"' : '') + ' title="' + escHtml(n.note) + '">' +
+                (editable ? ' data-grab="1"' : '') + ' title="' + escHtml(n.note) + '">' +
                 '<div class="cx-org-head"><strong class="' + (n.name.trim() ? '' : 'is-vaga') + '">' + escHtml(label(n)) + '</strong>' +
                 '<span class="cx-org-role">' + escHtml(n.role) + '</span>' + tags(n) + '</div>' +
                 (leaves.length ? '<div class="cx-org-rows">' + leaves.map(row).join('') + '</div>' : '') +
@@ -460,7 +473,7 @@
         }
         function row(n) {
             return '<div class="cx-org-row' + (n.name.trim() ? '' : ' is-vaga') + (n.dashed ? ' is-dashed' : '') + (sel === n.id ? ' is-sel' : '') + hit(n) + '" style="' + lc(n.lvl) +
-                '" data-id="' + escHtml(n.id) + '" tabindex="0"' + (editable ? ' draggable="true"' : '') +
+                '" data-id="' + escHtml(n.id) + '" tabindex="0"' + (editable ? ' data-grab="1"' : '') +
                 ' title="' + escHtml([n.role, n.note].filter(Boolean).join('\n')) + '">' + escHtml(label(n)) + tags(n) + '</div>';
         }
         function tags(n) {
@@ -483,18 +496,44 @@
         // A lista aninhada saiu: cada cartão é uma caixa posicionada, e as
         // ligações são traçadas em SVG. É o que permite, no 2c, um elemento
         // ficar onde o usuário largar sem quebrar o arranjo dos outros.
-        var HGAP = 14, VGAP = 48;
-        function cardList() {
-            var a = [];
-            walk(T, function (n) { if (n === T || n.kids.length) { a.push(n); } });
-            return a;
+        var HGAP = 14, VGAP = 48, GRID = 10, GUIDE_TOL = 8;
+        // Última geometria calculada (id -> {x,y,w,h}). O arraste usa para
+        // alinhar com os outros elementos sem ter que remedir o DOM.
+        var geom = {}, origin = { x: 0, y: 0 };
+        function isFree(n) { return typeof n.x === 'number' && typeof n.y === 'number'; }
+        function snap(v) { return Math.max(0, Math.round(v / GRID) * GRID); }
+        // Ponto do evento em coordenada do canvas. O zoom é CSS, e o
+        // getBoundingClientRect já vem escalado: dividir por z devolve a
+        // coordenada real onde a caixa deve ficar.
+        function pointOf(e) {
+            var canvas = treeEl.querySelector('[data-el="canvas"]');
+            if (!canvas) { return null; }
+            var r = canvas.getBoundingClientRect();
+            // Menos a origem: devolve coordenada NO MESMO espaço em que as
+            // posições são gravadas e em que as guias são calculadas.
+            return { x: (e.clientX - r.left) / (z || 1) - origin.x, y: (e.clientY - r.top) / (z || 1) - origin.y };
         }
+        function freeAt(id, pt, grab) {
+            var f = find(id); if (!f || !pt) { return; }
+            f.n.x = snap(pt.x - (grab && grab.dx ? grab.dx : 0));
+            f.n.y = snap(pt.y - (grab && grab.dy ? grab.dy : 0));
+        }
+        function reanchor(id) {
+            var f = find(id); if (!f) { return; }
+            delete f.n.x; delete f.n.y;
+        }
+        // Cartão próprio: quem tem equipe, e quem não tem chefe (elemento
+        // sem ligação — ele não pode ser linha dentro do cartão de ninguém).
+        function roots() { return S.nodes.filter(function (n) { return !parentOf[n.id]; }); }
+        function cardList() { return S.nodes.filter(isBox); }
         function layoutTree() {
             var list = cardList(), box = {}, wcache = {};
 
             treeEl.innerHTML = '<div class="cx-org-canvas" data-el="canvas">' +
-                '<svg class="cx-org-links" data-el="links" aria-hidden="true"></svg>' +
-                list.map(function (n) { return '<div class="cx-org-box" data-box="' + escHtml(n.id) + '">' + cardInner(n) + '</div>'; }).join('') +
+                '<svg class="cx-org-links" data-el="links" aria-hidden="true"><g data-el="guides"></g></svg>' +
+                list.map(function (n) {
+                    return '<div class="cx-org-box' + (isFree(n) ? ' is-free' : '') + '" data-box="' + escHtml(n.id) + '">' + cardInner(n) + '</div>';
+                }).join('') +
                 '</div>';
             var canvas = treeEl.querySelector('[data-el="canvas"]');
 
@@ -521,22 +560,54 @@
                 at = left + (total - sum) / 2;
                 kids.forEach(function (k) { put(k, at, top + b.h + VGAP); at += blockW(k) + HGAP; });
             }
-            put(T, 0, 0);
-
-            // Elemento solto (x/y próprios) fica onde está: quem o posiciona é
-            // o usuário, não o layout. Sem tela para criar um ainda (2c).
-            list.forEach(function (n) {
-                if (typeof n.x === 'number' && typeof n.y === 'number') { box[n.id].x = n.x; box[n.id].y = n.y; }
+            // Cada bloco sem chefe é arrumado por si; o primeiro é o topo do
+            // organograma, os demais ficam à direita até o usuário posicioná-los.
+            var at = 0;
+            roots().forEach(function (r) {
+                if (!box[r.id]) { return; }
+                put(r, at, 0);
+                at += blockW(r) + HGAP * 4;
             });
 
-            var minX = 0, W = 0, H = 0;
-            list.forEach(function (n) { if (box[n.id].x < minX) { minX = box[n.id].x; } });
+            // Elemento solto (x/y próprios) fica onde o usuário largou, e leva
+            // a equipe junto: o deslocamento vale para toda a descendência.
+            (function livres(n) {
+                var b = box[n.id];
+                if (b && isFree(n)) {
+                    var dx = n.x - b.x, dy = n.y - b.y;
+                    walk(n, function (m) { if (box[m.id]) { box[m.id].x += dx; box[m.id].y += dy; } });
+                }
+                branchesOf(n).forEach(livres);
+            })(T);
+            roots().forEach(function (r) { if (r !== T) { (function livres(n) {
+                var b = box[n.id];
+                if (b && isFree(n)) {
+                    var dx = n.x - b.x, dy = n.y - b.y;
+                    walk(n, function (m) { if (box[m.id]) { box[m.id].x += dx; box[m.id].y += dy; } });
+                }
+                branchesOf(n).forEach(livres);
+            })(r); } });
+
+            // Quem foi para o negativo (equipe que acompanhou um cartão movido
+            // para a borda) é acomodado por uma ORIGEM de desenho, não mexendo
+            // na coordenada de cada um: a posição gravada tem que continuar
+            // significando a mesma coisa na próxima abertura, senão o cartão
+            // não fica onde a guia mostrou.
+            var minX = 0, minY = 0, W = 0, H = 0;
             list.forEach(function (n) {
                 var b = box[n.id];
-                b.x -= minX;
-                W = Math.max(W, b.x + b.w);
-                H = Math.max(H, b.y + b.h);
-                if (b.el) { b.el.style.left = Math.round(b.x) + 'px'; b.el.style.top = Math.round(b.y) + 'px'; }
+                if (b.x < minX) { minX = b.x; }
+                if (b.y < minY) { minY = b.y; }
+            });
+            origin = { x: Math.max(0, -minX), y: Math.max(0, -minY) };
+            list.forEach(function (n) {
+                var b = box[n.id];
+                W = Math.max(W, b.x + b.w + origin.x);
+                H = Math.max(H, b.y + b.h + origin.y);
+                if (b.el) {
+                    b.el.style.left = Math.round(b.x + origin.x) + 'px';
+                    b.el.style.top = Math.round(b.y + origin.y) + 'px';
+                }
             });
             canvas.style.width = Math.ceil(W) + 'px';
             canvas.style.height = Math.ceil(H) + 'px';
@@ -544,20 +615,90 @@
             var d = [];
             list.forEach(function (n) {
                 var b = box[n.id];
+                if (!b) { return; }
                 branchesOf(n).forEach(function (k) {
                     var c = box[k.id];
-                    if (!c) { return; }
-                    var x1 = Math.round(b.x + b.w / 2), y1 = Math.round(b.y + b.h);
-                    var x2 = Math.round(c.x + c.w / 2), y2 = Math.round(c.y);
-                    var ym = Math.round(y1 + (y2 - y1) / 2);
-                    d.push('M' + x1 + ' ' + y1 + 'V' + ym + 'H' + x2 + 'V' + y2);
+                    if (c) { d.push(linkPath(b, c)); }
                 });
             });
             var svg = canvas.querySelector('[data-el="links"]');
             svg.setAttribute('width', Math.ceil(W));
             svg.setAttribute('height', Math.ceil(H));
             svg.setAttribute('viewBox', '0 0 ' + Math.ceil(W) + ' ' + Math.ceil(H));
-            svg.innerHTML = d.length ? '<path d="' + d.join(' ') + '" />' : '';
+            svg.innerHTML = '<g transform="translate(' + origin.x + ',' + origin.y + ')">' +
+                '<g data-el="guides"></g>' + (d.length ? '<path d="' + d.join(' ') + '" />' : '') + '</g>';
+            geom = box;
+        }
+
+        // Por onde a linha sai e entra depende de ONDE o filho está. A receita
+        // única "sai por baixo, atravessa, entra por cima" só serve para o
+        // filho abaixo do pai; lado a lado ela virava um traço solto no meio
+        // (relato de Claudio, 20/09). Folga de 8 px para considerar "abaixo".
+        function linkPath(b, c) {
+            var R = Math.round, folga = 8;
+            var bx = b.x + b.w / 2, by = b.y + b.h / 2;
+            var cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+            if (c.y >= b.y + b.h + folga) {                       // abaixo
+                var ym = R(b.y + b.h + (c.y - b.y - b.h) / 2);
+                return 'M' + R(bx) + ' ' + R(b.y + b.h) + 'V' + ym + 'H' + R(cx) + 'V' + R(c.y);
+            }
+            if (c.y + c.h + folga <= b.y) {                       // acima
+                var ya = R(c.y + c.h + (b.y - c.y - c.h) / 2);
+                return 'M' + R(bx) + ' ' + R(b.y) + 'V' + ya + 'H' + R(cx) + 'V' + R(c.y + c.h);
+            }
+            if (c.x >= b.x + b.w) {                               // à direita
+                var xm = R(b.x + b.w + (c.x - b.x - b.w) / 2);
+                return 'M' + R(b.x + b.w) + ' ' + R(by) + 'H' + xm + 'V' + R(cy) + 'H' + R(c.x);
+            }
+            if (c.x + c.w <= b.x) {                               // à esquerda
+                var xe = R(c.x + c.w + (b.x - c.x - c.w) / 2);
+                return 'M' + R(b.x) + ' ' + R(by) + 'H' + xe + 'V' + R(cy) + 'H' + R(c.x + c.w);
+            }
+            // Sobrepostos: reta entre os centros, para a ligação não sumir.
+            return 'M' + R(bx) + ' ' + R(by) + 'L' + R(cx) + ' ' + R(cy);
+        }
+
+        // ---- guias de alinhamento (bloco 2c-1) --------------------------
+        // Alinhar "no olho" não funciona: 3 px de diferença já aparecem. Ao
+        // arrastar, as bordas e o centro do elemento procuram as bordas e o
+        // centro dos outros; achando, a guia acende e a posição gruda nela.
+        function alignTo(x, y, w, h, skip) {
+            var gx = [], gy = [], bestX = null, bestY = null, id;
+            function test(v, alvo, melhor) {
+                var dif = Math.abs(v - alvo);
+                return dif <= GUIDE_TOL && (melhor === null || dif < Math.abs(melhor.d)) ? { d: alvo - v, at: alvo } : melhor;
+            }
+            for (id in geom) {
+                if (id === skip || !Object.prototype.hasOwnProperty.call(geom, id)) { continue; }
+                var o = geom[id];
+                [[x, o.x], [x + w / 2, o.x + o.w / 2], [x + w, o.x + o.w]].forEach(function (par) {
+                    var r = test(par[0], par[1], bestX);
+                    if (r !== bestX) { bestX = r; }
+                });
+                [[y, o.y], [y + h / 2, o.y + o.h / 2], [y + h, o.y + o.h]].forEach(function (par) {
+                    var r = test(par[0], par[1], bestY);
+                    if (r !== bestY) { bestY = r; }
+                });
+            }
+            if (bestX) { x += bestX.d; gx.push(bestX.at); }
+            if (bestY) { y += bestY.d; gy.push(bestY.at); }
+            return { x: x, y: y, gx: gx, gy: gy, colou: !!(bestX || bestY) };
+        }
+        function showGuides(gx, gy) {
+            var canvas = treeEl.querySelector('[data-el="canvas"]');
+            var g = canvas && canvas.querySelector('[data-el="guides"]');
+            if (!g) { return; }
+            var W = parseInt(canvas.style.width, 10) || 0, H = parseInt(canvas.style.height, 10) || 0;
+            g.innerHTML = gx.map(function (v) { return '<line class="cx-org-guide" x1="' + v + '" y1="0" x2="' + v + '" y2="' + H + '"/>'; }).join('') +
+                gy.map(function (v) { return '<line class="cx-org-guide" x1="0" y1="' + v + '" x2="' + W + '" y2="' + v + '"/>'; }).join('');
+        }
+        function clearGuides() { showGuides([], []); }
+        // Posição final de um arraste: encosta nas guias; sem guia, na grade.
+        function dropSpot(id, pt, grab) {
+            var b = geom[id] || { w: 200, h: 60 };
+            var x = pt.x - (grab && grab.dx ? grab.dx : 0), y = pt.y - (grab && grab.dy ? grab.dy : 0);
+            var a = alignTo(x, y, b.w, b.h, id);
+            return { x: a.colou ? Math.max(0, Math.round(a.x)) : snap(x), y: a.colou ? Math.max(0, Math.round(a.y)) : snap(y), gx: a.gx, gy: a.gy };
         }
         function render() {
             layoutTree();
@@ -573,11 +714,11 @@
             if (!editable) { return; }
             $('palette').innerHTML = '<span>Arraste para o organograma:</span>' +
                 PALETTE.map(function (p) {
-                    return '<span class="cx-org-chip" draggable="true" data-new="' + p.kind + '" title="Arraste e solte à esquerda, à direita ou em cima de um cartão"><i class="ti ' + p.icon + '"></i> ' + p.label + '</span>';
+                    return '<span class="cx-org-chip" data-grab="1" data-new="' + p.kind + '" title="Arraste e solte à esquerda, à direita ou em cima de um cartão"><i class="ti ' + p.icon + '"></i> ' + p.label + '</span>';
                 }).join('') +
                 S.elements.map(function (e) {
                     var l = e.lvl ? levelOf(e.lvl) : null;
-                    return '<span class="cx-org-chip is-custom' + (e.dashed ? ' is-dashed' : '') + '" draggable="true" data-new="el:' + escHtml(e.id) + '"' +
+                    return '<span class="cx-org-chip is-custom' + (e.dashed ? ' is-dashed' : '') + '" data-grab="1" data-new="el:' + escHtml(e.id) + '"' +
                         (l ? ' style="--lc:' + l.color + '"' : '') + ' title="Elemento criado neste organograma">' +
                         '<i class="ti ' + (e.base === 'equipe' ? 'ti-users-group' : 'ti-user') + '"></i> ' + escHtml(e.label) +
                         '<button type="button" class="cx-org-chipdel" data-eldel="' + escHtml(e.id) + '" aria-label="Excluir o elemento ' + escHtml(e.label) + '">×</button></span>';
@@ -643,6 +784,86 @@
             $('fullCorner').title = on ? 'Sair da tela cheia' : 'Tela cheia';
             setTimeout(fit, 60);
         }
+        // ---- salvamento automático (bloco 1b) --------------------------
+        // Grava SÓ o organograma, sem recarregar. Existe por dois motivos: não
+        // perder trabalho, e permitir salvar em tela cheia (recarregar derruba
+        // a tela cheia e o navegador não deixa voltar a ela sem um clique).
+        var autoTimer = null, salvando = false, refazerAoTerminar = false;
+        var AUTO_MS = 2500;
+
+        function estado(texto, classe) {
+            var el = $('savestate');
+            if (!el) { return; }
+            el.textContent = texto;
+            el.className = 'cx-org-savestate' + (classe ? ' is-' + classe : '');
+        }
+        function tokenEl() {
+            var form = root.closest('form');
+            return form ? form.querySelector('[name="_glpi_csrf_token"]') : null;
+        }
+        // O token é consumido a cada POST (Session::validateCSRF do 11.0.6).
+        // Todos os formulários da página compartilham o mesmo valor, então o
+        // token novo tem que entrar em TODOS, senão o Salvar ou um botão de
+        // fluxo falharia depois de um salvamento automático.
+        function rotacionaToken(novo) {
+            if (!novo) { return; }
+            var d = root.ownerDocument || document;
+            d.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = novo; });
+        }
+        function podeAuto() { return editable && saveUrl && docId; }
+        function agendaAuto() {
+            if (!podeAuto()) { return; }
+            if (autoTimer) { clearTimeout(autoTimer); }
+            estado('alterações não salvas', 'pendente');
+            autoTimer = setTimeout(function () { salvaAgora(); }, AUTO_MS);
+        }
+        function salvaAgora(aoTerminar) {
+            if (!podeAuto()) { if (aoTerminar) { aoTerminar(false); } return; }
+            if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+            if (salvando) { refazerAoTerminar = true; if (aoTerminar) { aoTerminar(false); } return; }
+            var tk = tokenEl();
+            if (!tk) { if (aoTerminar) { aoTerminar(false); } return; }
+
+            salvando = true;
+            estado('salvando…', 'salvando');
+            var corpo = new FormData();
+            corpo.append('id', docId);
+            corpo.append('_diagram', ser());
+            corpo.append('_glpi_csrf_token', tk.value);
+
+            fetch(saveUrl, { method: 'POST', body: corpo, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.erro || ('http ' + r.status)); }); })
+                .then(function (j) {
+                    salvando = false;
+                    rotacionaToken(j.csrf);
+                    dirty = false;
+                    estado('salvo às ' + (j.hora || ''), 'ok');
+                    if (refazerAoTerminar) { refazerAoTerminar = false; agendaAuto(); }
+                    if (aoTerminar) { aoTerminar(true); }
+                })
+                .catch(function (e) {
+                    salvando = false;
+                    refazerAoTerminar = false;
+                    // Sem recuperação automática: insistir com token queimado
+                    // só gera erro repetido. O Salvar do formulário continua lá.
+                    estado('não foi possível salvar — use o botão Salvar da página', 'erro');
+                    if (aoTerminar) { aoTerminar(false); }
+                });
+        }
+
+        // Em tela cheia o organograma cobre a página e o Salvar do documento
+        // fica fora de alcance. O botão daqui aciona o MESMO botão do
+        // formulário: mesmo token, mesma validação, mesmo destino.
+        function saveForm() {
+            // Com endpoint: grava sem recarregar, e a tela cheia não cai.
+            if (podeAuto()) { salvaAgora(); return; }
+            var form = root.closest('form');
+            if (!form) { return; }
+            var b = form.querySelector('[name="update"], [name="add"]');
+            if (b) { b.click(); }
+            else if (form.requestSubmit) { form.requestSubmit(); }
+            else { form.submit(); }
+        }
         function toggleFull() {
             var on = !root.classList.contains('is-full');
             if (root.requestFullscreen) {
@@ -664,7 +885,14 @@
         // ---- edição ----------------------------------------------------
         function select(id) {
             if (!editable) { return; }
-            sel = id; render(); fill(); ed.hidden = false;
+            sel = id;
+            // Sem redesenhar a árvore: trocar o DOM debaixo do cursor mata o
+            // gesto de arraste que o usuário acabou de começar (relato de
+            // Claudio em 20/09: "preciso clicar muitas vezes para pegar").
+            treeEl.querySelectorAll('.is-sel').forEach(function (x) { x.classList.remove('is-sel'); });
+            var el = treeEl.querySelector('[data-id="' + String(id).replace(/["\\]/g, '') + '"]');
+            if (el) { el.classList.add('is-sel'); }
+            fill(); ed.hidden = false;
         }
         function fill() {
             var f = find(sel);
@@ -685,8 +913,12 @@
             } else {
                 par.innerHTML = '<option>Topo do organograma</option>'; par.disabled = true;
             }
+            var up = $('unpin');
+            if (up) { up.hidden = !isFree(n); }
             var del = root.querySelector('[data-act="eddel"]');
-            del.disabled = !p; del.classList.remove('is-armed'); del.textContent = 'Excluir';
+            del.disabled = S.nodes.length < 2;
+            del.title = del.disabled ? 'O organograma não pode ficar vazio.' : '';
+            del.classList.remove('is-armed'); del.textContent = 'Excluir';
         }
         function cur() { return find(sel).n; }
         function move(id, pid) { place(id, pid, 'in'); }
@@ -787,15 +1019,21 @@
             var x = (e.clientX - r.left) / (r.width || 1);
             return x < 0.25 ? 'before' : (x > 0.75 ? 'after' : 'in');
         }
-        function clearDrop() {
-            root.querySelectorAll('.is-drop-in,.is-drop-before,.is-drop-after,.is-dragging').forEach(function (x) {
-                x.classList.remove('is-drop-in', 'is-drop-before', 'is-drop-after', 'is-dragging');
+        function clearZones() {
+            treeEl.classList.remove('is-drop-free');
+            clearGuides();
+            root.querySelectorAll('.is-drop-in,.is-drop-before,.is-drop-after').forEach(function (x) {
+                x.classList.remove('is-drop-in', 'is-drop-before', 'is-drop-after');
             });
+        }
+        function clearDrop() {
+            clearZones();
+            root.querySelectorAll('.is-dragging').forEach(function (x) { x.classList.remove('is-dragging'); });
         }
         function addUnder(id) {
             var f = find(id); if (!f) { return; }
             var lvl = nextLevel(f.n.lvl), k = P('', '', lvl);
-            S.nodes.push(k); attach(id, k.id); commit(); select(k.id); F('name').focus();
+            S.nodes.push(k); attach(id, k.id); commit(); render(); select(k.id); F('name').focus();
         }
 
         if (editable) {
@@ -833,47 +1071,126 @@
                 if (e.key === 'Escape' && !ed.hidden) { sel = null; ed.hidden = true; render(); }
             });
 
-            root.addEventListener('dragstart', function (e) {
+            // ---- arraste próprio (bloco 2c-3) ---------------------------
+            // O arraste nativo do navegador foi abandonado: ele desenha um
+            // fantasma próprio, o elemento real não acompanha o cursor, e
+            // qualquer mudança de layout durante o gesto desloca a conta do
+            // ponto de soltura (três rodadas de teste, 20/09). Aqui o gesto é
+            // feito na mão: uma cópia do cartão segue o cursor, já encostada
+            // nas guias, e o que se vê é o que fica.
+            var gest = null, LIMIAR = 4;
+
+            function alvoSob(e) {
+                if (!document.elementFromPoint) { return null; }
+                var el = document.elementFromPoint(e.clientX, e.clientY);
+                return el && el.closest ? el.closest('[data-id]') : null;
+            }
+            function fantasma(el, largura) {
+                var g = el.cloneNode(true);
+                g.classList.add('cx-org-ghost');
+                g.removeAttribute('data-id');
+                g.style.width = largura + 'px';
+                treeEl.querySelector('[data-el="canvas"]').appendChild(g);
+                return g;
+            }
+            function fimGesto() {
+                if (gest && gest.ghost) { gest.ghost.remove(); }
+                if (gest && gest.el) { gest.el.classList.remove('is-dragging'); }
+                if ($('dragHint')) { $('dragHint').hidden = true; }
+                gest = null;
+                clearDrop();
+            }
+
+            root.addEventListener('pointerdown', function (e) {
+                if (e.button !== 0 || !editable) { return; }
                 var chip = e.target.closest && e.target.closest('[data-new]');
                 var t = e.target.closest && e.target.closest('[data-id]');
-                if (chip) { drag = { kind: chip.getAttribute('data-new') }; }
-                else if (t && treeEl.contains(t)) {
-                    drag = { id: t.getAttribute('data-id') }; t.classList.add('is-dragging');
-                    var fd = find(drag.id), hint = $('dragHint');
-                    if (fd && fd.n.kids.length && hint) {
-                        var k = fd.n.kids.length;
-                        hint.textContent = label(fd.n) + ' tem ' + k + (k === 1 ? ' subordinado' : ' subordinados') +
-                            ': soltando numa lista, você escolhe se a equipe vai junto.';
-                        hint.hidden = false;
+                if (chip) {
+                    gest = { kind: chip.getAttribute('data-new'), el: chip, sx: e.clientX, sy: e.clientY, dx: 0, dy: 0, moveu: false };
+                    e.preventDefault();
+                } else if (t && treeEl.contains(t)) {
+                    var r = t.getBoundingClientRect();
+                    gest = {
+                        id: t.getAttribute('data-id'), el: t, sx: e.clientX, sy: e.clientY,
+                        dx: (e.clientX - r.left) / (z || 1), dy: (e.clientY - r.top) / (z || 1),
+                        w: r.width / (z || 1) || 200, moveu: false
+                    };
+                    // Sem isto o navegador começa a selecionar o texto do
+                    // cartão e o gesto se perde no meio.
+                    e.preventDefault();
+                }
+            });
+
+            document.addEventListener('pointermove', function (e) {
+                if (!gest) { return; }
+                if (!gest.moveu) {
+                    if (Math.abs(e.clientX - gest.sx) + Math.abs(e.clientY - gest.sy) < LIMIAR) { return; }
+                    gest.moveu = true;
+                    gest.ghost = fantasma(gest.el, gest.w || 200);
+                    if (gest.id) {
+                        gest.el.classList.add('is-dragging');
+                        var fd = find(gest.id), hint = $('dragHint');
+                        if (fd && fd.n.kids.length && hint) {
+                            var k = fd.n.kids.length;
+                            hint.textContent = label(fd.n) + ' tem ' + k + (k === 1 ? ' subordinado' : ' subordinados') +
+                                ': soltando numa lista, você escolhe se a equipe vai junto.';
+                            hint.hidden = false;
+                        }
                     }
                 }
-                else { return; }
-                e.dataTransfer.effectAllowed = drag.kind ? 'copy' : 'move';
-                try { e.dataTransfer.setData('text/plain', drag.kind || drag.id); } catch (_) { /* Safari antigo */ }
+                var pt = pointOf(e);
+                if (!pt) { return; }
+                var sob = alvoSob(e), tid = sob && sob.getAttribute('data-id');
+                clearZones();
+                if (sob && tid !== gest.id && canPlace(gest.id ? { id: gest.id } : { kind: gest.kind }, tid, zoneOf(sob, e))) {
+                    sob.classList.add('is-drop-' + zoneOf(sob, e));
+                    gest.ghost.style.left = Math.round(pt.x - gest.dx + origin.x) + 'px';
+                    gest.ghost.style.top = Math.round(pt.y - gest.dy + origin.y) + 'px';
+                    gest.solta = null;
+                } else {
+                    treeEl.classList.add('is-drop-free');
+                    var sp = gest.id ? dropSpot(gest.id, pt, gest)
+                        : { x: snap(pt.x - gest.dx), y: snap(pt.y - gest.dy), gx: [], gy: [] };
+                    showGuides(sp.gx, sp.gy);
+                    gest.ghost.style.left = Math.round(sp.x + origin.x) + 'px';
+                    gest.ghost.style.top = Math.round(sp.y + origin.y) + 'px';
+                    gest.solta = sp;
+                }
             });
-            treeEl.addEventListener('dragover', function (e) {
-                var t = e.target.closest('[data-id]'); if (!t || !drag) { return; }
-                var zone = zoneOf(t, e);
-                if (!canPlace(drag, t.getAttribute('data-id'), zone)) { return; }
-                e.preventDefault();
-                root.querySelectorAll('.is-drop-in,.is-drop-before,.is-drop-after').forEach(function (x) {
-                    x.classList.remove('is-drop-in', 'is-drop-before', 'is-drop-after');
-                });
-                t.classList.add('is-drop-' + zone);
+
+            document.addEventListener('pointerup', function (e) {
+                if (!gest) { return; }
+                if (!gest.moveu) { gest = null; return; }   // foi clique, não arraste
+                var g = gest, sob = alvoSob(e), tid = sob && sob.getAttribute('data-id');
+                var d = g.id ? { id: g.id } : { kind: g.kind };
+                fimGesto();
+
+                if (sob && tid !== d.id) {
+                    var zone = zoneOf(sob, e);
+                    if (!canPlace(d, tid, zone)) { return; }
+                    var fm = d.id ? find(d.id) : null;
+                    if (fm && fm.n.kids.length && wouldList(sob, zone) && canPlace(d, tid, zone)) { askMove(d, tid, zone); return; }
+                    doMove(d, tid, zone);
+                    return;
+                }
+                if (!g.solta) { return; }
+                if (d.kind) {
+                    var nn = newNode(d.kind, S.levels[S.levels.length - 1].key);
+                    nn.x = g.solta.x; nn.y = g.solta.y;
+                    S.nodes.push(nn);
+                    commit(); render(); select(nn.id);
+                    if (d.kind !== 'area') { F('name').focus(); }
+                } else {
+                    var fn = find(d.id);
+                    if (fn) { fn.n.x = g.solta.x; fn.n.y = g.solta.y; }
+                    commit(); render(); fill();
+                }
             });
-            treeEl.addEventListener('dragleave', function (e) {
-                var t = e.target.closest('[data-id]');
-                if (t && !t.contains(e.relatedTarget)) { t.classList.remove('is-drop-in', 'is-drop-before', 'is-drop-after'); }
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && gest) { fimGesto(); }
             });
-            treeEl.addEventListener('drop', function (e) {
-                var t = e.target.closest('[data-id]'); if (!t || !drag) { return; }
-                e.preventDefault();
-                var d = drag, zone = zoneOf(t, e), tid = t.getAttribute('data-id'); drag = null; clearDrop();
-                var fm = d.id ? find(d.id) : null;
-                if (fm && fm.n.kids.length && wouldList(t, zone) && canPlace(d, tid, zone)) { askMove(d, tid, zone); return; }
-                doMove(d, tid, zone);
-            });
-            root.addEventListener('dragend', function () { drag = null; clearDrop(); if ($('dragHint')) { $('dragHint').hidden = true; } });
+
 
             $('lvlist').addEventListener('input', function (e) {
                 var i = e.target.getAttribute('data-lvlabel'), j = e.target.getAttribute('data-lvcolor');
@@ -949,7 +1266,13 @@
             else if (act === 'redo') { jump(1); }
             else if (act === 'zin') { setZ(z + 0.1); }
             else if (act === 'zout') { setZ(z - 0.1); }
+            else if (act === 'save') { saveForm(); }
             else if (act === 'fit') { fit(); }
+            else if (act === 'tidy') {
+                S.nodes.forEach(function (n) { delete n.x; delete n.y; });
+                commit(); render(); fill(); fit();
+            }
+            else if (act === 'unpin') { reanchor(sel); commit(); render(); fill(); }
             else if (act === 'print') { printOrg(); }
             else if (act === 'full') { toggleFull(); }
             else if (act === 'tpl') { $('tpl').showModal(); }
@@ -985,7 +1308,7 @@
             else if (act === 'edclose') { sel = null; ed.hidden = true; render(); }
             else if (act === 'eddel') {
                 if (!b.classList.contains('is-armed')) { b.classList.add('is-armed'); b.textContent = 'Confirmar exclusão'; return; }
-                var f = find(sel); if (!f || !f.p) { return; }
+                var f = find(sel); if (!f) { return; }
                 removeNode(sel);
                 sel = null; ed.hidden = true; commit(); render();
             }
@@ -1065,6 +1388,20 @@
 
         var api = { getData: function () { return JSON.parse(ser()); }, fit: fit, setZoom: setZ, print: printOrg, place: place,
             undo: function () { jump(-1); }, redo: function () { jump(1); },
+            free: function (id, x, y) { var f = find(id); if (f) { f.n.x = snap(x); f.n.y = snap(y); commit(); render(); } },
+            origin: function () { return { x: origin.x, y: origin.y }; },
+            save: function (cb) { salvaAgora(cb); },
+            state: function () { var e = $('savestate'); return e ? e.textContent : ''; },
+            preview: function (id, x, y) { return dropSpot(id, { x: x, y: y }, { dx: 0, dy: 0 }); },
+            guides: function () {
+                var g = treeEl.querySelector('[data-el="guides"]');
+                return g ? g.querySelectorAll('line').length : 0;
+            },
+            tidy: function () { S.nodes.forEach(function (n) { delete n.x; delete n.y; }); commit(); render(); },
+            addFree: function (kind, x, y) {
+                var n = newNode(kind, S.levels[S.levels.length - 1].key);
+                n.x = snap(x); n.y = snap(y); S.nodes.push(n); commit(); render(); return n.id;
+            },
             history: function () { return { pos: hpos, len: hist.length }; }, drop: function (d, tid, zone) { var fm = d.id ? find(d.id) : null; var el = treeEl.querySelector('[data-id="' + tid + '"]'); if (fm && fm.n.kids.length && el && wouldList(el, zone) && canPlace(d, tid, zone)) { askMove(d, tid, zone); return 'ask'; } return doMove(d, tid, zone); }, templates: TEMPLATES.map(function (t) { return t.key; }) };
         root.__cxOrg = api;
         return api;

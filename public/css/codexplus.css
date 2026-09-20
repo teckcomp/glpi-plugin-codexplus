@@ -1514,6 +1514,22 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-box { position: absolute; top: 0; left: 0; }
 .cx-org-links { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
 .cx-org-links path { fill: none; stroke: var(--cx-org-line); stroke-width: 2; }
+/* A marca de "posicionado à mão" era um ponto em cada cartão e poluía o mapa
+   (Claudio, 20/09). Agora só aparece no cartão sob o cursor. */
+.cx-org-box.is-free .cx-org-card::after {
+    content: ""; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--cx-accent); box-shadow: 0 0 0 2px var(--cx-surface);
+    opacity: 0; transition: opacity .12s;
+}
+.cx-org-box.is-free:hover .cx-org-card::after { opacity: 1; }
+.cx-org-tree.is-drop-free { background: color-mix(in srgb, var(--cx-accent) 5%, transparent); }
+.cx-org-guide { stroke: var(--cx-accent); stroke-width: 1; stroke-dasharray: 4 3; }
+/* Cópia que segue o cursor durante o arraste (bloco 2c-3). */
+.cx-org-ghost {
+    position: absolute; z-index: 6; pointer-events: none; opacity: .92;
+    box-shadow: 0 10px 24px rgba(12, 20, 32, .28); cursor: grabbing;
+}
+.cx-org-card[data-grab], .cx-org-row[data-grab] { touch-action: none; }
 
 .cx-org-card {
     position: relative; background: var(--cx-surface); border: 1px solid var(--cx-border); border-left: 6px solid var(--lc);
@@ -1544,7 +1560,12 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org .is-dim { opacity: .28; }
 .cx-org .is-hit { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cx-accent) 45%, transparent); }
 .cx-org-row.is-hit { background: color-mix(in srgb, var(--cx-accent) 14%, transparent); box-shadow: none; }
-.cx-org-card[draggable="true"], .cx-org-row[draggable="true"] { cursor: grab; }
+.cx-org-card[data-grab], .cx-org-row[data-grab] { cursor: grab; }
+/* Sem isto, pressionar sobre o texto inicia seleção de texto e o arraste do
+   elemento só pega na borda: era o "preciso clicar muitas vezes" (20/09). */
+.cx-org-card[data-grab], .cx-org-row[data-grab],
+.cx-org-card[data-grab] * { user-select: none; -webkit-user-select: none; }
+.cx-org-card[data-grab]:active, .cx-org-row[data-grab]:active { cursor: grabbing; }
 
 .cx-org-editor {
     position: fixed; right: 16px; top: 96px; width: 320px; max-height: calc(100vh - 120px); overflow: auto;
@@ -1651,7 +1672,7 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-stage { cursor: grab; }
 .cx-org-stage.is-panning { cursor: grabbing; user-select: none; }
 .cx-org-stage [data-id] { cursor: pointer; }
-.cx-org-stage [draggable="true"] { cursor: grab; }
+.cx-org-stage [data-grab] { cursor: grab; }
 
 /* Tela cheia (API do navegador ou classe de reserva) */
 .cx-org.is-full {
@@ -1676,6 +1697,12 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-tplcard.is-armed strong::after { content: " · clique de novo para usar"; font-weight: 500; color: var(--cx-accent); font-size: 12.5px; }
 
 /* ---- Tela cheia em destaque (0.6.7-4) ---- */
+/* Só em tela cheia: fora dela, o Salvar do formulário está logo abaixo. */
+.cx-org-btn--save { display: none; }
+.cx-org-savestate { font-size: 12.5px; color: var(--cx-muted); min-width: 120px; }
+.cx-org-savestate.is-ok { color: var(--cx-ok, var(--cx-muted)); }
+.cx-org-savestate.is-erro { color: var(--cx-danger); font-weight: 500; }
+.cx-org.is-full .cx-org-btn--save { display: inline-flex; align-items: center; gap: 6px; }
 .cx-org-btn--full { background: var(--cx-text); border-color: var(--cx-text); color: #fff; }
 .cx-org-btn--full:hover { background: #2b3747; border-color: #2b3747; }
 .cx-org-stagewrap { position: relative; }
@@ -1715,9 +1742,14 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-io .cx-org-check { margin-top: 10px; }
 
 /* ---- 0.6.7-6: mover quem tem equipe ---- */
+/* Sobreposta, NUNCA no fluxo: aparecendo durante o arraste, ela empurrava o
+   mapa para baixo e o cartão caía deslocado da guia (relato de 20/09). */
+.cx-org { position: relative; }
 .cx-org-draghint {
-    margin: 0 0 10px; padding: 7px 12px; font-size: 13px; border-radius: 8px;
+    position: absolute; left: 0; right: 0; z-index: 5; margin: 0; padding: 7px 12px;
+    font-size: 13px; border-radius: 8px; pointer-events: none;
     background: var(--cx-accent-soft); color: var(--cx-accent-strong);
+    box-shadow: 0 2px 8px rgba(12, 20, 32, .12);
 }
 .cx-org-draghint[hidden] { display: none; }
 .cx-org-move { width: min(560px, 92vw); }

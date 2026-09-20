@@ -104,9 +104,10 @@
                         <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
                         <input type="hidden" name="_diagram" id="cx-org-input" value="">
                         <div data-cx-org data-editable="1" data-source="cx-org-data" data-input="cx-org-input"
-                             data-title="{{ name }}" data-code="{{ code }}"></div>
+                             data-title="{{ name }}" data-code="{{ code }}"
+                             {% if not is_new %}data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"{% endif %}></div>
                         <div class="codexplus-form-hint">
-                            {{ __('Clique numa pessoa para editar; arraste um cartão ou um nome sobre outro para mudar a quem responde. Para trazer o organograma do protótipo, use "Importar ou exportar". Nada fica gravado até clicar em Salvar.', 'codexplus') }}
+                            {{ __('Clique numa pessoa para editar; arraste um cartão para onde quiser, ou sobre outro para mudar a quem responde. Para trazer o organograma do protótipo, use "Importar ou exportar". O organograma é gravado sozinho pouco depois de cada mudança; o resto do documento, ao clicar em Salvar.', 'codexplus') }}
                         </div>
                     </div>
                 {% else %}

@@ -438,16 +438,25 @@
         }
 
         // ---- desenho ---------------------------------------------------
-        function card(n) {
-            var leaves = n.kids.filter(function (k) { return !k.kids.length; });
-            var br = n.kids.filter(function (k) { return k.kids.length; });
+        // Filhos sem equipe viram LINHAS dentro do cartão do chefe; filhos com
+        // equipe viram cartão próprio. Essa regra é a mesma na tela e no PDF.
+        function leavesOf(n) { return n.kids.filter(function (k) { return !k.kids.length; }); }
+        function branchesOf(n) { return n.kids.filter(function (k) { return k.kids.length; }); }
+        function cardInner(n) {
             var cls = 'cx-org-card' + (n.group ? ' is-group' : '') + (n.dashed ? ' is-dashed' : '') + (sel === n.id ? ' is-sel' : '') + hit(n);
-            return '<li><div class="' + cls + '" style="' + lc(n.lvl) + '" data-id="' + escHtml(n.id) + '" tabindex="0"' +
+            var leaves = leavesOf(n);
+            return '<div class="' + cls + '" style="' + lc(n.lvl) + '" data-id="' + escHtml(n.id) + '" tabindex="0"' +
                 (editable ? ' draggable="true"' : '') + ' title="' + escHtml(n.note) + '">' +
                 '<div class="cx-org-head"><strong class="' + (n.name.trim() ? '' : 'is-vaga') + '">' + escHtml(label(n)) + '</strong>' +
                 '<span class="cx-org-role">' + escHtml(n.role) + '</span>' + tags(n) + '</div>' +
                 (leaves.length ? '<div class="cx-org-rows">' + leaves.map(row).join('') + '</div>' : '') +
-                '</div>' + (br.length ? '<ul>' + br.map(card).join('') + '</ul>' : '') + '</li>';
+                '</div>';
+        }
+        // Aninhado, para o PDF (o motor de impressão continua usando o CSS de
+        // lista). A tela usa layoutTree(), que posiciona cada caixa.
+        function card(n) {
+            var br = branchesOf(n);
+            return '<li>' + cardInner(n) + (br.length ? '<ul>' + br.map(card).join('') + '</ul>' : '') + '</li>';
         }
         function row(n) {
             return '<div class="cx-org-row' + (n.name.trim() ? '' : ' is-vaga') + (n.dashed ? ' is-dashed' : '') + (sel === n.id ? ' is-sel' : '') + hit(n) + '" style="' + lc(n.lvl) +
@@ -470,8 +479,88 @@
                 return '<span style="--lc:' + l.color + '"><i></i>' + escHtml(l.label) + ' <b>' + (c[l.key] || 0) + '</b></span>';
             }).join('') + '<span><i class="is-dash"></i>Vagas em aberto <b>' + vagas + '</b></span><span>Pessoas nomeadas <b>' + total + '</b></span>';
         }
+        // ---- posicionamento (bloco 2b) ---------------------------------
+        // A lista aninhada saiu: cada cartão é uma caixa posicionada, e as
+        // ligações são traçadas em SVG. É o que permite, no 2c, um elemento
+        // ficar onde o usuário largar sem quebrar o arranjo dos outros.
+        var HGAP = 14, VGAP = 48;
+        function cardList() {
+            var a = [];
+            walk(T, function (n) { if (n === T || n.kids.length) { a.push(n); } });
+            return a;
+        }
+        function layoutTree() {
+            var list = cardList(), box = {}, wcache = {};
+
+            treeEl.innerHTML = '<div class="cx-org-canvas" data-el="canvas">' +
+                '<svg class="cx-org-links" data-el="links" aria-hidden="true"></svg>' +
+                list.map(function (n) { return '<div class="cx-org-box" data-box="' + escHtml(n.id) + '">' + cardInner(n) + '</div>'; }).join('') +
+                '</div>';
+            var canvas = treeEl.querySelector('[data-el="canvas"]');
+
+            list.forEach(function (n) {
+                var el = canvas.querySelector('[data-box="' + n.id.replace(/["\\]/g, '') + '"]');
+                // Ambiente sem layout (teste headless) devolve 0: a estimativa
+                // mantém o arranjo coerente para poder ser conferido.
+                var w = (el && el.offsetWidth) || 200;
+                var h = (el && el.offsetHeight) || (42 + leavesOf(n).length * 22);
+                box[n.id] = { el: el, w: w, h: h, x: 0, y: 0 };
+            });
+
+            function blockW(n) {
+                if (wcache[n.id] !== undefined) { return wcache[n.id]; }
+                var kids = branchesOf(n), sum = 0;
+                kids.forEach(function (k, j) { sum += blockW(k) + (j ? HGAP : 0); });
+                return (wcache[n.id] = kids.length ? Math.max(box[n.id].w, sum) : box[n.id].w);
+            }
+            function put(n, left, top) {
+                var b = box[n.id], total = blockW(n), kids = branchesOf(n), sum = 0, at;
+                b.x = left + (total - b.w) / 2;
+                b.y = top;
+                kids.forEach(function (k, j) { sum += blockW(k) + (j ? HGAP : 0); });
+                at = left + (total - sum) / 2;
+                kids.forEach(function (k) { put(k, at, top + b.h + VGAP); at += blockW(k) + HGAP; });
+            }
+            put(T, 0, 0);
+
+            // Elemento solto (x/y próprios) fica onde está: quem o posiciona é
+            // o usuário, não o layout. Sem tela para criar um ainda (2c).
+            list.forEach(function (n) {
+                if (typeof n.x === 'number' && typeof n.y === 'number') { box[n.id].x = n.x; box[n.id].y = n.y; }
+            });
+
+            var minX = 0, W = 0, H = 0;
+            list.forEach(function (n) { if (box[n.id].x < minX) { minX = box[n.id].x; } });
+            list.forEach(function (n) {
+                var b = box[n.id];
+                b.x -= minX;
+                W = Math.max(W, b.x + b.w);
+                H = Math.max(H, b.y + b.h);
+                if (b.el) { b.el.style.left = Math.round(b.x) + 'px'; b.el.style.top = Math.round(b.y) + 'px'; }
+            });
+            canvas.style.width = Math.ceil(W) + 'px';
+            canvas.style.height = Math.ceil(H) + 'px';
+
+            var d = [];
+            list.forEach(function (n) {
+                var b = box[n.id];
+                branchesOf(n).forEach(function (k) {
+                    var c = box[k.id];
+                    if (!c) { return; }
+                    var x1 = Math.round(b.x + b.w / 2), y1 = Math.round(b.y + b.h);
+                    var x2 = Math.round(c.x + c.w / 2), y2 = Math.round(c.y);
+                    var ym = Math.round(y1 + (y2 - y1) / 2);
+                    d.push('M' + x1 + ' ' + y1 + 'V' + ym + 'H' + x2 + 'V' + y2);
+                });
+            });
+            var svg = canvas.querySelector('[data-el="links"]');
+            svg.setAttribute('width', Math.ceil(W));
+            svg.setAttribute('height', Math.ceil(H));
+            svg.setAttribute('viewBox', '0 0 ' + Math.ceil(W) + ' ' + Math.ceil(H));
+            svg.innerHTML = d.length ? '<path d="' + d.join(' ') + '" />' : '';
+        }
         function render() {
-            treeEl.innerHTML = '<ul>' + card(T) + '</ul>';
+            layoutTree();
             $('legend').innerHTML = legendHtml();
             if (query) {
                 var n = treeEl.querySelectorAll('.is-hit').length;

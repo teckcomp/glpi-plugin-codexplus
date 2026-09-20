@@ -149,6 +149,9 @@ class Install
         // --- Etapa R1: documentos próprios ---
         self::installR1($migration);
 
+        // --- Etapa R3a: coluna Setor visível na lista de Categorias ---
+        self::installR3a($migration);
+
         $migration->executeMigration();
         return true;
     }
@@ -327,6 +330,33 @@ class Install
         }
     }
 
+    /**
+     * Etapa R3a — coluna Setor (opção de busca 10 de Category) visível por
+     * padrão na lista de Categorias. Só quando ainda não existe NENHUMA
+     * preferência padrão (users_id = 0) para Category: assim, se alguém
+     * reorganizar as colunas depois, uma reinstalação não desfaz a escolha.
+     */
+    private static function installR3a(Migration $migration): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $exists = countElementsInTable('glpi_displaypreferences', [
+            'itemtype' => Category::class,
+            'users_id' => 0,
+        ]) > 0;
+
+        if (!$exists) {
+            $DB->insert('glpi_displaypreferences', [
+                'itemtype'  => Category::class,
+                'num'       => 10,
+                'rank'      => 1,
+                'users_id'  => 0,
+                'interface' => 'central',
+            ]);
+        }
+    }
+
     public static function uninstall(): bool
     {
         /** @var \DBmysql $DB */
@@ -339,6 +369,11 @@ class Install
                 $DB->doQuery("DROP TABLE `$table`");
             }
         }
+
+        // Preferências de coluna das listas do plugin (R3a).
+        $DB->delete('glpi_displaypreferences', [
+            'itemtype' => [Category::class, Sector::class, Document::class],
+        ]);
 
         ProfileRight::deleteProfileRights(['plugin_codexplus_wiki']);
         return true;

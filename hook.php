@@ -34,8 +34,9 @@ function plugin_codexplus_getDropdown(): array
  * "este item está em uso" e "substituir por" ao excluir setor/categoria).
  *
  * Só entram tabelas que JÁ têm classe: o GLPI emite aviso para relação cuja
- * tabela não corresponde a um itemtype (DbUtils::getDbRelations). A ligação
- * documento–categoria entra na R3, junto com a classe dela.
+ * tabela não corresponde a um itemtype (DbUtils::getDbRelations, achado 31).
+ * A ligação documento–categoria entrou na R3a, junto com Document_Category:
+ * categoria usada por documento passa a dar o aviso "em uso".
  */
 function plugin_codexplus_getDatabaseRelations(): array
 {
@@ -44,7 +45,8 @@ function plugin_codexplus_getDatabaseRelations(): array
             'glpi_plugin_codexplus_categories' => 'plugin_codexplus_sectors_id',
         ],
         'glpi_plugin_codexplus_categories' => [
-            'glpi_plugin_codexplus_categories' => 'plugin_codexplus_categories_id',
+            'glpi_plugin_codexplus_categories'           => 'plugin_codexplus_categories_id',
+            'glpi_plugin_codexplus_documents_categories' => 'plugin_codexplus_categories_id',
         ],
     ];
 }

@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.1-alpha` · atualizado em 20/09/2026 (Etapa R2: setores e
-> categorias cadastráveis).
+> Estado: `v0.5.7-alpha` · atualizado em 19/09/2026 (revisão geral após
+> auditoria do servidor e do repositório).
 
 ---
 
@@ -38,14 +38,6 @@ instituição de forma fácil e rápida, criação intuitiva para não técnicos
 resultado final sem perda em relação ao protótipo aprovado. Detalhes na
 Etapa 9 do `ROADMAP.md`.
 
-**Decisão de 19/09/2026 — independência da Base de Conhecimento.** Os
-documentos do Codex+ deixam de ser artigos nativos (`glpi_knowbaseitems`) e
-passam a ser um objeto próprio. Motivo: permissões (duas matrizes
-conflitantes), setor acima da categoria, acesso anônimo (imagens e anexos
-nativos só saem com login) e histórico esbarravam todos na base nativa.
-Hora certa: nada em produção e só 5 documentos de teste. Detalhes na seção
-3.1 e na Etapa R do `ROADMAP.md`.
-
 ---
 
 ## 2. Escopo — o que está fora, e por quê
@@ -57,7 +49,7 @@ desta tabela sem alinhar antes.**
 |---|---|
 | Fluxo de aprovação multi-etapa | Não há intenção de certificar ISO 9001; autor e aprovador são a mesma pessoa |
 | Caixa de tarefas pendentes | Só faz sentido com várias pessoas no fluxo |
-| Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações. O histórico de revisão com resumo (Etapa R6) é do documento, não aparato de auditoria |
+| Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações |
 | Permissão separada de ver / imprimir / baixar | O GLPI já controla visibilidade por perfil, grupo e entidade |
 | Editor Markdown | O TinyMCE nativo atende |
 | Hierarquia livro → capítulo → página | Categoria → subcategoria resolve; o PSG cobre o agrupamento por setor |
@@ -78,7 +70,7 @@ desta tabela sem alinhar antes.**
 | Permissões | `KnowbaseItem::canViewItem()` e `getVisibilityCriteria()` — os mesmos helpers das telas nativas |
 | Telas | Próprias, em Twig, com menu em Ferramentas |
 | Edição | **Desde a Etapa 4d, embutida no Codex+** (`front/article.form.php`), reaproveitando o TinyMCE nativo via `Html::textarea(['enable_richtext' => true])` só para o CORPO — não é editor próprio, não é reskin da ficha nativa. Categoria, FAQ e anexos continuam só na ficha nativa (`front/knowbaseitem.form.php`). **Desde a Etapa 4f, o cabeçalho deixou de ter TinyMCE**: é uma prévia de 3 áreas fixas (título = mesmo campo `name`, logo = slot clicável que reaproveita `Branding::storeLogo()` via `front/header-logo.form.php`, dados automáticos = texto gerado, não editável) — ver `Branding::composeHeaderHtml()`/`composeArea3()` |
-| PDF | Impressão client-side pelo navegador (**não** TCPDF). **Desde a 0.5.8**, o cabeçalho é montado na hora da impressão a partir dos dados do documento (título + logo em todas as páginas; título grande e linha de identificação na 1ª) — `header_html` não é mais lido pelo PDF. Rodapé por documento (`footer_text`) continua com prioridade sobre o global (`Branding`) |
+| PDF | Impressão client-side pelo navegador (**não** TCPDF). **Desde a Etapa 4e**, cabeçalho/rodapé por documento (`header_html`/`footer_text`) têm prioridade sobre a configuração global (`Branding`) quando não vazios — regra centralizada em `public/js/codexplus.js` |
 | Configuração | `Config::setConfigurationValues()` no contexto `plugin:codexplus` — sem tabela própria |
 | Logo | Arquivo em `GLPI_PLUGIN_DOC_DIR/codexplus/` — dado de instância, **fora do repositório** |
 
@@ -97,7 +89,7 @@ desta tabela sem alinhar antes.**
 | `users_id_owner` | INT UNSIGNED | responsável |
 | `validity_months` | INT UNSIGNED | 0 = não vence (propostas) |
 | `client_name` | VARCHAR(255) | só propostas |
-| `header_html` | LONGTEXT NULL | Etapa 4d/4f: ainda gravado por `Branding::composeHeaderHtml()` na criação e na edição, mas **desde a 0.5.8 não é lido pelo PDF** (cabeçalho montado na impressão). Candidato a remoção numa etapa futura com migração |
+| `header_html` | LONGTEXT NULL | cabeçalho por documento — Etapa 4d, entra no PDF desde a 4e. **Desde a Etapa 4f, deixou de ser rich text editável**: sempre gravado por `Branding::composeHeaderHtml()` (título + logo + Área 3 fixa), nunca lido de `$_POST`. Estrutura: `<div class="cx-header-row cx-header-row-1">` (título + logo) + `<div class="cx-header-row cx-header-row-2">` (código · revisão · data) |
 | `footer_text` | LONGTEXT NULL | rodapé por documento, texto com marcadores (mesma sintaxe de `Branding::footer_text`, mas por documento) — Etapa 4d. Desde a Etapa 4e, entra no PDF com prioridade sobre `Branding::footer_text` |
 | `date_published` | TIMESTAMP | base do cálculo de vencimento |
 | `date_creation` / `date_mod` | TIMESTAMP | |
@@ -128,97 +120,6 @@ dias) · `vencido`.
 > A regra de vencimento tem **fonte única**: `DocumentMeta::expiryState()`.
 > `Dashboard::expiry()` apenas delega. Não duplique esse cálculo — é assim
 > que o painel e o documento começam a discordar sobre o que está vencido.
-
----
-
-### 3.1 Arquitetura-alvo — Etapa R (decidida em 19/09/2026)
-
-> **Transição.** A tabela da seção 3 descreve o código **até a 0.5.8**, ainda
-> apoiado na Base de Conhecimento. A Etapa R leva ao desenho abaixo. Durante
-> a Etapa R, confie nesta seção para o que for novo.
-
-| Camada | Decisão |
-|---|---|
-| Documento | Classe própria `GlpiPlugin\Codexplus\Document`, tabela `glpi_plugin_codexplus_documents` (a mesma de hoje, ampliada): título, conteúdo, entidade/recursivo, autor, responsável, tipo, sequencial, revisão, status, validade, cliente, datas. `dohistory` ligado: a aba Histórico nativa registra status, responsável e revisão (fecha o achado 20). Nome colide com o `Document` do núcleo: dentro do namespace, o do núcleo é `\Document` |
-| Categorias | Lista própria em árvore (CommonTreeDropdown). **Um documento pode estar em várias categorias** (tabela de ligação N:N) |
-| Setores | Lista própria (CommonDropdown). **A categoria pertence a um setor**; subcategorias herdam. Documento em categorias de setores diferentes mostra todos os setores. Setor é **organização**, não controle de acesso |
-| Leitura | **Mesma rotina da Base de Conhecimento:** alvos por documento — **perfis, grupos e usuários**. Documento sem alvo: só autor, responsável e quem tem "Ver todos". Rascunho: só quem pode editar |
-| Criação e edição | **Só por direitos de perfil** (aba Codex+ em Perfis): Ler, Criar, Atualizar, Excluir, Ver todos, Publicar para acesso anônimo, Gerenciar modelos. Uma matriz só, sem conflito com a base nativa |
-| Versões | Tabela própria: cópia do conteúdo a cada **revisão publicada** (:00 → :01), com resumo obrigatório do que mudou. Alimenta o histórico de revisão impresso no PDF |
-| Anexos e imagens | Mecanismo nativo genérico (`Document_Item`, imagens coladas via `addFiles`) — funciona com qualquer objeto |
-| Acesso anônimo | Link secreto por documento (só publicados, revogável), com entrega própria e controlada de imagens e anexos |
-| Base de Conhecimento nativa | O Codex+ deixa de ler e de gravar nela. Os artigos atuais ficam intocados |
-| Migração | Ferramenta de uso único, só administrador, com prévia, para os 5 documentos de teste (título, conteúdo, metadados, anexos, imagens). Fora do Install (dado não é schema). O histórico de revisões nativo não migra |
-
-#### Schema da Etapa R (criado na R1, `v0.6.0-alpha`)
-
-Nada abaixo é lido pelas telas atuais ainda; elas seguem sobre
-`glpi_knowbaseitems` até a R5. Chaves estrangeiras seguem a convenção do GLPI
-(nome da tabela sem `glpi_` + `_id`) para as classes da R2/R3 não precisarem
-de `getTable()` manual.
-
-| Tabela | Uso | Campos principais |
-|---|---|---|
-| `glpi_plugin_codexplus_documents` | o documento (ampliada) | + `name`, `content`, `entities_id`, `is_recursive`, `users_id` (autor), `is_deleted`. `knowbaseitems_id` deixou de ser único (documento próprio nasce com 0) e sai na R5 |
-| `glpi_plugin_codexplus_sectors` | setores (CommonDropdown, R2) | `name`, `comment`, `entities_id`, `is_recursive` |
-| `glpi_plugin_codexplus_categories` | categorias em árvore (CommonTreeDropdown, R2) | colunas da `glpi_knowbaseitemcategories` nativa + `plugin_codexplus_sectors_id` |
-| `glpi_plugin_codexplus_documents_categories` | documento ↔ categoria, N:N | único por par |
-| `glpi_plugin_codexplus_documents_profiles` | alvo de leitura: perfil | `profiles_id`, `entities_id` (NULL), `is_recursive`, `no_entity_restriction` — espelho de `glpi_knowbaseitems_profiles` |
-| `glpi_plugin_codexplus_documents_groups` | alvo de leitura: grupo | idem, com `groups_id` — espelho de `glpi_groups_knowbaseitems` |
-| `glpi_plugin_codexplus_documents_users` | alvo de leitura: usuário | `users_id` — espelho de `glpi_knowbaseitems_users` |
-| `glpi_plugin_codexplus_documentversions` | versões publicadas (R6) | `revision` (única por documento), `name`, `content`, `summary`, `users_id`, `date_published` |
-
-O campo do link anônimo entra na R7, não antes.
-
-#### Direitos (R1)
-
-Aba **Codex+** em Administração → Perfis (`src/ProfileTab.php`), só em
-perfis da interface padrão (achado 27). Reaproveita o formulário nativo:
-estende `pages/admin/profile/base_tab.html.twig`, desenha a matriz com
-`Profile::displayRightsChoiceMatrix()` e o POST vai para o
-`profile.form.php` do núcleo. Sem controller próprio.
-
-Chave em `glpi_profilerights`: continua `plugin_codexplus_wiki` (nome
-histórico; renomear exigiria migrar todos os perfis sem ganho). Bits em
-`src/Rights.php`:
-
-| Bit | Coluna |
-|---|---|
-| 1 | Ler |
-| 2 | Atualizar |
-| 4 | Criar |
-| 8 | Excluir (lixeira, `is_deleted`) |
-| 1024 | Ver todos (ignora os alvos de leitura) |
-| 2048 | Publicar para acesso anônimo |
-| 4096 | Gerenciar modelos, setores e categorias (R2) |
-
-Os bits novos **nascem desmarcados em todos os perfis**, inclusive
-Super-Admin: se o Install concedesse, cada reinstalação devolveria o que foi
-desmarcado. Em R1 eles só são gravados; a R3 passa a checá-los.
-
-#### Setores e categorias (R2)
-
-Classes `GlpiPlugin\Codexplus\Sector` (CommonDropdown) e `Category`
-(CommonTreeDropdown). Cadastro em **Configurar → Listas suspensas → Codex+**
-(hook `plugin_codexplus_getDropdown` no `hook.php`). Não há `front/` para
-elas: o GLPI 11 manda `/plugins/codexplus/front/sector[.form].php` e
-`category[.form].php` para os controllers genéricos (achado 30).
-
-- **Direitos** (decisão de Claudio, 20/09/2026): cadastrar = bit 4096
-  "Gerenciar modelos, setores e categorias"; ver = Ler ou 4096. O direito
-  nativo `dropdown` **não** vale para elas. Regra única no trait
-  `StructureRights`.
-- **Herança:** o setor é da categoria raiz. Subcategoria grava o setor do
-  pai e ignora o do formulário; mudar o setor da raiz ou mover uma
-  subárvore reaplica o setor nos descendentes (UPDATE direto, sem encher o
-  Histórico); categoria que vira raiz mantém o setor que tinha.
-- **Relações** declaradas em `plugin_codexplus_getDatabaseRelations` (setor →
-  categoria, categoria → categoria pai), para o aviso "item em uso" e o
-  "substituir por" ao excluir. A ligação documento–categoria entra na R3,
-  junto com a classe dela (achado 31).
-
-Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
-(o acesso anônimo cobre a necessidade de leitura sem login).
 
 ---
 
@@ -340,7 +241,7 @@ depender do comportamento errático de `position: fixed` na impressão.
     na aba **Histórico** (`glpi_logs`).
 20. **`DocumentMeta` não tem histórico ligado.** Trocar status,
     responsável, validade ou revisão do Codex+ não deixa rastro. Registrado
-    na Etapa R (R1 e R6).
+    como Etapa 10.
 21. **Imagens inseridas durante `layoutPages()` não são esperadas.** O motor
     do PDF aguarda as imagens do conteúdo **antes** de paginar; a logo do
     cabeçalho só é criada **durante** a paginação e a impressão dispara sem
@@ -351,44 +252,6 @@ depender do comportamento errático de `position: fixed` na impressão.
 23. **`scp` no cmd do Windows: destino sem barra final.**
     `"%USERPROFILE%\Downloads\"` falha porque `\"` vira aspa escapada; usar
     `"%USERPROFILE%\Downloads"`.
-24. **O nome sugerido do PDF vem do título da página principal**, não do
-    `<title>` do iframe de impressão. A 0.5.8 troca `document.title` na
-    hora do `print()` e devolve em seguida.
-25. **Dá para validar PHP no ambiente de quem gera os pacotes:**
-    `apt-get install -y php-cli` funciona lá, e `php -l` passa a rodar em
-    todo arquivo antes da entrega.
-26. **O Codex+ não tinha aba de direitos em Perfis.** O direito
-    `plugin_codexplus_wiki` existia, mas só era ajustável direto no banco.
-    A Etapa R1 cria a aba.
-27. **Perfil Self-Service perde todo direito de plugin na sessão.**
-    `Session::changeProfile()` chama `Profile::cleanProfile()`, que, na
-    interface simplificada, descarta tudo que não estiver em
-    `Profile::$helpdesk_rights` (lista estática pública do núcleo). Por isso
-    a aba Codex+ só aparece em perfis da interface padrão. Se for decidido
-    dar acesso ao Self-Service, o caminho a testar é o plugin acrescentar
-    `plugin_codexplus_wiki` a essa lista no `plugin_init`.
-28. **`Migration::dropKey()` + `addKey()` com o mesmo nome não funciona numa
-    passada só.** O `addKey` confere `isIndex()` na hora da chamada, quando
-    o índice antigo ainda existe, e não enfileira nada. Para trocar um
-    índice único por comum, a R1 usa SQL direto com guarda
-    (`SHOW INDEX … Non_unique = 0`).
-29. **Dá para testar o Install contra banco real no ambiente de quem gera os
-    pacotes:** `apt-get install mariadb-server php-mysql` funciona lá. A R1
-    foi validada instalando a 0.5.8, atualizando para a 0.6.0 com 5
-    documentos, rodando duas vezes, comparando com a instalação do zero
-    (schema idêntico) e desinstalando. O Twig 3.23 (versão do
-    `composer.lock` do GLPI 11.0.6) baixa pelo GitHub e renderiza os
-    templates do plugin sobre os templates reais do núcleo.
-30. **Lista suspensa de plugin não precisa de `front/`.** Quando a URL não
-    corresponde a arquivo nem rota, o `LegacyItemtypeRouteListener` do GLPI
-    11 procura a classe `GlpiPlugin\<Plugin>\<Item>` a partir de
-    `/plugins/<plugin>/front/<item>[.form].php` e, se for `CommonDropdown`,
-    usa `DropdownFormController`/`GenericListController` do núcleo. Os
-    direitos checados são os `can*()` estáticos da classe.
-31. **Relação declarada para tabela sem classe gera aviso.**
-    `DbUtils::getDbRelations()` emite `E_USER_WARNING` se a tabela de origem
-    ou de destino de `plugin_<x>_getDatabaseRelations` não corresponder a um
-    itemtype. Declarar relação só junto com a classe da tabela.
 
 ---
 
@@ -403,14 +266,10 @@ exportação silenciosamente, sem erro no console:
 ```
 #codexplus-doc            contêiner do que vai para o PDF
 .codexplus-doc-title      vira o <h1>
-.codexplus-doc-meta       só fallback da linha de identificação (0.5.8)
+.codexplus-doc-meta       vira a linha de metadados
 .codexplus-content        o corpo do documento
 #codexplus-pdf            o botão que dispara a exportação
 ```
-
-Desde a 0.5.8, a linha de identificação da 1ª página vem de
-`#codexplus-print-config` (`buildIdentLine()`), não da raspagem de
-`.codexplus-doc-meta` — que trazia a contagem de visualizações.
 
 Elemento novo dentro de `#codexplus-doc` **não** entra no PDF
 automaticamente — o JS monta o HTML a partir dos seletores acima, não clona o
@@ -433,10 +292,10 @@ contêiner inteiro.
 | Item | Valor |
 |---|---|
 | Homologação | `177.87.230.179`, SSH na porta **2078** (Debian, GLPI 11.0.6) |
-| Usuário de acesso | `resolutto` (sem sudo); **todo o trabalho é feito como root** (`su -`) |
+| Usuário de acesso | `resolutto` — **sem sudo**. Deploy como root via `su -` |
 | Caminho do GLPI | `/var/www/html/glpi` |
 | Dono dos arquivos do plugin | `www-data:www-data` |
-| Repositório no servidor | **a própria pasta do plugin**, `plugins/codexplus` (desde 19/09/2026, igual aos demais plugins da Teckcomp) |
+| Repositório no servidor | `~/glpi-plugin-codexplus` (usuário `resolutto`), separado da pasta implantada |
 | Repositório remoto | `github.com/teckcomp/glpi-plugin-codexplus` (público) |
 | PC de desenvolvimento | Windows, sem Git local; transferência por `scp` (OpenSSH do Windows) |
 | Ferramentas no servidor | `git` sim; `zip`/`unzip` **não** — pacotes em `.tar.gz` |
@@ -460,12 +319,7 @@ codexplus/
 │   ├── DocumentMeta.php       metadados, código derivado, vencimento
 │   ├── Template.php           modelos por tipo
 │   ├── Dashboard.php          indicadores do painel
-│   ├── Branding.php           configuração de marca (4a), cabeçalho (4f)
-│   ├── Rights.php             bits da matriz de direitos (R1)
-│   ├── ProfileTab.php         aba Codex+ em Perfis (R1)
-│   ├── StructureRights.php    direitos de setores e categorias (R2)
-│   ├── Sector.php             setor, lista simples (R2)
-│   └── Category.php           categoria em árvore com setor herdado (R2)
+│   └── Branding.php           configuração de marca (4a), cabeçalho (4f)
 ├── front/                     controllers (rodam em escopo de função!)
 ├── templates/                 Twig
 ├── public/                    CSS e JS (única pasta servida como estático)

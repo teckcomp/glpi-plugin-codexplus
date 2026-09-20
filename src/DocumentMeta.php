@@ -210,39 +210,56 @@ class DocumentMeta extends CommonDBTM
 
     public function prepareInputForAdd($input)
     {
-        /** @var \DBmysql $DB */
-        global $DB;
-
-        $input = $this->sanitizeInput($input);
+        $input = self::sanitizeFields($input);
 
         // Sequencial contínuo por tipo, gerado na primeira gravação.
         if (!empty($input['doctype']) && empty($input['sequence'])) {
-            $max = 0;
-            foreach ($DB->request([
-                'SELECT' => 'sequence',
-                'FROM'   => self::getTable(),
-                'WHERE'  => ['doctype' => $input['doctype']],
-                'ORDER'  => 'sequence DESC',
-                'LIMIT'  => 1,
-            ]) as $row) {
-                $max = (int) $row['sequence'];
-            }
-            $input['sequence'] = $max + 1;
+            $input['sequence'] = self::nextSequence((string) $input['doctype']);
         }
 
-        return $this->handlePublishDate($input);
+        return self::stampPublishDate($input, $this->fields['date_published'] ?? null);
     }
 
     public function prepareInputForUpdate($input)
     {
-        $input = $this->sanitizeInput($input);
-        return $this->handlePublishDate($input);
+        $input = self::sanitizeFields($input);
+        return self::stampPublishDate($input, $this->fields['date_published'] ?? null);
+    }
+
+    // ---------------------------------------------------------------------
+    // Regras do documento controlado — FONTE ÚNICA (Etapa R3a)
+    //
+    // Estáticas e públicas porque a classe Document (R3a) grava na MESMA
+    // tabela e precisa das mesmas regras. Até a R5 as duas classes convivem;
+    // regra copiada nas duas é como o sequencial começa a repetir número.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Próximo sequencial do tipo. Conta TODAS as linhas da tabela (artigos
+     * antigos e documentos próprios): o sequencial é um só por tipo.
+     */
+    public static function nextSequence(string $doctype): int
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $max = 0;
+        foreach ($DB->request([
+            'SELECT' => 'sequence',
+            'FROM'   => Install::DOCUMENTS_TABLE,
+            'WHERE'  => ['doctype' => $doctype],
+            'ORDER'  => 'sequence DESC',
+            'LIMIT'  => 1,
+        ]) as $row) {
+            $max = (int) $row['sequence'];
+        }
+        return $max + 1;
     }
 
     /**
      * Normaliza tipo/status para os valores permitidos.
      */
-    private function sanitizeInput(array $input): array
+    public static function sanitizeFields(array $input): array
     {
         if (isset($input['doctype']) && !in_array($input['doctype'], self::DOCTYPE_KEYS, true)) {
             $input['doctype'] = '';
@@ -255,11 +272,13 @@ class DocumentMeta extends CommonDBTM
 
     /**
      * Carimba a data-base de vencimento na primeira vez que vira "publicado".
+     *
+     * @param ?string $currentPublished date_published já gravado (null/'' = nunca publicado)
      */
-    private function handlePublishDate(array $input): array
+    public static function stampPublishDate(array $input, ?string $currentPublished): array
     {
         $becoming_published = (($input['status'] ?? '') === 'publicado');
-        $already_stamped    = !empty($this->fields['date_published']);
+        $already_stamped    = !empty($currentPublished);
 
         if ($becoming_published && !$already_stamped && empty($input['date_published'])) {
             $input['date_published'] = $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s');

@@ -1,19 +1,17 @@
 # Codex+ — deploy e teste
 
 > Atualizado em 19/09/2026: servidor novo, `scp` no lugar do `pscp`, pacotes
-> em `.tar.gz` e **repositório = pasta do plugin**, tudo como root — mesmo
-> fluxo dos demais plugins da Teckcomp.
+> em `.tar.gz`, cópia que preserva arquivos ocultos.
 
 | Item | Valor |
 |---|---|
 | Homologação | `177.87.230.179`, SSH porta **2078**, usuário `resolutto` |
 | GLPI | `/var/www/html/glpi` |
-| Repositório no servidor | `/var/www/html/glpi/plugins/codexplus` (a própria pasta do plugin) |
+| Repositório no servidor | `~/glpi-plugin-codexplus` (usuário `resolutto`) |
 | Produção | Codex+ **não instalado** |
 
-`resolutto` não tem sudo: entre, rode **`su -` sozinho**, e só cole os
-comandos depois que o prompt virar `root@debian`. Colado junto num bloco só,
-o `su -` abre uma sessão nova e o resto do bloco não roda nela.
+`resolutto` **não tem sudo**. Aplicar pacote exige root (`su -`); versionar
+é com o próprio `resolutto`, para o repositório não ficar com dono root.
 
 ---
 
@@ -24,30 +22,28 @@ scp -P 2078 "%USERPROFILE%\Downloads\codexplus-<versao>.tar.gz" resolutto@177.87
 ```
 
 - Porta com **P maiúsculo** no `scp` (no `ssh` é minúsculo).
-- Ao baixar do servidor, destino **sem barra final**:
-  `"%USERPROFILE%\Downloads"` (com barra, `\"` vira aspa escapada).
+- Destino local **sem barra final** quando for baixar do servidor:
+  `"%USERPROFILE%\Downloads"`. Com barra, o Windows lê `\"` como aspa
+  escapada e o comando falha.
 - Nome do pacote **sempre com a versão**: dois arquivos de mesmo nome
   colidem no Downloads e o antigo é reenviado sem ninguém perceber.
-- O pacote traz a pasta `codexplus/` na raiz e só os arquivos que mudaram.
-  O servidor **não tem** `zip`/`unzip`: pacotes em `.tar.gz`.
+- O pacote tem a pasta `codexplus/` na raiz. O servidor **não tem**
+  `zip`/`unzip`: pacotes vêm em `.tar.gz`.
 
 ---
 
-## 2. Aplicar (root)
+## 2. Aplicar no servidor (root)
 
 ```bash
 ssh -p 2078 resolutto@177.87.230.179
 su -
 ```
 
-Depois que o prompt virar `root@debian`:
-
 ### Quando `setup.php` (versão) ou `src/Install.php` mudou
 
 ```bash
-md5sum /tmp/codexplus-<versao>.tar.gz
-cd /var/www/html/glpi/plugins/codexplus && git pull
-cd /var/www/html/glpi/plugins && tar -xzf /tmp/codexplus-<versao>.tar.gz
+cd /var/www/html/glpi/plugins
+tar -xzf /tmp/codexplus-<versao>.tar.gz
 chown -R www-data:www-data /var/www/html/glpi/plugins/codexplus
 
 cd /var/www/html/glpi
@@ -66,9 +62,8 @@ sudo -u www-data php bin/console plugin:list | grep -i codexplus
 ### Quando mudou só Twig, CSS, JS ou PHP de `src/`/`front/`
 
 ```bash
-md5sum /tmp/codexplus-<versao>.tar.gz
-cd /var/www/html/glpi/plugins/codexplus && git pull
-cd /var/www/html/glpi/plugins && tar -xzf /tmp/codexplus-<versao>.tar.gz
+cd /var/www/html/glpi/plugins
+tar -xzf /tmp/codexplus-<versao>.tar.gz
 chown -R www-data:www-data /var/www/html/glpi/plugins/codexplus
 
 cd /var/www/html/glpi
@@ -86,30 +81,35 @@ Não reinstale por precaução.
 | `setup.php` (versão), `src/Install.php` | bloco completo acima |
 | só `docs/` ou `README.md` | extrair e `chown`; nada mais |
 
-O console recusa rodar como root puro: use sempre `sudo -u www-data`.
+O console recusa rodar como root puro: use sempre `sudo -u www-data` (como
+root, o `sudo` funciona).
 
 ---
 
-## 3. Versionar (root, depois do teste aprovado)
+## 3. Versionar (usuário `resolutto`, depois do teste aprovado)
 
-Como a pasta implantada **é** o repositório, versionar é só registrar o que
-já está lá:
+Saia do root (`exit`) antes. O GitHub é a fonte da verdade: **nada fica só
+no servidor**.
 
 ```bash
-cd /var/www/html/glpi/plugins/codexplus
-git status --short && git diff --stat
-git add -A && git commit -m "Codex+ v<versao>: <resumo sem acentos>" && git push
+cd ~/glpi-plugin-codexplus
+git pull
+rm -rf /tmp/cx && mkdir /tmp/cx && tar -xzf /tmp/codexplus-<versao>.tar.gz -C /tmp/cx
+cp -rf /tmp/cx/codexplus/. ~/glpi-plugin-codexplus/
+git status
+git add -A
+git commit -m "Codex+ v<versao>: <resumo sem acentos>"
+git push origin master
 git log --oneline -1
 ```
 
-- O `git status --short` tem que listar **só** os arquivos do pacote. Coisa
-  a mais é sinal de edição manual no servidor: pare e investigue.
-- No `push`, a senha é um **token de acesso pessoal** do GitHub. Nunca cole
-  token em chat nem em arquivo do repositório.
+- **`codexplus/.` e não `codexplus/*`**: o `*` não copia arquivos ocultos, e
+  o `git add -A` registra a ausência como exclusão. Foi assim que o
+  `.gitignore` sumiu em 31/08.
+- No `push`, a senha é um **token de acesso pessoal** do GitHub, não a senha
+  da conta. Nunca cole token em chat nem em arquivo do repositório.
+- Se houve commit pela interface web do GitHub, `git pull` antes do push.
 - A versão na mensagem do commit tem que ser a mesma do `setup.php`.
-- **Teste reprovado:** `git checkout -- . && git clean -fd` devolve a pasta
-  ao último commit (e reinstale se a versão tinha mudado).
-- O root usa `safe.directory` para esta pasta (configurado em 19/09/2026).
 
 > O **logo não entra no commit**: mora em `files/_plugins/codexplus/`, fora
 > da pasta do plugin. Dado de instância não se versiona.
@@ -124,18 +124,19 @@ git log --oneline -1
 tail -n 100 /var/www/html/glpi/files/_log/php-errors.log
 ```
 
+O log do Apache normalmente só tem ruído de inicialização.
+
 Se uma correção "não fez efeito", confirme **primeiro** que o arquivo novo
-chegou (o `git status` já mostra) ou:
+chegou ao servidor — arquivo antigo é a causa mais comum:
 
 ```bash
 grep -c "<trecho_que_só_existe_na_versão_nova>" \
   /var/www/html/glpi/plugins/codexplus/<arquivo>
 ```
 
-Para um retrato completo do estado (plugin, repositório, banco, direitos,
-erros) há o script de auditoria somente leitura usado em 19/09/2026,
-rodado como root.
+Para um retrato completo do estado (plugin implantado, repositório, banco,
+direitos, erros), existe o script de auditoria somente leitura usado em
+19/09/2026: `bash /tmp/codexplus-auditoria-2.sh`, rodado como root.
 
-Quem gera os pacotes valida antes de entregar: `php -l` em todo PHP (o
-ambiente dele instala `php-cli`), `node --check` e teste em DOM headless
-(jsdom) no JS.
+Não há PHP no ambiente de quem gera os pacotes: `php -l` não roda antes do
+envio, e erros de sintaxe aparecem só na ativação.

@@ -1,7 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.5.7-alpha` · atualizado em 19/09/2026 (revisão geral após
-> auditoria do servidor e do repositório).
+> Estado em `v0.6.2-alpha` · atualizado em 20/09/2026 (R1 e R2 concluídos;
+> R3a entregue, em teste na homologação).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -9,16 +9,20 @@
 
 ## Ordem de execução
 
-Definida por Claudio em 19/09/2026:
+Revisada por Claudio em 19/09/2026, após a decisão de independência da Base
+de Conhecimento:
 
-1. **Pacote 0.5.8** — manutenção e PDF
-2. **Etapa 9a–9c** — diagramas: tipo `DIA`, leitura e editor de organograma
-3. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
-4. **Etapa 10** — responsável e histórico
+1. ~~Pacote 0.5.8 — manutenção e PDF~~ ✅
+2. **Etapa R** — reestruturação: documentos próprios (R1–R7)
+3. **Etapa 9a–9c** — diagramas: tipo `DIA`, leitura e editor de organograma
+4. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
 5. **Etapa 5** — PSG e seus POPs
 6. **Etapa 7** — alerta de vencimento
 7. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
 8. **Etapa 8** — personalização completa do PDF
+
+A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
+"permissões e acesso anônimo".
 
 Depois: marco **Pronto para produção** (fim deste documento).
 
@@ -41,6 +45,9 @@ Depois: marco **Pronto para produção** (fim deste documento).
 | 4e | `header_html`/`footer_text` por documento (criados na 4d) passam a entrar no PDF, com prioridade sobre a marca global (`Branding`) e reaproveitando 100% do motor de paginação da 4c — nenhum arquivo de PDF recriado. Cabeçalho reserva altura fixa (`header_logo_height`), corta excesso. Todo documento (novo ou antigo sem cabeçalho) nasce/abre a edição já com a logo de `Branding` semeada em `header_html`, alinhada à esquerda — sem campo de upload novo. Único arquivo com mudança de lógica de PDF: `public/js/codexplus.js` | v0.5.5 |
 | 4f | Cabeçalho deixa de ser rich text livre (TinyMCE, 4d/4e) e vira 3 áreas fixas: título (mesmo campo `name` de sempre, sem duplicidade) + logo (slot clicável, mesma logo global de `Branding`, upload direto da tela de edição via `front/header-logo.form.php` novo) lado a lado, e uma 2ª linha de dados automáticos (código · revisão · data), sempre recomposta no servidor (`Branding::composeHeaderHtml()`), nunca editada à mão. Rodapé inalterado | v0.5.6 |
 | 4f-correção | Logo aparecia pequena demais na prévia da edição — bug real: CSS tinha limite fixo de 40px desconectado de `header_logo_height`. Corrigido para WYSIWYG com o PDF (mesma conversão mm→px). De passagem, teto de `header_logo_height` subiu de 30 para 40mm (30 não cabia a logo de referência, 138px ≈ 36,5mm) — corrigido nos DOIS lugares que validavam isso (`Branding::save()` e `codexplus.js`, estavam duplicados e podiam divergir) | v0.5.7 |
+| 0.5.8 | Pós-auditoria: logo volta a sair no PDF (espera dupla de imagens); cabeçalho corrido montado na impressão (título + logo, uma linha), título grande e linha de identificação só na 1ª página, sem visualizações; âncoras dos títulos fora do PDF e discretas na tela; arquivo sugerido `código - título`; prévia do cabeçalho na edição sem a 2ª linha | v0.5.8 |
+| R1 | Schema dos documentos próprios (documento ampliado, setores, categorias, documento–categoria, alvos de leitura, versões) e aba **Codex+ em Perfis** com a matriz de direitos. Commit `330da62` | v0.6.0 |
+| R2 | Setores e categorias cadastráveis (listas suspensas), categoria ligada a setor, setor herdado na árvore; cadastro por "Gerenciar modelos, setores e categorias". Commit `26a114f` | v0.6.1 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -48,40 +55,33 @@ Depois: marco **Pronto para produção** (fim deste documento).
 
 ---
 
-## ▶ Pacote 0.5.8 — manutenção e PDF
+## ▶ Etapa R — documentos próprios
 
-**O próximo.** Nasce da auditoria de 19/09/2026 e da validação visual do PDF
-da 4e/4f na homologação.
+**Decidida por Claudio em 19/09/2026.** O Codex+ deixa de usar a Base de
+Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 
-**Entrega:**
+**Decisões que a guiam:**
 
-- **Logo ausente no PDF** (achado 21 do `CONTEXTO.md`): depois de
-  `layoutPages()`, aguardar de novo as imagens pendentes antes de imprimir
-- **Cabeçalho aprovado em 19/09/2026**, sobre mockup:
-  - todas as páginas: uma linha só, nome do documento pequeno à esquerda e
-    logo à direita (sai a 2ª linha código · revisão · data, que repetia o
-    rodapé)
-  - só na 1ª página: título grande em CAIXA ALTA e linha de identificação —
-    cliente (proposta), setor (PSG), responsável e data de publicação (demais)
-  - sem contagem de visualizações no PDF (na tela continua)
-  - rodapé inalterado: `código:revisão · rev. NN` à esquerda, `N / T` à direita
-- **Cabeçalho montado na hora da impressão**, a partir dos dados do
-  documento, em vez do `header_html` gravado no banco. Hoje documentos
-  anteriores à 4f saem sem o cabeçalho novo e o endereço da logo fica
-  congelado no HTML salvo. Sem mudança de schema: a coluna continua existindo
-- **Âncoras dos títulos de seção** escondidas no PDF; na tela, só ao passar o mouse
-- **Nome do arquivo** sugerido: `<código> - <título>` (ex.: `POP0014-01 - Instalação de CFTV.pdf`)
-- Versão alinhada em `setup.php`, `README.md` e mensagem do commit
-- **Passo manual (decisão 8b):** conceder o direito de leitura do Codex+ a
-  todos os perfis internos em Administração → Perfis. Quais documentos cada
-  um vê continua sendo a visibilidade nativa da Base de Conhecimento
+- Setor > Categoria: setor é lista própria; a categoria pertence a um setor
+- Documento pode estar em **várias categorias**
+- Leitura: **alvos por documento — perfis, grupos e usuários**, como na base
+  nativa. Criação e edição: **só direitos de perfil**
+- Acesso anônimo por **link secreto por documento** (só publicados, revogável)
+- **Migrar** os 5 documentos de teste atuais
 
-**A decidir ao abrir o pacote:** o "setor" do PSG é a categoria do documento
-ou um campo novo?
+| Bloco | Entrega | Aceite |
+|---|---|---|
+| R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando. ✅ **Concluído na 0.6.0-alpha** | Aba aparece em Perfis e grava |
+| R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore. Cadastro por quem tem "Gerenciar modelos" (decisão de Claudio, 20/09/2026). ✅ **Concluído na 0.6.1-alpha** | Criar setor e subcategoria e ver o setor herdado |
+| R3a | Classe `Document` e ligações (categoria, perfil, grupo, usuário), leitura e edição pelos bits da R1, visibilidade por item e em SQL, Histórico ligado; comandos de console para testar. Sem telas novas. **Entregue na 0.6.2-alpha, em teste** | Criar documento com alvo num grupo e conferir quem vê e quem não vê; telas atuais inalteradas |
+| R3b | Formulário (TinyMCE, categorias múltiplas, alvos, anexos, imagens coladas), leitura e PDF no modelo novo | Criar um POP do zero, restringir a um grupo, exportar |
+| R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
+| R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
+| R6 | Publicar revisão com resumo; versões guardadas; histórico de revisão impresso no fim do PDF; responsável editável na tela de edição; indicador "Sem responsável" | Publicar a :01 e ver a tabela no PDF e a troca na aba Histórico |
+| R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
 
-**Aceite:** exportar um POP de duas páginas e obter logo nas duas, título
-grande só na primeira, código só no rodapé, sem visualizações, sem ícone de
-âncora, e o arquivo sugerido com o nome no padrão.
+**Candidatos, a decidir durante a Etapa R:** quadro **Atividade** no fim da
+leitura (quem, quando, o quê); indicador "Sem setor" no Painel.
 
 ---
 
@@ -102,9 +102,9 @@ Codex+, a partir de um protótipo de organograma aprovado (hierarquia em
 - Diagrama é **mais um tipo de documento**: sigla `DIA`, subtipos
   organograma, fluxograma e matriz. Herda código (`DIA0001:00`), ciclo de
   vida, validade, responsável, categorias, busca, painel e a visibilidade
-  nativa
+  do Codex+ (Etapa R)
 - Revisão = a mesma do Codex+ (`:00`, `:01`…), sem histórico de versões novo
-- Tabela satélite nova: documento, subtipo, JSON editável (rascunho) e **SVG
+- Tabela própria do diagrama, ligada ao documento: subtipo, JSON editável (rascunho) e **SVG
   da versão publicada**. Nenhuma tabela nativa alterada
 - Leitura usa o SVG publicado (rápido, sem carregar editor). PDF: **uma
   página paisagem, ajustada para caber** — não usa a paginação da 4c
@@ -162,26 +162,6 @@ apresentável ao cliente com pouca edição.
 
 ---
 
-## Etapa 10 — responsável e histórico
-
-**Registrada em 19/09/2026**, a partir da auditoria.
-
-**Obrigatório:** ligar o histórico de `DocumentMeta` (achado 20) e fazer as
-mudanças de status, responsável, validade e revisão aparecerem no
-**Histórico** do próprio artigo — um lugar só para tudo.
-
-**Candidatos, a decidir quando a etapa abrir:**
-
-- responsável editável na tela de edição do Codex+ (hoje só na aba da ficha nativa)
-- indicador "Sem responsável" em "Precisa de atenção"
-- quadro **Atividade** no fim da leitura (fora do PDF): quem, quando, o quê
-- histórico de revisão impresso: ao publicar nova revisão, pedir um resumo
-  curto e imprimir a tabela no fim do PDF (substitui a tabela manual do
-  modelo de POP). Encosta no item "trilha de auditoria" do escopo — decidir
-  explicitamente
-
----
-
 ## Etapa 5 — PSG e seus POPs
 
 **Tabela** `glpi_plugin_codexplus_psg_items`: `id`, `psg_documents_id`,
@@ -235,7 +215,7 @@ os critérios abaixo estiverem cumpridos:
 - [ ] PDF validado com documentos reais de cada tipo, principalmente proposta
 - [ ] Modelos com conteúdo de verdade (3c)
 - [ ] Direitos por perfil definidos e testados
-- [ ] Responsável e histórico funcionando (Etapa 10)
+- [ ] Etapa R concluída (documentos próprios, permissões, histórico, anônimo)
 - [ ] Logo definitiva configurada
 - [ ] Instalação e atualização testadas do zero numa instância limpa
 
@@ -246,8 +226,7 @@ os critérios abaixo estiverem cumpridos:
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
-- [ ] **Self-Service vê o Codex+?** Decidir no 9b
-- [ ] **"Setor" do PSG** na linha de identificação do PDF — decidir no 0.5.8
+- [ ] **Self-Service vê o Codex+?** Decidir na Etapa R. Atenção ao achado 27: o GLPI tira da sessão do Self-Service todo direito de plugin; liberar exige acrescentar o direito a `Profile::$helpdesk_rights`
 
 **Decididas:**
 
@@ -255,7 +234,12 @@ os critérios abaixo estiverem cumpridos:
 - [x] Imagem anexa no PDF: só proposta, só imagens marcadas — 19/09/2026
 - [x] Indicador "PSG sem POP vinculado": exibido esmaecido com a etiqueta
       "etapa 5" até a Etapa 5 (solução da 0.5.x)
-- [x] Direito de leitura do Codex+ para todos os perfis internos — 19/09/2026
 - [x] Cabeçalho do PDF (0.5.8) aprovado sobre mockup — 19/09/2026
+- [x] Setor próprio, acima da categoria, para todos os tipos, lista do Codex+ — 19/09/2026
+- [x] **Independência da Base de Conhecimento** (Etapa R) — 19/09/2026
+- [x] Várias categorias por documento; leitura por perfis, grupos e usuários; edição só por perfil — 19/09/2026
+- [x] Acesso anônimo por link secreto por documento — 19/09/2026
+- [x] Migrar os 5 documentos de teste — 19/09/2026
+- [x] Repositório = pasta do plugin, trabalho como root — 19/09/2026
 - [x] Manuais e propostas escritos dentro do Codex+ — 08/2026
 - [x] Validade padrão de 12 meses; siglas `POP` `PSG` `MAN` `PRP`

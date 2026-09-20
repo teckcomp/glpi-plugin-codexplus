@@ -4,7 +4,7 @@ Plugin que transforma a base de conhecimento do GLPI 11 em um sistema de
 **documentos controlados**: wiki, base de conhecimento e produção de POPs,
 manuais e propostas, com exportação em PDF com a marca da empresa.
 
-> **Estado:** `v0.5.7-alpha` — em desenvolvimento, homologação interna.
+> **Estado:** `v0.6.2-alpha` — em desenvolvimento, homologação interna.
 > Não recomendado para produção ainda.
 
 ## O que já faz

@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.5.8-alpha` · atualizado em 19/09/2026 (revisão geral após
-> auditoria do servidor e do repositório; pacote 0.5.8).
+> Estado: `v0.6.0-alpha` · atualizado em 20/09/2026 (Etapa R1: schema dos
+> documentos próprios e aba Codex+ em Perfis).
 
 ---
 
@@ -150,6 +150,52 @@ dias) · `vencido`.
 | Base de Conhecimento nativa | O Codex+ deixa de ler e de gravar nela. Os artigos atuais ficam intocados |
 | Migração | Ferramenta de uso único, só administrador, com prévia, para os 5 documentos de teste (título, conteúdo, metadados, anexos, imagens). Fora do Install (dado não é schema). O histórico de revisões nativo não migra |
 
+#### Schema da Etapa R (criado na R1, `v0.6.0-alpha`)
+
+Nada abaixo é lido pelas telas atuais ainda; elas seguem sobre
+`glpi_knowbaseitems` até a R5. Chaves estrangeiras seguem a convenção do GLPI
+(nome da tabela sem `glpi_` + `_id`) para as classes da R2/R3 não precisarem
+de `getTable()` manual.
+
+| Tabela | Uso | Campos principais |
+|---|---|---|
+| `glpi_plugin_codexplus_documents` | o documento (ampliada) | + `name`, `content`, `entities_id`, `is_recursive`, `users_id` (autor), `is_deleted`. `knowbaseitems_id` deixou de ser único (documento próprio nasce com 0) e sai na R5 |
+| `glpi_plugin_codexplus_sectors` | setores (CommonDropdown, R2) | `name`, `comment`, `entities_id`, `is_recursive` |
+| `glpi_plugin_codexplus_categories` | categorias em árvore (CommonTreeDropdown, R2) | colunas da `glpi_knowbaseitemcategories` nativa + `plugin_codexplus_sectors_id` |
+| `glpi_plugin_codexplus_documents_categories` | documento ↔ categoria, N:N | único por par |
+| `glpi_plugin_codexplus_documents_profiles` | alvo de leitura: perfil | `profiles_id`, `entities_id` (NULL), `is_recursive`, `no_entity_restriction` — espelho de `glpi_knowbaseitems_profiles` |
+| `glpi_plugin_codexplus_documents_groups` | alvo de leitura: grupo | idem, com `groups_id` — espelho de `glpi_groups_knowbaseitems` |
+| `glpi_plugin_codexplus_documents_users` | alvo de leitura: usuário | `users_id` — espelho de `glpi_knowbaseitems_users` |
+| `glpi_plugin_codexplus_documentversions` | versões publicadas (R6) | `revision` (única por documento), `name`, `content`, `summary`, `users_id`, `date_published` |
+
+O campo do link anônimo entra na R7, não antes.
+
+#### Direitos (R1)
+
+Aba **Codex+** em Administração → Perfis (`src/ProfileTab.php`), só em
+perfis da interface padrão (achado 27). Reaproveita o formulário nativo:
+estende `pages/admin/profile/base_tab.html.twig`, desenha a matriz com
+`Profile::displayRightsChoiceMatrix()` e o POST vai para o
+`profile.form.php` do núcleo. Sem controller próprio.
+
+Chave em `glpi_profilerights`: continua `plugin_codexplus_wiki` (nome
+histórico; renomear exigiria migrar todos os perfis sem ganho). Bits em
+`src/Rights.php`:
+
+| Bit | Coluna |
+|---|---|
+| 1 | Ler |
+| 2 | Atualizar |
+| 4 | Criar |
+| 8 | Excluir (lixeira, `is_deleted`) |
+| 1024 | Ver todos (ignora os alvos de leitura) |
+| 2048 | Publicar para acesso anônimo |
+| 4096 | Gerenciar modelos |
+
+Os bits novos **nascem desmarcados em todos os perfis**, inclusive
+Super-Admin: se o Install concedesse, cada reinstalação devolveria o que foi
+desmarcado. Em R1 eles só são gravados; a R3 passa a checá-los.
+
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
 
@@ -293,6 +339,25 @@ depender do comportamento errático de `position: fixed` na impressão.
 26. **O Codex+ não tinha aba de direitos em Perfis.** O direito
     `plugin_codexplus_wiki` existia, mas só era ajustável direto no banco.
     A Etapa R1 cria a aba.
+27. **Perfil Self-Service perde todo direito de plugin na sessão.**
+    `Session::changeProfile()` chama `Profile::cleanProfile()`, que, na
+    interface simplificada, descarta tudo que não estiver em
+    `Profile::$helpdesk_rights` (lista estática pública do núcleo). Por isso
+    a aba Codex+ só aparece em perfis da interface padrão. Se for decidido
+    dar acesso ao Self-Service, o caminho a testar é o plugin acrescentar
+    `plugin_codexplus_wiki` a essa lista no `plugin_init`.
+28. **`Migration::dropKey()` + `addKey()` com o mesmo nome não funciona numa
+    passada só.** O `addKey` confere `isIndex()` na hora da chamada, quando
+    o índice antigo ainda existe, e não enfileira nada. Para trocar um
+    índice único por comum, a R1 usa SQL direto com guarda
+    (`SHOW INDEX … Non_unique = 0`).
+29. **Dá para testar o Install contra banco real no ambiente de quem gera os
+    pacotes:** `apt-get install mariadb-server php-mysql` funciona lá. A R1
+    foi validada instalando a 0.5.8, atualizando para a 0.6.0 com 5
+    documentos, rodando duas vezes, comparando com a instalação do zero
+    (schema idêntico) e desinstalando. O Twig 3.23 (versão do
+    `composer.lock` do GLPI 11.0.6) baixa pelo GitHub e renderiza os
+    templates do plugin sobre os templates reais do núcleo.
 
 ---
 
@@ -364,7 +429,9 @@ codexplus/
 │   ├── DocumentMeta.php       metadados, código derivado, vencimento
 │   ├── Template.php           modelos por tipo
 │   ├── Dashboard.php          indicadores do painel
-│   └── Branding.php           configuração de marca (4a), cabeçalho (4f)
+│   ├── Branding.php           configuração de marca (4a), cabeçalho (4f)
+│   ├── Rights.php             bits da matriz de direitos (R1)
+│   └── ProfileTab.php         aba Codex+ em Perfis (R1)
 ├── front/                     controllers (rodam em escopo de função!)
 ├── templates/                 Twig
 ├── public/                    CSS e JS (única pasta servida como estático)

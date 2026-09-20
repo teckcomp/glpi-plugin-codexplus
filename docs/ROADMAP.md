@@ -1,7 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.5.8-alpha` · atualizado em 19/09/2026 (revisão geral após
-> auditoria do servidor e do repositório; pacote 0.5.8).
+> Estado em `v0.6.0-alpha` · atualizado em 20/09/2026 (R1 entregue, em
+> teste na homologação).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -69,7 +69,7 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 
 | Bloco | Entrega | Aceite |
 |---|---|---|
-| R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando | Aba aparece em Perfis e grava |
+| R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando. **Entregue na 0.6.0-alpha, em teste** | Aba aparece em Perfis e grava |
 | R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore | Criar setor e subcategoria e ver o setor herdado |
 | R3 | Criar, editar e ler no modelo novo: categorias múltiplas, alvos de leitura, anexos, imagens coladas, PDF | Criar um POP do zero, restringir a um grupo, exportar |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
@@ -223,7 +223,7 @@ os critérios abaixo estiverem cumpridos:
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
-- [ ] **Self-Service vê o Codex+?** Decidir na Etapa R (alvos de leitura já permitem o perfil Self-Service)
+- [ ] **Self-Service vê o Codex+?** Decidir na Etapa R. Atenção ao achado 27: o GLPI tira da sessão do Self-Service todo direito de plugin; liberar exige acrescentar o direito a `Profile::$helpdesk_rights`
 
 **Decididas:**
 

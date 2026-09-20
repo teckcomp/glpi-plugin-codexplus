@@ -1,0 +1,23 @@
+{#
+ # Codex+ — aba "Codex+" na ficha de Perfil (Etapa R1).
+ #
+ # Estende o template das abas nativas de Perfil: ele abre o <form> para
+ # front/profile.form.php, põe o id, o token CSRF e o botão Salvar. Aqui só
+ # entra o conteúdo. Variáveis: item, cx_matrix, cx_canedit, cx_title.
+ #}
+{% extends 'pages/admin/profile/base_tab.html.twig' %}
+
+{% block content %}
+    {% do item.displayRightsChoiceMatrix(cx_matrix, {
+        canedit: cx_canedit,
+        title: cx_title
+    }) %}
+    <div class="px-3 pb-3 text-muted small codexplus-profile-help">
+        <p class="mb-1">
+            {{ __('Criação e edição dependem só destes direitos. A leitura de cada documento depende também dos alvos definidos no próprio documento (perfis, grupos e usuários); "Ver todos" ignora os alvos.', 'codexplus') }}
+        </p>
+        <p class="mb-0">
+            {{ __('Etapa de transição: as telas atuais do Codex+ ainda usam os direitos da Base de Conhecimento. Estes passam a valer quando os documentos próprios entrarem em uso.', 'codexplus') }}
+        </p>
+    </div>
+{% endblock %}

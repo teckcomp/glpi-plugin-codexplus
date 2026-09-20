@@ -1,7 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.4-alpha` · atualizado em 20/09/2026 (R1, R2, R3a e R3c
-> concluídos; R3b1 entregue, em teste na homologação).
+> Estado em `v0.6.4-alpha` · atualizado em 20/09/2026 (R1, R2, R3a, R3c e
+> R3b1 concluídos; próximo bloco a decidir: R3b2 ou núcleo da revisão).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -50,6 +50,7 @@ Depois: marco **Pronto para produção** (fim deste documento).
 | R2 | Setores e categorias cadastráveis (listas suspensas), categoria ligada a setor, setor herdado na árvore; cadastro por "Gerenciar modelos, setores e categorias". Commit `26a114f` | v0.6.1 |
 | R3a | Classe `Document`, ligações (categoria, perfil, grupo, usuário), visibilidade por item e em SQL, Histórico, comandos de console. Commits `5d528e4` + `6c64b4d` (restauração dos docs) | v0.6.2 |
 | R3c | Papéis (gestores e validadores por setor, editores por documento), bit Validar, Super-Admin com todos os bits, validação antes de publicar. Commit `daf8941` | v0.6.3 |
+| R3b1 | Página do documento no modelo novo (criar, editar, enviar, validar, devolver, obsoleto) e quadro "Documentos do modelo novo" no Painel. Commit `0f0119f` | v0.6.4 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -80,7 +81,7 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore. Cadastro por quem tem "Gerenciar modelos" (decisão de Claudio, 20/09/2026). ✅ **Concluído na 0.6.1-alpha** | Criar setor e subcategoria e ver o setor herdado |
 | R3a | Classe `Document` e ligações (categoria, perfil, grupo, usuário), leitura e edição pelos bits da R1, visibilidade por item e em SQL, Histórico ligado; comandos de console para testar. Sem telas novas. ✅ **Concluído na 0.6.2-alpha** | Criar documento com alvo num grupo e conferir quem vê e quem não vê; telas atuais inalteradas |
 | R3c | Papéis: bit Validar; Super-Admin com todos os bits; gestores e validadores por setor; editores por documento; estado "em validação"; regras refeitas (alvo de leitura deixa de dar edição); comandos `sector:member` e fluxo no `document:set`. Sem telas novas. ✅ **Concluído na 0.6.3-alpha** | Pelo console: gestor cria, editor edita, quem editou não valida, validador do setor publica, leitor só vê depois de publicado |
-| R3b1 | Página do documento (`front/document.form.php`): criar e editar título, tipo, categorias, responsável e corpo; botões Enviar / Validar / Devolver / Obsoleto conforme o direito; quadro "Documentos do modelo novo (em teste)" no Painel. **Entregue na 0.6.4-alpha, em teste** | Criar um POP pela tela como gestor, enviar e validar com outro usuário |
+| R3b1 | Página do documento (`front/document.form.php`): criar e editar título, tipo, categorias, responsável e corpo; botões Enviar / Validar / Devolver / Obsoleto conforme o direito; quadro "Documentos do modelo novo (em teste)" no Painel. ✅ **Concluído na 0.6.4-alpha** | Criar um POP pela tela como gestor, enviar e validar com outro usuário |
 | R3b2 | Aba **Papéis** no Setor; abas **Editores** e **Leitura** (alvos) no documento; aba Histórico nativa | Montar o cenário da R3c pela interface, sem console |
 | R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF | POP com imagem e anexo, publicado e exportado |
 | R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa" | Nenhum caminho da interface cria artigo na Base de Conhecimento |

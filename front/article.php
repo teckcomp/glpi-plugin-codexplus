@@ -59,11 +59,16 @@ $print_config = json_encode(
             'footer_pages' => Branding::get('footer_show_pagination') === '1',
         ],
         'document' => [
-            'title'    => $article['subject'],
-            'code'     => $article['meta']['code'],
-            'revision' => $article['meta']['revision'],
-            'client'   => $article['meta']['client_name'],
-            'date_mod' => $article['date_mod'],
+            'title'       => $article['subject'],
+            'code'        => $article['meta']['code'],
+            'revision'    => $article['meta']['revision'],
+            'client'      => $article['meta']['client_name'],
+            'date_mod'    => $article['date_mod'],
+            // Etapa 4e: cabeçalho/rodapé por documento. Quando vazios, o JS
+            // cai no cabeçalho de canto / rodapé geral (Branding) — a regra
+            // de prioridade fica inteira em codexplus.js, não aqui.
+            'header_html' => $article['meta']['header_html'],
+            'footer_text' => $article['meta']['footer_text'],
         ],
     ],
     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE

@@ -9,6 +9,7 @@
  * nativa, para ele escrever o documento.
  */
 
+use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\Template;
 
@@ -73,6 +74,19 @@ $meta->add([
     'users_id_owner'   => Session::getLoginUserID(),
     'validity_months'  => $doctype === 'PRP' ? 0 : DocumentMeta::DEFAULT_VALIDITY_MONTHS,
     'client_name'      => '',
+]);
+
+// Etapa 4f: header_html só pode ser composto DEPOIS do add() acima, porque
+// depende do sequencial (getBareCode()) que o próprio add() acabou de
+// gerar — por isso um update() imediato, em vez de entrar no add() inicial.
+$meta->update([
+    'id'          => $meta->getID(),
+    'header_html' => Branding::composeHeaderHtml(
+        $title,
+        $meta->getBareCode(),
+        sprintf('%02d', (int) $meta->fields['revision']),
+        date('d/m/Y')
+    ),
 ]);
 
 // 3) Vai direto para a edição nativa, para escrever o documento.

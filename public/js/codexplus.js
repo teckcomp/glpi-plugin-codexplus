@@ -61,6 +61,31 @@
  * por ESTE arquivo. Não são contrato com o Twig — ninguém fora daqui
  * precisa conhecê-los.
  * =========================================================================
+ * CABEÇALHO/RODAPÉ POR DOCUMENTO (Etapa 4e; cabeçalho estruturado na 4f)
+ * =========================================================================
+ * `cfg.document.header_html` / `cfg.document.footer_text` (Etapa 4d, lidos
+ * de DocumentMeta via front/article.php) têm PRIORIDADE sobre a marca
+ * global (`cfg.brand.*`) quando não vazios:
+ *
+ *   - header_html presente -> vira o conteúdo de .cx-page-header em TODAS
+ *     as páginas (não depende de `repeat_logo`, que é específico do
+ *     fallback de logo de canto, abaixo). Desde a Etapa 4f, header_html
+ *     NUNCA é texto livre — é sempre gerado por
+ *     Branding::composeHeaderHtml() (título + logo lado a lado, mais uma
+ *     2ª linha de dados automáticos, código·revisão·data). A altura
+ *     reservada é FIXA (computeGeometry(), `geo.headerBoxH`) e o excesso é
+ *     cortado (`overflow:hidden`) — mesma razão da 4e (achado 17,
+ *     CONTEXTO.md: capacidade de página constante), só que agora a altura
+ *     tem uma folga extra fixa (`AREA3_H`) para a 2ª linha, porque o
+ *     conteúdo deixou de ser de tamanho imprevisível.
+ *   - header_html vazio -> cabeçalho de canto de sempre (Etapa 4c), sem
+ *     nenhuma mudança de comportamento.
+ *   - footer_text (documento) presente -> substitui cfg.brand.footer_text
+ *     como TEXTO do rodapé, resolvido pelos mesmos resolveMarkers(). O
+ *     toggle `footer_show` continua sendo o interruptor geral: rodapé por
+ *     documento não liga o rodapé sozinho se `footer_show` estiver
+ *     desligado — só troca o texto exibido quando ele já apareceria.
+ * =========================================================================
  */
 
 (function () {
@@ -116,6 +141,7 @@
     var MARGIN_TOP_MM   = 18;
     var MARGIN_BOTTOM_MM = 18;
     var FOOTER_H        = 34; // px — altura fixa da faixa de rodapé, quando ligado
+    var AREA3_H         = 16; // px — Etapa 4f: 2ª linha do cabeçalho estruturado (código · rev. · data)
 
     function mmToPx(mm) {
         return mm * 96 / 25.4;
@@ -133,7 +159,10 @@
                 logo_pos: 'right', logo_mm: 14, title_upper: false,
                 footer_show: false, footer_text: '', footer_pages: false
             },
-            document: { title: '', code: '', revision: '', client: '', date_mod: '' }
+            document: {
+                title: '', code: '', revision: '', client: '', date_mod: '',
+                header_html: '', footer_text: ''
+            }
         };
 
         var el = document.getElementById('codexplus-print-config');
@@ -175,11 +204,19 @@
         cfg.brand.repeat_logo = !!cfg.brand.repeat_logo;
         cfg.brand.logo_pos    = cfg.brand.logo_pos === 'left' ? 'left' : 'right';
         cfg.brand.title_upper = !!cfg.brand.title_upper;
-        cfg.brand.footer_show = !!(cfg.brand.footer_show && cfg.brand.footer_text);
+        // Etapa 4e: o texto pode vir do documento (prioridade) OU da marca
+        // (fallback) — footer_show não pode depender só de cfg.brand.footer_text,
+        // senão um rodapé próprio do documento some quando o texto global
+        // está vazio, mesmo com o interruptor ligado.
+        cfg.brand.footer_show = !!(cfg.brand.footer_show && (cfg.brand.footer_text || cfg.document.footer_text));
         cfg.brand.footer_pages = !!cfg.brand.footer_pages;
 
         var mm = parseInt(cfg.brand.logo_mm, 10);
-        cfg.brand.logo_mm = isNaN(mm) ? 14 : Math.max(6, Math.min(30, mm));
+        // Teto sobe para 40 junto com Branding::save() (correção pós-4f) —
+        // duas validações da mesma regra, precisam concordar. Sem isso, um
+        // valor salvo entre 31 e 40mm passaria pela config mas seria
+        // encolhido de volta na exportação em PDF, silenciosamente.
+        cfg.brand.logo_mm = isNaN(mm) ? 14 : Math.max(6, Math.min(40, mm));
 
         return cfg;
     }
@@ -200,7 +237,14 @@
         var marginTop     = Math.round(mmToPx(MARGIN_TOP_MM));
         var marginBottom  = Math.round(mmToPx(MARGIN_BOTTOM_MM));
         var logoPx        = Math.round(mmToPx(cfg.brand.logo_mm));
-        var headerH       = cfg.brand.show_logo ? (logoPx + 10) : 0;
+        var hasDocHeader  = !!cfg.document.header_html;
+        // Etapa 4f: header_html estruturado tem DUAS linhas (título+logo e
+        // Área 3) — a caixa do cabeçalho de canto (Etapa 4c, uma linha só)
+        // usa logoPx puro; com header_html, soma-se AREA3_H para a segunda
+        // linha caber sem ser cortada pelo overflow:hidden da caixa.
+        var headerBoxH    = hasDocHeader ? (logoPx + AREA3_H) : logoPx;
+        var hasHeader     = cfg.brand.show_logo || hasDocHeader;
+        var headerH       = hasHeader ? (headerBoxH + 10) : 0;
         var footerH       = cfg.brand.footer_show ? FOOTER_H : 0;
         var contentW      = PAGE_W - (2 * marginX);
         var contentH      = PAGE_H - marginTop - marginBottom - headerH - footerH;
@@ -208,7 +252,7 @@
         return {
             pageW: PAGE_W, pageH: PAGE_H,
             marginX: marginX, marginTop: marginTop, marginBottom: marginBottom,
-            headerH: headerH, footerH: footerH, logoPx: logoPx,
+            headerH: headerH, footerH: footerH, logoPx: logoPx, headerBoxH: headerBoxH,
             contentW: contentW, contentH: contentH
         };
     }
@@ -224,11 +268,32 @@
             + (geo.marginBottom + geo.footerH) + 'px;}'
             + '.cx-page:last-child{page-break-after:auto;}'
             + '.cx-page-content{width:' + geo.contentW + 'px;}'
+            // overflow:hidden vem da 4e: a altura da caixa é fixa (ver
+            // computeGeometry) — o que passar do espaço reservado é
+            // cortado, não empurra o layout. Etapa 4f: a caixa usa
+            // headerBoxH, não logoPx — precisa caber a 2ª linha (Área 3)
+            // do cabeçalho estruturado além da altura do logo/título.
             + '.cx-page-header{position:absolute;top:' + geo.marginTop + 'px;'
             + 'left:' + geo.marginX + 'px;right:' + geo.marginX + 'px;'
-            + 'height:' + geo.logoPx + 'px;line-height:0;}'
+            + 'height:' + geo.headerBoxH + 'px;overflow:hidden;}'
+            + '.cx-page-header--right,.cx-page-header--left{line-height:0;}'
             + '.cx-page-header--right img{float:right;height:' + geo.logoPx + 'px;width:auto;}'
             + '.cx-page-header--left img{float:left;height:' + geo.logoPx + 'px;width:auto;}'
+            // Variante --doc: cabeçalho estruturado (Etapa 4f), sempre gerado
+            // por Branding::composeHeaderHtml() — nunca mais texto livre
+            // (isso era a Etapa 4e; documentos salvos depois da 4f só têm
+            // as duas linhas abaixo dentro de header_html, nada mais).
+            // Linha 1: título (cx-header-title) + logo (cx-header-logo),
+            // lado a lado. Linha 2 (cx-header-row-2): Área 3, texto fixo
+            // resolvido no servidor (Branding::composeArea3), sem marcador
+            // a resolver aqui — por isso não passa por resolveMarkers().
+            + '.cx-page-header--doc{font-size:9pt;}'
+            + '.cx-header-row{display:flex;align-items:center;}'
+            + '.cx-header-row-1{justify-content:space-between;gap:10px;height:' + geo.logoPx + 'px;}'
+            + '.cx-header-title{font-size:13pt;font-weight:600;overflow:hidden;'
+            + 'text-overflow:ellipsis;white-space:nowrap;}'
+            + '.cx-header-logo{max-height:100%;width:auto;flex-shrink:0;}'
+            + '.cx-header-row-2{font-size:8pt;color:#6b7280;margin-top:2px;}'
             + '.cx-page-footer{position:absolute;left:' + geo.marginX + 'px;right:' + geo.marginX + 'px;'
             + 'bottom:' + geo.marginBottom + 'px;height:' + FOOTER_H + 'px;'
             + 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
@@ -267,23 +332,37 @@
     }
 
     /**
-     * Monta o <div class="cx-page"> de uma folha: cabeçalho (logo,
-     * condicionado a `repeat_logo` a partir da 2ª página), conteúdo (os
-     * blocos já decididos por layoutPages) e rodapé.
+     * Monta o <div class="cx-page"> de uma folha: cabeçalho (header_html do
+     * documento se houver — estruturado desde a Etapa 4f —, senão logo de
+     * canto condicionado a `repeat_logo` a partir da 2ª página), conteúdo
+     * (os blocos já decididos por layoutPages) e rodapé (footer_text do
+     * documento, com fallback para o texto da marca).
      */
     function buildPageEl(idoc, cfg, geo, blocksForPage, pageIndex, total) {
         var page = idoc.createElement('div');
         page.className = 'cx-page';
 
-        var showHeader = cfg.brand.show_logo && (pageIndex === 0 || cfg.brand.repeat_logo);
-        if (showHeader) {
-            var header = idoc.createElement('div');
-            header.className = 'cx-page-header cx-page-header--' + cfg.brand.logo_pos;
-            var img = idoc.createElement('img');
-            img.src = cfg.brand.logo_url;
-            img.alt = '';
-            header.appendChild(img);
-            page.appendChild(header);
+        // Etapa 4e: header_html (documento) tem prioridade e entra em TODAS
+        // as páginas, sem depender de repeat_logo (que é específico do
+        // fallback de logo de canto, abaixo). Vazio -> comportamento da
+        // Etapa 4c, inalterado.
+        var hasDocHeader = !!cfg.document.header_html;
+        if (hasDocHeader) {
+            var docHeader = idoc.createElement('div');
+            docHeader.className = 'cx-page-header cx-page-header--doc';
+            docHeader.innerHTML = cfg.document.header_html;
+            page.appendChild(docHeader);
+        } else {
+            var showHeader = cfg.brand.show_logo && (pageIndex === 0 || cfg.brand.repeat_logo);
+            if (showHeader) {
+                var header = idoc.createElement('div');
+                header.className = 'cx-page-header cx-page-header--' + cfg.brand.logo_pos;
+                var img = idoc.createElement('img');
+                img.src = cfg.brand.logo_url;
+                img.alt = '';
+                header.appendChild(img);
+                page.appendChild(header);
+            }
         }
 
         var content = idoc.createElement('div');
@@ -297,9 +376,13 @@
             var footer = idoc.createElement('div');
             footer.className = 'cx-page-footer';
 
+            // Etapa 4e: rodapé do documento tem prioridade como TEXTO; o
+            // interruptor continua sendo footer_show (marca), inalterado.
+            var footerText = cfg.document.footer_text || cfg.brand.footer_text;
+
             var left = idoc.createElement('span');
             left.className = 'cx-page-footer-left';
-            left.textContent = resolveMarkers(cfg.brand.footer_text, cfg, pageIndex + 1, total);
+            left.textContent = resolveMarkers(footerText, cfg, pageIndex + 1, total);
             footer.appendChild(left);
 
             if (cfg.brand.footer_pages) {

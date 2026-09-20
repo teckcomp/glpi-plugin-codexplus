@@ -2,7 +2,7 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.5.4-alpha` · atualizado em 31/08/2026.
+> Estado: `v0.5.6-alpha` · atualizado em 14/09/2026.
 
 ---
 
@@ -59,8 +59,8 @@ desta tabela sem alinhar antes.**
 | Metadados (tipo, código, status…) | Tabela satélite própria, ligada por `knowbaseitems_id`. **Nenhuma tabela nativa é alterada** |
 | Permissões | `KnowbaseItem::canViewItem()` e `getVisibilityCriteria()` — os mesmos helpers das telas nativas |
 | Telas | Próprias, em Twig, com menu em Ferramentas |
-| Edição | **Desde a Etapa 4d, embutida no Codex+** (`front/article.form.php`), reaproveitando o TinyMCE nativo via `Html::textarea(['enable_richtext' => true])` — não é editor próprio, não é reskin da ficha nativa. Categoria, FAQ e anexos continuam só na ficha nativa (`front/knowbaseitem.form.php`) |
-| PDF | Impressão client-side pelo navegador (**não** TCPDF) |
+| Edição | **Desde a Etapa 4d, embutida no Codex+** (`front/article.form.php`), reaproveitando o TinyMCE nativo via `Html::textarea(['enable_richtext' => true])` só para o CORPO — não é editor próprio, não é reskin da ficha nativa. Categoria, FAQ e anexos continuam só na ficha nativa (`front/knowbaseitem.form.php`). **Desde a Etapa 4f, o cabeçalho deixou de ter TinyMCE**: é uma prévia de 3 áreas fixas (título = mesmo campo `name`, logo = slot clicável que reaproveita `Branding::storeLogo()` via `front/header-logo.form.php`, dados automáticos = texto gerado, não editável) — ver `Branding::composeHeaderHtml()`/`composeArea3()` |
+| PDF | Impressão client-side pelo navegador (**não** TCPDF). **Desde a Etapa 4e**, cabeçalho/rodapé por documento (`header_html`/`footer_text`) têm prioridade sobre a configuração global (`Branding`) quando não vazios — regra centralizada em `public/js/codexplus.js` |
 | Configuração | `Config::setConfigurationValues()` no contexto `plugin:codexplus` — sem tabela própria |
 | Logo | Arquivo em `GLPI_PLUGIN_DOC_DIR/codexplus/` — dado de instância, **fora do repositório** |
 
@@ -79,8 +79,8 @@ desta tabela sem alinhar antes.**
 | `users_id_owner` | INT UNSIGNED | responsável |
 | `validity_months` | INT UNSIGNED | 0 = não vence (propostas) |
 | `client_name` | VARCHAR(255) | só propostas |
-| `header_html` | LONGTEXT NULL | cabeçalho por documento, rich text (TinyMCE) — Etapa 4d. Ainda não entra no PDF (ver Etapa 4e no roadmap) |
-| `footer_text` | LONGTEXT NULL | rodapé por documento, texto com marcadores (mesma sintaxe de `Branding::footer_text`, mas por documento) — Etapa 4d. Ainda não entra no PDF |
+| `header_html` | LONGTEXT NULL | cabeçalho por documento — Etapa 4d, entra no PDF desde a 4e. **Desde a Etapa 4f, deixou de ser rich text editável**: sempre gravado por `Branding::composeHeaderHtml()` (título + logo + Área 3 fixa), nunca lido de `$_POST`. Estrutura: `<div class="cx-header-row cx-header-row-1">` (título + logo) + `<div class="cx-header-row cx-header-row-2">` (código · revisão · data) |
+| `footer_text` | LONGTEXT NULL | rodapé por documento, texto com marcadores (mesma sintaxe de `Branding::footer_text`, mas por documento) — Etapa 4d. Desde a Etapa 4e, entra no PDF com prioridade sobre `Branding::footer_text` |
 | `date_published` | TIMESTAMP | base do cálculo de vencimento |
 | `date_creation` / `date_mod` | TIMESTAMP | |
 
@@ -204,6 +204,21 @@ depender do comportamento errático de `position: fixed` na impressão.
       transbordar visualmente para a folha seguinte. Não dá para evitar
       sem partir o bloco, o que fere a regra "não partir passo nem tabela
       no meio". Não acontece em documento comum (POP, manual, proposta).
+    - **Etapa 4e:** `header_html` (por documento, rich text livre) entra no
+      cabeçalho de cada página usando a MESMA altura fixa reservada para a
+      logo de canto (`header_logo_height`) — decisão explícita do usuário,
+      não um valor calculado. Conteúdo que ultrapassa essa altura é cortado
+      (`overflow:hidden`), nunca empurra o layout. Alternativa descartada:
+      medir a altura real do `header_html` como se faz com os blocos de
+      `#cx-stage` — quebraria a premissa de capacidade de página constante
+      logo acima, exigindo recalcular `contentH` por página.
+    - **Etapa 4f (correção sobre a 4e):** `header_html` deixou de ser texto
+      livre — vira sempre 2 linhas fixas (título+logo, depois dados
+      automáticos). A altura de logo sozinha (`logoPx`) não sobra espaço
+      para a 2ª linha; `computeGeometry()` ganhou `headerBoxH` (=
+      `logoPx + AREA3_H` quando há `header_html`, só `logoPx` no fallback
+      de logo de canto) — bug pego e corrigido durante a própria
+      implementação da 4f, antes de qualquer teste no ambiente real.
 
 ---
 

@@ -155,11 +155,16 @@ class Branding
             $values[$key] = (string) $input[$key];
         }
 
-        // Altura do logo: entre 6 e 30 mm. Fora disso o cabeçalho come a
+        // Altura do logo: entre 6 e 40 mm. Fora disso o cabeçalho come a
         // primeira linha do conteúdo ou vira um selo minúsculo.
         if (isset($values['header_logo_height'])) {
             $h = (int) $values['header_logo_height'];
-            $values['header_logo_height'] = (string) max(6, min(30, $h ?: 14));
+            // Teto subiu de 30 para 40mm nesta correção: uma logo de 138px de
+            // altura nativa (~36,5mm a 96dpi) passava do teto antigo. Segue
+            // sendo um valor fixo por página (não a altura nativa da imagem
+            // em si) — a arquitetura de altura de cabeçalho constante
+            // (achado 17, CONTEXTO.md) continua exigindo um teto, só mais alto.
+            $values['header_logo_height'] = (string) max(6, min(40, $h ?: 14));
         }
 
         if (
@@ -320,5 +325,66 @@ class Branding
                 @unlink($f);
             }
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Cabeçalho estruturado por documento (Etapa 4f)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Área 3 do cabeçalho — dados automáticos, fixos, sem opção de
+     * configuração (decisão explícita do usuário, Etapa 4f: nada de
+     * campo/tela para isso). Reaproveitada tanto na prévia somente-leitura
+     * da tela de edição (front/article.form.php, GET) quanto na marcação
+     * final gravada por composeHeaderHtml() — fonte única, evita compor o
+     * mesmo texto em dois lugares com uma pequena diferença um dia.
+     *
+     * $bareCode vem de DocumentMeta::getBareCode() (sem sufixo de revisão —
+     * a revisão já aparece ao lado, separada). Documento ainda sem tipo
+     * classificado (sequencial não gerado) mostra só a data.
+     */
+    public static function composeArea3(string $bareCode, string $revision2, string $dateStr): string
+    {
+        return $bareCode !== ''
+            ? sprintf('%s · rev. %s · %s', $bareCode, $revision2, $dateStr)
+            : $dateStr;
+    }
+
+    /**
+     * Marcação do cabeçalho estruturado (Etapa 4f): título + logo lado a
+     * lado (linha 1) e Área 3 (linha 2). Substitui getDefaultHeaderHtml()
+     * da Etapa 4e — o cabeçalho deixou de ser semeado-e-editável-livremente
+     * por TinyMCE; passa a ser sempre RECOMPOSTO por inteiro no salvamento
+     * (front/article.form.php) e na criação (front/newdocument.form.php),
+     * nunca editado à mão. Continua sendo gravado na mesma coluna
+     * `header_html` e lido pelo mesmo pipeline até o PDF (Etapa 4e,
+     * `cfg.document.header_html` em codexplus.js) — nenhuma mudança ali.
+     *
+     * As classes `cx-header-*` têm CSS próprio tanto no PDF
+     * (buildPageCss() em codexplus.js, variante `.cx-page-header--doc`)
+     * quanto na prévia da tela de edição (public/css/codexplus.css) — os
+     * nomes de classe são o único contrato entre esta função e os dois.
+     */
+    public static function composeHeaderHtml(
+        string $title,
+        string $bareCode,
+        string $revision2,
+        string $dateStr
+    ): string {
+        $logoImg = '';
+        if (self::hasLogo()) {
+            $height = (int) self::get('header_logo_height');
+            $height = $height > 0 ? $height : 14;
+            $logoImg = '<img class="cx-header-logo" src="' . htmlescape(self::getLogoUrl())
+                . '" alt="" style="height:' . $height . 'mm;">';
+        }
+
+        return '<div class="cx-header-row cx-header-row-1">'
+            . '<span class="cx-header-title">' . htmlescape($title) . '</span>'
+            . $logoImg
+            . '</div>'
+            . '<div class="cx-header-row cx-header-row-2">'
+            . htmlescape(self::composeArea3($bareCode, $revision2, $dateStr))
+            . '</div>';
     }
 }

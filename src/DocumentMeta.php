@@ -194,6 +194,20 @@ class DocumentMeta extends CommonDBTM
         );
     }
 
+    /**
+     * Código SEM o sufixo de revisão (ex.: `POP0014`, sem `:01`) — Etapa 4f.
+     * getCode() já embute a revisão; usá-lo na Área 3 do cabeçalho estruturado
+     * duplicaria a informação ao lado do valor de revisão mostrado em
+     * separado (`POP0014:01 · rev. 01`). Mesma condição de vazio de getCode().
+     */
+    public function getBareCode(): string
+    {
+        if (empty($this->fields['doctype']) || empty($this->fields['sequence'])) {
+            return '';
+        }
+        return sprintf('%s%04d', $this->fields['doctype'], (int) $this->fields['sequence']);
+    }
+
     public function prepareInputForAdd($input)
     {
         /** @var \DBmysql $DB */

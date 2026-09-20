@@ -1,6 +1,6 @@
 # Codex+ — roadmap
 
-> Estado em `v0.5.4-alpha` · atualizado em 31/08/2026.
+> Estado em `v0.5.7-alpha` · atualizado em 15/09/2026.
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -20,6 +20,9 @@
 | 4b | Código, tipo, situação, responsável e cliente na tela de leitura; regra de vencimento centralizada em `DocumentMeta::expiryState()`; JSON de impressão embutido | v0.5.2 |
 | 4c | Motor de paginação manual do PDF (folhas 794×1123 em `.cx-page`), logo repetido por página, rodapé com marcadores resolvidos e paginação `1 / N`. Único arquivo alterado: `public/js/codexplus.js` | v0.5.3 |
 | 4d | Edição embutida no Codex+ (`article.form.php`, TinyMCE nativo via `Html::textarea`), sem sair para a ficha nativa; cabeçalho por documento (rich text) e rodapé por documento (texto com marcadores); moldura de folha (A4) na leitura. Ficha nativa continua acessível para categoria/FAQ/anexos | v0.5.4 |
+| 4e | `header_html`/`footer_text` por documento (criados na 4d) passam a entrar no PDF, com prioridade sobre a marca global (`Branding`) e reaproveitando 100% do motor de paginação da 4c — nenhum arquivo de PDF recriado. Cabeçalho reserva altura fixa (`header_logo_height`), corta excesso. Todo documento (novo ou antigo sem cabeçalho) nasce/abre a edição já com a logo de `Branding` semeada em `header_html`, alinhada à esquerda — sem campo de upload novo. Único arquivo com mudança de lógica de PDF: `public/js/codexplus.js` | v0.5.5 |
+| 4f | Cabeçalho deixa de ser rich text livre (TinyMCE, 4d/4e) e vira 3 áreas fixas: título (mesmo campo `name` de sempre, sem duplicidade) + logo (slot clicável, mesma logo global de `Branding`, upload direto da tela de edição via `front/header-logo.form.php` novo) lado a lado, e uma 2ª linha de dados automáticos (código · revisão · data), sempre recomposta no servidor (`Branding::composeHeaderHtml()`), nunca editada à mão. Rodapé inalterado | v0.5.6 |
+| 4f-correção | Logo aparecia pequena demais na prévia da edição — bug real: CSS tinha limite fixo de 40px desconectado de `header_logo_height`. Corrigido para WYSIWYG com o PDF (mesma conversão mm→px). De passagem, teto de `header_logo_height` subiu de 30 para 40mm (30 não cabia a logo de referência, 138px ≈ 36,5mm) — corrigido nos DOIS lugares que validavam isso (`Branding::save()` e `codexplus.js`, estavam duplicados e podiam divergir) | v0.5.7 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -45,35 +48,6 @@ apresentável ao cliente com pouca edição.
 
 > Vem **depois** da 4c de propósito: só dá para calibrar as seções vendo como
 > elas caem no PDF real.
-
----
-
-## Etapa 4e — cabeçalho/rodapé no PDF vindo do conteúdo (futura)
-
-**Registrada em 31/08/2026, a partir da 4d.** Decisão do usuário: abolir a
-estrutura atual de `public/js/codexplus.js` que *desenha* cabeçalho/rodapé
-por página a partir de config (`cfg.brand` / `cfg.document`, ver Etapa 4b/4c).
-No lugar, o corpo do documento passa a **vir com cabeçalho/rodapé
-pré-definidos**, prontos no próprio conteúdo — não sintetizados pelo JS a
-cada página impressa.
-
-**Por quê depois, e não junto com a 4d:** redesenhar o motor de paginação
-inteiro é mudança grande; fazer isso antes de ter os campos de cabeçalho
-(4d) rodando de verdade arriscaria retrabalho. A 4d já entrega os campos
-(`header_html`, `footer_text` por documento) — só não os leva ainda ao PDF.
-
-**Entrega (a definir em detalhe quando a etapa for aberta):**
-
-- Repensar como `codexplus.js` monta `.cx-page-header` / `.cx-page-footer`
-  por página sem depender de JS sintetizar a partir de marcadores/config
-- Decidir se o rodapé continua com marcadores dinâmicos (`{pagina}`,
-  `{total}`) ou se isso muda de abordagem junto
-- Migrar o PDF a ler `header_html`/`footer_text` por documento, com fallback
-  para a configuração global (`Branding`) quando o documento não tiver os
-  seus próprios
-
-**Aceite:** exportar em PDF um documento com cabeçalho/rodapé próprios e ver
-exatamente o que foi editado na Etapa 4d aparecer, repetido, em cada página.
 
 ---
 

@@ -1,17 +1,25 @@
 <?php
 
 /**
- * Codex+ — edição embutida do artigo (Etapa 4d).
+ * Codex+ — edição embutida do artigo (Etapa 4d; cabeçalho estruturado
+ * desde a Etapa 4f).
  *
  * Antes, o botão "Editar" mandava o usuário para a ficha nativa
- * (front/knowbaseitem.form.php). Esta etapa passa a editar SEM sair do
+ * (front/knowbaseitem.form.php). A Etapa 4d passou a editar SEM sair do
  * Codex+: título, corpo (TinyMCE nativo) e cabeçalho (TinyMCE nativo, campo
  * novo do Codex+) na mesma tela; rodapé em texto simples com marcadores,
  * igual ao padrão já usado em Branding::footer_text, só que por documento.
  *
+ * A Etapa 4f REMOVEU o TinyMCE do cabeçalho: ele deixou de ser texto livre
+ * e passou a ser 3 áreas fixas (título + logo lado a lado, e uma linha de
+ * dados automáticos não editável) — sempre recomposto por
+ * Branding::composeHeaderHtml() neste POST, nunca lido de $_POST diretamente.
+ * O título continua sendo o mesmo campo `name` de sempre, só que agora
+ * exibido visualmente dentro da zona de cabeçalho (ver
+ * templates/article-edit.html.twig) — não existe um segundo campo de título.
+ *
  * NÃO reimplementa o TinyMCE: usa Html::textarea(['enable_richtext' => true])
- * duas vezes (corpo e cabeçalho), o mesmo helper nativo que a ficha do GLPI
- * usa por baixo. Cada instância tem 'editor_id' próprio para não colidir.
+ * para o corpo, o mesmo helper nativo que a ficha do GLPI usa por baixo.
  *
  * O SALVAMENTO chama KnowbaseItem::update() diretamente — o mesmo método
  * público que o controller nativo chama por baixo dos panos — em vez de
@@ -26,6 +34,7 @@
  */
 
 use Glpi\Application\View\TemplateRenderer;
+use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\Wiki;
 
@@ -48,18 +57,33 @@ $articleUrl = $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/article.php?id='
 // POST — grava e volta para a leitura.
 // -----------------------------------------------------------------------
 if (isset($_POST['update'])) {
+    $title = (string) ($_POST['name'] ?? $kb->fields['name']);
+
     $kb->update([
         'id'     => $id,
-        'name'   => (string) ($_POST['name'] ?? $kb->fields['name']),
+        'name'   => $title,
         'answer' => (string) ($_POST['answer'] ?? $kb->fields['answer']),
     ]);
+
+    // Etapa 4f: cabeçalho deixou de vir de $_POST — é sempre recomposto
+    // aqui a partir do título que acabou de ser salvo + logo global (via
+    // Branding) + código/revisão/data (Área 3, fixa). doctype/sequence/
+    // revisão não são editados por este formulário, então lemos o estado
+    // atual do metadado antes de recompor.
+    $currentMeta = DocumentMeta::getForKnowbaseItem($id);
+    $headerHtml  = Branding::composeHeaderHtml(
+        $title,
+        $currentMeta->getBareCode(),
+        sprintf('%02d', (int) ($currentMeta->fields['revision'] ?? 0)),
+        date('d/m/Y')
+    );
 
     // Upsert dos campos do Codex+ (cabeçalho/rodapé) — mesmo padrão de
     // front/documentmeta.form.php: um metadado por artigo, chave única em
     // knowbaseitems_id decide entre add/update.
     $metaInput = [
         'knowbaseitems_id' => $id,
-        'header_html'      => (string) ($_POST['header_html'] ?? ''),
+        'header_html'      => $headerHtml,
         'footer_text'      => (string) ($_POST['footer_text'] ?? ''),
     ];
     $existing = new DocumentMeta();
@@ -67,8 +91,8 @@ if (isset($_POST['update'])) {
         $metaInput['id'] = $existing->getID();
         $existing->update($metaInput);
     } else {
-        $meta = new DocumentMeta();
-        $meta->add($metaInput);
+        $newMeta = new DocumentMeta();
+        $newMeta->add($metaInput);
     }
 
     Html::redirect($articleUrl);
@@ -107,17 +131,22 @@ $answerReturn = Html::textarea([
 $answerCaptured   = ob_get_clean();
 $answerEditorHtml = $answerCaptured !== '' ? $answerCaptured : (string) $answerReturn;
 
-ob_start();
-$headerReturn = Html::textarea([
-    'name'            => 'header_html',
-    'value'           => (string) ($meta->fields['header_html'] ?? ''),
-    'rand'            => mt_rand(),
-    'editor_id'       => 'codexplus-editor-header',
-    'enable_richtext' => true,
-    'rows'            => 6,
-]);
-$headerCaptured   = ob_get_clean();
-$headerEditorHtml = $headerCaptured !== '' ? $headerCaptured : (string) $headerReturn;
+// Etapa 4f: cabeçalho deixou de ter TinyMCE — o slot de logo e a Área 3
+// (linha 2, fixa) são compostos aqui só para PRÉVIA na tela; o valor que
+// realmente vale é recomposto no POST, com o título já salvo.
+$canManageLogo = Session::haveRight('config', UPDATE);
+
+$headerBareCode = $meta->getBareCode();
+$headerRevision = sprintf('%02d', (int) ($meta->fields['revision'] ?? 0));
+$headerPreviewLine2 = Branding::composeArea3($headerBareCode, $headerRevision, date('d/m/Y'));
+
+// Correção pós-4f: a prévia do slot de logo tinha um limite fixo de 40px no
+// CSS, sem nenhuma relação com "Altura do logo (mm)" (Configurar → Codex+).
+// Aqui convertemos o mesmo valor para px (96dpi, igual ao mmToPx() do PDF em
+// codexplus.js) para a prévia mostrar exatamente o tamanho que sai no PDF.
+$logoHeightMm = (int) Branding::get('header_logo_height');
+$logoHeightMm = $logoHeightMm > 0 ? $logoHeightMm : 14;
+$logoHeightPx = (int) round($logoHeightMm * 96 / 25.4);
 
 TemplateRenderer::getInstance()->display('@codexplus/article-edit.html.twig', [
     'glpi_root'   => $CFG_GLPI['root_doc'],
@@ -125,7 +154,10 @@ TemplateRenderer::getInstance()->display('@codexplus/article-edit.html.twig', [
     'article_url' => $articleUrl,
     'title'       => $rawTitle,
     'answer_editor_html' => $answerEditorHtml,
-    'header_editor_html' => $headerEditorHtml,
+    'can_manage_logo'     => $canManageLogo,
+    'logo_url'            => Branding::getLogoUrl(),
+    'logo_height_px'      => $logoHeightPx,
+    'header_preview_line2' => $headerPreviewLine2,
     'footer_text' => (string) ($meta->fields['footer_text'] ?? ''),
     // Mesmo padrão de front/documentmeta.form.php (token embutido no
     // formulário). Session::getNewCSRFToken() é o helper nativo padrão.

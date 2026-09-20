@@ -1,4 +1,7 @@
-{# Codex+ — Etapa 4d: edição embutida do artigo (sem sair do Codex+) #}
+{# Codex+ — Etapa 4d: edição embutida do artigo (sem sair do Codex+).
+   Etapa 4f: cabeçalho deixou de ser rich text livre — vira 3 áreas fixas:
+   título (mesmo campo `name` de sempre, só reposicionado aqui dentro),
+   logo (slot, Branding global) e dados automáticos (linha 2, não editável). #}
 
 <div class="codexplus-app">
 
@@ -15,23 +18,71 @@
         </div>
     </div>
 
+    {# Formulário separado do principal DE PROPÓSITO: upload de arquivo com
+       redirecionamento próprio (front/header-logo.form.php) — HTML não
+       permite <form> aninhado dentro do formulário principal abaixo. #}
+    {% if can_manage_logo %}
+        <form method="post" enctype="multipart/form-data" id="codexplus-logo-slot-form"
+              action="{{ glpi_root }}/plugins/codexplus/front/header-logo.form.php">
+            <input type="hidden" name="back"
+                   value="{{ glpi_root }}/plugins/codexplus/front/article.form.php?id={{ article_id }}">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+            <input type="file" name="logo" id="codexplus-logo-slot-input"
+                   accept="image/png,image/jpeg" hidden
+                   onchange="this.form.submit()">
+        </form>
+    {% endif %}
+
     <form method="post" action="{{ glpi_root }}/plugins/codexplus/front/article.form.php">
         <input type="hidden" name="id" value="{{ article_id }}">
         <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
 
         <article class="codexplus-doc codexplus-doc-edit">
 
-            <div class="codexplus-form-row codexplus-doc-edit-title">
-                <label for="codexplus-edit-name">{{ __('Título', 'codexplus') }}</label>
-                <input type="text" id="codexplus-edit-name" name="name"
-                       value="{{ title }}" class="codexplus-doc-title-input" required>
-            </div>
-
             <div class="codexplus-doc-edit-zone codexplus-doc-edit-header">
                 <label class="codexplus-doc-edit-zone-label">
                     <i class="ti ti-layout-navbar"></i> {{ __('Cabeçalho', 'codexplus') }}
                 </label>
-                {{ header_editor_html|raw }}
+
+                <div class="codexplus-header-preview">
+                    <div class="codexplus-header-row codexplus-header-row-1">
+                        <input type="text" id="codexplus-edit-name" name="name"
+                               value="{{ title }}" class="codexplus-header-title-input"
+                               placeholder="{{ __('Título do documento', 'codexplus') }}" required>
+
+                        <div class="codexplus-header-logo-slot">
+                            {% if can_manage_logo %}
+                                <label for="codexplus-logo-slot-input"
+                                       class="codexplus-logo-slot-clickable"
+                                       title="{{ __('Clique para enviar ou trocar a logo', 'codexplus') }}">
+                                    {% if logo_url %}
+                                        <img src="{{ logo_url }}" alt="{{ __('Logo', 'codexplus') }}"
+                                             style="height:{{ logo_height_px }}px;">
+                                    {% else %}
+                                        <span class="codexplus-logo-slot-empty">
+                                            <i class="ti ti-photo-plus"></i>
+                                        </span>
+                                    {% endif %}
+                                </label>
+                            {% else %}
+                                <div class="codexplus-logo-slot-static">
+                                    {% if logo_url %}
+                                        <img src="{{ logo_url }}" alt="{{ __('Logo', 'codexplus') }}"
+                                             style="height:{{ logo_height_px }}px;">
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="codexplus-header-row codexplus-header-row-2">
+                        {{ header_preview_line2 }}
+                    </div>
+                </div>
+
+                <div class="codexplus-form-hint">
+                    {{ __('O título acima é o título do documento — editar aqui edita o mesmo campo em qualquer lugar. A logo vem de Configurar → Codex+. A linha de baixo (código · revisão · data) é gerada automaticamente e não pode ser editada.', 'codexplus') }}
+                </div>
             </div>
 
             <div class="codexplus-doc-edit-zone codexplus-doc-edit-body">
@@ -50,7 +101,7 @@
                 <div class="codexplus-form-hint">
                     {{ __('Texto simples. Marcadores disponíveis: {codigo} {revisao} {titulo} {empresa} {data} {pagina} {total}', 'codexplus') }}
                     <br>
-                    {{ __('Por enquanto este rodapé fica salvo e visível só aqui — a exportação em PDF ainda usa o rodapé geral (Configurar → Codex+); a integração vem numa etapa futura.', 'codexplus') }}
+                    {{ __('Aparece no PDF exportado. Deixe em branco para usar o rodapé geral (Configurar → Codex+).', 'codexplus') }}
                 </div>
             </div>
 

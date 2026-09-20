@@ -61,30 +61,21 @@
  * por ESTE arquivo. Não são contrato com o Twig — ninguém fora daqui
  * precisa conhecê-los.
  * =========================================================================
- * CABEÇALHO/RODAPÉ POR DOCUMENTO (Etapa 4e; cabeçalho estruturado na 4f)
+ * CABEÇALHO E RODAPÉ (0.5.8; histórico: 4c, 4e, 4f)
  * =========================================================================
- * `cfg.document.header_html` / `cfg.document.footer_text` (Etapa 4d, lidos
- * de DocumentMeta via front/article.php) têm PRIORIDADE sobre a marca
- * global (`cfg.brand.*`) quando não vazios:
+ * Cabeçalho: montado por buildPageEl() na hora da impressão, igual em
+ * todas as páginas — título do documento pequeno de um lado, logo do outro
+ * (`logo_pos`; a logo respeita `show_logo` e `repeat_logo`). A 1ª página
+ * traz ainda o título grande e a linha de identificação (buildIdentLine()).
+ * `cfg.document.header_html` NÃO é mais lido aqui (era na 4e/4f): o HTML
+ * gravado no banco deixava documentos antigos sem cabeçalho e congelava o
+ * endereço da logo.
  *
- *   - header_html presente -> vira o conteúdo de .cx-page-header em TODAS
- *     as páginas (não depende de `repeat_logo`, que é específico do
- *     fallback de logo de canto, abaixo). Desde a Etapa 4f, header_html
- *     NUNCA é texto livre — é sempre gerado por
- *     Branding::composeHeaderHtml() (título + logo lado a lado, mais uma
- *     2ª linha de dados automáticos, código·revisão·data). A altura
- *     reservada é FIXA (computeGeometry(), `geo.headerBoxH`) e o excesso é
- *     cortado (`overflow:hidden`) — mesma razão da 4e (achado 17,
- *     CONTEXTO.md: capacidade de página constante), só que agora a altura
- *     tem uma folga extra fixa (`AREA3_H`) para a 2ª linha, porque o
- *     conteúdo deixou de ser de tamanho imprevisível.
- *   - header_html vazio -> cabeçalho de canto de sempre (Etapa 4c), sem
- *     nenhuma mudança de comportamento.
- *   - footer_text (documento) presente -> substitui cfg.brand.footer_text
- *     como TEXTO do rodapé, resolvido pelos mesmos resolveMarkers(). O
- *     toggle `footer_show` continua sendo o interruptor geral: rodapé por
- *     documento não liga o rodapé sozinho se `footer_show` estiver
- *     desligado — só troca o texto exibido quando ele já apareceria.
+ * Rodapé: `cfg.document.footer_text` (documento) tem prioridade sobre
+ * `cfg.brand.footer_text` como TEXTO, resolvido por resolveMarkers(). O
+ * toggle `footer_show` continua sendo o interruptor geral.
+ *
+ * Nome do arquivo sugerido: fileTitle() — "POP0014-01 - Título".
  * =========================================================================
  */
 
@@ -141,7 +132,7 @@
     var MARGIN_TOP_MM   = 18;
     var MARGIN_BOTTOM_MM = 18;
     var FOOTER_H        = 34; // px — altura fixa da faixa de rodapé, quando ligado
-    var AREA3_H         = 16; // px — Etapa 4f: 2ª linha do cabeçalho estruturado (código · rev. · data)
+    var HEADER_MIN_H    = 22; // px — 0.5.8: altura mínima do cabeçalho corrido (título sem logo)
 
     function mmToPx(mm) {
         return mm * 96 / 25.4;
@@ -161,7 +152,9 @@
             },
             document: {
                 title: '', code: '', revision: '', client: '', date_mod: '',
-                header_html: '', footer_text: ''
+                header_html: '', footer_text: '',
+                // 0.5.8: linha de identificação montada aqui, não raspada da tela
+                doctype: '', owner: '', date_published: '', sector: ''
             }
         };
 
@@ -237,14 +230,11 @@
         var marginTop     = Math.round(mmToPx(MARGIN_TOP_MM));
         var marginBottom  = Math.round(mmToPx(MARGIN_BOTTOM_MM));
         var logoPx        = Math.round(mmToPx(cfg.brand.logo_mm));
-        var hasDocHeader  = !!cfg.document.header_html;
-        // Etapa 4f: header_html estruturado tem DUAS linhas (título+logo e
-        // Área 3) — a caixa do cabeçalho de canto (Etapa 4c, uma linha só)
-        // usa logoPx puro; com header_html, soma-se AREA3_H para a segunda
-        // linha caber sem ser cortada pelo overflow:hidden da caixa.
-        var headerBoxH    = hasDocHeader ? (logoPx + AREA3_H) : logoPx;
-        var hasHeader     = cfg.brand.show_logo || hasDocHeader;
-        var headerH       = hasHeader ? (headerBoxH + 10) : 0;
+        // 0.5.8: cabeçalho corrido em TODAS as páginas (título pequeno +
+        // logo, uma linha só). Não lê mais header_html — ver comentário
+        // de buildPageEl(). Sem logo, reserva só a altura do título.
+        var headerBoxH    = cfg.brand.show_logo ? Math.max(logoPx, HEADER_MIN_H) : HEADER_MIN_H;
+        var headerH       = headerBoxH + 10;
         var footerH       = cfg.brand.footer_show ? FOOTER_H : 0;
         var contentW      = PAGE_W - (2 * marginX);
         var contentH      = PAGE_H - marginTop - marginBottom - headerH - footerH;
@@ -268,32 +258,18 @@
             + (geo.marginBottom + geo.footerH) + 'px;}'
             + '.cx-page:last-child{page-break-after:auto;}'
             + '.cx-page-content{width:' + geo.contentW + 'px;}'
-            // overflow:hidden vem da 4e: a altura da caixa é fixa (ver
-            // computeGeometry) — o que passar do espaço reservado é
-            // cortado, não empurra o layout. Etapa 4f: a caixa usa
-            // headerBoxH, não logoPx — precisa caber a 2ª linha (Área 3)
-            // do cabeçalho estruturado além da altura do logo/título.
+            // 0.5.8: cabeçalho corrido aprovado em 19/09/2026 — título
+            // pequeno de um lado, logo do outro, filete embaixo. Altura fixa
+            // (capacidade de página constante, achado 17); excesso cortado.
             + '.cx-page-header{position:absolute;top:' + geo.marginTop + 'px;'
             + 'left:' + geo.marginX + 'px;right:' + geo.marginX + 'px;'
-            + 'height:' + geo.headerBoxH + 'px;overflow:hidden;}'
-            + '.cx-page-header--right,.cx-page-header--left{line-height:0;}'
-            + '.cx-page-header--right img{float:right;height:' + geo.logoPx + 'px;width:auto;}'
-            + '.cx-page-header--left img{float:left;height:' + geo.logoPx + 'px;width:auto;}'
-            // Variante --doc: cabeçalho estruturado (Etapa 4f), sempre gerado
-            // por Branding::composeHeaderHtml() — nunca mais texto livre
-            // (isso era a Etapa 4e; documentos salvos depois da 4f só têm
-            // as duas linhas abaixo dentro de header_html, nada mais).
-            // Linha 1: título (cx-header-title) + logo (cx-header-logo),
-            // lado a lado. Linha 2 (cx-header-row-2): Área 3, texto fixo
-            // resolvido no servidor (Branding::composeArea3), sem marcador
-            // a resolver aqui — por isso não passa por resolveMarkers().
-            + '.cx-page-header--doc{font-size:9pt;}'
-            + '.cx-header-row{display:flex;align-items:center;}'
-            + '.cx-header-row-1{justify-content:space-between;gap:10px;height:' + geo.logoPx + 'px;}'
-            + '.cx-header-title{font-size:13pt;font-weight:600;overflow:hidden;'
-            + 'text-overflow:ellipsis;white-space:nowrap;}'
-            + '.cx-header-logo{max-height:100%;width:auto;flex-shrink:0;}'
-            + '.cx-header-row-2{font-size:8pt;color:#6b7280;margin-top:2px;}'
+            + 'height:' + geo.headerBoxH + 'px;overflow:hidden;box-sizing:border-box;'
+            + 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
+            + 'border-bottom:1px solid #e5e7eb;}'
+            + '.cx-page-header--logo-left{flex-direction:row-reverse;}'
+            + '.cx-run-title{font-size:9.5pt;color:#4b5563;white-space:nowrap;'
+            + 'overflow:hidden;text-overflow:ellipsis;min-width:0;}'
+            + '.cx-run-logo{height:' + (geo.logoPx - 4) + 'px;width:auto;flex-shrink:0;}'
             + '.cx-page-footer{position:absolute;left:' + geo.marginX + 'px;right:' + geo.marginX + 'px;'
             + 'bottom:' + geo.marginBottom + 'px;height:' + FOOTER_H + 'px;'
             + 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
@@ -332,7 +308,8 @@
     }
 
     /**
-     * Monta o <div class="cx-page"> de uma folha: cabeçalho (header_html do
+     * Monta o <div class="cx-page"> de uma folha: cabeçalho corrido (0.5.8,
+     * título + logo; antes lia o header_html do
      * documento se houver — estruturado desde a Etapa 4f —, senão logo de
      * canto condicionado a `repeat_logo` a partir da 2ª página), conteúdo
      * (os blocos já decididos por layoutPages) e rodapé (footer_text do
@@ -342,28 +319,26 @@
         var page = idoc.createElement('div');
         page.className = 'cx-page';
 
-        // Etapa 4e: header_html (documento) tem prioridade e entra em TODAS
-        // as páginas, sem depender de repeat_logo (que é específico do
-        // fallback de logo de canto, abaixo). Vazio -> comportamento da
-        // Etapa 4c, inalterado.
-        var hasDocHeader = !!cfg.document.header_html;
-        if (hasDocHeader) {
-            var docHeader = idoc.createElement('div');
-            docHeader.className = 'cx-page-header cx-page-header--doc';
-            docHeader.innerHTML = cfg.document.header_html;
-            page.appendChild(docHeader);
-        } else {
-            var showHeader = cfg.brand.show_logo && (pageIndex === 0 || cfg.brand.repeat_logo);
-            if (showHeader) {
-                var header = idoc.createElement('div');
-                header.className = 'cx-page-header cx-page-header--' + cfg.brand.logo_pos;
-                var img = idoc.createElement('img');
-                img.src = cfg.brand.logo_url;
-                img.alt = '';
-                header.appendChild(img);
-                page.appendChild(header);
-            }
+        // 0.5.8: cabeçalho montado AQUI, na hora da impressão, a partir dos
+        // dados do documento — não mais do header_html gravado no banco.
+        // Motivo: documentos anteriores à 4f saíam sem cabeçalho e o
+        // endereço da logo ficava congelado no HTML salvo. A coluna
+        // header_html continua existindo, só deixou de ser lida pelo PDF.
+        var header = idoc.createElement('div');
+        header.className = 'cx-page-header'
+            + (cfg.brand.logo_pos === 'left' ? ' cx-page-header--logo-left' : '');
+        var run = idoc.createElement('span');
+        run.className = 'cx-run-title';
+        run.textContent = cfg.document.title || '';
+        header.appendChild(run);
+        if (cfg.brand.show_logo && (pageIndex === 0 || cfg.brand.repeat_logo)) {
+            var img = idoc.createElement('img');
+            img.className = 'cx-run-logo';
+            img.src = cfg.brand.logo_url;
+            img.alt = '';
+            header.appendChild(img);
         }
+        page.appendChild(header);
 
         var content = idoc.createElement('div');
         content.className = 'cx-page-content';
@@ -395,6 +370,69 @@
         }
 
         return page;
+    }
+
+    /**
+     * 0.5.8 — linha de identificação da 1ª página, montada a partir de
+     * #codexplus-print-config (não mais raspada de .codexplus-doc-meta,
+     * que trazia a contagem de visualizações). Aprovada em 19/09/2026:
+     * proposta mostra o cliente; os demais, responsável e data. O setor
+     * entra em todos os tipos quando existir (Etapa 2c).
+     */
+    function buildIdentLine(cfg) {
+        var d = cfg.document;
+        var parts = [];
+        if (d.doctype === 'PRP' && d.client) { parts.push('Cliente: ' + d.client); }
+        if (d.sector) { parts.push('Setor: ' + d.sector); }
+        if (d.doctype !== 'PRP' && d.owner) { parts.push('Responsável: ' + d.owner); }
+        var pub = formatDate(d.date_published);
+        var mod = formatDate(d.date_mod);
+        if (pub) { parts.push('Publicado em ' + pub); }
+        else if (mod) { parts.push('Atualizado em ' + mod); }
+        return parts.join('  ·  ');
+    }
+
+    /** 0.5.8 — nome sugerido do arquivo: "POP0014-01 - Título". */
+    function fileTitle(cfg, fallbackTitle) {
+        var code  = String(cfg.document.code || '').replace(/:/g, '-');
+        var title = String(cfg.document.title || fallbackTitle || 'Documento');
+        var name  = code ? (code + ' - ' + title) : title;
+        return name.replace(/[\\/?%*:|"<>]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Espera as imagens ainda não carregadas do documento (carregadas OU
+     * com erro), com teto de 8s. 0.5.8: chamada DUAS vezes — antes da
+     * paginação (imagens do conteúdo) e depois dela (logo do cabeçalho,
+     * que só nasce dentro de layoutPages). Achado 21 do CONTEXTO.md.
+     */
+    function waitImages(idoc, callback) {
+        var called = false;
+        function finish() {
+            if (called) { return; }
+            called = true;
+            callback();
+        }
+        var pending = [];
+        for (var j = 0; j < idoc.images.length; j++) {
+            if (!idoc.images[j].complete) {
+                pending.push(idoc.images[j]);
+            }
+        }
+        if (pending.length === 0) {
+            finish();
+            return;
+        }
+        var remaining = pending.length;
+        function done() {
+            remaining--;
+            if (remaining <= 0) { finish(); }
+        }
+        for (var k = 0; k < pending.length; k++) {
+            pending[k].addEventListener('load', done);
+            pending[k].addEventListener('error', done);
+        }
+        setTimeout(finish, 8000);
     }
 
     /**
@@ -476,11 +514,24 @@
             imgs[i].removeAttribute('decoding');
         }
 
+        // 0.5.8: âncoras que o GLPI injeta nos títulos de seção
+        // (KnowbaseItem::getAnswer(): <a href="#slug"><svg>…</svg></a>)
+        // não têm função no papel.
+        var anchors = clone.querySelectorAll(
+            'h1 > a[href^="#"], h2 > a[href^="#"], h3 > a[href^="#"], '
+            + 'h4 > a[href^="#"], h5 > a[href^="#"], h6 > a[href^="#"]'
+        );
+        for (var an = 0; an < anchors.length; an++) {
+            if (anchors[an].querySelector('svg')) {
+                anchors[an].parentNode.removeChild(anchors[an]);
+            }
+        }
+
         // Metadados: monta item a item para sair legível no PDF, em vez de
         // concatenar o textContent (que sai tudo grudado).
         var metaEl = doc.querySelector('.codexplus-doc-meta');
-        var meta   = '';
-        if (metaEl) {
+        var meta   = buildIdentLine(cfg);
+        if (!meta && metaEl) {
             var parts = [];
             for (var m = 0; m < metaEl.children.length; m++) {
                 var txt = metaEl.children[m].textContent.replace(/\s+/g, ' ').trim();
@@ -502,7 +553,7 @@
 
         var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
             + '<base href="' + window.location.origin + '/">'
-            + '<title>' + safeTitle + '</title>'
+            + '<title>' + fileTitle(cfg, title).replace(/</g, '&lt;') + '</title>'
             + '<style>' + PRINT_CSS + buildPageCss(geo) + '</style></head><body>'
             + '<div id="cx-stage">' + heading + clone.innerHTML + '</div>'
             + '</body></html>';
@@ -522,46 +573,36 @@
             var idoc = iframe.contentDocument || win.document;
             var printed = false;
 
-            function doPrint() {
+            function printNow() {
                 if (printed) { return; }
                 printed = true;
+                // O Chrome sugere o nome do arquivo a partir do título da
+                // página PRINCIPAL, não do iframe (PDF de 19/09/2026 saiu
+                // "Codex+ (Base de Conhecimento) - 7 - GLPI"). Troca e
+                // devolve em seguida.
+                var previousTitle = document.title;
+                document.title = fileTitle(cfg, title);
                 try {
-                    // A paginação só acontece agora, com as imagens já
-                    // carregadas e #cx-stage ainda "achatado" — mover nós
-                    // já carregados de lugar no DOM não os recarrega.
-                    layoutPages(idoc, cfg, geo);
                     win.focus();
                     win.print();
                 } catch (err) {
                     console.error('Codex+ (PDF):', err);
                 }
+                setTimeout(function () { document.title = previousTitle; }, 1000);
                 setTimeout(function () { iframe.remove(); }, 2000);
             }
 
-            // Espera todas as imagens terminarem (carregadas OU com erro),
-            // com teto de 8s para não travar caso alguma nunca responda.
-            var pending = [];
-            for (var j = 0; j < idoc.images.length; j++) {
-                if (!idoc.images[j].complete) {
-                    pending.push(idoc.images[j]);
+            // 1ª espera: imagens do conteúdo, antes de medir e paginar.
+            // 2ª espera: logo do cabeçalho, que só existe depois de
+            // layoutPages() (achado 21).
+            waitImages(idoc, function () {
+                try {
+                    layoutPages(idoc, cfg, geo);
+                } catch (err) {
+                    console.error('Codex+ (PDF):', err);
                 }
-            }
-
-            if (pending.length === 0) {
-                doPrint();
-                return;
-            }
-
-            var remaining = pending.length;
-            function done() {
-                remaining--;
-                if (remaining <= 0) { doPrint(); }
-            }
-            for (var k = 0; k < pending.length; k++) {
-                pending[k].addEventListener('load', done);
-                pending[k].addEventListener('error', done);
-            }
-            setTimeout(doPrint, 8000);
+                waitImages(idoc, printNow);
+            });
         };
 
         document.body.appendChild(iframe);

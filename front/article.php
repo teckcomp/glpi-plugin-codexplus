@@ -64,6 +64,11 @@ $print_config = json_encode(
             'revision'    => $article['meta']['revision'],
             'client'      => $article['meta']['client_name'],
             'date_mod'    => $article['date_mod'],
+            // 0.5.8: linha de identificação da 1ª página do PDF. Responsável
+            // cai no autor do artigo quando o documento não tem dono.
+            'doctype'        => $article['meta']['doctype'],
+            'owner'          => $article['meta']['owner'] !== '' ? $article['meta']['owner'] : $article['writer'],
+            'date_published' => $article['meta']['date_published'],
             // Etapa 4e: cabeçalho/rodapé por documento. Quando vazios, o JS
             // cai no cabeçalho de canto / rodapé geral (Branding) — a regra
             // de prioridade fica inteira em codexplus.js, não aqui.

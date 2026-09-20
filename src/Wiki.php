@@ -423,6 +423,8 @@ class Wiki extends CommonGLPI
                 ? getUserName((int) $meta->fields['users_id_owner'])
                 : '',
             'client_name'   => (string) ($meta->fields['client_name'] ?? ''),
+            // 0.5.8: data de publicação para a linha de identificação do PDF.
+            'date_published' => (string) ($meta->fields['date_published'] ?? ''),
             // Etapa 4e: cabeçalho/rodapé por documento, lidos por
             // front/article.php para o JSON de impressão. Antes disso
             // (Etapa 4d) esses campos existiam só na tela de edição.

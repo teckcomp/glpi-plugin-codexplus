@@ -1210,3 +1210,27 @@
 /* O JSON de impressão não é conteúdo visível; garante que nenhum tema o
    revele como texto solto no fim da página. */
 #codexplus-print-config { display: none; }
+
+/* =========================================================================
+   0.5.8 — Âncoras dos títulos de seção na leitura
+   O GLPI injeta <a href="#slug"><svg/></a> antes de cada título
+   (KnowbaseItem::getAnswer). Na tela, só aparecem ao passar o mouse; no
+   PDF são removidas pelo codexplus.js.
+   ========================================================================= */
+.codexplus-content :is(h1, h2, h3, h4, h5, h6) {
+    position: relative;
+}
+/* Fora do fluxo, à esquerda do título: escondida, não empurra o texto
+   (antes ocupava espaço e deixava os títulos recuados em relação ao corpo). */
+.codexplus-content :is(h1, h2, h3, h4, h5, h6) > a[href^="#"]:first-child {
+    position: absolute;
+    right: 100%;
+    margin-right: 4px;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.codexplus-content :is(h1, h2, h3, h4, h5, h6):hover > a[href^="#"]:first-child,
+.codexplus-content :is(h1, h2, h3, h4, h5, h6) > a[href^="#"]:first-child:focus {
+    opacity: .6;
+}
+

@@ -10,11 +10,18 @@ namespace GlpiPlugin\Codexplus;
  * (can($id, READ) / can($id, UPDATE)), sempre checado ANTES de chamar esta
  * classe, em front/document.form.php. Aqui só se lê e grava a linha.
  *
- * `data` é o JSON do motor (public/js/codexplus-org.js):
- *   { "tree": { id, name, role, lvl, kids: [...], note, pend, group },
- *     "esc":  [ { lvl, c: [nível, papel, quando escala, tempo] } ] }
- * validate() confere a forma e os limites antes de gravar; o motor confere
- * de novo ao carregar (fix()).
+ * `data` é o JSON do motor (public/js/codexplus-org.js). Desde o bloco 2a o
+ * formato é grafo, não árvore (Claudio, 20/09/2026 — posição livre e ligações
+ * próprias vêm nos blocos seguintes):
+ *   { "kind": "organograma",
+ *     "levels": [ { key, label, color } ],
+ *     "nodes": [ { id, name, role, lvl, shape, x, y, note, pend, group, dashed } ],
+ *     "edges": [ { id, from, to, style, label } ],
+ *     "esc":   [ { lvl, c: [nível, papel, quando escala, tempo] } ] }
+ * `x`/`y` ausentes = elemento ancorado (quem posiciona é o layout). A primeira
+ * ligação que chega a um nó é a hierárquica; as demais são ligações extras.
+ * validate() aceita TAMBÉM o formato antigo (`tree` com `kids`) e converte:
+ * é assim que os diagramas gravados antes da 0.6.8 continuam abrindo.
  */
 class Diagram
 {
@@ -25,6 +32,15 @@ class Diagram
 
     /** Níveis aceitos (mesmas chaves do motor e dos tokens --cx-l-*). */
     public const LEVELS = ['diretoria', 'gestao', 'supervisao', 'n3', 'n2', 'n1', 'noc'];
+
+    /** Tipos de diagrama. Só organograma tem motor hoje; os outros vêm depois. */
+    public const KINDS = ['organograma', 'fluxograma', 'matriz', 'cronograma'];
+
+    public const MAX_NODES = 2000;
+    public const MAX_EDGES = 4000;
+
+    /** Teto de coordenada: tela livre grande, mas nunca infinita. */
+    public const MAX_COORD = 20000;
 
     public static function getTable(): string
     {
@@ -41,10 +57,11 @@ class Diagram
     public static function starter(): array
     {
         return [
-            'tree' => [
-                'id' => 'n1', 'name' => '', 'role' => 'Direção', 'lvl' => 'diretoria',
-                'kids' => [], 'note' => '',
+            'kind'  => 'organograma',
+            'nodes' => [
+                ['id' => 'n1', 'name' => '', 'role' => 'Direção', 'lvl' => 'diretoria', 'note' => ''],
             ],
+            'edges'  => [],
             'esc'    => [],
             // Níveis padrão de mercado (os mesmos de STD_LEVELS no motor).
             'levels' => [
@@ -130,17 +147,16 @@ class Diagram
      * Confere e normaliza o JSON vindo do navegador. Devolve null se a forma
      * não for a esperada. Texto é só texto: o motor escapa ao desenhar.
      *
-     * 0.6.7-5: cada organograma traz os próprios níveis (`levels`: chave,
-     * nome, cor) e os elementos criados pelo usuário (`elements`). Sem
-     * `levels` = organograma anterior: valem as chaves de LEVELS e o motor
-     * completa os níveis ao abrir.
+     * Bloco 2a: aceita o formato grafo (`nodes`/`edges`) e o antigo (`tree`),
+     * devolvendo sempre o grafo. A conversão é a única ponte entre os dois —
+     * não existe caminho que regrave `tree`.
      *
      * @param mixed $data
      * @return array<string, mixed>|null
      */
     public static function validate($data): ?array
     {
-        if (!is_array($data) || !isset($data['tree']) || !is_array($data['tree'])) {
+        if (!is_array($data)) {
             return null;
         }
 
@@ -160,9 +176,86 @@ class Diagram
         $keys     = $levels ? array_keys($levels) : self::LEVELS;
         $fallback = $keys[count($keys) - 1];
 
-        $count = 0;
-        $tree  = self::node($data['tree'], 0, $count, $keys, $fallback);
-        if ($tree === null) {
+        if (isset($data['nodes']) && is_array($data['nodes'])) {
+            $raw = ['nodes' => $data['nodes'], 'edges' => (array) ($data['edges'] ?? [])];
+        } elseif (isset($data['tree']) && is_array($data['tree'])) {
+            $raw = self::fromTree($data['tree']);
+            if ($raw === null) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+
+        $nodes = [];
+        $seen  = [];
+        foreach (array_slice($raw['nodes'], 0, self::MAX_NODES) as $n) {
+            if (!is_array($n)) {
+                continue;
+            }
+            $id = self::key($n['id'] ?? '');
+            if ($id === '' || isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $node = [
+                'id'    => $id,
+                'name'  => self::text($n['name'] ?? '', 120),
+                'role'  => self::text($n['role'] ?? '', 160),
+                'lvl'   => in_array($n['lvl'] ?? '', $keys, true) ? $n['lvl'] : $fallback,
+                'note'  => self::text($n['note'] ?? '', 500),
+                'pend'  => !empty($n['pend']),
+                'group' => !empty($n['group']),
+            ];
+            if (!empty($n['dashed'])) {
+                $node['dashed'] = true;
+            }
+            $kind = self::key($n['kind'] ?? '');
+            if ($kind !== '') {
+                $node['kind'] = $kind;
+            }
+            $shape = self::key($n['shape'] ?? '');
+            if ($shape !== '') {
+                $node['shape'] = $shape;
+            }
+            // Posição: só entra se as DUAS coordenadas vierem. Sem posição, o
+            // elemento é ancorado e quem decide onde fica é o layout.
+            if (isset($n['x'], $n['y']) && is_numeric($n['x']) && is_numeric($n['y'])) {
+                $node['x'] = self::coord($n['x']);
+                $node['y'] = self::coord($n['y']);
+            }
+            $nodes[] = $node;
+        }
+        if (!$nodes) {
+            return null;
+        }
+
+        $edges = [];
+        $pairs = [];
+        foreach (array_slice((array) $raw['edges'], 0, self::MAX_EDGES) as $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $from = self::key($e['from'] ?? '');
+            $to   = self::key($e['to'] ?? '');
+            $pair = $from . '>' . $to;
+            // Ligação para nó inexistente, laço no próprio nó e ligação
+            // repetida saem em silêncio: nenhuma delas tem desenho possível.
+            if ($from === '' || $to === '' || $from === $to
+                || !isset($seen[$from]) || !isset($seen[$to]) || isset($pairs[$pair])) {
+                continue;
+            }
+            $pairs[$pair] = true;
+            $id = self::key($e['id'] ?? '');
+            $edges[] = [
+                'id'    => $id !== '' ? $id : 'e' . (count($edges) + 1),
+                'from'  => $from,
+                'to'    => $to,
+                'style' => ($e['style'] ?? '') === 'tracejada' ? 'tracejada' : 'solida',
+                'label' => self::text($e['label'] ?? '', 120),
+            ];
+        }
+        if (self::hasCycle($edges)) {
             return null;
         }
 
@@ -197,7 +290,13 @@ class Diagram
             ];
         }
 
-        $out = ['tree' => $tree, 'esc' => $esc];
+        $kind = self::key($data['kind'] ?? '');
+        $out  = [
+            'kind'  => in_array($kind, self::KINDS, true) ? $kind : self::SUBTYPE_ORG,
+            'nodes' => $nodes,
+            'edges' => $edges,
+            'esc'   => $esc,
+        ];
         if ($levels) {
             $out['levels'] = array_values($levels);
         }
@@ -211,41 +310,74 @@ class Diagram
     }
 
     /**
-     * @param array<int, string> $keys níveis válidos
-     * @return array<string, mixed>|null
+     * Converte a árvore do formato antigo em nós e ligações. A ordem das
+     * ligações É a ordem dos irmãos no desenho — por isso a varredura é em
+     * profundidade, na ordem em que os filhos estavam.
+     *
+     * @return array{nodes: array<int, mixed>, edges: array<int, mixed>}|null
      */
-    private static function node($n, int $depth, int &$count, array $keys, string $fallback): ?array
+    private static function fromTree($tree): ?array
     {
-        if (!is_array($n) || $depth > 40 || ++$count > 2000) {
-            return null;
-        }
-        $kids = [];
-        foreach ((array) ($n['kids'] ?? []) as $k) {
-            $child = self::node($k, $depth + 1, $count, $keys, $fallback);
-            if ($child === null) {
-                return null;
+        $nodes = [];
+        $edges = [];
+        $count = 0;
+        $walk = function ($n, $parentId, int $depth) use (&$walk, &$nodes, &$edges, &$count): bool {
+            if (!is_array($n) || $depth > 40 || ++$count > self::MAX_NODES) {
+                return false;
             }
-            $kids[] = $child;
+            $id = self::key($n['id'] ?? '');
+            if ($id === '') {
+                $id = 'n' . ($count + 100000);
+            }
+            $copy = $n;
+            unset($copy['kids']);
+            $copy['id'] = $id;
+            $nodes[] = $copy;
+            if ($parentId !== null) {
+                $edges[] = ['id' => 'e' . count($edges), 'from' => $parentId, 'to' => $id];
+            }
+            foreach ((array) ($n['kids'] ?? []) as $k) {
+                if (!$walk($k, $id, $depth + 1)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        return $walk($tree, null, 0) ? ['nodes' => $nodes, 'edges' => $edges] : null;
+    }
+
+    /**
+     * Ciclo (A manda em B que manda em A) travaria o desenho: o layout anda
+     * pelas ligações. Só a PRIMEIRA ligação que chega a cada nó é hierárquica,
+     * então é sobre essas que a verificação corre.
+     *
+     * @param array<int, array<string, string>> $edges
+     */
+    private static function hasCycle(array $edges): bool
+    {
+        $parent = [];
+        foreach ($edges as $e) {
+            if (!isset($parent[$e['to']])) {
+                $parent[$e['to']] = $e['from'];
+            }
         }
-        $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($n['id'] ?? ''));
-        $out = [
-            'id'    => $id !== '' ? substr($id, 0, 32) : 'n' . $count,
-            'name'  => self::text($n['name'] ?? '', 120),
-            'role'  => self::text($n['role'] ?? '', 160),
-            'lvl'   => in_array($n['lvl'] ?? '', $keys, true) ? $n['lvl'] : $fallback,
-            'kids'  => $kids,
-            'note'  => self::text($n['note'] ?? '', 500),
-            'pend'  => !empty($n['pend']),
-            'group' => !empty($n['group']),
-        ];
-        if (array_key_exists('dashed', $n)) {
-            $out['dashed'] = !empty($n['dashed']);
+        foreach (array_keys($parent) as $start) {
+            $seen = [];
+            $at   = $start;
+            while (isset($parent[$at])) {
+                if (isset($seen[$at])) {
+                    return true;
+                }
+                $seen[$at] = true;
+                $at = $parent[$at];
+            }
         }
-        $kind = preg_replace('/[^a-z0-9:_-]/i', '', (string) ($n['kind'] ?? ''));
-        if ($kind !== '') {
-            $out['kind'] = substr($kind, 0, 40);
-        }
-        return $out;
+        return false;
+    }
+
+    private static function coord($v): int
+    {
+        return max(0, min(self::MAX_COORD, (int) round((float) $v)));
     }
 
     /** Chave curta e segura (nível, elemento). */

@@ -134,11 +134,25 @@
         var code = root.getAttribute('data-code') || '';
 
         var S = null, sel = null, drag = null, z = 1, uid = 0, dirty = false, query = '';
+        // Histórico de desfazer/refazer (0.6.7-7, Claudio, 20/09/2026): guarda o
+        // ESTADO INTEIRO em JSON a cada mudança. O organograma tem poucas
+        // dezenas de kB, e a cópia inteira evita o risco de um desfazer
+        // parcial deixar a árvore inconsistente (pai sem o filho que ficou).
+        var hist = [], hpos = -1, hkey = '', hstamp = 0;
+        var HIST_MAX = 60;
+        // Declarados AQUI, antes do primeiro rebuild(): a declaração `var` é
+        // içada, mas a atribuição não — declarar junto das funções abaixo
+        // zerava o que o rebuild do mount tinha acabado de montar.
+        var byId = {}, parentOf = {}, T = null;
         try { S = srcEl ? JSON.parse(srcEl.textContent || 'null') : null; } catch (e) { S = null; }
-        if (!S || !S.tree) {
-            S = { levels: copyLevels(STD_LEVELS), tree: { id: 'n1', name: '', role: 'Direção', lvl: 'diretoria', kids: [], note: '' }, esc: [] };
+        if (!S || (!S.nodes && !S.tree)) {
+            S = { kind: 'organograma', levels: copyLevels(STD_LEVELS), esc: [],
+                  nodes: [{ id: 'n1', name: '', role: 'Direção', lvl: 'diretoria', note: '' }], edges: [] };
         }
-        fix(S);
+        normalize(S);
+        rebuild();
+        hist = [ser()];
+        hpos = 0;
 
         // ---- estrutura -------------------------------------------------
         root.classList.add('cx-org');
@@ -146,6 +160,10 @@
             '<div class="cx-org-tools">' +
                 '<button type="button" class="cx-org-btn cx-org-btn--full" data-act="full" data-el="fullBtn"><i class="ti ti-maximize"></i> Tela cheia</button>' +
                 (editable ? '<button type="button" class="cx-org-btn cx-org-btn--primary" data-act="add">Nova pessoa</button>' : '') +
+                (editable ? '<span class="cx-org-zoom">' +
+                    '<button type="button" class="cx-org-btn" data-act="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled><i class="ti ti-arrow-back-up"></i></button>' +
+                    '<button type="button" class="cx-org-btn" data-act="redo" title="Refazer (Ctrl+Shift+Z)" aria-label="Refazer" disabled><i class="ti ti-arrow-forward-up"></i></button>' +
+                '</span>' : '') +
                 '<span class="cx-org-zoom"><button type="button" class="cx-org-btn" data-act="zout" aria-label="Diminuir zoom">−</button>' +
                 '<output data-el="zlbl">100%</output>' +
                 '<button type="button" class="cx-org-btn" data-act="zin" aria-label="Aumentar zoom">+</button></span>' +
@@ -235,8 +253,86 @@
 
         // ---- modelo ----------------------------------------------------
         function walk(n, f, p, d) { p = p || null; d = d || 0; f(n, p, d); n.kids.forEach(function (k) { walk(k, f, n, d + 1); }); }
-        function fix(s) {
+
+        // ---- grafo (bloco 2a) ---------------------------------------------
+        // O modelo gravado é `nodes` + `edges`. A árvore que o desenho usa é
+        // DERIVADA: rebuild() pendura um `kids` transitório em cada nó, e
+        // ser() tira esse `kids` de volta na hora de gravar. Assim todo o
+        // código de desenho (card, row, legenda, PDF) continua o mesmo.
+        function ser(pretty) {
+            return JSON.stringify(S, function (k, v) { return k === 'kids' ? undefined : v; }, pretty ? 2 : 0);
+        }
+        function rebuild() {
+            byId = {}; parentOf = {}; T = null;
+            S.nodes.forEach(function (n) { n.kids = []; byId[n.id] = n; });
+            S.edges.forEach(function (e) {
+                var f = byId[e.from], t = byId[e.to];
+                // Só a PRIMEIRA ligação que chega a um nó é hierárquica; as
+                // demais são ligações extras (desenhadas a partir do 2c).
+                if (!f || !t || parentOf[e.to]) { return; }
+                parentOf[e.to] = e.from;
+                f.kids.push(t);
+            });
+            for (var i = 0; i < S.nodes.length; i++) {
+                if (!parentOf[S.nodes[i].id]) { T = S.nodes[i]; break; }
+            }
+            if (!T) { T = S.nodes[0]; }
+            return T;
+        }
+        // Converte a árvore do formato antigo. A ordem das ligações É a ordem
+        // dos irmãos, por isso a varredura é em profundidade (igual ao PHP).
+        function fromTree(tree) {
+            var nodes = [], edges = [], k = 0;
+            (function go(n, pid) {
+                if (!n || typeof n !== 'object') { return; }
+                var copy = {}, key;
+                for (key in n) { if (key !== 'kids' && Object.prototype.hasOwnProperty.call(n, key)) { copy[key] = n[key]; } }
+                if (!copy.id) { copy.id = 'n' + (++k + 100000); }
+                nodes.push(copy);
+                if (pid) { edges.push({ id: 'e' + edges.length, from: pid, to: copy.id }); }
+                (n.kids || []).forEach(function (c) { go(c, copy.id); });
+            })(tree, null);
+            return { nodes: nodes, edges: edges };
+        }
+        function edgeIndexTo(id) {
+            for (var i = 0; i < S.edges.length; i++) { if (S.edges[i].to === id) { return i; } }
+            return -1;
+        }
+        function detach(id) {
+            var i = edgeIndexTo(id);
+            if (i >= 0) { S.edges.splice(i, 1); }
+        }
+        function attach(from, to, at) {
+            var e = { id: 'e' + Date.now().toString(36) + S.edges.length, from: from, to: to, style: 'solida', label: '' };
+            if (at === undefined || at < 0 || at > S.edges.length) { S.edges.push(e); } else { S.edges.splice(at, 0, e); }
+        }
+        // Tira o nó e sobe os filhos dele para o lugar que ele ocupava entre
+        // os irmãos — uma passada só, sem conta de índice deslocado.
+        function removeNode(id) {
+            var f = find(id);
+            if (!f || !f.p) { return; }
+            var pid = f.p.id, out = [], done = false;
+            S.edges.forEach(function (e) {
+                if (e.to === id && e.from === pid && !done) {
+                    S.edges.forEach(function (k) {
+                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, style: k.style, label: k.label }); }
+                    });
+                    done = true; return;
+                }
+                if (e.from === id || e.to === id) { return; }
+                out.push(e);
+            });
+            S.edges = out;
+            S.nodes = S.nodes.filter(function (n) { return n.id !== id; });
+        }
+        function normalize(s) {
             var m = 0;
+            if (!s.nodes && s.tree) { var g = fromTree(s.tree); s.nodes = g.nodes; s.edges = g.edges; }
+            delete s.tree;
+            s.kind = s.kind || 'organograma';
+            s.nodes = Array.isArray(s.nodes) ? s.nodes.filter(function (n) { return n && n.id; }) : [];
+            s.edges = Array.isArray(s.edges) ? s.edges : [];
+            if (!s.nodes.length) { s.nodes = [{ id: 'n1', name: '', role: 'Direção', lvl: '', note: '' }]; }
             // Sem níveis gravados = organograma de antes da 0.6.7-5: ganha os
             // níveis que já usava, e o NOC continua tracejado como era.
             var legacy = !Array.isArray(s.levels) || !s.levels.length;
@@ -247,16 +343,34 @@
             var keys = s.levels.map(function (l) { return l.key; });
             var last = keys[keys.length - 1];
             s.elements = Array.isArray(s.elements) ? s.elements.filter(function (e) { return e && e.id && e.label; }) : [];
-            walk(s.tree, function (n) {
-                n.kids = Array.isArray(n.kids) ? n.kids : [];
+            var ids = {};
+            s.nodes.forEach(function (n) {
+                n.id = String(n.id);
                 n.name = n.name || ''; n.role = n.role || ''; n.note = n.note || '';
                 if (keys.indexOf(n.lvl) < 0) { n.lvl = last; }
                 if (legacy && n.lvl === 'noc' && n.dashed === undefined) { n.dashed = true; }
-                var k = parseInt(String(n.id || '').replace(/\D/g, ''), 10);
-                if (!n.id) { n.id = 'n' + (++m + 100000); }
+                ids[n.id] = true;
+                var k = parseInt(n.id.replace(/\D/g, ''), 10);
                 if (k > m) { m = k; }
             });
             uid = m;
+            // Ligação órfã, laço, repetida ou que fecharia ciclo é descartada:
+            // o desenho anda pelas ligações e um ciclo o travaria.
+            var pai = {}, vistos = {};
+            s.edges = s.edges.filter(function (e) {
+                if (!e || !ids[e.from] || !ids[e.to] || e.from === e.to) { return false; }
+                var par = e.from + '>' + e.to;
+                if (vistos[par]) { return false; }
+                vistos[par] = true;
+                if (pai[e.to]) { return true; }      // ligação extra, não hierárquica
+                var at = e.from, guard = 0;
+                while (pai[at] && guard++ < 5000) { if (at === e.to) { return false; } at = pai[at]; }
+                if (at === e.to) { return false; }
+                pai[e.to] = e.from;
+                e.style = e.style === 'tracejada' ? 'tracejada' : 'solida';
+                e.label = e.label || '';
+                return true;
+            });
             if (!Array.isArray(s.esc)) { s.esc = []; }
             s.esc.forEach(function (r) { if (keys.indexOf(r.lvl) < 0) { r.lvl = last; } });
         }
@@ -266,18 +380,57 @@
             var i = S.levels.map(function (l) { return l.key; }).indexOf(k);
             return (S.levels[Math.min(i + 1, S.levels.length - 1)] || S.levels[0]).key;
         }
-        function levelUsed(k) { var u = false; walk(S.tree, function (n) { if (n.lvl === k) { u = true; } }); return u || S.esc.some(function (r) { return r.lvl === k; }); }
+        function levelUsed(k) { return S.nodes.some(function (n) { return n.lvl === k; }) || S.esc.some(function (r) { return r.lvl === k; }); }
         function levelOptions(selected, withAuto) {
             return (withAuto ? '<option value="">Conforme a posição</option>' : '') + S.levels.map(function (l) {
                 return '<option value="' + escHtml(l.key) + '"' + (l.key === selected ? ' selected' : '') + '>' + escHtml(l.label) + '</option>';
             }).join('');
         }
         function P(name, role, lvl) { return { id: 'n' + (++uid), name: name, role: role, lvl: lvl, kids: [], note: '' }; }
-        function find(id) { var r = null; walk(S.tree, function (n, p) { if (n.id === id) { r = { n: n, p: p }; } }); return r; }
+        function find(id) { var n = byId[id]; return n ? { n: n, p: parentOf[id] ? byId[parentOf[id]] : null } : null; }
         function isIn(a, b) { var f = false; walk(a, function (n) { if (n.id === b.id) { f = true; } }); return f; }
         function label(n) { return n.name.trim() || (n.lvl === 'noc' ? 'Coringa a definir' : 'Vaga em aberto'); }
-        function commit() {
-            if (input) { input.value = JSON.stringify(S); dirty = true; }
+        function commit(key) {
+            rebuild();
+            if (input) { input.value = ser(); dirty = true; }
+            pushHist(key);
+        }
+        // `key` agrupa alterações seguidas do mesmo campo do mesmo nó: um
+        // caractere digitado não é um passo de desfazer. Sem `key`, cada
+        // commit vira um passo (mover, excluir, trocar nível, aplicar modelo).
+        function pushHist(key) {
+            if (!editable) { return; }
+            var json = ser(), now = Date.now();
+            if (hist[hpos] === json) { return; }
+            if (key && key === hkey && (now - hstamp) < 900 && hpos > 0) {
+                hist[hpos] = json; hstamp = now; return;
+            }
+            hist.splice(hpos + 1, hist.length);
+            hist.push(json);
+            if (hist.length > HIST_MAX) { hist.shift(); }
+            hpos = hist.length - 1; hkey = key || ''; hstamp = now;
+            syncHist();
+        }
+        function syncHist() {
+            var u = root.querySelector('[data-act="undo"]'), r = root.querySelector('[data-act="redo"]');
+            if (u) { u.disabled = hpos <= 0; }
+            if (r) { r.disabled = hpos >= hist.length - 1; }
+        }
+        // Volta (-1) ou avança (+1) um passo. Recompõe tudo: a seleção pode
+        // apontar para alguém que deixou de existir no estado restaurado.
+        function jump(d) {
+            if (!editable) { return; }
+            var i = hpos + d, s;
+            if (i < 0 || i >= hist.length) { return; }
+            try { s = JSON.parse(hist[i]); } catch (e) { return; }
+            hpos = i; hkey = ''; hstamp = 0;
+            normalize(s); S = s; rebuild();
+            if (sel && !find(sel)) { sel = null; }
+            if (input) { input.value = ser(); dirty = true; }
+            if (ed) { ed.hidden = !sel; }
+            render(); renderEsc(); renderPalette(); renderLevels();
+            if (sel) { fill(); }
+            syncHist();
         }
         function hit(n) {
             if (!query) { return ''; }
@@ -308,7 +461,7 @@
         }
         function legendHtml() {
             var c = {}, vagas = 0, total = 0;
-            walk(S.tree, function (n) {
+            S.nodes.forEach(function (n) {
                 if (n.group) { return; }
                 if (!n.name.trim()) { vagas++; return; }
                 c[n.lvl] = (c[n.lvl] || 0) + 1; total++;
@@ -318,7 +471,7 @@
             }).join('') + '<span><i class="is-dash"></i>Vagas em aberto <b>' + vagas + '</b></span><span>Pessoas nomeadas <b>' + total + '</b></span>';
         }
         function render() {
-            treeEl.innerHTML = '<ul>' + card(S.tree) + '</ul>';
+            treeEl.innerHTML = '<ul>' + card(T) + '</ul>';
             $('legend').innerHTML = legendHtml();
             if (query) {
                 var n = treeEl.querySelectorAll('.is-hit').length;
@@ -435,7 +588,7 @@
             var par = F('parent');
             if (p) {
                 var o = '';
-                walk(S.tree, function (m, _, d) {
+                walk(T, function (m, _, d) {
                     if (isIn(n, m)) { return; }
                     o += '<option value="' + escHtml(m.id) + '"' + (p.id === m.id ? ' selected' : '') + '>' + '\u00A0\u00A0'.repeat(d) + escHtml(label(m)) + '</option>';
                 });
@@ -485,13 +638,15 @@
             var t = find(tid), n;
             if (d.kind) {
                 n = newNode(d.kind, zone === 'in' ? nextLevel(t.n.lvl) : t.n.lvl);
+                S.nodes.push(n);
             } else {
-                var a = find(d.id); n = a.n;
-                a.p.kids.splice(a.p.kids.indexOf(n), 1);
-                t = find(tid);
+                n = find(d.id).n;
+                detach(n.id);
             }
-            if (zone === 'in') { t.n.kids.push(n); }
-            else { t.p.kids.splice(t.p.kids.indexOf(t.n) + (zone === 'after' ? 1 : 0), 0, n); }
+            // A posição do irmão é a posição da ligação DELE na lista: o
+            // índice é calculado depois do detach, senão vem deslocado.
+            if (zone === 'in') { attach(tid, n.id); }
+            else { attach(parentOf[tid], n.id, edgeIndexTo(tid) + (zone === 'after' ? 1 : 0)); }
             commit(); render();
             return n;
         }
@@ -502,9 +657,19 @@
         function wouldList(el, zone) { return zone === 'in' || el.classList.contains('cx-org-row'); }
         function leaveTeam(id) {
             var f = find(id); if (!f || !f.p || !f.n.kids.length) { return; }
-            var i = f.p.kids.indexOf(f.n);
-            f.p.kids.splice.apply(f.p.kids, [i + 1, 0].concat(f.n.kids));
-            f.n.kids = [];
+            var pid = f.p.id, out = [], done = false;
+            S.edges.forEach(function (e) {
+                if (e.from === id) { return; }
+                out.push(e);
+                if (!done && e.to === id && e.from === pid) {
+                    S.edges.forEach(function (k) {
+                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, style: k.style, label: k.label }); }
+                    });
+                    done = true;
+                }
+            });
+            S.edges = out;
+            rebuild();
         }
         function countTeam(n) { var c = -1; walk(n, function () { c++; }); return c; }
         function askMove(d, tid, zone) {
@@ -541,18 +706,36 @@
         function addUnder(id) {
             var f = find(id); if (!f) { return; }
             var lvl = nextLevel(f.n.lvl), k = P('', '', lvl);
-            f.n.kids.push(k); commit(); select(k.id); F('name').focus();
+            S.nodes.push(k); attach(id, k.id); commit(); select(k.id); F('name').focus();
         }
 
         if (editable) {
             ['name', 'role', 'note'].forEach(function (k) {
-                F(k).addEventListener('input', function () { cur()[k] = F(k).value; commit(); render(); });
+                F(k).addEventListener('input', function () { cur()[k] = F(k).value; commit('t:' + k + ':' + sel); render(); });
             });
             F('lvl').addEventListener('change', function () { cur().lvl = F('lvl').value; commit(); render(); });
             F('pend').addEventListener('change', function () { cur().pend = F('pend').checked; commit(); render(); });
             F('group').addEventListener('change', function () { cur().group = F('group').checked; commit(); render(); fill(); });
             F('dashed').addEventListener('change', function () { cur().dashed = F('dashed').checked; commit(); render(); });
             F('parent').addEventListener('change', function () { move(sel, F('parent').value); fill(); });
+
+            // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (0.6.7-8). Dentro do organograma
+            // o desfazer é SEMPRE o do organograma, campo de texto incluído: o
+            // histórico já agrupa a digitação num passo, e depender do desfazer
+            // nativo do campo deixava o atalho mudo (teste de 20/09, passos 5 e
+            // 6). Campo fora do organograma (título, categorias) segue com o do
+            // navegador. Na fase de CAPTURA para que nenhum handler do núcleo
+            // engula a tecla antes.
+            document.addEventListener('keydown', function (e) {
+                if (!(e.ctrlKey || e.metaKey) || e.altKey) { return; }
+                var k = String(e.key || '').toLowerCase();
+                if (k !== 'z' && k !== 'y') { return; }
+                if (!document.body || !document.body.contains(root)) { return; }
+                var t = e.target, el = t && t.nodeType === 1 ? t : null;
+                if (el && !root.contains(el) && (el.isContentEditable || el.matches('input, textarea, select'))) { return; }
+                e.preventDefault();
+                jump(k === 'y' || e.shiftKey ? 1 : -1);
+            }, true);
 
             // O editor vive dentro do formulário do documento: Enter num campo
             // não pode enviar o formulário.
@@ -608,13 +791,13 @@
                 if (i !== null && S.levels[i]) { S.levels[i].label = e.target.value.slice(0, 40) || '—'; }
                 else if (j !== null && S.levels[j] && /^#[0-9a-f]{6}$/i.test(e.target.value)) { S.levels[j].color = e.target.value; }
                 else { return; }
-                commit(); render(); renderEsc(); renderPalette();
+                commit('lv:' + (i !== null ? i : j)); render(); renderEsc(); renderPalette();
             });
 
             var escBody = $('esc');
             escBody.addEventListener('input', function (e) {
                 var r = e.target.getAttribute('data-r'), c = e.target.getAttribute('data-c');
-                if (r !== null && S.esc[r]) { S.esc[r].c[c] = e.target.innerText.trim(); commit(); }
+                if (r !== null && S.esc[r]) { S.esc[r].c[c] = e.target.innerText.trim(); commit('esc:' + r + ':' + c); }
             });
             escBody.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey && e.target.hasAttribute('contenteditable')) { e.preventDefault(); }
@@ -649,7 +832,7 @@
                 var tp = TEMPLATES.filter(function (x) { return x.key === tb.getAttribute('data-tpl'); })[0];
                 if (tp) {
                     var ns = tp.make(); ns.tree = withIds(ns.tree);
-                    fix(ns); S = ns; sel = null; ed.hidden = true; commit(); render(); renderEsc(); renderPalette(); $('tpl').close(); fit();
+                    normalize(ns); S = ns; sel = null; ed.hidden = true; commit(); render(); renderEsc(); renderPalette(); $('tpl').close(); fit();
                 }
                 return;
             }
@@ -673,7 +856,9 @@
             }
             var b = e.target.closest('[data-act]'); if (!b || !root.contains(b)) { return; }
             var act = b.getAttribute('data-act');
-            if (act === 'zin') { setZ(z + 0.1); }
+            if (act === 'undo') { jump(-1); }
+            else if (act === 'redo') { jump(1); }
+            else if (act === 'zin') { setZ(z + 0.1); }
             else if (act === 'zout') { setZ(z - 0.1); }
             else if (act === 'fit') { fit(); }
             else if (act === 'print') { printOrg(); }
@@ -706,17 +891,17 @@
                 commit(); renderPalette(); $('eldlg').close();
             }
             else if (act === 'tplclose') { $('tpl').close(); }
-            else if (act === 'add') { addUnder(sel && find(sel) ? sel : S.tree.id); }
+            else if (act === 'add') { addUnder(sel && find(sel) ? sel : T.id); }
             else if (act === 'edadd') { addUnder(sel); }
             else if (act === 'edclose') { sel = null; ed.hidden = true; render(); }
             else if (act === 'eddel') {
                 if (!b.classList.contains('is-armed')) { b.classList.add('is-armed'); b.textContent = 'Confirmar exclusão'; return; }
                 var f = find(sel); if (!f || !f.p) { return; }
-                f.p.kids.splice.apply(f.p.kids, [f.p.kids.indexOf(f.n), 1].concat(f.n.kids));
+                removeNode(sel);
                 sel = null; ed.hidden = true; commit(); render();
             }
             else if (act === 'escadd') { S.esc.push({ lvl: S.levels[S.levels.length - 1].key, c: ['Novo nível', '', '', ''] }); commit(); renderEsc(); }
-            else if (act === 'io') { $('ioText').value = JSON.stringify(S, null, 2); $('ioMsg').textContent = ''; $('io').showModal(); }
+            else if (act === 'io') { $('ioText').value = ser(true); $('ioMsg').textContent = ''; $('io').showModal(); }
             else if (act === 'ioclose') { $('io').close(); }
             else if (act === 'iocopy') {
                 var t = $('ioText'); t.select();
@@ -726,8 +911,10 @@
             else if (act === 'ioapply') {
                 try {
                     var s = JSON.parse($('ioText').value);
-                    if (!s || !s.tree || !Array.isArray(s.tree.kids)) { throw new Error('forma'); }
-                    fix(s); S = s; sel = null; ed.hidden = true; commit(); render(); renderEsc(); renderPalette(); $('io').close(); fit();
+                    // Aceita os dois formatos: o grafo novo e a árvore antiga
+                    // (é o que o protótipo e as exportações anteriores geram).
+                    if (!s || typeof s !== 'object' || (!Array.isArray(s.nodes) && !s.tree)) { throw new Error('forma'); }
+                    normalize(s); S = s; sel = null; ed.hidden = true; commit(); render(); renderEsc(); renderPalette(); $('io').close(); fit();
                 } catch (err) {
                     $('ioMsg').textContent = 'Conteúdo inválido. Cole o texto completo gerado por Exportar, do primeiro ao último caractere.';
                 }
@@ -753,7 +940,7 @@
             d.write(head + '<body class="cx-org-printdoc"><div class="cx-org cx-org--print">' +
                 '<div class="cx-org-printhead"><strong>' + escHtml(title) + '</strong><span>' + escHtml(code) + '</span></div>' +
                 '<div class="cx-org-legend">' + legendHtml() + '</div>' +
-                '<div class="cx-org-stage"><div class="cx-org-tree"><ul>' + card(S.tree) + '</ul></div></div>' +
+                '<div class="cx-org-stage"><div class="cx-org-tree"><ul>' + card(T) + '</ul></div></div>' +
                 (S.esc.length ? '<section class="cx-org-esc"><h3>Matriz de escalonamento</h3><div class="cx-org-tablewrap"><table><thead><tr><th>Nível</th><th>Papel</th><th>Escala para o próximo nível quando</th><th>Tempo alvo</th></tr></thead><tbody>' +
                     S.esc.map(function (r) { return '<tr style="' + lc(r.lvl) + '">' + r.c.map(function (c) { return '<td>' + escHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
                     '</tbody></table></div></section>' : '') +
@@ -787,7 +974,9 @@
         if (input) { input.value = JSON.stringify(S); }
         requestAnimationFrame(function () { if (treeEl.scrollWidth > stage.clientWidth) { fit(); } });
 
-        var api = { getData: function () { return JSON.parse(JSON.stringify(S)); }, fit: fit, setZoom: setZ, print: printOrg, place: place, drop: function (d, tid, zone) { var fm = d.id ? find(d.id) : null; var el = treeEl.querySelector('[data-id="' + tid + '"]'); if (fm && fm.n.kids.length && el && wouldList(el, zone) && canPlace(d, tid, zone)) { askMove(d, tid, zone); return 'ask'; } return doMove(d, tid, zone); }, templates: TEMPLATES.map(function (t) { return t.key; }) };
+        var api = { getData: function () { return JSON.parse(ser()); }, fit: fit, setZoom: setZ, print: printOrg, place: place,
+            undo: function () { jump(-1); }, redo: function () { jump(1); },
+            history: function () { return { pos: hpos, len: hist.length }; }, drop: function (d, tid, zone) { var fm = d.id ? find(d.id) : null; var el = treeEl.querySelector('[data-id="' + tid + '"]'); if (fm && fm.n.kids.length && el && wouldList(el, zone) && canPlace(d, tid, zone)) { askMove(d, tid, zone); return 'ask'; } return doMove(d, tid, zone); }, templates: TEMPLATES.map(function (t) { return t.key; }) };
         root.__cxOrg = api;
         return api;
     }

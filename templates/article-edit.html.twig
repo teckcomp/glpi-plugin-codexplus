@@ -1,7 +1,7 @@
 {# Codex+ — Etapa 4d: edição embutida do artigo (sem sair do Codex+).
    Etapa 4f: cabeçalho deixou de ser rich text livre — vira 3 áreas fixas:
    título (mesmo campo `name` de sempre, só reposicionado aqui dentro),
-   logo (slot, Branding global) e dados automáticos (linha 2, não editável). #}
+   logo (slot, Branding global). Linha 2 removida na 0.5.8. #}
 
 <div class="codexplus-app">
 
@@ -80,7 +80,7 @@
                 </div>
 
                 <div class="codexplus-form-hint">
-                    {{ __('O título acima é o título do documento — editar aqui edita o mesmo campo em qualquer lugar. A logo vem de Configurar → Codex+. A linha de baixo (código · revisão · data) é gerada automaticamente e não pode ser editada.', 'codexplus') }}
+                    {{ __('O título acima é o título do documento — editar aqui edita o mesmo campo em qualquer lugar. A logo vem de Configurar → Codex+. Código e revisão saem no rodapé do PDF.', 'codexplus') }}
                 </div>
             </div>
 

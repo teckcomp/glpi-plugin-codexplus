@@ -34,7 +34,7 @@ final class Rights
 
     public const VIEWALL   = 1024;  // ignora os alvos de leitura
     public const ANONYMOUS = 2048;  // gerar/revogar link de acesso anônimo (R7)
-    public const TEMPLATES = 4096;  // gerenciar modelos
+    public const TEMPLATES = 4096;  // gerenciar modelos, setores e categorias (R2)
 
     /** Soma de todos os bits da matriz. */
     public const ALL = self::READ | self::UPDATE | self::CREATE | self::DELETE
@@ -55,7 +55,7 @@ final class Rights
             self::DELETE    => __('Excluir', 'codexplus'),
             self::VIEWALL   => __('Ver todos', 'codexplus'),
             self::ANONYMOUS => __('Publicar para acesso anônimo', 'codexplus'),
-            self::TEMPLATES => __('Gerenciar modelos', 'codexplus'),
+            self::TEMPLATES => __('Gerenciar modelos, setores e categorias', 'codexplus'),
         ];
     }
 }

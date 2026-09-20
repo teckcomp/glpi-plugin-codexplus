@@ -1,7 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.0-alpha` · atualizado em 20/09/2026 (R1 entregue, em
-> teste na homologação).
+> Estado em `v0.6.1-alpha` · atualizado em 20/09/2026 (R1 concluído; R2
+> entregue, em teste na homologação).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -46,6 +46,7 @@ Depois: marco **Pronto para produção** (fim deste documento).
 | 4f | Cabeçalho deixa de ser rich text livre (TinyMCE, 4d/4e) e vira 3 áreas fixas: título (mesmo campo `name` de sempre, sem duplicidade) + logo (slot clicável, mesma logo global de `Branding`, upload direto da tela de edição via `front/header-logo.form.php` novo) lado a lado, e uma 2ª linha de dados automáticos (código · revisão · data), sempre recomposta no servidor (`Branding::composeHeaderHtml()`), nunca editada à mão. Rodapé inalterado | v0.5.6 |
 | 4f-correção | Logo aparecia pequena demais na prévia da edição — bug real: CSS tinha limite fixo de 40px desconectado de `header_logo_height`. Corrigido para WYSIWYG com o PDF (mesma conversão mm→px). De passagem, teto de `header_logo_height` subiu de 30 para 40mm (30 não cabia a logo de referência, 138px ≈ 36,5mm) — corrigido nos DOIS lugares que validavam isso (`Branding::save()` e `codexplus.js`, estavam duplicados e podiam divergir) | v0.5.7 |
 | 0.5.8 | Pós-auditoria: logo volta a sair no PDF (espera dupla de imagens); cabeçalho corrido montado na impressão (título + logo, uma linha), título grande e linha de identificação só na 1ª página, sem visualizações; âncoras dos títulos fora do PDF e discretas na tela; arquivo sugerido `código - título`; prévia do cabeçalho na edição sem a 2ª linha | v0.5.8 |
+| R1 | Schema dos documentos próprios (documento ampliado, setores, categorias, documento–categoria, alvos de leitura, versões) e aba **Codex+ em Perfis** com a matriz de direitos. Commit `330da62` | v0.6.0 |
 
 > A numeração saiu fora de ordem de propósito: o Painel (6) veio antes do PDF
 > (4) porque dependia apenas da Etapa 2, e valia mais ter a tela que mostra o
@@ -69,8 +70,8 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 
 | Bloco | Entrega | Aceite |
 |---|---|---|
-| R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando. **Entregue na 0.6.0-alpha, em teste** | Aba aparece em Perfis e grava |
-| R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore | Criar setor e subcategoria e ver o setor herdado |
+| R1 | Schema novo (documento ampliado, categorias, setores, ligação documento–categoria, alvos de leitura, versões) e **aba Codex+ em Perfis** com Ler, Criar, Atualizar, Excluir, Ver todos, Publicar anônimo, Gerenciar modelos. Telas atuais continuam funcionando. ✅ **Concluído na 0.6.0-alpha** | Aba aparece em Perfis e grava |
+| R2 | Setores e categorias cadastráveis (listas suspensas do GLPI), categoria ligada a setor, herança na árvore. Cadastro por quem tem "Gerenciar modelos" (decisão de Claudio, 20/09/2026). **Entregue na 0.6.1-alpha, em teste** | Criar setor e subcategoria e ver o setor herdado |
 | R3 | Criar, editar e ler no modelo novo: categorias múltiplas, alvos de leitura, anexos, imagens coladas, PDF | Criar um POP do zero, restringir a um grupo, exportar |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
 | R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |

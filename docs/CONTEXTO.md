@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.0-alpha` · atualizado em 20/09/2026 (Etapa R1: schema dos
-> documentos próprios e aba Codex+ em Perfis).
+> Estado: `v0.6.1-alpha` · atualizado em 20/09/2026 (Etapa R2: setores e
+> categorias cadastráveis).
 
 ---
 
@@ -190,11 +190,32 @@ histórico; renomear exigiria migrar todos os perfis sem ganho). Bits em
 | 8 | Excluir (lixeira, `is_deleted`) |
 | 1024 | Ver todos (ignora os alvos de leitura) |
 | 2048 | Publicar para acesso anônimo |
-| 4096 | Gerenciar modelos |
+| 4096 | Gerenciar modelos, setores e categorias (R2) |
 
 Os bits novos **nascem desmarcados em todos os perfis**, inclusive
 Super-Admin: se o Install concedesse, cada reinstalação devolveria o que foi
 desmarcado. Em R1 eles só são gravados; a R3 passa a checá-los.
+
+#### Setores e categorias (R2)
+
+Classes `GlpiPlugin\Codexplus\Sector` (CommonDropdown) e `Category`
+(CommonTreeDropdown). Cadastro em **Configurar → Listas suspensas → Codex+**
+(hook `plugin_codexplus_getDropdown` no `hook.php`). Não há `front/` para
+elas: o GLPI 11 manda `/plugins/codexplus/front/sector[.form].php` e
+`category[.form].php` para os controllers genéricos (achado 30).
+
+- **Direitos** (decisão de Claudio, 20/09/2026): cadastrar = bit 4096
+  "Gerenciar modelos, setores e categorias"; ver = Ler ou 4096. O direito
+  nativo `dropdown` **não** vale para elas. Regra única no trait
+  `StructureRights`.
+- **Herança:** o setor é da categoria raiz. Subcategoria grava o setor do
+  pai e ignora o do formulário; mudar o setor da raiz ou mover uma
+  subárvore reaplica o setor nos descendentes (UPDATE direto, sem encher o
+  Histórico); categoria que vira raiz mantém o setor que tinha.
+- **Relações** declaradas em `plugin_codexplus_getDatabaseRelations` (setor →
+  categoria, categoria → categoria pai), para o aviso "item em uso" e o
+  "substituir por" ao excluir. A ligação documento–categoria entra na R3,
+  junto com a classe dela (achado 31).
 
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
@@ -358,6 +379,16 @@ depender do comportamento errático de `position: fixed` na impressão.
     (schema idêntico) e desinstalando. O Twig 3.23 (versão do
     `composer.lock` do GLPI 11.0.6) baixa pelo GitHub e renderiza os
     templates do plugin sobre os templates reais do núcleo.
+30. **Lista suspensa de plugin não precisa de `front/`.** Quando a URL não
+    corresponde a arquivo nem rota, o `LegacyItemtypeRouteListener` do GLPI
+    11 procura a classe `GlpiPlugin\<Plugin>\<Item>` a partir de
+    `/plugins/<plugin>/front/<item>[.form].php` e, se for `CommonDropdown`,
+    usa `DropdownFormController`/`GenericListController` do núcleo. Os
+    direitos checados são os `can*()` estáticos da classe.
+31. **Relação declarada para tabela sem classe gera aviso.**
+    `DbUtils::getDbRelations()` emite `E_USER_WARNING` se a tabela de origem
+    ou de destino de `plugin_<x>_getDatabaseRelations` não corresponder a um
+    itemtype. Declarar relação só junto com a classe da tabela.
 
 ---
 
@@ -431,7 +462,10 @@ codexplus/
 │   ├── Dashboard.php          indicadores do painel
 │   ├── Branding.php           configuração de marca (4a), cabeçalho (4f)
 │   ├── Rights.php             bits da matriz de direitos (R1)
-│   └── ProfileTab.php         aba Codex+ em Perfis (R1)
+│   ├── ProfileTab.php         aba Codex+ em Perfis (R1)
+│   ├── StructureRights.php    direitos de setores e categorias (R2)
+│   ├── Sector.php             setor, lista simples (R2)
+│   └── Category.php           categoria em árvore com setor herdado (R2)
 ├── front/                     controllers (rodam em escopo de função!)
 ├── templates/                 Twig
 ├── public/                    CSS e JS (única pasta servida como estático)

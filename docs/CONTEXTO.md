@@ -2,7 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.7-alpha` · atualizado em 21/09/2026 (motor de diagrama em
+> Estado: `v0.6.8-alpha` · atualizado em 21/09/2026 (R6-a: revisão de
+> documento publicado). Antes: (motor de diagrama em
 > grafo: posição livre, arraste próprio, ligações com chefia, salvamento
 > automático, PDF igual à tela e dobras à mão — seção 3.4; commits `bd41b7a`
 > a `9ae6110` e o do bloco 2d-2).
@@ -390,6 +391,40 @@ Decisões de Claudio, 21/09/2026, sobre as da R3c:
   sem o bit Validar, 21/09/2026).
 - Documento que estava em `validacao` antes da R3d fica na 2ª etapa, sem
   auditor: só o Super-Admin valida (ou devolve, para escolher o auditor).
+
+#### Revisão de documento publicado (R6-a, `v0.6.8-alpha`, 21/09/2026)
+
+Decisões de Claudio, 21/09/2026.
+
+- **Versões guardadas.** Cada publicação grava título, corpo e **diagrama**
+  (coluna nova `diagram`) em `glpi_plugin_codexplus_documentversions`, uma
+  linha por revisão (`DocumentVersion::snapshot`, chamado em `approve()`).
+  Documento publicado antes da R6 ganha a cópia ao abrir a primeira revisão
+  (dado não vai no Install). `DocumentVersion` não é CommonDBTM (permissão é
+  a do documento) nem entra em getDatabaseRelations (achado 38).
+- **Abrir revisão** (`openRevision`): gestor do setor a qualquer momento, ou
+  o **revisor dentro da janela** (com Atualizar). A revisão sobe (:00 → :01)
+  e o documento volta a rascunho **com o conteúdo atual**. O revisor passa a
+  editar a revisão, junto com os editores.
+- **Leitores durante a revisão** veem a **versão publicada anterior** — tela
+  e PDF — com o aviso "Em atualização" (só na tela). `isInRevision()` =
+  revisão > 0 fora de publicado/obsoleto; `canViewItem` e a SQL aceitam esse
+  estado para os alvos. Quem tem papel vê a revisão em andamento e abre a
+  publicada por `?version=N` (só leitura, sem fluxo nem Permissões).
+- **Envio de uma revisão exige o resumo** do que mudou (`revision_summary`),
+  escrito por quem envia; vai para a versão ao publicar. Publicar uma revisão
+  é publicação nova: data de hoje e janela recalculada.
+- **Cancelar revisão** (gestor): descarta a revisão e restaura título, corpo
+  e diagrama da versão anterior, como publicado.
+- **Revisado sem alteração** (`confirmNoChange`, gestor ou revisor na
+  janela): vale na hora, **sem auditor**; renova a janela a partir de hoje
+  pela regra do tipo, sem subir a revisão. Tipo sem validade (proposta):
+  janela à mão.
+- **Painel:** revisão em andamento conta como publicado (é o que está no ar),
+  com a etiqueta "em atualização" e o código da versão em vigor; entra em
+  "Em revisão".
+- **R6-b (depois):** prazo da revisão aberta, "Revisão atrasada",
+  prorrogação motivada, histórico de revisões no fim do PDF.
 
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).

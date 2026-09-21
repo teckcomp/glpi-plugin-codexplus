@@ -284,6 +284,14 @@ class Dashboard
         ]) as $r) {
             $id      = (int) $r['id'];
             $status  = (string) $r['status'];
+            // R6-a: revisão de publicado em andamento conta como publicado (é
+            // o que está no ar), marcada "em atualização", com o código da
+            // versão em vigor.
+            $emRevisao = (int) $r['revision'] > 0
+                && in_array($status, [Document::STATUS_DRAFT, Document::STATUS_APPROVAL, Document::STATUS_VALIDATION], true);
+            if ($emRevisao) {
+                $status = Document::STATUS_PUBLISHED;
+            }
             $expiry  = self::expiry($r['date_published'] ?? null, (int) $r['validity_months'], $status, $r['review_end'] ?? null);
             $ownerId = (int) $r['users_id_owner'];
             if ($ownerId > 0) {
@@ -297,7 +305,8 @@ class Dashboard
                 'date_mod_ts'  => $r['date_mod'] ? (strtotime($r['date_mod']) ?: 0) : 0,
                 'doctype'      => (string) $r['doctype'],
                 'status'       => $status,
-                'code'         => sprintf('%s%04d:%02d', $r['doctype'], (int) $r['sequence'], (int) $r['revision']),
+                'code'         => sprintf('%s%04d:%02d', $r['doctype'], (int) $r['sequence'], (int) $r['revision'] - ($emRevisao ? 1 : 0)),
+                'in_revision'  => $emRevisao,
                 'client_name'  => (string) ($r['client_name'] ?? ''),
                 'category'     => '',
                 'has_category' => false,
@@ -390,8 +399,9 @@ class Dashboard
                 $c['publicados']++;
             }
 
-            // R3d: as duas etapas (aguardando gestor e aguardando auditor).
-            if ($d['status'] === 'validacao' || $d['status'] === 'aprovacao') {
+            // R3d: as duas etapas (aguardando gestor e aguardando auditor);
+            // R6-a: e as revisões de publicado em andamento.
+            if ($d['status'] === 'validacao' || $d['status'] === 'aprovacao' || !empty($d['in_revision'])) {
                 $c['emrevisao']++;
             }
 

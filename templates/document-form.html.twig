@@ -19,8 +19,35 @@
         {% endif %}
     </div>
 
+    {# ---------------- Revisão de publicado (R6-a) ---------------- #}
+    {% if version.on %}
+        <div class="cx-notice cx-notice--warn">
+            <i class="ti ti-refresh-alert"></i>
+            <div>
+                {% if version.reader %}
+                    <strong>{{ __('Em atualização', 'codexplus') }}</strong> —
+                    {{ __('este documento está sendo revisado. Esta é a versão publicada em vigor, %s, válida até a nova ser validada.', 'codexplus')|format(version.code) }}
+                {% else %}
+                    <strong>{{ __('Versão publicada %s', 'codexplus')|format(version.code) }}</strong> —
+                    {{ __('é o que os leitores veem enquanto a revisão não é validada.', 'codexplus') }}
+                    <a href="{{ version.link }}">{{ __('Voltar para a revisão em andamento', 'codexplus') }}</a>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+    {% if revinfo.on %}
+        <div class="cx-notice">
+            <i class="ti ti-refresh"></i>
+            <div>
+                <strong>{{ __('Revisão %s em andamento.', 'codexplus')|format(code) }}</strong>
+                {{ __('Os leitores continuam vendo a versão publicada %s até esta ser validada.', 'codexplus')|format(revinfo.prev_code) }}
+                <a href="{{ revinfo.link }}">{{ __('Ver a versão publicada', 'codexplus') }}</a>
+            </div>
+        </div>
+    {% endif %}
+
     {# ---------------- Avisos do fluxo ---------------- #}
-    {% if not is_new and status == 'rascunho' and validation_comment %}
+    {% if not is_new and not version.on and status == 'rascunho' and validation_comment %}
         <div class="cx-notice cx-notice--warn">
             <i class="ti ti-arrow-back-up"></i>
             <div>
@@ -37,13 +64,13 @@
             <div>{{ __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo.', 'codexplus') }}</div>
         </div>
     {% endif %}
-    {% if missing_right %}
+    {% if missing_right and not version.on %}
         <div class="cx-notice cx-notice--warn">
             <i class="ti ti-lock"></i>
             <div>{{ missing_right }}</div>
         </div>
     {% endif %}
-    {% if pending.label %}
+    {% if pending.label and not version.on %}
         {# R3d: quem responde pela etapa em que o documento está. #}
         <div class="cx-notice">
             <i class="ti ti-hourglass"></i>
@@ -215,7 +242,7 @@
                         {% if review.start and review.end %}{{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% else %}—{% endif %}</span>
                 {% endif %}
             </div>
-            {% if review.show and review.can_review %}
+            {% if review.show and review.can_review and not version.on %}
                 {# R3d: fora de rascunho, quem gere o documento ainda muda
                    revisor e janela (o auditor, não: só em rascunho). #}
                 <form method="post" action="{{ self }}" class="cx-review-form">
@@ -230,7 +257,7 @@
                 </form>
             {% endif %}
             </div>
-            {% if perm.show %}
+            {% if perm.show and not version.on %}
                 {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
             {% endif %}
             </div>
@@ -245,7 +272,8 @@
     {% endif %}
 
     {# ================= FLUXO ================= #}
-    {% if not is_new and (can_submit or can_approve or can_validate or can_reject or can_obsolete) %}
+    {% if not is_new and not version.on and (can_submit or can_approve or can_validate or can_reject or can_obsolete
+        or can_open_revision or can_confirm_nochange or can_cancel_revision) %}
         <section class="cx-flow">
             <h3 class="cx-card-title">{{ __('Fluxo do documento', 'codexplus') }}</h3>
 
@@ -253,10 +281,51 @@
                 <form method="post" action="{{ self }}" class="cx-flow-row">
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
+                    {% if revision_no > 0 %}
+                        {# R6-a: numa revisão, o resumo do que mudou é obrigatório. #}
+                        <textarea name="revision_summary" rows="2" class="form-control cx-flow-summary" required
+                                  placeholder="{{ __('Resumo do que mudou nesta revisão (obrigatório)', 'codexplus') }}"></textarea>
+                    {% endif %}
                     <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}
                     </button>
                     <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Vai primeiro ao gestor do setor e depois ao auditor responsável; nesse meio-tempo o documento fica travado.', 'codexplus') }}</span>
+                </form>
+            {% endif %}
+
+            {% if can_open_revision %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="open_revision" value="1" class="codexplus-btn codexplus-btn-primary"
+                            onclick="return confirm('{{ __('Abrir a revisão seguinte? O documento volta a rascunho; os leitores continuam vendo a versão publicada até a nova ser validada.', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-pencil-plus"></i> {{ __('Abrir revisão', 'codexplus') }}
+                    </button>
+                    <span class="codexplus-form-hint">{{ __('Cria a próxima revisão para editar. A publicada segue no ar até a nova passar pelo gestor e pelo auditor.', 'codexplus') }}</span>
+                </form>
+            {% endif %}
+
+            {% if can_confirm_nochange %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="confirm_nochange" value="1" class="codexplus-btn"
+                            onclick="return confirm('{{ __('Confirmar que o documento foi revisado e continua correto? A janela de revisão será renovada a partir de hoje.', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-rosette-discount-check"></i> {{ __('Revisado sem alteração', 'codexplus') }}
+                    </button>
+                    <span class="codexplus-form-hint">{{ __('Renova a janela sem criar nova revisão e sem passar pelo auditor.', 'codexplus') }}</span>
+                </form>
+            {% endif %}
+
+            {% if can_cancel_revision %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="cancel_revision" value="1" class="codexplus-btn cx-btn-danger-outline"
+                            onclick="return confirm('{{ __('Cancelar esta revisão? Tudo o que mudou nela será descartado e o documento volta à versão publicada.', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-arrow-back"></i> {{ __('Cancelar revisão', 'codexplus') }}
+                    </button>
+                    <span class="codexplus-form-hint">{{ __('Descarta a revisão em andamento.', 'codexplus') }}</span>
                 </form>
             {% endif %}
 

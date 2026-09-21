@@ -276,9 +276,54 @@ class Document extends CommonDBTM
         if (self::hasViewAll() || $this->hasRole()) {
             return true;
         }
-        return in_array($this->status(), self::READER_STATUSES, true)
+        // R6-a: durante a revisão o leitor continua lendo — a versão
+        // publicada anterior (a página troca o conteúdo; ver isInRevision()).
+        return (in_array($this->status(), self::READER_STATUSES, true) || $this->isInRevision())
             && self::bit(Rights::READ)
             && $this->haveVisibilityAccess();
+    }
+
+    /**
+     * Revisão de publicado em andamento (R6-a): revisão > 0 e fora de
+     * publicado/obsoleto. A revisão só sobe por openRevision(), a partir de
+     * um publicado, então existe a versão anterior guardada.
+     */
+    public function isInRevision(): bool
+    {
+        return (int) ($this->fields['revision'] ?? 0) > 0
+            && in_array($this->status(), [self::STATUS_DRAFT, self::STATUS_APPROVAL, self::STATUS_VALIDATION], true);
+    }
+
+    /** O revisor está dentro da janela de revisão (as duas datas, hoje entre elas)? */
+    private function reviewerInWindow(): bool
+    {
+        $ini = (string) ($this->fields['review_start'] ?? '');
+        $fim = (string) ($this->fields['review_end'] ?? '');
+        if (!$this->isReviewer() || $ini === '' || $fim === '') {
+            return false;
+        }
+        $hoje = substr((string) ($_SESSION['glpi_currenttime'] ?? date('Y-m-d')), 0, 10);
+        return $hoje >= substr($ini, 0, 10) && $hoje <= substr($fim, 0, 10);
+    }
+
+    /** Abrir revisão: publicado + (gestor, ou revisor dentro da janela, com Atualizar). */
+    public function canOpenRevision(): bool
+    {
+        return $this->status() === self::STATUS_PUBLISHED
+            && $this->checkEntity()
+            && ($this->canManage() || (self::canUpdate() && $this->reviewerInWindow()));
+    }
+
+    /** "Revisado sem alteração": as mesmas pessoas de abrir revisão. */
+    public function canConfirmNoChange(): bool
+    {
+        return $this->canOpenRevision();
+    }
+
+    /** Cancelar revisão: só quem gere o documento, com a revisão em andamento. */
+    public function canCancelRevision(): bool
+    {
+        return $this->isInRevision() && $this->canManage();
     }
 
     /**
@@ -322,7 +367,9 @@ class Document extends CommonDBTM
     {
         return $this->checkEntity()
             && $this->status() === self::STATUS_DRAFT
-            && (self::hasViewAll() || $this->isEditor() || $this->isManager());
+            && (self::hasViewAll() || $this->isEditor() || $this->isManager()
+                // R6-a: o revisor edita a revisão em andamento.
+                || ($this->isReviewer() && (int) ($this->fields['revision'] ?? 0) > 0));
     }
 
     /**
@@ -558,7 +605,15 @@ class Document extends CommonDBTM
             'OR' => [$tp . '.no_entity_restriction' => 1]
                 + getEntitiesRestrictCriteria($tp, '', '', true, true),
         ];
-        $ors[] = ['AND' => [$targets, [$doc . '.status' => self::READER_STATUSES]]];
+        // R6-a: também durante a revisão (revisão > 0 fora de publicado), com
+        // a versão anterior na tela — espelho de isInRevision().
+        $ors[] = ['AND' => [$targets, ['OR' => [
+            [$doc . '.status' => self::READER_STATUSES],
+            [
+                $doc . '.revision' => ['>', 0],
+                $doc . '.status'   => [self::STATUS_DRAFT, self::STATUS_APPROVAL, self::STATUS_VALIDATION],
+            ],
+        ]]]];
 
         $where[] = ['OR' => $ors];
         return ['LEFT JOIN' => $join, 'WHERE' => $where];
@@ -568,8 +623,11 @@ class Document extends CommonDBTM
     // Fluxo: enviar, validar, devolver, obsoleto
     // ---------------------------------------------------------------------
 
-    /** Envia para validação. Exige categoria com setor (senão ninguém valida). */
-    public function submit(): bool
+    /**
+     * Envia para validação. Exige categoria com setor (senão ninguém valida).
+     * Numa revisão (R6-a), exige também o resumo do que mudou.
+     */
+    public function submit(string $summary = ''): bool
     {
         if (!$this->canSubmit()) {
             return $this->deny(__('Sem direito de enviar este documento para validação.', 'codexplus'));
@@ -591,7 +649,15 @@ class Document extends CommonDBTM
                 return $this->deny(__('O auditor escolhido não é mais auditor do setor. Escolha outro.', 'codexplus'));
             }
         }
-        return $this->transition([
+        $extra = [];
+        if ((int) $this->fields['revision'] > 0) {
+            $summary = trim($summary);
+            if ($summary === '') {
+                return $this->deny(__('Numa revisão, informe o resumo do que mudou antes de enviar.', 'codexplus'));
+            }
+            $extra['revision_summary'] = $summary;
+        }
+        return $this->transition($extra + [
             'status'             => self::STATUS_APPROVAL,
             'users_id_submitter' => (int) Session::getLoginUserID(),
             'date_submitted'     => $_SESSION['glpi_currenttime'],
@@ -638,7 +704,13 @@ class Document extends CommonDBTM
             'date_validated'     => $_SESSION['glpi_currenttime'],
             'validation_comment' => null,
         ], $this->fields['date_published'] ?? null);
-        if (empty($this->fields['review_start']) && empty($this->fields['review_end'])) {
+        // R6-a: publicar uma revisão é uma publicação nova — data de hoje e
+        // janela recalculada a partir dela.
+        $revisao = (int) $this->fields['revision'] > 0;
+        if ($revisao) {
+            $data['date_published'] = $_SESSION['glpi_currenttime'];
+        }
+        if ($revisao || (empty($this->fields['review_start']) && empty($this->fields['review_end']))) {
             $win = self::defaultWindow(
                 (string) ($data['date_published'] ?? $this->fields['date_published'] ?? $_SESSION['glpi_currenttime']),
                 (int) ($this->fields['validity_months'] ?? 0)
@@ -648,7 +720,86 @@ class Document extends CommonDBTM
                 $data['review_end']   = $win[1];
             }
         }
-        return $this->transition($data);
+        if (!$this->transition($data)) {
+            return false;
+        }
+        DocumentVersion::snapshot($this);
+        return true;
+    }
+
+    /**
+     * Abre a revisão seguinte (R6-a): a revisão sobe (:00 -> :01) e o
+     * documento volta a rascunho COM o conteúdo atual. A versão em vigor fica
+     * guardada (e é a que os leitores continuam vendo).
+     */
+    public function openRevision(): bool
+    {
+        if (!$this->canOpenRevision()) {
+            return $this->deny(__('Sem direito de abrir revisão (é preciso ser gestor do setor, ou o revisor dentro da janela).', 'codexplus'));
+        }
+        // Documento publicado antes da R6 ainda não tem a cópia: faz agora.
+        if (DocumentVersion::get((int) $this->fields['id'], (int) $this->fields['revision']) === null) {
+            DocumentVersion::snapshot($this);
+        }
+        return $this->transition([
+            'revision'           => (int) $this->fields['revision'] + 1,
+            'status'             => self::STATUS_DRAFT,
+            'users_id_submitter' => 0,
+            'date_submitted'     => null,
+            'users_id_approver'  => 0,
+            'date_approved'      => null,
+            'validation_comment' => null,
+            'revision_summary'   => null,
+        ]);
+    }
+
+    /**
+     * Cancela a revisão (R6-a, gestor): descarta o que mudou e devolve o
+     * documento à versão publicada anterior, como publicado.
+     */
+    public function cancelRevision(): bool
+    {
+        if (!$this->canCancelRevision()) {
+            return $this->deny(__('Sem direito de cancelar esta revisão.', 'codexplus'));
+        }
+        $anterior = (int) $this->fields['revision'] - 1;
+        $v = DocumentVersion::get((int) $this->fields['id'], $anterior);
+        if ($v === null) {
+            return $this->deny(__('A versão publicada anterior não foi encontrada; a revisão não pode ser cancelada.', 'codexplus'));
+        }
+        $ok = $this->transition([
+            'revision'           => $anterior,
+            'status'             => self::STATUS_PUBLISHED,
+            'name'               => (string) $v['name'],
+            'content'            => (string) $v['content'],
+            'users_id_submitter' => 0,
+            'date_submitted'     => null,
+            'users_id_approver'  => 0,
+            'date_approved'      => null,
+            'validation_comment' => null,
+            'revision_summary'   => null,
+        ]);
+        if ($ok && ($d = DocumentVersion::diagramOf($v)) !== null) {
+            Diagram::save((int) $this->fields['id'], $d);
+        }
+        return $ok;
+    }
+
+    /**
+     * "Revisado sem alteração" (R6-a): vale na hora, sem auditor — não há
+     * conteúdo novo. Renova a janela a partir de hoje pela regra do tipo; a
+     * revisão não sobe. Fica no Histórico (janela nova, quem, quando).
+     */
+    public function confirmNoChange(): bool
+    {
+        if (!$this->canConfirmNoChange()) {
+            return $this->deny(__('Sem direito de confirmar a revisão deste documento.', 'codexplus'));
+        }
+        $win = self::defaultWindow((string) $_SESSION['glpi_currenttime'], (int) ($this->fields['validity_months'] ?? 0));
+        if ($win === null) {
+            return $this->deny(__('Este tipo não tem validade padrão: defina a nova janela de revisão à mão.', 'codexplus'));
+        }
+        return $this->transition(['review_start' => $win[0], 'review_end' => $win[1]]);
     }
 
     /**
@@ -855,8 +1006,11 @@ class Document extends CommonDBTM
     {
         // Tipo e sequencial formam o código: não mudam depois de criado.
         // Revisão sobe só na R6 (revisão de documento publicado).
-        unset($input['doctype'], $input['sequence'], $input['knowbaseitems_id'],
-            $input['users_id'], $input['revision']);
+        unset($input['doctype'], $input['sequence'], $input['knowbaseitems_id'], $input['users_id']);
+        // Revisão e resumo da revisão só mudam pelo fluxo (R6-a).
+        if (!$this->inTransition) {
+            unset($input['revision'], $input['revision_summary']);
+        }
 
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
 
@@ -916,6 +1070,7 @@ class Document extends CommonDBTM
         ]);
         DocumentContributor::purgeDocument((int) $this->fields['id']);
         Diagram::purgeDocument((int) $this->fields['id']);
+        DocumentVersion::purgeDocument((int) $this->fields['id']);
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */
@@ -1100,6 +1255,7 @@ class Document extends CommonDBTM
             ['20', 'date_approved', __('Aprovado em', 'codexplus'), 'datetime'],
             ['22', 'review_start', __('Revisão: início', 'codexplus'), 'date'],
             ['23', 'review_end', __('Revisão: fim', 'codexplus'), 'date'],
+            ['24', 'revision_summary', __('Resumo da revisão', 'codexplus'), 'text'],
         ] as [$sid, $campo, $rotulo, $tipo]) {
             $tab[] = [
                 'id'            => $sid,

@@ -32,6 +32,7 @@ use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\DocumentMeta;
+use GlpiPlugin\Codexplus\DocumentVersion;
 use GlpiPlugin\Codexplus\Rights;
 use GlpiPlugin\Codexplus\SectorMember;
 use GlpiPlugin\Codexplus\Wiki;
@@ -215,7 +216,7 @@ if ($id > 0 && isset($_POST['update_review'])) {
 if ($id > 0) {
     $flow = null;
     if (isset($_POST['submit_validation'])) {
-        $flow = static fn () => $doc->submit();
+        $flow = static fn () => $doc->submit((string) ($_POST['revision_summary'] ?? ''));
         $okMsg = __('Enviado: aguardando a aprovação do gestor do setor.', 'codexplus');
     } elseif (isset($_POST['manager_approve'])) {
         $flow = static fn () => $doc->managerApprove();
@@ -229,6 +230,16 @@ if ($id > 0) {
     } elseif (isset($_POST['obsolete'])) {
         $flow = static fn () => $doc->markObsolete();
         $okMsg = __('Documento marcado como obsoleto.', 'codexplus');
+    } elseif (isset($_POST['open_revision'])) {
+        // R6-a
+        $flow = static fn () => $doc->openRevision();
+        $okMsg = __('Revisão aberta: o documento voltou a rascunho. Os leitores continuam vendo a versão publicada.', 'codexplus');
+    } elseif (isset($_POST['cancel_revision'])) {
+        $flow = static fn () => $doc->cancelRevision();
+        $okMsg = __('Revisão cancelada: o documento voltou à versão publicada.', 'codexplus');
+    } elseif (isset($_POST['confirm_nochange'])) {
+        $flow = static fn () => $doc->confirmNoChange();
+        $okMsg = __('Revisado sem alteração: a janela de revisão foi renovada.', 'codexplus');
     }
     if ($flow !== null) {
         if ($flow()) {
@@ -258,6 +269,40 @@ if ($isDiagram) {
         $diagram['data'],
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
     );
+}
+
+// R6-a: durante a revisão, quem só lê vê a VERSÃO PUBLICADA anterior (tela
+// e PDF), com o aviso "Em atualização". Quem tem papel vê a revisão em
+// andamento e pode abrir a publicada por ?version=N.
+$fmtCode = static fn (string $t, int $seq, int $rev) => sprintf('%s%04d:%02d', $t, $seq, $rev);
+$inRevision = !$isNew && $doc->isInRevision();
+$version = ['on' => false, 'reader' => false, 'rev' => -1, 'code' => '', 'link' => '', 'validator' => '', 'date' => ''];
+$revinfo = ['on' => false, 'prev_code' => '', 'link' => ''];
+$shown   = [];
+if ($inRevision) {
+    $prevRev  = (int) $doc->fields['revision'] - 1;
+    $prevCode = $fmtCode((string) $doc->fields['doctype'], (int) $doc->fields['sequence'], $prevRev);
+    $plain    = !$doc->hasRole() && !Session::haveRight(Rights::NAME, Rights::VIEWALL);
+    $want     = isset($_GET['version']) && (int) $_GET['version'] === $prevRev;
+    $vRow     = ($plain || $want) ? DocumentVersion::get($id, $prevRev) : null;
+    if ($vRow !== null) {
+        $version = [
+            'on'        => true,
+            'reader'    => $plain,
+            'rev'       => $prevRev,
+            'code'      => $prevCode,
+            'link'      => $self . '?id=' . $id,
+            'validator' => (int) $vRow['users_id'] > 0 ? getUserName((int) $vRow['users_id']) : '',
+            'date'      => (string) ($vRow['date_published'] ?? ''),
+        ];
+        $canEdit = false;
+        $shown = ['name' => (string) $vRow['name'], 'content' => (string) $vRow['content']];
+        if ($isDiagram && ($d = DocumentVersion::diagramOf($vRow)) !== null) {
+            $diagramJson = json_encode($d, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+        }
+    } elseif (!$plain) {
+        $revinfo = ['on' => true, 'prev_code' => $prevCode, 'link' => $self . '?id=' . $id . '&version=' . $prevRev];
+    }
 }
 
 Html::header(Wiki::getMenuName(), $_SERVER['PHP_SELF'], 'tools', Wiki::class);
@@ -460,22 +505,23 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'id'          => $id,
     'can_edit'    => $canEdit,
     'can_manage'  => $canManage,
-    'code'        => $isNew ? '' : $doc->getCode(),
+    'code'        => $isNew ? '' : ($version['on'] ? $version['code'] : $doc->getCode()),
     'doctype'     => $isNew ? '' : (string) $doc->fields['doctype'],
     'doctype_label' => $isNew ? '' : (DocumentMeta::getDoctypes()[$doc->fields['doctype']] ?? $doc->fields['doctype']),
-    'status'      => $status,
-    'status_label' => Document::getStatuses()[$status] ?? $status,
-    'name'        => $isNew ? '' : (string) $doc->fields['name'],
+    'status'      => $version['on'] ? Document::STATUS_PUBLISHED : $status,
+    'status_label' => $version['on'] ? Document::getStatuses()[Document::STATUS_PUBLISHED] : (Document::getStatuses()[$status] ?? $status),
+    'name'        => $isNew ? '' : ($shown['name'] ?? (string) $doc->fields['name']),
     'client_name' => $isNew ? '' : (string) ($doc->fields['client_name'] ?? ''),
-    'content_html' => $isNew ? '' : RichText::getEnhancedHtml((string) ($doc->fields['content'] ?? '')),
+    'content_html' => $isNew ? '' : RichText::getEnhancedHtml($shown['content'] ?? (string) ($doc->fields['content'] ?? '')),
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
     'category_names' => $categoryNames,
     'sector_names'   => $sectorNames,
     'editors'        => $editors,
     'validation_comment' => $isNew ? '' : (string) ($doc->fields['validation_comment'] ?? ''),
-    'validator_name'     => $isNew || (int) ($doc->fields['users_id_validator'] ?? 0) <= 0 ? '' : getUserName((int) $doc->fields['users_id_validator']),
-    'date_validated'     => $isNew ? '' : (string) ($doc->fields['date_validated'] ?? ''),
+    'validator_name'     => $version['on'] ? $version['validator']
+        : ($isNew || (int) ($doc->fields['users_id_validator'] ?? 0) <= 0 ? '' : getUserName((int) $doc->fields['users_id_validator'])),
+    'date_validated'     => $version['on'] ? $version['date'] : ($isNew ? '' : (string) ($doc->fields['date_validated'] ?? '')),
     'widgets'     => $widgets,
     'perm'        => $perm,
     'review'      => $review,
@@ -493,6 +539,14 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         && $doc->isContributor()
         && !Session::haveRight(Rights::NAME, Rights::VIEWALL),
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
+    // R6-a
+    'version'      => $version,
+    'revinfo'      => $revinfo,
+    'in_revision'  => $inRevision,
+    'revision_no'  => $isNew ? 0 : (int) $doc->fields['revision'],
+    'can_open_revision'    => !$isNew && $doc->canOpenRevision(),
+    'can_confirm_nochange' => !$isNew && $doc->canConfirmNoChange(),
+    'can_cancel_revision'  => !$isNew && $doc->canCancelRevision(),
     'csrf_token'   => Session::getNewCSRFToken(),
 ]);
 

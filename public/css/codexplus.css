@@ -1358,6 +1358,10 @@
 .cx-pending-block { display: block; color: var(--cx-warn); }
 .cx-review-form { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--cx-border); }
 .cx-review-form .codexplus-btn { margin-top: 10px; }
+/* Revisão de publicado (R6-a). */
+.cx-flow-row { flex-wrap: wrap; }
+.cx-flow-summary { flex: 1 1 100%; margin-bottom: 6px; }
+.cx-btn-danger-outline { color: var(--cx-danger); border-color: var(--cx-danger); }
 
 .cx-notice {
     display: flex; gap: 10px; align-items: flex-start;

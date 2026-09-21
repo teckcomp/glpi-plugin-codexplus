@@ -39,7 +39,8 @@ class DocumentSetCommand extends AbstractCommand
         $this->addOption('reviewer', null, InputOption::VALUE_REQUIRED, 'Login do revisor (R3d; vazio tira)');
         $this->addOption('review-start', null, InputOption::VALUE_REQUIRED, 'Início da janela de revisão, AAAA-MM-DD (vazio tira)');
         $this->addOption('review-end', null, InputOption::VALUE_REQUIRED, 'Fim da janela de revisão, AAAA-MM-DD (vazio tira)');
-        $this->addOption('action', null, InputOption::VALUE_REQUIRED, 'enviar, aprovar (gestor), validar (auditor), devolver ou obsoleto');
+        $this->addOption('action', null, InputOption::VALUE_REQUIRED, 'enviar, aprovar (gestor), validar (auditor), devolver, obsoleto; revisão (R6-a): abrir, cancelar, semalteracao');
+        $this->addOption('summary', null, InputOption::VALUE_REQUIRED, 'Resumo do que mudou (obrigatório para enviar uma revisão)');
         $this->addOption('comment', null, InputOption::VALUE_REQUIRED, 'Motivo (obrigatório para devolver)');
     }
 
@@ -114,7 +115,16 @@ class DocumentSetCommand extends AbstractCommand
             $doc->getFromDB($id);
             switch ($action) {
                 case 'enviar':
-                    $ok = $doc->submit();
+                    $ok = $doc->submit((string) ($input->getOption('summary') ?? ''));
+                    break;
+                case 'abrir':
+                    $ok = $doc->openRevision();
+                    break;
+                case 'cancelar':
+                    $ok = $doc->cancelRevision();
+                    break;
+                case 'semalteracao':
+                    $ok = $doc->confirmNoChange();
                     break;
                 case 'aprovar':
                     $ok = $doc->managerApprove();
@@ -129,7 +139,7 @@ class DocumentSetCommand extends AbstractCommand
                     $ok = $doc->markObsolete();
                     break;
                 default:
-                    $output->writeln("<error>Ação desconhecida: $action (use enviar, aprovar, validar, devolver ou obsoleto).</error>");
+                    $output->writeln("<error>Ação desconhecida: $action (use enviar, aprovar, validar, devolver, obsoleto, abrir, cancelar ou semalteracao).</error>");
                     return Command::FAILURE;
             }
             if (!$ok) {

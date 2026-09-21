@@ -298,7 +298,13 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <p class="codexplus-muted">{{ __('Nenhum diagrama ainda. Use "Novo diagrama" para criar o primeiro organograma.', 'codexplus') }}</p>
+                <p class="codexplus-muted">
+                    {% if can_create %}
+                        {{ __('Nenhum diagrama ainda. Use "Novo diagrama" para criar o primeiro organograma.', 'codexplus') }}
+                    {% else %}
+                        {{ __('Nenhum diagrama disponível para você.', 'codexplus') }}
+                    {% endif %}
+                </p>
             {% endif %}
         </section>
 
@@ -336,7 +342,9 @@
                             </td>
                             <td class="cx-cell-when">{{ d.ago }}</td>
                             <td>
-                                {% if d.status == 'aprovacao' %}
+                                {% if d.in_revision|default(false) %}
+                                    <span class="codexplus-status codexplus-status--aprovacao">{{ __('em atualização', 'codexplus') }}</span>
+                                {% elseif d.status == 'aprovacao' %}
                                     <span class="codexplus-status codexplus-status--aprovacao">{{ __('aguarda gestor', 'codexplus') }}</span>
                                 {% elseif d.status == 'validacao' %}
                                     <span class="codexplus-status codexplus-status--validacao">{{ __('aguarda auditor', 'codexplus') }}</span>

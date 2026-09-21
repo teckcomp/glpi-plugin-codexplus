@@ -170,6 +170,9 @@ class Install
         // --- Etapa R3d: validação em duas etapas, revisor e janela ---
         self::installR3d($migration);
 
+        // --- Etapa R6-a: revisão de documento publicado ---
+        self::installR6a($migration);
+
         $migration->executeMigration();
         return true;
     }
@@ -411,6 +414,21 @@ class Install
         $migration->addKey($doc, 'users_id_auditor');
         $migration->addKey($doc, 'users_id_reviewer');
         $migration->addKey($doc, 'review_end');
+    }
+
+    /**
+     * Etapa R6-a (Claudio, 21/09/2026): revisão de documento publicado.
+     *   - versions.diagram: o JSON do diagrama da versão publicada (a tabela
+     *     de versões é da R1 e só guardava título e corpo);
+     *   - documents.revision_summary: resumo do que mudou na revisão em
+     *     andamento, obrigatório no envio; vai para a versão ao publicar.
+     * As cópias das versões já publicadas NÃO são geradas aqui (dado não é
+     * schema): o documento ganha a dele ao abrir a primeira revisão.
+     */
+    private static function installR6a(Migration $migration): void
+    {
+        $migration->addField(self::VERSIONS_TABLE, 'diagram', 'longtext', ['null' => true]);
+        $migration->addField(self::DOCUMENTS_TABLE, 'revision_summary', 'text');
     }
 
     private static function installR3c(Migration $migration): void

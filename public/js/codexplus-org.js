@@ -1519,6 +1519,32 @@
         // ---- PDF: A4 paisagem numa janela própria ---------------------
         // Mesmo caminho do PDF dos documentos (codexplus.js): iframe fora da
         // tela, CSS do plugin carregado nele, espera fontes, depois imprime.
+        //
+        // O desenho do PDF É o desenho da tela (bloco 2d-3a, antecipado por
+        // Claudio para a apresentação de 21/09/2026): clona o canvas já
+        // posicionado, com as ligações em SVG, e tira o que é só de edição.
+        // Antes o PDF montava a lista aninhada a partir de card(T) e imprimia
+        // só o bloco do PRIMEIRO elemento sem chefe — num organograma com
+        // mais de um bloco, o resto sumia sem erro (DIA0001, 3 de 36).
+        function printCanvasHtml() {
+            var canvas = treeEl.querySelector('[data-el="canvas"]');
+            // Reserva: sem canvas desenhado, lista aninhada de TODOS os blocos.
+            if (!canvas) { return '<ul>' + roots().map(card).join('') + '</ul>'; }
+            var c = canvas.cloneNode(true);
+            function each(sel, f) { Array.prototype.forEach.call(c.querySelectorAll(sel), f); }
+            each('.cx-org-port, .cx-org-hit, .cx-org-ghost, [data-el="guides"]', function (el) { el.parentNode.removeChild(el); });
+            each('.is-sel, .is-hit, .is-dim, .is-drop-in, .is-drop-before, .is-drop-after', function (el) {
+                el.classList.remove('is-sel', 'is-hit', 'is-dim', 'is-drop-in', 'is-drop-before', 'is-drop-after');
+            });
+            each('[data-grab], [tabindex]', function (el) { el.removeAttribute('data-grab'); el.removeAttribute('tabindex'); });
+            // Largura de cada caixa fixada pela medida da tela: se a fonte do
+            // iframe atrasar, o cartão não alarga por cima do vizinho.
+            each('.cx-org-box[data-box]', function (el) {
+                var b = geom[el.getAttribute('data-box')];
+                if (b && b.w) { el.style.width = Math.round(b.w) + 'px'; }
+            });
+            return c.outerHTML;
+        }
         function printOrg() {
             var cssLink = document.querySelector('link[href*="codexplus/css/codexplus.css"], link[href*="codexplus.css"]');
             var css = cssLink ? cssLink.href : '';
@@ -1535,7 +1561,7 @@
             d.write(head + '<body class="cx-org-printdoc"><div class="cx-org cx-org--print">' +
                 '<div class="cx-org-printhead"><strong>' + escHtml(title) + '</strong><span>' + escHtml(code) + '</span></div>' +
                 '<div class="cx-org-legend">' + legendHtml() + '</div>' +
-                '<div class="cx-org-stage"><div class="cx-org-tree"><ul>' + card(T) + '</ul></div></div>' +
+                '<div class="cx-org-stage"><div class="cx-org-tree">' + printCanvasHtml() + '</div></div>' +
                 (S.esc.length ? '<section class="cx-org-esc"><h3>Matriz de escalonamento</h3><div class="cx-org-tablewrap"><table><thead><tr><th>Nível</th><th>Papel</th><th>Escala para o próximo nível quando</th><th>Tempo alvo</th></tr></thead><tbody>' +
                     S.esc.map(function (r) { return '<tr style="' + lc(r.lvl) + '">' + r.c.map(function (c) { return '<td>' + escHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
                     '</tbody></table></div></section>' : '') +

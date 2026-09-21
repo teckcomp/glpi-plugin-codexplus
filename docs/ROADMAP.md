@@ -1,8 +1,8 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.7-alpha` · atualizado em 20/09/2026 (R1, R2, R3a, R3c,
-> R3b1, identidade visual, Painel no modelo novo e demonstração de
-> diagramas concluídos; próximo: completar 9a–9c ou a estante).
+> Estado em `v0.6.7-alpha` · atualizado em 21/09/2026 (motor de diagrama em
+> grafo: 2d-1, 2d-2 e o PDF igual à tela (2d-3a) prontos; falta fechar o
+> 2d-3 e subir para `0.6.8-alpha`).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
 > de duas outras ao mesmo tempo.
 
@@ -23,16 +23,10 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
    leitura a partir do **JSON publicado** (o SVG fica para o item 5, desvio
    aprovado por Claudio), zoom e busca, fluxo de validação atual, PDF
    paisagem. Leva junto as validades novas (Manual 6, DIA 3)
-5. **Completar 9a–9c** — desfazer/refazer, salvamento automático, SVG publicado,
-   **ligações extras** (reporte funcional pontilhado entre cartões) e
-   **trocar com o superior pelo arraste** (Claudio, 20/09/2026: natural, sem
-   botão): soltar um cartão na borda de cima de outro faz dele o novo
-   superior; cada um leva a própria equipe e quem estava abaixo continua
-   abaixo. Ex.: Conselho → Nahun → José vira Nahun → Conselho → José. Já
-   entregues na 0.6.7-3: tela cheia, zoom com Ctrl + roda, arrastar o fundo,
-   mover com marca de posição, paleta de componentes e modelos de organograma;
-   na 0.6.7-5: elementos padrão de mercado, níveis editáveis por organograma e
-   "Criar elemento"
+5. **Motor de diagrama em grafo** — ver "Blocos do motor" logo abaixo. A
+   pedido de Claudio (20/09/2026, a partir de cinco protótipos de uso real),
+   o diagrama deixou de ser uma árvore e passou a ser um grafo com posição
+   livre e ligações próprias. Concluído até o 2d-2 e o 2d-3a; falta fechar o 2d-3
 6. **Estante** (parte da R5, pedida por Claudio em 20/09/2026) — tela
    Documentos como prateleira, agrupada por **Setor → Categoria**, no modelo
    novo. **Modelos** no mesmo formato (exige setor e categoria no modelo:
@@ -45,6 +39,32 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 12. **Etapa 7** — alerta de vencimento
 13. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
 14. **Etapa 8** — personalização completa do PDF
+
+### Ordem até produção, acordada com Claudio em 20/09/2026
+
+Vale sobre a lista acima quando houver conflito. Os itens marcados como novos
+foram levantados na conversa: eram pré-requisitos ou esquecimentos.
+
+1. Finalizar organograma (blocos do motor: falta fechar o 2d-3)
+2. Cronograma e matrizes — outros dois subtipos de `DIA`, baratos porque
+   reusam a mesma tabela e o mesmo motor
+3. Permissões (R3b2)
+4. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
+   pré-requisito dos itens 5 e 7 (hoje o documento novo não aceita anexo nem
+   imagem colada: `enable_images => false`, sem `Document_Item`)
+5. Editor de documentos com importação e exportação
+6. Fluxograma (sobre o motor próprio)
+7. Editor de propostas com mini excel e mini editor de desenho
+8. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
+   vazia enquanto os documentos reais seguem na base nativa
+9. Prateleira de Documentos e Modelos, e corte da base nativa (R5)
+10. **Modelos com conteúdo real (3c)** — novo
+11. Revisão (R6)
+12. **Acesso anônimo (R7)** — novo; era requisito original dos diagramas
+    ("visível a toda a instituição de forma fácil e rápida")
+13. **PSG com POPs e PDF composto (Etapa 5)** — novo
+14. Caça a bugs
+15. Produção, com o alerta de vencimento (Etapa 7) logo depois
 
 A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
 "permissões e acesso anônimo".
@@ -129,6 +149,34 @@ leitura (quem, quando, o quê); indicador "Sem setor" no Painel.
 
 ---
 
+## Blocos do motor de diagrama (20/09/2026)
+
+**Decididos por Claudio em 20/09/2026.** Arquitetura em `CONTEXTO.md`, seção 3.4.
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| 1a | Desfazer e refazer no organograma (histórico de estados, Ctrl+Z / Ctrl+Shift+Z) ✅ | `bd41b7a` |
+| 2a | Modelo de grafo: `nodes` + `edges`, conversão do formato antigo, árvore derivada das ligações ✅ | `bd41b7a` |
+| 2b | Desenho posicionado: caixas com coordenadas calculadas e ligações em SVG; a lista aninhada sai da tela ✅ | `d4871b7` |
+| 2c | Posição livre com guias de alinhamento, elemento sem chefe, "Arrumar", arraste próprio, exclusão de qualquer elemento ✅ | `17e651d` |
+| 1b | Salvamento automático do diagrama (`ajax/diagram.save.php`), Salvar em tela cheia sem recarregar ✅ | `17e651d` |
+| 2d-1 | Ligações: criar puxando da borda, chefia ou reporte, rótulo, excluir, troca de chefe e recusa de ciclo ✅ | `f78a0c9` |
+| 2d-3a | PDF imprime o desenho da tela: clona o canvas posicionado, com as ligações em SVG, sem o que é de edição. Antecipado por Claudio para a apresentação de 21/09 (o PDF só imprimia o bloco do primeiro elemento sem chefe — achado 50) ✅ | `9ae6110` |
+| 2d-2 | Cotovelos à mão: alça no meio da linha selecionada; arrastando, nasce a dobra; uma alça por trecho, então quantas dobras forem precisas; encaixe na coluna e na linha do vizinho; duplo clique desfaz uma; "Endireitar" tira todas; "Arrumar" também. Pontos em `waypoints`, validados no PHP ✅ | — |
+| **2d-3** | **Fechamento do organograma:** conferir a página de leitura com um diagrama publicado e o PDF com dobras; subir o `setup.php` para `0.6.8-alpha` (o GLPI pede reinstalação: bloco completo do `DEPLOY.md`) | — |
+
+**Decisões que guiam estes blocos:**
+
+- Modo **híbrido**: o elemento é ancorado (o layout posiciona) ou solto (o
+  usuário posiciona). Nasce ancorado; vira solto ao ser arrastado; "Arrumar"
+  devolve todo mundo ao automático
+- **Um chefe por elemento**, marcado na ligação. É ele que define o time e a
+  posição; as demais ligações são reporte. Ciclo de chefia é recusado
+- O **draw.io sai do roadmap** (ver `CONTEXTO.md`, seção 2): o fluxograma
+  passa a ser uma paleta de formas sobre este mesmo motor
+
+---
+
 ## Etapa 9 — Diagramas institucionais
 
 **Decidida em 09/2026.** Organogramas, fluxogramas e matrizes dentro do
@@ -155,19 +203,14 @@ Codex+, a partir de um protótipo de organograma aprovado (hierarquia em
 - O mesmo componente desenha no editor e na leitura: é a garantia de "sem perda"
 - Cores de nível viram tokens `--cx-`
 
-**Fluxograma com draw.io** (Apache 2.0), hospedado em `public/`, modo
-embutido, offline, sem chamada externa. Enxugado em três camadas:
+**Fluxograma sobre o motor próprio** (decisão de Claudio, 20/09/2026 — o
+draw.io embutido foi descartado). Com o grafo, a posição livre e as ligações
+à mão já prontos, o fluxograma é: uma paleta de formas (início/fim, processo,
+decisão, documento), o campo `shape` no nó, setas com rótulo e as dobras do
+2d-2. Sem código de terceiro no repositório público.
 
-1. parâmetros de abertura: interface mínima, sem menus de arquivo, nuvem e
-   publicação, em português
-2. configuração enviada pelo Codex+: só a biblioteca de fluxograma mais uma
-   biblioteca própria (início/fim, processo, decisão, documento, raia por
-   nível), estilo padrão de formas e setas, paleta restrita aos tokens, fonte
-3. remoção das bibliotecas de formas não usadas (com teste: há dependências
-   internas)
-
-Nomes exatos de parâmetros e chaves: **conferir no fonte do draw.io** no
-bloco, não supor. Salva XML (editável) e SVG (publicação).
+**Preço aceito:** desenho livre (forma arbitrária, curva à mão, agrupamento)
+não existirá.
 
 | Bloco | Entrega |
 |---|---|
@@ -176,7 +219,7 @@ bloco, não supor. Salva XML (editável) e SVG (publicação).
 | 9c | Editor de organograma: protótipo + desfazer/refazer + salvamento automático do rascunho + publicar |
 | 9d | Vínculo com Usuários e Grupos; "gerar a partir do GLPI" (grupo pai + campo Supervisor) |
 | 9e | Matrizes: escalonamento e RACI |
-| 9f | Fluxograma com draw.io embutido, enxugado e estilizado |
+| 9f | Fluxograma: paleta de formas e setas sobre o motor próprio |
 | 9g | Modelos prontos de diagrama (reaproveita o sistema de modelos da etapa 3) |
 
 **Validar no 9b:** a leitura abre na **interface simplificada** (Self-Service)?
@@ -274,7 +317,13 @@ os critérios abaixo estiverem cumpridos:
 
 **Decididas:**
 
-- [x] Diagramas dentro do Codex+; fluxograma com draw.io enxugado — 09/2026
+- [x] Diagramas dentro do Codex+ — 09/2026
+- [x] **draw.io descartado**; fluxograma sobre o motor próprio — 20/09/2026
+- [x] **Diagrama é grafo, não árvore**: posição livre híbrida, ligações
+      próprias, um chefe por elemento, cotovelos à mão — 20/09/2026
+- [x] **Cronograma** entra como subtipo de `DIA`, com períodos relativos
+      (S1, S2…) em vez de datas; bloco embutido na proposta fica para
+      depois — 20/09/2026
 - [x] Imagem anexa no PDF: só proposta, só imagens marcadas — 19/09/2026
 - [x] Indicador "PSG sem POP vinculado": exibido esmaecido com a etiqueta
       "etapa 5" até a Etapa 5 (solução da 0.5.x)

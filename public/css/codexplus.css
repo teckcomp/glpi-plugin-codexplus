@@ -1533,6 +1533,13 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .cx-org-linking { fill: none; stroke: var(--cx-accent); stroke-width: 2; stroke-dasharray: 5 4; }
 .cx-org-elabel { font-size: 11px; fill: var(--cx-muted); paint-order: stroke; stroke: var(--cx-surface); stroke-width: 3px; }
+/* Dobras à mão (bloco 2d-2): alças só na ligação selecionada. Cheia = dobra
+   que existe (arrastar move, duplo clique desfaz); vazada = meio de trecho,
+   arrastar cria dobra. O SVG não recebe ponteiro; as alças, sim. */
+.cx-org-wp, .cx-org-wpadd { pointer-events: all; cursor: move; touch-action: none; stroke-width: 2; }
+.cx-org-wp { fill: var(--cx-accent); stroke: var(--cx-surface); }
+.cx-org-wpadd { fill: var(--cx-surface); stroke: var(--cx-accent); }
+.cx-org-wp:hover, .cx-org-wpadd:hover { stroke-width: 3; }
 .cx-org-port {
     position: absolute; width: 11px; height: 11px; border-radius: 50%;
     background: var(--cx-accent); border: 2px solid var(--cx-surface);

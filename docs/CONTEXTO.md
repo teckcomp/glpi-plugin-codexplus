@@ -2,8 +2,10 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.7-alpha` · atualizado em 20/09/2026 (identidade visual,
-> Painel no modelo novo e demonstração de diagramas).
+> Estado: `v0.6.7-alpha` · atualizado em 21/09/2026 (motor de diagrama em
+> grafo: posição livre, arraste próprio, ligações com chefia, salvamento
+> automático, PDF igual à tela e dobras à mão — seção 3.4; commits `bd41b7a`
+> a `9ae6110` e o do bloco 2d-2).
 
 ---
 
@@ -64,8 +66,14 @@ desta tabela sem alinhar antes.**
 | PDF via TCPDF (server-side) | Testado e descartado — ver seção 4 |
 | Reskin por CSS sobre telas nativas | Abordagem original, **abandonada** — ver seção 4 |
 
-> **Saiu desta tabela em 09/2026:** draw.io embutido. Entra na Etapa 9,
-> hospedado no próprio plugin, enxugado e estilizado, **só para fluxograma**.
+> **Saiu desta tabela em 09/2026:** draw.io embutido. Entrou na Etapa 9.
+> **Voltou para cá em 20/09/2026 (Claudio):** com o motor de canvas do Codex+
+> (grafo com posição livre e ligações próprias — seção 3.4), o fluxograma
+> passa a ser uma paleta de formas sobre o mesmo motor. Embutir o draw.io
+> traria megabytes de código de terceiro no repositório público, mais o
+> trabalho de enxugar e manter, para entregar o que o motor próprio já faz.
+> **Preço aceito:** desenho livre de verdade (forma arbitrária, curva à mão,
+> agrupamento) não existirá. Há caixa, seta e rótulo.
 
 ---
 
@@ -420,6 +428,83 @@ Pacote enxuto da Etapa 9 (9a–9c) para a apresentação à gestão de 21/09
   a 9a–9c. Sem nomes de pessoas no código (repositório público): o DIA nasce
   só com o topo, e o organograma real entra por "Importar ou exportar".
 
+### 3.4 Motor de diagrama — grafo em canvas (20/09/2026)
+
+> Substitui o desenho em árvore da seção 3.3 a partir dos blocos 2a–2d.
+> **Decidido por Claudio em 20/09/2026**, a partir de cinco protótipos de uso
+> real: inverter posições, arrastar sem perder ligações, criar elemento solto
+> e ligar à mão. Nada disso cabia numa árvore.
+
+**Formato gravado** (`glpi_plugin_codexplus_diagrams.data`):
+
+```
+{ "kind": "organograma",
+  "levels": [ { key, label, color } ],
+  "nodes":  [ { id, name, role, lvl, x, y, note, pend, group, dashed, kind } ],
+  "edges":  [ { id, from, to, boss, style, label, waypoints: [ {x, y} ] } ],
+  "esc":    [ ... ] }
+```
+
+- **`kids` não existe mais.** A hierarquia é lida das ligações. O `kids` que o
+  desenho usa é montado a cada `rebuild()` e retirado na gravação (`ser()`
+  filtra a chave) — nunca vai para o banco.
+- **`x`/`y` ausentes = ancorado:** quem posiciona é o layout. Com as duas
+  coordenadas, o elemento fica onde o usuário largou e **leva a equipe junto**
+  (o deslocamento vale para toda a descendência).
+- **`boss` decide tudo.** Uma ligação de chefia por elemento; ela define o
+  time, a posição no arranjo e a cadeia de hierarquia. As demais são reporte:
+  aparecem no desenho e não mexem em nada. Ciclo de chefia é recusado — o
+  arranjo percorre essa cadeia — e a ligação entra como reporte, com o motivo
+  na tela, em vez de se perder.
+- **Compatibilidade:** `Diagram::validate()` e o `normalize()` do motor aceitam
+  o formato antigo (`tree` com `kids`) e convertem; ligação sem marca de
+  chefia, num diagrama onde **nenhuma** tem, vira chefia. A conversão acontece
+  ao abrir; o formato novo só é gravado no primeiro salvamento.
+
+**Desenho.** A lista aninhada saiu da tela: cada cartão é uma caixa posicionada
+por `layoutTree()` e as ligações são traçadas em SVG, uma `<path>` por ligação
+mais uma trilha invisível de 14 px que é a área de clique. Vira caixa quem tem
+equipe, quem não tem chefe ou quem foi posicionado à mão; os demais são linhas
+dentro do cartão do chefe. O traçado escolhe por onde sair conforme a posição
+relativa (abaixo, acima, ao lado): receita única gerava traço solto no meio.
+Elementos que passam da borda são acomodados por uma **origem de desenho**,
+nunca mexendo na coordenada gravada — senão a posição vista e a gravada
+divergem, e o cartão "anda sozinho" na abertura seguinte.
+
+**Gesto.** O arraste nativo do navegador foi abandonado (achado 45): o gesto é
+próprio, com uma cópia do cartão seguindo o cursor, guias de alinhamento a 8 px
+e grade de 10 px como reserva. Limiar de 4 px separa clique de arraste; Esc
+cancela.
+
+**Salvamento automático** (`ajax/diagram.save.php`): grava só o diagrama, 2,5 s
+depois da última mudança, sem recarregar. Repete as permissões do formulário
+(`can($id, UPDATE)`), nunca reimplementa regra. Existe também para o Salvar da
+tela cheia — recarregar derruba a tela cheia e o navegador não deixa voltar a
+ela sem um clique do usuário.
+
+**Dobras à mão (bloco 2d-2).** `waypoints` fica na ligação, na mesma
+coordenada do `x`/`y` dos nós; sem dobra, a chave não existe e vale o traçado
+automático. A linha passa pelos pontos em ordem, em retas; a ponta sai do lado
+da caixa voltado para a primeira dobra (e chega pelo lado voltado para a
+última), e ponto dentro do vão da caixa puxa a ponta para a mesma coluna — é o
+que deixa a descida reta. Alças só na ligação selecionada: vazada no meio de
+cada trecho (arrastar cria a dobra ali), cheia em cada dobra (arrastar move,
+duplo clique desfaz). A dobra gruda na coluna ou na linha do vizinho (dobra
+anterior e seguinte, ou centro da caixa na ponta), senão na grade; é assim que
+se faz ângulo reto sem mira. Esc devolve como estava. "Endireitar" (painel da
+ligação) tira todas; **"Arrumar" também**, porque dobra feita para um arranjo à
+mão não serve ao automático. Durante o arraste só o SVG é redesenhado
+(`drawLinks()`, separado do `layoutTree()`); o canvas alarga para caber dobra
+fora das caixas. `Diagram::validate()` aceita até 20 pontos por ligação, com
+coordenada inteira entre 0 e 20000 (achado 49).
+
+**PDF (bloco 2d-3a).** `printCanvasHtml()` clona o canvas já desenhado — caixas
+posicionadas e ligações em SVG — e tira portas, trilhas de clique, alças,
+guias, seleção e destaque de busca; cada caixa leva a largura medida na tela,
+para uma fonte atrasada no iframe não alargar o cartão por cima do vizinho. O
+que se vê é o que sai, com posições, reportes e dobras. A lista aninhada
+(`card()`) ficou só como reserva, e cobrindo todos os blocos (achado 50).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -654,6 +739,43 @@ depender do comportamento errático de `position: fixed` na impressão.
 
 ---
 
+43. **O token CSRF é consumido a cada POST.** `Session::validateCSRF` (fonte
+    do 11.0.6) faz `unset($_SESSION['glpicsrftokens'][$token])` ao validar.
+    Endpoint chamado mais de uma vez pela mesma página precisa devolver
+    `Session::getNewCSRFToken(true)` e o JS trocar o valor em **todos** os
+    `[name="_glpi_csrf_token"]` — os formulários de fluxo compartilham o mesmo
+    token, e sem isso "Enviar para validação" quebra depois de um autosave.
+44. **Elemento que aparece durante o arraste e está no fluxo desloca o mapa.**
+    A faixa "fulano tem N subordinados" empurrava o canvas ~40 px para baixo
+    no instante em que o gesto começava, e o ponto de soltura era medido
+    depois disso: o cartão caía deslocado da guia. Aviso que aparece durante
+    gesto tem que ser `position: absolute` e `pointer-events: none`.
+45. **Arraste nativo (HTML5 drag and drop) não serve para canvas.** Ele
+    desenha um fantasma próprio, o elemento real não acompanha o cursor, e
+    qualquer mudança de layout no meio do gesto estraga a conta do ponto de
+    soltura. Três rodadas de teste até trocar por `pointerdown`/`pointermove`/
+    `pointerup`. Com gesto próprio, `document.elementFromPoint` acha o alvo —
+    a cópia que segue o cursor precisa de `pointer-events: none`.
+46. **Sem `user-select: none`, pressionar sobre o texto do cartão inicia
+    seleção de texto**, e o arraste só pega na borda. Era o "preciso clicar
+    muitas vezes para pegar o cartão".
+47. **Redesenhar a árvore ao selecionar mata o gesto em curso:** o elemento
+    sob o cursor é trocado por outro. `select()` só acende a classe no
+    elemento que já está lá.
+48. **`var` içado engana:** `rebuild()` chamado no mount antes da linha
+    `var byId = {}, parentOf = {}, T = null;` funcionava, e logo depois a
+    declaração zerava o que ele tinha montado. Declarar acima da primeira
+    chamada, não junto das funções.
+49. **`Diagram::validate()` descarta toda chave que não conhece.** Campo novo no
+    JSON do motor (como `waypoints` no 2d-2) some no primeiro salvamento se o
+    PHP não for alterado junto — sem erro, o desenho só volta ao que era.
+50. **O PDF do organograma desenhava a partir de `T`** (o primeiro elemento sem
+    chefe), enquanto a tela desenha todos os blocos (`roots()`). Num diagrama
+    ajustado à mão a tela parece uma árvore só, mas a chefia gravada pode ter
+    mais de um bloco (DIA0001: o Tiago sem chefe e chefe do Rhuan) — o PDF saiu
+    com 3 de 36 pessoas. Corrigido no 2d-3a. Regra: nada novo desenha a partir
+    de `T`. O "Arrumar" revela a chefia gravada: vale conferir antes de usar.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -736,10 +858,13 @@ codexplus/
 │   ├── DocumentContributor.php quem alterou cada revisão (R3c)
 │   ├── Diagram.php            diagrama do documento DIA: ler, gravar, validar (0.6.7)
 │   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
+├── ajax/
+│   └── diagram.save.php       grava só o diagrama, sem recarregar (bloco 1b)
 ├── front/                     controllers (rodam em escopo de função!)
 │   └── document.form.php      documento no modelo novo (R3b1)
 ├── templates/                 Twig (parts/brand.html.twig: cabeçalho com a marca, 0.6.5)
 ├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
+│   └── js/codexplus-org.js    motor do diagrama: grafo, canvas, gesto, ligações
 └── docs/                      esta documentação
 ```
 

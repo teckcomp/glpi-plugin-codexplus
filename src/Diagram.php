@@ -16,7 +16,7 @@ namespace GlpiPlugin\Codexplus;
  *   { "kind": "organograma",
  *     "levels": [ { key, label, color } ],
  *     "nodes": [ { id, name, role, lvl, shape, x, y, note, pend, group, dashed } ],
- *     "edges": [ { id, from, to, style, label } ],
+ *     "edges": [ { id, from, to, boss, style, label, waypoints: [ {x, y} ] } ],
  *     "esc":   [ { lvl, c: [nível, papel, quando escala, tempo] } ] }
  * `x`/`y` ausentes = elemento ancorado (quem posiciona é o layout). A primeira
  * ligação que chega a um nó é a hierárquica; as demais são ligações extras.
@@ -41,6 +41,9 @@ class Diagram
 
     /** Teto de coordenada: tela livre grande, mas nunca infinita. */
     public const MAX_COORD = 20000;
+
+    /** Dobras por ligação (bloco 2d-2): passa com folga de qualquer desvio real. */
+    public const MAX_WAYPOINTS = 20;
 
     public static function getTable(): string
     {
@@ -247,7 +250,7 @@ class Diagram
             }
             $pairs[$pair] = true;
             $id = self::key($e['id'] ?? '');
-            $edges[] = [
+            $edge = [
                 'id'    => $id !== '' ? $id : 'e' . (count($edges) + 1),
                 'from'  => $from,
                 'to'    => $to,
@@ -255,6 +258,13 @@ class Diagram
                 'style' => ($e['style'] ?? '') === 'tracejada' ? 'tracejada' : 'solida',
                 'label' => self::text($e['label'] ?? '', 120),
             ];
+            // Dobras feitas à mão (bloco 2d-2). Sem dobra, a chave não existe:
+            // o traçado automático continua valendo.
+            $wps = self::waypoints($e['waypoints'] ?? null);
+            if ($wps) {
+                $edge['waypoints'] = $wps;
+            }
+            $edges[] = $edge;
         }
         $edges = self::normalizeBoss($edges);
         if (self::hasCycle($edges)) {
@@ -409,6 +419,27 @@ class Diagram
             }
         }
         return false;
+    }
+
+    /**
+     * Pontos de dobra de uma ligação, na mesma coordenada do x/y dos nós.
+     * Ponto sem as duas coordenadas numéricas sai em silêncio.
+     *
+     * @param mixed $raw
+     * @return array<int, array{x: int, y: int}>
+     */
+    private static function waypoints($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        foreach (array_slice(array_values($raw), 0, self::MAX_WAYPOINTS) as $p) {
+            if (is_array($p) && isset($p['x'], $p['y']) && is_numeric($p['x']) && is_numeric($p['y'])) {
+                $out[] = ['x' => self::coord($p['x']), 'y' => self::coord($p['y'])];
+            }
+        }
+        return $out;
     }
 
     private static function coord($v): int

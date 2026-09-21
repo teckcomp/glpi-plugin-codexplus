@@ -146,6 +146,8 @@
         // içada, mas a atribuição não — declarar junto das funções abaixo
         // zerava o que o rebuild do mount tinha acabado de montar.
         var byId = {}, parentOf = {}, T = null;
+        // Tamanho do canvas só das caixas; drawLinks() alarga para as dobras.
+        var boxW = 0, boxH = 0;
         try { S = srcEl ? JSON.parse(srcEl.textContent || 'null') : null; } catch (e) { S = null; }
         if (!S || (!S.nodes && !S.tree)) {
             S = { kind: 'organograma', levels: copyLevels(STD_LEVELS), esc: [],
@@ -172,7 +174,7 @@
                 '<output data-el="zlbl">100%</output>' +
                 '<button type="button" class="cx-org-btn" data-act="zin" aria-label="Aumentar zoom">+</button></span>' +
                 '<button type="button" class="cx-org-btn" data-act="fit">Ajustar à tela</button>' +
-                (editable ? '<button type="button" class="cx-org-btn" data-act="tidy" title="Devolve todos os elementos ao arranjo automático"><i class="ti ti-layout-distribute-vertical"></i> Arrumar</button>' : '') +
+                (editable ? '<button type="button" class="cx-org-btn" data-act="tidy" title="Devolve todos os elementos e ligações ao arranjo automático (as dobras feitas à mão saem)"><i class="ti ti-layout-distribute-vertical"></i> Arrumar</button>' : '') +
                 '<label class="cx-org-search"><span class="cx-org-sr">Buscar pessoa</span>' +
                     '<input type="search" data-el="q" placeholder="Buscar pessoa ou cargo…" autocomplete="off">' +
                     '<span data-el="qcount" class="cx-org-qcount"></span></label>' +
@@ -209,7 +211,9 @@
                 '<label class="cx-org-check"><input type="checkbox" data-l="boss"> É a chefia (define o time e a posição)</label>' +
                 '<label class="cx-org-check"><input type="checkbox" data-l="dash"> Linha tracejada</label>' +
                 '<label>Rótulo<input data-l="label" maxlength="120" autocomplete="off" placeholder="Ex.: reporte funcional"></label>' +
-                '<div class="cx-org-btns"><button type="button" class="cx-org-btn cx-org-btn--danger" data-act="ldel">Excluir ligação</button></div>' +
+                '<p class="cx-org-hint">Para desviar a linha, puxe a bolinha do meio. Cada trecho ganha a sua; duplo clique numa dobra desfaz aquela.</p>' +
+                '<div class="cx-org-btns"><button type="button" class="cx-org-btn" data-act="lstraight">Endireitar</button>' +
+                '<button type="button" class="cx-org-btn cx-org-btn--danger" data-act="ldel">Excluir ligação</button></div>' +
                 '<p class="cx-org-hint" data-el="lmsg"></p>' +
             '</aside>' : '') +
             '<section class="cx-org-esc">' +
@@ -642,17 +646,26 @@
                     b.el.style.top = Math.round(b.y + origin.y) + 'px';
                 }
             });
-            canvas.style.width = Math.ceil(W) + 'px';
-            canvas.style.height = Math.ceil(H) + 'px';
-
             geomTmp = box;
-            var linhas = '';
+            geom = box;
+            boxW = W; boxH = H;
+            drawLinks();
+        }
+
+        // Traça as ligações sobre as caixas já posicionadas (geom). Separado do
+        // layoutTree() no bloco 2d-2: arrastar uma dobra redesenha só o SVG, sem
+        // remedir nem recriar os cartões a cada movimento do ponteiro.
+        function drawLinks() {
+            var canvas = treeEl.querySelector('[data-el="canvas"]');
+            if (!canvas) { return; }
+            var W = boxW, H = boxH, linhas = '', alcas = '';
             S.edges.forEach(function (e) {
                 var ai = boxOf(e.from), bi = boxOf(e.to);
                 if (!ai || !bi || ai === bi) { return; }
-                var b = box[ai], c = box[bi];
+                var b = geom[ai], c = geom[bi];
                 if (!b || !c) { return; }
-                var p = linkPath(b, c);
+                var wps = e.waypoints && e.waypoints.length ? e.waypoints : null;
+                var p = wps ? bentPath(b, c, wps) : linkPath(b, c);
                 var cls = 'cx-org-link' + (e.boss ? '' : ' is-rep') + (e.style === 'tracejada' ? ' is-dash' : '') +
                     (selEdge === e.id ? ' is-sel' : '');
                 linhas += '<path class="' + cls + '" d="' + p.d + '"/>' +
@@ -660,14 +673,87 @@
                 if (e.label) {
                     linhas += '<text class="cx-org-elabel" x="' + p.mx + '" y="' + (p.my - 4) + '" text-anchor="middle">' + escHtml(e.label) + '</text>';
                 }
+                (wps || []).forEach(function (w) {
+                    W = Math.max(W, w.x + origin.x + 12);
+                    H = Math.max(H, w.y + origin.y + 12);
+                });
+                // Alças só na ligação selecionada: em todas, poluiriam o mapa.
+                if (editable && selEdge === e.id) { alcas += handlesOf(e, p); }
             });
+            canvas.style.width = Math.ceil(W) + 'px';
+            canvas.style.height = Math.ceil(H) + 'px';
             var svg = canvas.querySelector('[data-el="links"]');
             svg.setAttribute('width', Math.ceil(W));
             svg.setAttribute('height', Math.ceil(H));
             svg.setAttribute('viewBox', '0 0 ' + Math.ceil(W) + ' ' + Math.ceil(H));
             svg.innerHTML = '<g transform="translate(' + origin.x + ',' + origin.y + ')">' +
-                '<g data-el="guides"></g>' + linhas + '</g>';
-            geom = box;
+                '<g data-el="guides"></g>' + linhas + alcas + '</g>';
+        }
+
+        // ---- dobras à mão (bloco 2d-2) ---------------------------------
+        // Cada ligação pode ter pontos de dobra (`waypoints`), na mesma
+        // coordenada do x/y dos nós. A linha passa por eles em ordem; a ponta
+        // sai do lado da caixa voltado para a primeira dobra e chega pelo lado
+        // voltado para a última. Ponto dentro do vão da caixa puxa a ponta para
+        // a mesma coluna (ou linha): é o que deixa a descida reta, sem diagonal.
+        function anchorOf(b, q) {
+            var R = Math.round, m = 8;
+            var cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+            var ax = q.x >= b.x + m && q.x <= b.x + b.w - m ? q.x : cx;
+            var ay = q.y >= b.y + m && q.y <= b.y + b.h - m ? q.y : cy;
+            if (q.y >= b.y + b.h) { return { x: R(ax), y: R(b.y + b.h) }; }   // abaixo
+            if (q.y <= b.y) { return { x: R(ax), y: R(b.y) }; }               // acima
+            if (q.x >= b.x + b.w) { return { x: R(b.x + b.w), y: R(ay) }; }   // à direita
+            if (q.x <= b.x) { return { x: R(b.x), y: R(ay) }; }               // à esquerda
+            return { x: R(cx), y: R(cy) };                                    // dentro
+        }
+        function bentPath(b, c, wps) {
+            var pts = [anchorOf(b, wps[0])].concat(wps.map(function (w) { return { x: w.x, y: w.y }; }), [anchorOf(c, wps[wps.length - 1])]);
+            var d = pts.map(function (q, i) { return (i ? 'L' : 'M') + Math.round(q.x) + ' ' + Math.round(q.y); }).join('');
+            // Rótulo no meio do trecho do meio.
+            var k = Math.floor((pts.length - 1) / 2), a = pts[k], z2 = pts[k + 1];
+            return { d: d, pts: pts, mx: Math.round((a.x + z2.x) / 2), my: Math.round((a.y + z2.y) / 2) };
+        }
+        // Bolinha cheia = dobra existente (arrastar move, duplo clique desfaz).
+        // Bolinha vazada no meio de cada trecho = arrastar cria uma dobra ali.
+        // Ligação sem dobra tem uma alça só, no meio do traçado automático.
+        function handlesOf(e, p) {
+            var id = escHtml(e.id), h = '', i, pts = p.pts;
+            if (!pts) {
+                return '<circle class="cx-org-wpadd" data-wedge="' + id + '" data-wpadd="0" cx="' + p.mx + '" cy="' + p.my + '" r="5">' +
+                    '<title>Arraste para dobrar a linha</title></circle>';
+            }
+            for (i = 0; i < pts.length - 1; i++) {
+                h += '<circle class="cx-org-wpadd" data-wedge="' + id + '" data-wpadd="' + i + '" cx="' +
+                    Math.round((pts[i].x + pts[i + 1].x) / 2) + '" cy="' + Math.round((pts[i].y + pts[i + 1].y) / 2) + '" r="5">' +
+                    '<title>Arraste para dobrar a linha aqui</title></circle>';
+            }
+            (e.waypoints || []).forEach(function (w, j) {
+                h += '<circle class="cx-org-wp" data-wedge="' + id + '" data-wp="' + j + '" cx="' + w.x + '" cy="' + w.y + '" r="6">' +
+                    '<title>Arraste para mover a dobra; duplo clique desfaz</title></circle>';
+            });
+            return h;
+        }
+        // Onde a dobra para: gruda na coluna ou na linha do vizinho (a dobra
+        // anterior e a seguinte, ou o centro da caixa na ponta), que é o que
+        // faz o ângulo reto; sem vizinho perto, a grade.
+        function wpSpot(e, idx, pt) {
+            var list = e.waypoints || [];
+            var ai = boxOf(e.from), bi = boxOf(e.to), b = geom[ai], c = geom[bi];
+            var viz = [];
+            viz.push(idx > 0 ? list[idx - 1] : (b ? { x: b.x + b.w / 2, y: b.y + b.h / 2 } : null));
+            viz.push(idx < list.length - 1 ? list[idx + 1] : (c ? { x: c.x + c.w / 2, y: c.y + c.h / 2 } : null));
+            var bx = null, by = null;
+            viz.forEach(function (v) {
+                if (!v) { return; }
+                if (Math.abs(pt.x - v.x) <= GUIDE_TOL && (bx === null || Math.abs(pt.x - v.x) < Math.abs(pt.x - bx))) { bx = v.x; }
+                if (Math.abs(pt.y - v.y) <= GUIDE_TOL && (by === null || Math.abs(pt.y - v.y) < Math.abs(pt.y - by))) { by = v.y; }
+            });
+            return {
+                x: bx !== null ? Math.max(0, Math.round(bx)) : snap(pt.x),
+                y: by !== null ? Math.max(0, Math.round(by)) : snap(pt.y),
+                gx: bx !== null ? [Math.round(bx)] : [], gy: by !== null ? [Math.round(by)] : []
+            };
         }
 
         // Por onde a linha sai e entra depende de ONDE o filho está. A receita
@@ -881,6 +967,19 @@
                 S.edges.push(e);
             }
             commit(); render(); selectEdge(e.id);
+        }
+        function tiraDobra(id, idx) {
+            var e = edgeById(id);
+            if (!e || !e.waypoints || !e.waypoints[idx]) { return; }
+            e.waypoints.splice(idx, 1);
+            if (!e.waypoints.length) { delete e.waypoints; }
+            commit(); render();
+        }
+        function endireita(id) {
+            var e = edgeById(id);
+            if (!e || !e.waypoints) { return; }
+            delete e.waypoints;
+            commit(); render();
         }
         function selectEdge(id) {
             var e = edgeById(id);
@@ -1242,6 +1341,19 @@
 
             root.addEventListener('pointerdown', function (e) {
                 if (e.button !== 0 || !editable) { return; }
+                // Alça de dobra (bloco 2d-2). preventDefault também impede o
+                // mousedown de compatibilidade, que começaria a passear o mapa.
+                var alca = e.target.closest && e.target.closest('[data-wedge]');
+                if (alca && edgeById(alca.getAttribute('data-wedge'))) {
+                    var ea = edgeById(alca.getAttribute('data-wedge'));
+                    var nova = alca.hasAttribute('data-wpadd');
+                    gest = {
+                        dobra: ea.id, nova: nova, idx: +(nova ? alca.getAttribute('data-wpadd') : alca.getAttribute('data-wp')),
+                        antes: JSON.stringify(ea.waypoints || []), sx: e.clientX, sy: e.clientY, moveu: false
+                    };
+                    e.preventDefault();
+                    return;
+                }
                 var porta = e.target.closest && e.target.closest('[data-port]');
                 if (porta) {
                     gest = { ligando: porta.getAttribute('data-port'), sx: e.clientX, sy: e.clientY, moveu: false };
@@ -1268,6 +1380,23 @@
 
             document.addEventListener('pointermove', function (e) {
                 if (!gest) { return; }
+                if (gest.dobra) {
+                    var ew = edgeById(gest.dobra);
+                    if (!ew) { gest = null; return; }
+                    if (!gest.moveu) {
+                        if (Math.abs(e.clientX - gest.sx) + Math.abs(e.clientY - gest.sy) < LIMIAR) { return; }
+                        gest.moveu = true;
+                        if (!ew.waypoints) { ew.waypoints = []; }
+                        if (gest.nova) { ew.waypoints.splice(gest.idx, 0, { x: 0, y: 0 }); }
+                    }
+                    var pw = pointOf(e);
+                    if (!pw) { return; }
+                    var sw = wpSpot(ew, gest.idx, pw);
+                    ew.waypoints[gest.idx] = { x: sw.x, y: sw.y };
+                    drawLinks();
+                    showGuides(sw.gx, sw.gy);
+                    return;
+                }
                 if (gest.ligando) {
                     if (!gest.moveu && Math.abs(e.clientX - gest.sx) + Math.abs(e.clientY - gest.sy) < LIMIAR) { return; }
                     gest.moveu = true;
@@ -1321,6 +1450,11 @@
             document.addEventListener('pointerup', function (e) {
                 if (!gest) { return; }
                 if (!gest.moveu) { gest = null; return; }   // foi clique, não arraste
+                if (gest.dobra) {
+                    gest = null; clearGuides();
+                    commit(); render();
+                    return;
+                }
                 if (gest.ligando) {
                     var de = gest.ligando, alvo = alvoSob(e);
                     gest = null; clearZones();
@@ -1355,7 +1489,23 @@
             });
 
             document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && gest) { fimGesto(); }
+                if (e.key !== 'Escape' || !gest) { return; }
+                // Esc no meio da dobra devolve a ligação como estava.
+                if (gest.dobra) {
+                    var ec = edgeById(gest.dobra), antes = JSON.parse(gest.antes);
+                    if (ec) { if (antes.length) { ec.waypoints = antes; } else { delete ec.waypoints; } }
+                    gest = null; clearGuides(); drawLinks();
+                    return;
+                }
+                fimGesto();
+            });
+
+            // Duplo clique numa dobra desfaz aquela dobra; as outras ficam.
+            treeEl.addEventListener('dblclick', function (e) {
+                var w = e.target.closest && e.target.closest('[data-wp]');
+                if (!w) { return; }
+                e.preventDefault();
+                tiraDobra(w.getAttribute('data-wedge'), +w.getAttribute('data-wp'));
             });
 
 
@@ -1451,8 +1601,12 @@
             }
             else if (act === 'bcancel') { pendLink = null; $('bossdlg').close(); }
             else if (act === 'fit') { fit(); }
+            else if (act === 'lstraight') { endireita(selEdge); }
             else if (act === 'tidy') {
+                // Tudo volta ao automático, dobras inclusive: dobra feita para
+                // um arranjo à mão não serve ao arranjo novo.
                 S.nodes.forEach(function (n) { delete n.x; delete n.y; });
+                S.edges.forEach(function (e) { delete e.waypoints; });
                 commit(); render(); fill(); fit();
             }
             else if (act === 'unpin') { reanchor(sel); commit(); render(); fill(); }
@@ -1532,7 +1686,7 @@
             if (!canvas) { return '<ul>' + roots().map(card).join('') + '</ul>'; }
             var c = canvas.cloneNode(true);
             function each(sel, f) { Array.prototype.forEach.call(c.querySelectorAll(sel), f); }
-            each('.cx-org-port, .cx-org-hit, .cx-org-ghost, [data-el="guides"]', function (el) { el.parentNode.removeChild(el); });
+            each('.cx-org-port, .cx-org-hit, .cx-org-ghost, .cx-org-wp, .cx-org-wpadd, [data-el="guides"]', function (el) { el.parentNode.removeChild(el); });
             each('.is-sel, .is-hit, .is-dim, .is-drop-in, .is-drop-before, .is-drop-after', function (el) {
                 el.classList.remove('is-sel', 'is-hit', 'is-dim', 'is-drop-in', 'is-drop-before', 'is-drop-after');
             });
@@ -1610,7 +1764,9 @@
                 var g = treeEl.querySelector('[data-el="guides"]');
                 return g ? g.querySelectorAll('line').length : 0;
             },
-            tidy: function () { S.nodes.forEach(function (n) { delete n.x; delete n.y; }); commit(); render(); },
+            tidy: function () { S.nodes.forEach(function (n) { delete n.x; delete n.y; }); S.edges.forEach(function (e) { delete e.waypoints; }); commit(); render(); },
+            unbend: function (id, idx) { tiraDobra(id, idx); },
+            straighten: function (id) { endireita(id); },
             addFree: function (kind, x, y) {
                 var n = newNode(kind, S.levels[S.levels.length - 1].key);
                 n.x = snap(x); n.y = snap(y); S.nodes.push(n); commit(); render(); return n.id;

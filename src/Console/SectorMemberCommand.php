@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * setores e categorias). Sem --user/--group, só lista os papéis do setor.
  *
  *   ... sector:member --username=glpi --sector="Qualidade" --role=gestor --user=joao
- *   ... sector:member --username=glpi --sector="Qualidade" --role=validador --group="Auditoria"
+ *   ... sector:member --username=glpi --sector="Qualidade" --role=auditor --group="Auditoria"
  *   ... sector:member --username=glpi --sector="Qualidade" --role=gestor --user=joao --remove
  */
 class SectorMemberCommand extends AbstractCommand
@@ -29,7 +29,7 @@ class SectorMemberCommand extends AbstractCommand
         $this->addOption('username', null, InputOption::VALUE_REQUIRED, 'Login de quem executa');
         $this->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Perfil a usar (nome)');
         $this->addOption('sector', null, InputOption::VALUE_REQUIRED, 'Setor (nome ou ID)');
-        $this->addOption('role', null, InputOption::VALUE_REQUIRED, 'gestor ou validador');
+        $this->addOption('role', null, InputOption::VALUE_REQUIRED, 'gestor ou auditor (validador = auditor)');
         $this->addOption('user', null, InputOption::VALUE_REQUIRED, 'Usuário (login)');
         $this->addOption('group', null, InputOption::VALUE_REQUIRED, 'Grupo (nome)');
         $this->addOption('remove', null, InputOption::VALUE_NONE, 'Tira o papel em vez de dar');
@@ -48,6 +48,9 @@ class SectorMemberCommand extends AbstractCommand
 
         if ($input->getOption('user') !== null || $input->getOption('group') !== null) {
             $row['role']      = (string) $input->getOption('role');
+            if ($row['role'] === 'auditor') {        // R3d: nome novo, chave antiga
+                $row['role'] = SectorMember::ROLE_VALIDATOR;
+            }
             $row['users_id']  = $input->getOption('user') !== null ? self::userId((string) $input->getOption('user')) : 0;
             $row['groups_id'] = $input->getOption('group') !== null ? self::groupId((string) $input->getOption('group')) : 0;
 

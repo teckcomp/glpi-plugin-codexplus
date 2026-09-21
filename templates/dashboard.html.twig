@@ -37,6 +37,37 @@
         {% endif %}
     </div>
 
+    {# ============ Aguardando você (R3d-1) ============
+       Só aparece quando há algo. Mesma regra dos botões da página do
+       documento: quem está aqui consegue agir. #}
+    {% if pending %}
+        <section class="cx-card cx-pending" aria-label="{{ __('Aguardando você', 'codexplus') }}">
+            <h3 class="cx-card-title">
+                <i class="ti ti-bell-ringing"></i> {{ __('Aguardando você', 'codexplus') }}
+                <span class="cx-pending-count">{{ pending|length }}</span>
+            </h3>
+            <ul class="cx-pending-list">
+                {% for p in pending %}
+                    <li class="cx-pending-item">
+                        <span class="codexplus-code cx-code-chip cx-code-type-{{ p.doctype }}">{{ p.code }}</span>
+                        <a class="cx-pending-name" href="{{ form_url }}?id={{ p.id }}">{{ p.name }}</a>
+                        <span class="cx-pending-meta">
+                            {{ p.etapa }}{% if p.quem %} · {{ p.quem }}{% endif %}{% if p.ago %} · {{ p.ago }}{% endif %}
+                            {% if p.bloqueio %}<span class="cx-pending-block"><i class="ti ti-lock"></i> {{ p.bloqueio }}</span>{% endif %}
+                        </span>
+                        {% if p.acao %}
+                            <a class="codexplus-btn codexplus-btn-primary cx-pending-go" href="{{ form_url }}?id={{ p.id }}">
+                                <i class="ti ti-circle-check"></i> {{ p.acao }}
+                            </a>
+                        {% else %}
+                            <a class="codexplus-btn cx-pending-go" href="{{ form_url }}?id={{ p.id }}">{{ __('Abrir', 'codexplus') }}</a>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
     {% if counters.total == 0 %}
 
         {# ---- Estado vazio: zeros pareceriam defeito. Convida a criar. ---- #}
@@ -305,8 +336,10 @@
                             </td>
                             <td class="cx-cell-when">{{ d.ago }}</td>
                             <td>
-                                {% if d.status == 'validacao' %}
-                                    <span class="codexplus-status codexplus-status--validacao">{{ __('em revisão', 'codexplus') }}</span>
+                                {% if d.status == 'aprovacao' %}
+                                    <span class="codexplus-status codexplus-status--aprovacao">{{ __('aguarda gestor', 'codexplus') }}</span>
+                                {% elseif d.status == 'validacao' %}
+                                    <span class="codexplus-status codexplus-status--validacao">{{ __('aguarda auditor', 'codexplus') }}</span>
                                 {% elseif d.status == 'rascunho' %}
                                     <span class="codexplus-status codexplus-status--rascunho">{{ __('rascunho', 'codexplus') }}</span>
                                 {% elseif d.status == 'obsoleto' %}

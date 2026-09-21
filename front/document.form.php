@@ -12,8 +12,9 @@
  * Todas as regras vêm de GlpiPlugin\Codexplus\Document (R3a/R3c); aqui só se
  * chama can*() e os métodos do fluxo. Nenhuma regra nova nesta página.
  *
- * Fora desta etapa (ROADMAP, R3b2–R3b4): editores e alvos de leitura pela
- * tela (hoje: pelo console), imagens coladas e anexos, leitura com PDF, e
+ * Desde a R3b2-a, alvos de leitura pela coluna "Permissões" (endpoint
+ * ajax/document.targets.php). Fora ainda (ROADMAP, R3b2-b a R3b4): editores
+ * pela tela (hoje: pelo console), imagens coladas e anexos, leitura com PDF, e
  * trocar o "Novo documento" antigo. Por isso o TinyMCE está com
  * enable_images = false: imagem colada ainda não teria onde ser guardada.
  *
@@ -123,6 +124,13 @@ if ($id > 0 && isset($_POST['update'])) {
         if (isset($_POST['users_id_owner'])) {
             $data['users_id_owner'] = (int) $_POST['users_id_owner'];
         }
+        // R3d: auditor, revisor e janela. Conferidos em Document (auditor do
+        // setor, só em rascunho; janela com as duas datas).
+        foreach (['users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'] as $f) {
+            if (isset($_POST[$f])) {
+                $data[$f] = (string) $_POST[$f];
+            }
+        }
 
         // Categorias: diferença entre o que está gravado e o que veio.
         $current = Document_Category::getCategoryIds($id);
@@ -181,13 +189,37 @@ if ($id > 0 && isset($_POST['update'])) {
 }
 
 // -------------------------------------------------------------------------
-// POST — fluxo (Enviar, Validar, Devolver, Obsoleto)
+// POST — revisão periódica fora de rascunho (R3d): revisor e janela mudam em
+// qualquer status, por quem gere o documento. Só esses campos.
+// -------------------------------------------------------------------------
+if ($id > 0 && isset($_POST['update_review'])) {
+    if (!$doc->canManage()) {
+        Session::addMessageAfterRedirect(__('Só quem gere o documento muda revisor e janela de revisão.', 'codexplus'), false, ERROR);
+        Html::redirect($self . '?id=' . $id);
+    }
+    $data = ['id' => $id];
+    foreach (['users_id_reviewer', 'review_start', 'review_end'] as $f) {
+        if (isset($_POST[$f])) {
+            $data[$f] = (string) $_POST[$f];
+        }
+    }
+    if ($doc->update($data)) {
+        Session::addMessageAfterRedirect(__('Revisão periódica salva.', 'codexplus'));
+    }
+    Html::redirect($self . '?id=' . $id);
+}
+
+// -------------------------------------------------------------------------
+// POST — fluxo (Enviar, Aprovar, Validar, Devolver, Obsoleto)
 // -------------------------------------------------------------------------
 if ($id > 0) {
     $flow = null;
     if (isset($_POST['submit_validation'])) {
         $flow = static fn () => $doc->submit();
-        $okMsg = __('Enviado para validação.', 'codexplus');
+        $okMsg = __('Enviado: aguardando a aprovação do gestor do setor.', 'codexplus');
+    } elseif (isset($_POST['manager_approve'])) {
+        $flow = static fn () => $doc->managerApprove();
+        $okMsg = __('Aprovado pelo gestor: aguardando o auditor responsável.', 'codexplus');
     } elseif (isset($_POST['approve'])) {
         $flow = static fn () => $doc->approve();
         $okMsg = __('Documento validado e publicado.', 'codexplus');
@@ -304,7 +336,122 @@ if (!$isNew) {
     }
 }
 
+// R3b2-a: coluna "Permissões" com os alvos de leitura. Quem gere o documento
+// muda (em qualquer status: é acesso, não conteúdo); quem tem papel nele ou
+// Ver todos só vê a lista. O leitor comum não vê quem mais lê.
+$perm = [
+    'show'       => false,
+    'can_manage' => false,
+    'targets'    => [],
+    'widgets'    => ['group' => '', 'profile' => '', 'user' => ''],
+    'url'        => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.targets.php',
+];
+if (!$isNew && ($canManage || $doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL))) {
+    $perm['show']       = true;
+    $perm['can_manage'] = $canManage;
+    $perm['targets']    = Document::listTargets($id);
+    if ($canManage) {
+        // Nomes com "_cxt_": o Salvar do formulário não os lê. Os três vão
+        // pelo endpoint, que confere de novo quem pode (TargetRelation).
+        $perm['widgets']['group'] = Group::dropdown([
+            'name'    => '_cxt_group',
+            'display' => false,
+            'width'   => '100%',
+        ]);
+        $perm['widgets']['profile'] = Profile::dropdown([
+            'name'    => '_cxt_profile',
+            'display' => false,
+            'width'   => '100%',
+        ]);
+        $perm['widgets']['user'] = User::dropdown([
+            'name'    => '_cxt_user',
+            'right'   => 'all',
+            'display' => false,
+            'width'   => '100%',
+        ]);
+    }
+}
+
 $status = $isNew ? Document::STATUS_DRAFT : (string) $doc->fields['status'];
+
+// R3d: auditor responsável, revisor e janela de revisão. O auditor muda só em
+// rascunho e é escolhido entre os auditores do setor; revisor e janela mudam
+// em qualquer status. Quem não gere o documento só vê.
+$fmtDate = static fn ($d) => empty($d) ? '' : substr((string) $d, 0, 10);
+$review = [
+    'show'             => !$isNew,
+    'can_auditor'      => false,
+    'can_review'       => false,
+    'auditor_widget'   => '',
+    'reviewer_widget'  => '',
+    'auditor_name'     => '',
+    'reviewer_name'    => '',
+    'start'            => '',
+    'end'              => '',
+    'no_auditors'      => false,
+    'validity_months'  => 0,
+];
+$pending = ['label' => '', 'names' => []];
+$missingRight = '';
+if (!$isNew) {
+    $auditorId  = (int) ($doc->fields['users_id_auditor'] ?? 0);
+    $reviewerId = (int) ($doc->fields['users_id_reviewer'] ?? 0);
+    $review['auditor_name']    = $auditorId > 0 ? getUserName($auditorId) : '';
+    $review['reviewer_name']   = $reviewerId > 0 ? getUserName($reviewerId) : '';
+    $review['start']           = $fmtDate($doc->fields['review_start'] ?? null);
+    $review['end']             = $fmtDate($doc->fields['review_end'] ?? null);
+    $review['validity_months'] = (int) ($doc->fields['validity_months'] ?? 0);
+    $review['can_review']      = $canManage;
+    $review['can_auditor']     = $canManage && $canEdit && $doc->fields['status'] === Document::STATUS_DRAFT;
+
+    if ($review['can_auditor']) {
+        $opcoes = [0 => Dropdown::EMPTY_VALUE];
+        foreach (SectorMember::usersOfRole($doc->getSectorIds(), SectorMember::ROLE_VALIDATOR) as $uid) {
+            $opcoes[$uid] = getUserName($uid);
+        }
+        // Auditor gravado que saiu do setor continua visível, para não sumir
+        // em silêncio; o envio avisa que precisa trocar.
+        if ($auditorId > 0 && !isset($opcoes[$auditorId])) {
+            $opcoes[$auditorId] = getUserName($auditorId) . ' ' . __('(não é mais auditor do setor)', 'codexplus');
+        }
+        $review['no_auditors']    = count($opcoes) === 1;
+        $review['auditor_widget'] = Dropdown::showFromArray('users_id_auditor', $opcoes, [
+            'value'   => $auditorId,
+            'display' => false,
+            'width'   => '100%',
+        ]);
+    }
+    if ($review['can_review']) {
+        $review['reviewer_widget'] = User::dropdown([
+            'name'    => 'users_id_reviewer',
+            'value'   => $reviewerId,
+            'right'   => 'all',
+            'display' => false,
+            'width'   => '100%',
+        ]);
+    }
+
+    // R3d-1: quem responde pela etapa mas não consegue agir fica sabendo o
+    // porquê (antes o botão só não aparecia). Regra das duas camadas:
+    // perfil (bit) + papel no plugin.
+    $st0 = (string) $doc->fields['status'];
+    if ($st0 === Document::STATUS_APPROVAL && $doc->isManager() && !$doc->canApprove()) {
+        $missingRight = __('Você é gestor do setor deste documento, mas seu perfil não tem o direito Atualizar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+    } elseif ($st0 === Document::STATUS_VALIDATION && $doc->isAuditor() && !$doc->canValidate() && !$doc->isContributor()) {
+        $missingRight = !$doc->isValidator()
+            ? __('Você é o auditor responsável deste documento, mas não está mais entre os auditores do setor. Quem gere o documento precisa devolvê-lo e escolher outro auditor.', 'codexplus')
+            : __('Você é o auditor responsável deste documento, mas seu perfil não tem o direito Validar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+    }
+
+    // Aviso "aguardando …": quem responde pela etapa atual.
+    $st = (string) $doc->fields['status'];
+    if (in_array($st, Document::PENDING_STATUSES, true)) {
+        $pending['label'] = $st === Document::STATUS_APPROVAL
+            ? __('Aguardando a aprovação do gestor do setor', 'codexplus')
+            : __('Aguardando a validação do auditor responsável', 'codexplus');
+        $pending['names'] = array_map('getUserName', $doc->pendingWith());
+    }
+}
 
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'glpi_root'   => $CFG_GLPI['root_doc'],
@@ -330,13 +477,19 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'validator_name'     => $isNew || (int) ($doc->fields['users_id_validator'] ?? 0) <= 0 ? '' : getUserName((int) $doc->fields['users_id_validator']),
     'date_validated'     => $isNew ? '' : (string) ($doc->fields['date_validated'] ?? ''),
     'widgets'     => $widgets,
+    'perm'        => $perm,
+    'review'      => $review,
+    'pending'     => $pending,
+    'missing_right' => $missingRight,
     'is_diagram'   => $isDiagram,
     'diagram_json' => $diagramJson,
     'can_submit'   => !$isNew && $doc->canSubmit(),
     'can_validate' => !$isNew && $doc->canValidate(),
+    'can_approve'  => !$isNew && $doc->canApprove(),
+    'can_reject'   => !$isNew && $doc->canReject(),
     'is_blocked_contributor' => !$isNew
         && $status === Document::STATUS_VALIDATION
-        && $doc->isValidator()
+        && $doc->isAuditor()
         && $doc->isContributor()
         && !Session::haveRight(Rights::NAME, Rights::VIEWALL),
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),

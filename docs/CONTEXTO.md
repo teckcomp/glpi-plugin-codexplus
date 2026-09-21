@@ -57,7 +57,7 @@ desta tabela sem alinhar antes.**
 
 | Item | Por que não |
 |---|---|
-| Fluxo de aprovação multi-etapa | Não há intenção de certificar ISO 9001. **Desde 20/09/2026 (Claudio) existe validação de UMA etapa** antes de publicar (Etapa R3c); várias etapas continuam fora |
+| Fluxo de aprovação com mais de duas etapas | Não há intenção de certificar ISO 9001. **Desde 21/09/2026 (Claudio) a validação tem DUAS etapas** antes de publicar — gestor do setor, depois auditor responsável (Etapa R3d). Mais etapas, ou etapas configuráveis, continuam fora |
 | Caixa de tarefas pendentes | "Aguardando validação" e "Revisão atrasada" são indicadores do "Precisa de atenção" do Painel (R5), não caixa de tarefas |
 | Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações. O histórico de revisão com resumo (Etapa R6) é do documento, não aparato de auditoria |
 | Permissão separada de ver / imprimir / baixar | O GLPI já controla visibilidade por perfil, grupo e entidade |
@@ -324,6 +324,72 @@ POST forjado é recusado pelas mesmas checagens (testado).
   ou Ver todos) e os 10 mais recentes visíveis. Sai na R5, quando o Painel
   inteiro passa a ler o modelo novo.
 - Editores e alvos de leitura ainda só pelo console (R3b2).
+
+#### Coluna "Permissões" (R3b2-a, 21/09/2026)
+
+Leitores (grupo, perfil, usuário) pela tela, na coluna à direita de
+Categorias e Responsável (layout de Claudio, 20/09/2026), em
+`templates/parts/doc-permissions.html.twig`, incluída na edição **e** na
+visão: alvo de leitura é acesso, não conteúdo, então muda em qualquer status
+— é justamente no publicado que se escolhe quem lê.
+
+- **Quem vê a coluna:** quem gere o documento (muda), quem tem papel nele ou
+  Ver todos (só a lista). O leitor comum não vê quem mais lê.
+- **Não é formulário.** `public/js/codexplus-perm.js` manda para
+  `ajax/document.targets.php` (`acao` = add, del ou list) e troca a lista
+  pela que o servidor devolve. Recarregar no meio de uma edição perderia o
+  que não foi salvo. Os campos têm nome `_cxt_*`, que o Salvar ignora.
+- **Regra nenhuma nova:** o endpoint usa `can()` das ligações (trait
+  `TargetRelation`: gerir o documento). Recusa o mesmo alvo duas vezes (as
+  tabelas espelham as nativas e não têm chave única) e só apaga ligação do
+  próprio documento. Perfil e grupo entram sem restrição de entidade; alvo
+  restrito (só pelo console) aparece com a entidade entre parênteses.
+- **Lista com fonte única:** `Document::listTargets()` (grupos, perfis,
+  usuários, cada bloco por nome), usada pelo controller e pelo endpoint. A
+  marcação do item está no Twig e no JS (`listaHtml`): mudou uma, mude a outra.
+- **CSRF** como no autosave do diagrama (achado 43): a coluna tem o próprio
+  campo de token, e o token novo de cada resposta vai para todos os campos da
+  página.
+
+#### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
+
+Decisões de Claudio, 21/09/2026, sobre as da R3c:
+
+- **Duas etapas.** rascunho → `aprovacao` (aguardando gestor) →
+  `validacao` (aguardando auditor) → publicado. Devolver vale nas duas, com
+  motivo. Métodos: `submit()`, `managerApprove()`, `approve()`, `reject()`.
+- **1ª etapa, gestor do setor** (`canApprove`: Atualizar + gestor). Aprova
+  mesmo tendo editado: só gestor cria, e ele é quase sempre o autor.
+- **2ª etapa, auditor responsável** (`users_id_auditor`, `canValidate`): bit
+  Validar + ser o auditor do documento + ainda auditor do setor + não ter
+  alterado nesta revisão. O papel "validador" do setor passou a se chamar
+  **Auditor** (a chave gravada continua `validador`; console aceita
+  `--role=auditor`). O auditor é escolhido por quem gere o documento, entre os
+  auditores do setor (usuários diretos e membros dos grupos —
+  `SectorMember::usersOfRole()`), só em rascunho; enviar exige auditor.
+- **Super-Admin pode tudo, definitivo** (Claudio, 21/09/2026): "Ver todos"
+  envia sem auditor e passa pelas duas etapas. Não é pendência de produção.
+- **Revisor** (`users_id_reviewer`): papel novo, só para a revisão
+  periódica. Tem papel no documento (lê em qualquer status). Abrir a revisão e
+  "revisado sem alteração" continuam na R6.
+- **Janela de revisão** (`review_start`, `review_end`, datas): quem gere o
+  documento escolhe, em qualquer status (fora de rascunho, pelo formulário
+  "Salvar revisão periódica"). As duas datas ou nenhuma. Vazia na publicação,
+  é calculada pela regra do tipo (`Document::defaultWindow`): fim = publicação
+  + validade do tipo; início = fim − 30 dias. **O vencimento passa a ser o fim
+  da janela** (`DocumentMeta::expiryState(..., $reviewEnd)`, ainda fonte
+  única; sem janela, a regra antiga).
+- **Aviso "aguardando …"** na página: gestores do setor ou o auditor
+  (`Document::pendingWith()`). E-mail ao enviar fica para a Etapa 7.
+- **"Aguardando você" no Painel (R3d-1)** — `Dashboard::pendingForMe()`: 1ª
+  etapa para o gestor do setor, 2ª para o auditor responsável. Mesma regra dos
+  botões; quem responde pela etapa mas não pode agir (perfil sem o bit,
+  auditor que editou ou saiu do setor) aparece com o motivo e sem o botão. O
+  Ver todos não entra só por poder tudo. Na página do documento, o mesmo
+  motivo vira aviso (antes o botão só sumia — caso real: perfil Tecnicos N1
+  sem o bit Validar, 21/09/2026).
+- Documento que estava em `validacao` antes da R3d fica na 2ª etapa, sem
+  auditor: só o Super-Admin valida (ou devolve, para escolher o auditor).
 
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
@@ -859,7 +925,9 @@ codexplus/
 │   ├── Diagram.php            diagrama do documento DIA: ler, gravar, validar (0.6.7)
 │   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
 ├── ajax/
-│   └── diagram.save.php       grava só o diagrama, sem recarregar (bloco 1b)
+│   ├── diagram.save.php       grava só o diagrama, sem recarregar (bloco 1b)
+│   └── document.targets.php   leitores do documento pela coluna Permissões (R3b2-a)
+│   (templates/parts/doc-review.html.twig: auditor, revisor e janela — R3d)
 ├── front/                     controllers (rodam em escopo de função!)
 │   └── document.form.php      documento no modelo novo (R3b1)
 ├── templates/                 Twig (parts/brand.html.twig: cabeçalho com a marca, 0.6.5)

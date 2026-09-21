@@ -130,7 +130,9 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R3a | Classe `Document` e ligações (categoria, perfil, grupo, usuário), leitura e edição pelos bits da R1, visibilidade por item e em SQL, Histórico ligado; comandos de console para testar. Sem telas novas. ✅ **Concluído na 0.6.2-alpha** | Criar documento com alvo num grupo e conferir quem vê e quem não vê; telas atuais inalteradas |
 | R3c | Papéis: bit Validar; Super-Admin com todos os bits; gestores e validadores por setor; editores por documento; estado "em validação"; regras refeitas (alvo de leitura deixa de dar edição); comandos `sector:member` e fluxo no `document:set`. Sem telas novas. ✅ **Concluído na 0.6.3-alpha** | Pelo console: gestor cria, editor edita, quem editou não valida, validador do setor publica, leitor só vê depois de publicado |
 | R3b1 | Página do documento (`front/document.form.php`): criar e editar título, tipo, categorias, responsável e corpo; botões Enviar / Validar / Devolver / Obsoleto conforme o direito; quadro "Documentos do modelo novo (em teste)" no Painel. ✅ **Concluído na 0.6.4-alpha** | Criar um POP pela tela como gestor, enviar e validar com outro usuário |
-| R3b2 | Aba **Papéis** no Setor; **Editores** e **Leitura** (alvos) no documento; aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
+| R3d | Validação em duas etapas (gestor do setor, depois auditor responsável), revisor e janela de revisão no calendário, vencimento pelo fim da janela; campos na página do documento e aviso "aguardando …". Super-Admin pode tudo (definitivo). Precisa reinstalar. ✅ pacote `codexplus-r3d-validacao-1` (Claudio, 21/09/2026) | Gestor aprova, auditor responsável publica, janela calculada; quem editou não valida na 2ª etapa |
+| R3d-1 | "Aguardando você" no Painel (gestor na 1ª etapa, auditor na 2ª, com o motivo quando falta o direito) e aviso na página do documento quando quem responde pela etapa não consegue agir. Sem schema ✅ pacote `codexplus-r3d1-aguardando-1` | O auditor entra no Codex+ e vê o que espera por ele |
+| R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna; **R3b2-c** aba **Papéis** no Setor. Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
 | R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF | POP com imagem e anexo, publicado e exportado |
 | R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa" | Nenhum caminho da interface cria artigo na Base de Conhecimento |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
@@ -162,7 +164,7 @@ leitura (quem, quando, o quê); indicador "Sem setor" no Painel.
 | 1b | Salvamento automático do diagrama (`ajax/diagram.save.php`), Salvar em tela cheia sem recarregar ✅ | `17e651d` |
 | 2d-1 | Ligações: criar puxando da borda, chefia ou reporte, rótulo, excluir, troca de chefe e recusa de ciclo ✅ | `f78a0c9` |
 | 2d-3a | PDF imprime o desenho da tela: clona o canvas posicionado, com as ligações em SVG, sem o que é de edição. Antecipado por Claudio para a apresentação de 21/09 (o PDF só imprimia o bloco do primeiro elemento sem chefe — achado 50) ✅ | `9ae6110` |
-| 2d-2 | Cotovelos à mão: alça no meio da linha selecionada; arrastando, nasce a dobra; uma alça por trecho, então quantas dobras forem precisas; encaixe na coluna e na linha do vizinho; duplo clique desfaz uma; "Endireitar" tira todas; "Arrumar" também. Pontos em `waypoints`, validados no PHP ✅ | — |
+| 2d-2 | Cotovelos à mão: alça no meio da linha selecionada; arrastando, nasce a dobra; uma alça por trecho, então quantas dobras forem precisas; encaixe na coluna e na linha do vizinho; duplo clique desfaz uma; "Endireitar" tira todas; "Arrumar" também. Pontos em `waypoints`, validados no PHP ✅ | `7f5adf0` |
 | **2d-3** | **Fechamento do organograma:** conferir a página de leitura com um diagrama publicado e o PDF com dobras; subir o `setup.php` para `0.6.8-alpha` (o GLPI pede reinstalação: bloco completo do `DEPLOY.md`) | — |
 
 **Decisões que guiam estes blocos:**
@@ -321,6 +323,8 @@ os critérios abaixo estiverem cumpridos:
 - [x] **draw.io descartado**; fluxograma sobre o motor próprio — 20/09/2026
 - [x] **Diagrama é grafo, não árvore**: posição livre híbrida, ligações
       próprias, um chefe por elemento, cotovelos à mão — 20/09/2026
+- [x] **Validação em duas etapas** (1ª gestor do setor, 2ª auditor responsável), **revisor** como papel próprio e **janela de revisão** no calendário — 21/09/2026
+- [x] **Super-Admin pode tudo**, inclusive validar o que editou, em definitivo — 21/09/2026
 - [x] **Cronograma** entra como subtipo de `DIA`, com períodos relativos
       (S1, S2…) em vez de datas; bloco embutido na proposta fica para
       depois — 20/09/2026

@@ -167,6 +167,9 @@ class Install
         // --- Etapa R3c: papéis, validação, Super-Admin com todos os bits ---
         self::installR3c($migration);
 
+        // --- Etapa R3d: validação em duas etapas, revisor e janela ---
+        self::installR3d($migration);
+
         $migration->executeMigration();
         return true;
     }
@@ -385,6 +388,31 @@ class Install
      *    (Super-Admin): "o Super-Admin herda tudo". OR bit a bit, então
      *    reinstalar nunca tira bit de ninguém.
      */
+    /**
+     * Etapa R3d (Claudio, 21/09/2026): validação em duas etapas — 1ª o gestor
+     * do setor aprova, 2ª o auditor responsável valida — e revisão periódica
+     * com revisor e janela no calendário. Só campos novos no documento; o
+     * status novo (aprovacao) é um valor a mais no mesmo varchar.
+     *   - users_id_auditor:  auditor responsável (2ª etapa), escolhido entre
+     *                        os auditores do setor;
+     *   - users_id_approver, date_approved: quem aprovou a 1ª etapa;
+     *   - users_id_reviewer: revisor da revisão periódica;
+     *   - review_start, review_end: janela da próxima revisão (datas).
+     */
+    private static function installR3d(Migration $migration): void
+    {
+        $doc = self::DOCUMENTS_TABLE;
+        $migration->addField($doc, 'users_id_auditor', 'fkey');
+        $migration->addField($doc, 'users_id_approver', 'fkey');
+        $migration->addField($doc, 'date_approved', 'timestamp');
+        $migration->addField($doc, 'users_id_reviewer', 'fkey');
+        $migration->addField($doc, 'review_start', 'date');
+        $migration->addField($doc, 'review_end', 'date');
+        $migration->addKey($doc, 'users_id_auditor');
+        $migration->addKey($doc, 'users_id_reviewer');
+        $migration->addKey($doc, 'review_end');
+    }
+
     private static function installR3c(Migration $migration): void
     {
         /** @var \DBmysql $DB */

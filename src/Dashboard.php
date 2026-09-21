@@ -147,9 +147,100 @@ class Dashboard
      * Delega para DocumentMeta::expiryState(), que é a fonte única da regra
      * desde a Etapa 4b (a tela de leitura precisa do mesmo cálculo).
      */
-    private static function expiry(?string $published, int $months, string $status): array
+    private static function expiry(?string $published, int $months, string $status, ?string $reviewEnd = null): array
     {
-        return DocumentMeta::expiryState($published, $months, $status);
+        return DocumentMeta::expiryState($published, $months, $status, $reviewEnd);
+    }
+
+    /**
+     * "Aguardando você" (bloco R3d-1, Claudio, 21/09/2026): documentos em que
+     * o usuário da sessão é quem responde pela etapa atual E pode agir —
+     *   - 1ª etapa (aprovacao): gestor de um setor do documento, com o botão
+     *     Aprovar liberado (canApprove);
+     *   - 2ª etapa (validacao): o auditor responsável, com o botão Validar
+     *     liberado (canValidate — quem editou não entra).
+     * A regra é a mesma dos botões. Quem responde pela etapa mas não consegue
+     * agir (perfil sem o bit, auditor que editou ou que saiu do setor) aparece
+     * também, com o motivo e sem o botão de ação — senão nunca saberia que o
+     * documento espera por ele. O Ver todos NÃO entra só por poder tudo (a lista viraria a de todos os
+     * pendentes); o Super-Admin aparece onde estiver como gestor ou auditor.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function pendingForMe(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $me = (int) \Session::getLoginUserID();
+        if ($me <= 0) {
+            return [];
+        }
+        $t  = Document::getTable();
+        $or = [[$t . '.users_id_auditor' => $me, $t . '.status' => Document::STATUS_VALIDATION]];
+
+        $sectors = SectorMember::mySectors(SectorMember::ROLE_MANAGER);
+        if ($sectors) {
+            $dc  = Document_Category::getTable();
+            $cat = Category::getTable();
+            $or[] = [
+                $t . '.status' => Document::STATUS_APPROVAL,
+                $t . '.id'     => new \Glpi\DBAL\QuerySubQuery([
+                    'SELECT'     => $dc . '.' . Document_Category::$items_id_1,
+                    'FROM'       => $dc,
+                    'INNER JOIN' => [$cat => ['ON' => [$dc => Document_Category::$items_id_2, $cat => 'id']]],
+                    'WHERE'      => [$cat . '.' . Category::SECTOR_FIELD => $sectors],
+                ]),
+            ];
+        }
+
+        $out = [];
+        foreach ($DB->request([
+            'SELECT' => [$t . '.id'],
+            'FROM'   => $t,
+            'WHERE'  => [$t . '.knowbaseitems_id' => 0, $t . '.is_deleted' => 0, 'OR' => $or],
+            'ORDER'  => [$t . '.date_submitted ASC'],
+        ]) as $row) {
+            $doc = new Document();
+            if (!$doc->getFromDB((int) $row['id'])) {
+                continue;
+            }
+            $etapa1 = $doc->fields['status'] === Document::STATUS_APPROVAL;
+            $dono   = $etapa1 ? $doc->isManager() : $doc->isAuditor();
+            if (!$dono) {
+                continue;
+            }
+            $pode    = $etapa1 ? $doc->canApprove() : $doc->canValidate();
+            $bloqueio = '';
+            if (!$pode) {
+                if ($etapa1) {
+                    $bloqueio = __('seu perfil não tem o direito Atualizar do Codex+', 'codexplus');
+                } elseif ($doc->isContributor() && !\Session::haveRight(Rights::NAME, Rights::VIEWALL)) {
+                    $bloqueio = __('você alterou o documento: outro auditor precisa validar', 'codexplus');
+                } elseif (!$doc->isValidator()) {
+                    $bloqueio = __('você não está mais entre os auditores do setor', 'codexplus');
+                } else {
+                    $bloqueio = __('seu perfil não tem o direito Validar do Codex+', 'codexplus');
+                }
+            }
+            // Desde quando espera por esta etapa: envio (1ª) ou aprovação (2ª).
+            $desde = $etapa1 ? $doc->fields['date_submitted'] : ($doc->fields['date_approved'] ?: $doc->fields['date_submitted']);
+            $quem  = (int) ($etapa1 ? $doc->fields['users_id_submitter'] : $doc->fields['users_id_approver']);
+            $out[] = [
+                'id'      => (int) $doc->fields['id'],
+                'code'    => $doc->getCode(),
+                'doctype' => (string) $doc->fields['doctype'],
+                'name'    => (string) $doc->fields['name'],
+                'acao'    => $pode ? ($etapa1 ? __('Aprovar', 'codexplus') : __('Validar', 'codexplus')) : '',
+                'bloqueio' => $bloqueio,
+                'etapa'   => $etapa1 ? __('1ª etapa: gestor', 'codexplus') : __('2ª etapa: auditor', 'codexplus'),
+                'quem'    => $quem > 0
+                    ? ($etapa1 ? __('enviado por', 'codexplus') : __('aprovado por', 'codexplus')) . ' ' . getUserName($quem)
+                    : '',
+                'ago'     => $desde ? self::relativeTime((string) $desde) : '',
+            ];
+        }
+        return $out;
     }
 
     /**
@@ -183,7 +274,7 @@ class Dashboard
                 $t . '.id', $t . '.name', $t . '.date_mod', $t . '.doctype',
                 $t . '.sequence', $t . '.revision', $t . '.status',
                 $t . '.users_id_owner', $t . '.validity_months',
-                $t . '.client_name', $t . '.date_published',
+                $t . '.client_name', $t . '.date_published', $t . '.review_end',
             ],
             'DISTINCT'  => true,
             'FROM'      => $t,
@@ -193,7 +284,7 @@ class Dashboard
         ]) as $r) {
             $id      = (int) $r['id'];
             $status  = (string) $r['status'];
-            $expiry  = self::expiry($r['date_published'] ?? null, (int) $r['validity_months'], $status);
+            $expiry  = self::expiry($r['date_published'] ?? null, (int) $r['validity_months'], $status, $r['review_end'] ?? null);
             $ownerId = (int) $r['users_id_owner'];
             if ($ownerId > 0) {
                 $owners[$ownerId] = true;
@@ -299,7 +390,8 @@ class Dashboard
                 $c['publicados']++;
             }
 
-            if ($d['status'] === 'validacao') {
+            // R3d: as duas etapas (aguardando gestor e aguardando auditor).
+            if ($d['status'] === 'validacao' || $d['status'] === 'aprovacao') {
                 $c['emrevisao']++;
             }
 

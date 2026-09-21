@@ -37,10 +37,21 @@
             <div>{{ __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo.', 'codexplus') }}</div>
         </div>
     {% endif %}
-    {% if not is_new and status == 'validacao' and not can_validate and not is_blocked_contributor %}
+    {% if missing_right %}
+        <div class="cx-notice cx-notice--warn">
+            <i class="ti ti-lock"></i>
+            <div>{{ missing_right }}</div>
+        </div>
+    {% endif %}
+    {% if pending.label %}
+        {# R3d: quem responde pela etapa em que o documento está. #}
         <div class="cx-notice">
             <i class="ti ti-hourglass"></i>
-            <div>{{ __('Em validação. Nenhuma alteração até o validador aprovar ou devolver.', 'codexplus') }}</div>
+            <div>
+                <strong>{{ pending.label }}:</strong>
+                {{ pending.names ? pending.names|join(', ') : __('ninguém cadastrado ainda', 'codexplus') }}
+                <div class="cx-notice-text">{{ __('Nenhuma alteração no conteúdo até a validação terminar ou o documento ser devolvido.', 'codexplus') }}</div>
+            </div>
         </div>
     {% endif %}
 
@@ -61,7 +72,9 @@
                            placeholder="{{ __('Título do documento', 'codexplus') }}">
                 </div>
 
-                <div class="codexplus-doc-edit-zone cx-docform-grid">
+                {# R3b2-a: campos à esquerda, coluna "Permissões" à direita. #}
+                <div class="codexplus-doc-edit-zone cx-docform-split{{ perm.show ? ' cx-docform-split--perm' : '' }}">
+                <div class="cx-docform-grid">
                     {% if is_new %}
                         <div class="cx-docform-field">
                             <label>{{ __('Tipo', 'codexplus') }}</label>
@@ -86,12 +99,20 @@
                         </div>
                     {% endif %}
 
+                    {% if review.show %}
+                        {% include '@codexplus/parts/doc-review.html.twig' with {review: review} only %}
+                    {% endif %}
+
                     {% if is_new or doctype == 'PRP' %}
                         <div class="cx-docform-field">
                             <label for="cx-docform-client">{{ __('Cliente (só propostas)', 'codexplus') }}</label>
                             <input type="text" id="cx-docform-client" name="client_name" value="{{ client_name }}" class="form-control">
                         </div>
                     {% endif %}
+                </div>
+                {% if perm.show %}
+                    {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
+                {% endif %}
                 </div>
 
                 {% if is_diagram %}
@@ -176,6 +197,8 @@
         {# ================= VISÃO (sem edição) ================= #}
         <article class="codexplus-doc">
             <h1 class="cx-docform-view-title">{{ name }}</h1>
+            <div class="cx-docform-split{{ perm.show ? ' cx-docform-split--perm' : '' }}">
+            <div>
             <div class="cx-docform-roles">
                 <span><strong>{{ __('Categorias', 'codexplus') }}:</strong> {{ category_names ? category_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
@@ -185,6 +208,31 @@
                 {% if status == 'publicado' and validator_name %}
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
                 {% endif %}
+                {% if review.show and not review.can_review %}
+                    <span><strong>{{ __('Auditor responsável', 'codexplus') }}:</strong> {{ review.auditor_name ?: '—' }}</span>
+                    <span><strong>{{ __('Revisor', 'codexplus') }}:</strong> {{ review.reviewer_name ?: '—' }}</span>
+                    <span><strong>{{ __('Revisão', 'codexplus') }}:</strong>
+                        {% if review.start and review.end %}{{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% else %}—{% endif %}</span>
+                {% endif %}
+            </div>
+            {% if review.show and review.can_review %}
+                {# R3d: fora de rascunho, quem gere o documento ainda muda
+                   revisor e janela (o auditor, não: só em rascunho). #}
+                <form method="post" action="{{ self }}" class="cx-review-form">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <div class="cx-docform-grid">
+                        {% include '@codexplus/parts/doc-review.html.twig' with {review: review} only %}
+                    </div>
+                    <button type="submit" name="update_review" value="1" class="codexplus-btn">
+                        <i class="ti ti-device-floppy"></i> {{ __('Salvar revisão periódica', 'codexplus') }}
+                    </button>
+                </form>
+            {% endif %}
+            </div>
+            {% if perm.show %}
+                {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
+            {% endif %}
             </div>
             {% if is_diagram %}
                 <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
@@ -197,7 +245,7 @@
     {% endif %}
 
     {# ================= FLUXO ================= #}
-    {% if not is_new and (can_submit or can_validate or can_obsolete) %}
+    {% if not is_new and (can_submit or can_approve or can_validate or can_reject or can_obsolete) %}
         <section class="cx-flow">
             <h3 class="cx-card-title">{{ __('Fluxo do documento', 'codexplus') }}</h3>
 
@@ -208,7 +256,19 @@
                     <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}
                     </button>
-                    <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Em validação, o documento fica travado.', 'codexplus') }}</span>
+                    <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Vai primeiro ao gestor do setor e depois ao auditor responsável; nesse meio-tempo o documento fica travado.', 'codexplus') }}</span>
+                </form>
+            {% endif %}
+
+            {% if can_approve %}
+                <form method="post" action="{{ self }}" class="cx-flow-row">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <button type="submit" name="manager_approve" value="1" class="codexplus-btn codexplus-btn-primary"
+                            onclick="return confirm('{{ __('Aprovar e enviar ao auditor responsável?', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-circle-check"></i> {{ __('Aprovar e enviar ao auditor', 'codexplus') }}
+                    </button>
+                    <span class="codexplus-form-hint">{{ __('1ª etapa: aprovação do gestor do setor.', 'codexplus') }}</span>
                 </form>
             {% endif %}
 
@@ -220,7 +280,11 @@
                             onclick="return confirm('{{ __('Validar e publicar este documento?', 'codexplus')|e('js') }}');">
                         <i class="ti ti-circle-check"></i> {{ __('Validar e publicar', 'codexplus') }}
                     </button>
+                    <span class="codexplus-form-hint">{{ __('2ª etapa: validação do auditor responsável.', 'codexplus') }}</span>
                 </form>
+            {% endif %}
+
+            {% if can_reject %}
                 <form method="post" action="{{ self }}" class="cx-flow-row cx-flow-reject">
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">

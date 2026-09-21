@@ -1,0 +1,56 @@
+{# Codex+ — auditor responsável, revisor e janela de revisão (bloco R3d).
+   Decisão de Claudio, 21/09/2026: validação em duas etapas (1ª o gestor do
+   setor, 2ª o auditor responsável) e revisão periódica com um papel próprio
+   (revisor) e uma janela no calendário, com início e fim.
+   Entra dentro de um .cx-docform-grid: na edição (formulário do documento)
+   e, fora de rascunho, no formulário "Salvar revisão periódica".
+   Variável: review (ver front/document.form.php). #}
+
+<div class="cx-docform-field cx-docform-field--wide">
+    <label>{{ __('Auditor responsável', 'codexplus') }}</label>
+    {% if review.can_auditor %}
+        {{ review.auditor_widget|raw }}
+        <div class="codexplus-form-hint">
+            {% if review.no_auditors %}
+                {{ __('O setor deste documento ainda não tem auditor. Os auditores do setor são cadastrados nos papéis do setor.', 'codexplus') }}
+            {% else %}
+                {{ __('2ª etapa da validação: quem valida e publica, depois do gestor do setor. Só aparecem os auditores do setor.', 'codexplus') }}
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="cx-docform-readonly">{{ review.auditor_name ?: '—' }}</div>
+        <div class="codexplus-form-hint">{{ __('O auditor responsável só muda em rascunho, por quem gere o documento.', 'codexplus') }}</div>
+    {% endif %}
+</div>
+
+<div class="cx-docform-field cx-docform-field--wide cx-review">
+    <label>{{ __('Revisão periódica', 'codexplus') }}</label>
+    {% if review.can_review %}
+        <div class="cx-review-grid">
+            <div>
+                <span class="cx-review-lbl">{{ __('Revisor', 'codexplus') }}</span>
+                {{ review.reviewer_widget|raw }}
+            </div>
+            <div>
+                <span class="cx-review-lbl">{{ __('De', 'codexplus') }}</span>
+                <input type="date" name="review_start" value="{{ review.start }}" class="form-control">
+            </div>
+            <div>
+                <span class="cx-review-lbl">{{ __('Até', 'codexplus') }}</span>
+                <input type="date" name="review_end" value="{{ review.end }}" class="form-control">
+            </div>
+        </div>
+        <div class="codexplus-form-hint">
+            {% if review.validity_months > 0 %}
+                {{ __('Em branco, a janela é calculada na publicação: termina %d meses depois e começa 30 dias antes do fim. O documento vence no fim da janela.', 'codexplus')|format(review.validity_months) }}
+            {% else %}
+                {{ __('Este tipo não tem validade padrão: defina as duas datas.', 'codexplus') }}
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="cx-docform-readonly">
+            {{ review.reviewer_name ?: '—' }}
+            {% if review.start and review.end %}· {{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% endif %}
+        </div>
+    {% endif %}
+</div>

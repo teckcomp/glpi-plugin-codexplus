@@ -43,14 +43,19 @@ class SectorMember extends CommonDBChild
     {
         return [
             self::ROLE_MANAGER   => __('Gestor', 'codexplus'),
-            self::ROLE_VALIDATOR => __('Validador', 'codexplus'),
+            // R3d (Claudio, 21/09/2026): o validador do setor é o AUDITOR, a
+            // 2ª etapa da validação. A chave gravada continua 'validador'.
+            self::ROLE_VALIDATOR => __('Auditor', 'codexplus'),
         ];
     }
 
     public function prepareInputForAdd($input)
     {
+        if (($input['role'] ?? '') === 'auditor') {
+            $input['role'] = self::ROLE_VALIDATOR;
+        }
         if (!in_array($input['role'] ?? '', self::ROLES, true)) {
-            Session::addMessageAfterRedirect(__('Papel inválido: use gestor ou validador.', 'codexplus'), false, ERROR);
+            Session::addMessageAfterRedirect(__('Papel inválido: use gestor ou auditor.', 'codexplus'), false, ERROR);
             return false;
         }
         $u = (int) ($input['users_id'] ?? 0);
@@ -115,6 +120,59 @@ class SectorMember extends CommonDBChild
             }
         }
         return self::$mine[$role] = $ids;
+    }
+
+    /**
+     * Usuários que têm o papel em algum dos setores: os ligados direto e os
+     * membros dos grupos ligados (R3d). Só usuários ativos e não excluídos.
+     * Serve à escolha do auditor responsável e aos avisos "aguardando …".
+     *
+     * @param int[] $sectorIds
+     * @return int[]
+     */
+    public static function usersOfRole(array $sectorIds, string $role): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $sectorIds = array_values(array_filter(array_map('intval', $sectorIds)));
+        if ($sectorIds === []) {
+            return [];
+        }
+        $users = $groups = [];
+        foreach ($DB->request([
+            'SELECT' => ['users_id', 'groups_id'],
+            'FROM'   => static::getTable(),
+            'WHERE'  => ['role' => $role, 'plugin_codexplus_sectors_id' => $sectorIds],
+        ]) as $row) {
+            if ((int) $row['users_id'] > 0) {
+                $users[(int) $row['users_id']] = true;
+            } elseif ((int) $row['groups_id'] > 0) {
+                $groups[] = (int) $row['groups_id'];
+            }
+        }
+        if ($groups) {
+            foreach ($DB->request([
+                'SELECT' => ['users_id'],
+                'FROM'   => 'glpi_groups_users',
+                'WHERE'  => ['groups_id' => $groups],
+            ]) as $row) {
+                $users[(int) $row['users_id']] = true;
+            }
+        }
+        if ($users === []) {
+            return [];
+        }
+        $out = [];
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => 'glpi_users',
+            'WHERE'  => ['id' => array_keys($users), 'is_active' => 1, 'is_deleted' => 0],
+            'ORDER'  => ['realname', 'firstname', 'name'],
+        ]) as $row) {
+            $out[] = (int) $row['id'];
+        }
+        return $out;
     }
 
     /** Limpa o cache (troca de sessão no console, testes). */

@@ -176,20 +176,29 @@ class DocumentMeta extends CommonDBTM
      *
      * @return array{state:string, due:?int} state: '' | 'emdia' | 'avencer' | 'vencido'
      */
-    public static function expiryState(?string $published, int $months, string $status): array
+    public static function expiryState(?string $published, int $months, string $status, ?string $reviewEnd = null): array
     {
         $none = ['state' => '', 'due' => null];
 
-        if ($months <= 0 || $status !== 'publicado' || empty($published)) {
+        if ($status !== 'publicado') {
             return $none;
         }
 
-        $base = strtotime($published);
-        if ($base === false) {
-            return $none;
+        // R3d: documento do modelo novo com janela de revisão vence no FIM da
+        // janela (fim do dia), que pode ter sido ajustado à mão. Sem janela,
+        // a regra antiga: publicação + validade em meses.
+        if (!empty($reviewEnd)) {
+            $due = strtotime(substr($reviewEnd, 0, 10) . ' 23:59:59');
+        } else {
+            if ($months <= 0 || empty($published)) {
+                return $none;
+            }
+            $base = strtotime($published);
+            if ($base === false) {
+                return $none;
+            }
+            $due = strtotime('+' . $months . ' months', $base);
         }
-
-        $due = strtotime('+' . $months . ' months', $base);
         if ($due === false) {
             return $none;
         }

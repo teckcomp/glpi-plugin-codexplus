@@ -28,14 +28,18 @@ class DocumentSetCommand extends AbstractCommand
     {
         parent::configure();
         $this->setName('plugins:codexplus:document:set');
-        $this->setDescription('Codex+ (teste R3c): edita ou move o documento no fluxo (enviar/validar/devolver/obsoleto)');
+        $this->setDescription('Codex+ (teste R3c/R3d): edita ou move o documento no fluxo (enviar/aprovar/validar/devolver/obsoleto)');
         $this->addOption('username', null, InputOption::VALUE_REQUIRED, 'Login de quem age');
         $this->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Perfil a usar (nome)');
         $this->addOption('id', null, InputOption::VALUE_REQUIRED, 'ID do documento');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Novo título');
         $this->addOption('content', null, InputOption::VALUE_REQUIRED, 'Novo conteúdo (HTML)');
         $this->addOption('owner', null, InputOption::VALUE_REQUIRED, 'Login do novo responsável');
-        $this->addOption('action', null, InputOption::VALUE_REQUIRED, 'enviar, validar, devolver ou obsoleto');
+        $this->addOption('auditor', null, InputOption::VALUE_REQUIRED, 'Login do auditor responsável (R3d; vazio tira)');
+        $this->addOption('reviewer', null, InputOption::VALUE_REQUIRED, 'Login do revisor (R3d; vazio tira)');
+        $this->addOption('review-start', null, InputOption::VALUE_REQUIRED, 'Início da janela de revisão, AAAA-MM-DD (vazio tira)');
+        $this->addOption('review-end', null, InputOption::VALUE_REQUIRED, 'Fim da janela de revisão, AAAA-MM-DD (vazio tira)');
+        $this->addOption('action', null, InputOption::VALUE_REQUIRED, 'enviar, aprovar (gestor), validar (auditor), devolver ou obsoleto');
         $this->addOption('comment', null, InputOption::VALUE_REQUIRED, 'Motivo (obrigatório para devolver)');
     }
 
@@ -71,8 +75,23 @@ class DocumentSetCommand extends AbstractCommand
         if ($input->getOption('owner') !== null) {
             $data['users_id_owner'] = self::userId((string) $input->getOption('owner'));
         }
+        foreach (['auditor' => 'users_id_auditor', 'reviewer' => 'users_id_reviewer'] as $opt => $campo) {
+            if ($input->getOption($opt) !== null) {
+                $login = (string) $input->getOption($opt);
+                $data[$campo] = $login === '' ? 0 : self::userId($login);
+            }
+        }
+        foreach (['review-start' => 'review_start', 'review-end' => 'review_end'] as $opt => $campo) {
+            if ($input->getOption($opt) !== null) {
+                $data[$campo] = (string) $input->getOption($opt);
+            }
+        }
         if (count($data) > 1) {
-            $isOwnerOnly = array_keys($data) === ['id', 'users_id_owner'];
+            // Gestão (responsável, auditor, revisor, janela) é de quem gere o
+            // documento, em qualquer status; o resto é edição (só rascunho).
+            // As regras finas (auditor só em rascunho etc.) ficam em Document.
+            $gestao = ['id', 'users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'];
+            $isOwnerOnly = array_diff(array_keys($data), $gestao) === [];
             $allowed = $isOwnerOnly ? $doc->canManage() : $doc->can($id, UPDATE);
             if (!$allowed) {
                 $output->writeln(sprintf(
@@ -97,6 +116,9 @@ class DocumentSetCommand extends AbstractCommand
                 case 'enviar':
                     $ok = $doc->submit();
                     break;
+                case 'aprovar':
+                    $ok = $doc->managerApprove();
+                    break;
                 case 'validar':
                     $ok = $doc->approve();
                     break;
@@ -107,7 +129,7 @@ class DocumentSetCommand extends AbstractCommand
                     $ok = $doc->markObsolete();
                     break;
                 default:
-                    $output->writeln("<error>Ação desconhecida: $action (use enviar, validar, devolver ou obsoleto).</error>");
+                    $output->writeln("<error>Ação desconhecida: $action (use enviar, aprovar, validar, devolver ou obsoleto).</error>");
                     return Command::FAILURE;
             }
             if (!$ok) {
@@ -116,7 +138,16 @@ class DocumentSetCommand extends AbstractCommand
         }
 
         $doc->getFromDB($id);
-        $output->writeln(sprintf('#%d %s status: <info>%s</info>', $id, $doc->getCode(), $doc->fields['status']));
+        $output->writeln(sprintf(
+            '#%d %s status: <info>%s</info>  auditor: %s  revisor: %s  janela: %s a %s',
+            $id,
+            $doc->getCode(),
+            $doc->fields['status'],
+            (int) $doc->fields['users_id_auditor'] > 0 ? getUserName((int) $doc->fields['users_id_auditor']) : '-',
+            (int) $doc->fields['users_id_reviewer'] > 0 ? getUserName((int) $doc->fields['users_id_reviewer']) : '-',
+            $doc->fields['review_start'] ?: '-',
+            $doc->fields['review_end'] ?: '-'
+        ));
 
         $output->writeln('Histórico (mais recente primeiro):');
         foreach ($DB->request([

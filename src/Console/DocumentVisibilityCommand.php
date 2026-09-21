@@ -72,9 +72,12 @@ class DocumentVisibilityCommand extends AbstractCommand
             $sql  = isset($bySql[$id]);
             $edit = $doc->can($id, UPDATE);
             $val  = $doc->canValidate();
+            $apr  = $doc->canApprove();
             $roles = array_filter([
                 $doc->isManager() ? 'G' : '',
-                $doc->isValidator() ? 'V' : '',
+                $doc->isValidator() ? 'A' : '',
+                $doc->isAuditor() ? 'AR' : '',
+                $doc->isReviewer() ? 'R' : '',
                 $doc->isEditor() ? 'E' : '',
                 $doc->isContributor() ? 'alterou' : '',
             ]);
@@ -92,19 +95,19 @@ class DocumentVisibilityCommand extends AbstractCommand
                 $roles ? implode(' ', $roles) : '-',
                 $item ? 'VÊ' : '-',
                 $edit ? 'EDITA' : '-',
-                $val ? 'VALIDA' : '-',
+                $apr ? 'APROVA' : ($val ? 'VALIDA' : '-'),
                 $item === $sql ? 'ok' : '<error>DIVERGE</error>',
             ];
         }
 
         (new Table($output))
-            ->setHeaders(['ID', 'Código', 'Título', 'Status', 'Alvos', 'Papéis', 'Leitura', 'Edição', 'Validação', 'SQL=item'])
+            ->setHeaders(['ID', 'Código', 'Título', 'Status', 'Alvos', 'Papéis', 'Leitura', 'Edição', 'Aprovação', 'SQL=item'])
             ->setRows($rows)
             ->render();
 
         $legacy = countElementsInTable($table, ['knowbaseitems_id' => ['>', 0]]);
         $output->writeln(sprintf('(%d linha(s) de artigo nativo na mesma tabela, fora desta lista até a R4)', $legacy));
-        $output->writeln('Papéis: G = gestor do setor, V = validador do setor, E = editor; "alterou" = mexeu nesta revisão (não pode validar).');
+        $output->writeln('Papéis: G = gestor do setor, A = auditor do setor, AR = auditor responsável, R = revisor, E = editor; "alterou" = mexeu nesta revisão (não valida). Aprovação: APROVA = 1ª etapa (gestor), VALIDA = 2ª etapa (auditor).');
 
         if ($diverge > 0) {
             $output->writeln("<error>$diverge divergência(s) entre SQL e canViewItem.</error>");

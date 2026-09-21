@@ -41,6 +41,9 @@ TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
     // Etapa 9: os diagramas mais recentes, para o quadro "Diagramas".
     'diagrams'   => Dashboard::getRecent(array_filter($docs, static fn ($d) => $d['doctype'] === 'DIA'), 6),
     'can_create' => $canCreate,
+    // R3d-1: o que espera por quem está logado (gestor ou auditor).
+    'pending'    => Dashboard::pendingForMe(),
+    'form_url'   => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php',
 ]);
 
 Html::footer();

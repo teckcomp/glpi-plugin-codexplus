@@ -427,6 +427,7 @@
 .codexplus-status--rascunho  { background: var(--cx-neutral-bg); color: var(--cx-neutral); }
 .codexplus-status--obsoleto  { background: var(--cx-danger-bg);  color: var(--cx-danger); }
 .codexplus-status--validacao { background: var(--cx-warn-bg);    color: var(--cx-warn); }   /* R3c */
+.codexplus-status--aprovacao { background: var(--cx-accent-soft); color: var(--cx-accent); } /* R3d */
 .codexplus-status--none      { background: transparent;          color: var(--cx-faint); }
 
 /* Vencimento (calculado a partir de date_published + validity_months).
@@ -1309,6 +1310,54 @@
 }
 .cx-docform-view-title { margin: 0 0 8px; }
 .cx-docform-roles + .codexplus-content { margin-top: 18px; }
+
+/* Coluna "Permissões" (bloco R3b2-a): campos à esquerda, coluna à direita.
+   Sem a coluna, o split é uma coluna só e nada muda de lugar. */
+.cx-docform-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start; }
+.cx-docform-split--perm { grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); }
+.cx-docform-split + .codexplus-content, .cx-docform-split + .cx-docform-diagram { margin-top: 18px; }
+@media (max-width: 900px) { .cx-docform-split--perm { grid-template-columns: minmax(0, 1fr); } }
+.cx-perm {
+    border: 1px solid var(--cx-border); border-radius: 8px; padding: 12px 14px;
+    background: var(--cx-surface); font-size: .92em;
+}
+.cx-perm.is-busy { opacity: .6; pointer-events: none; }
+.cx-perm-title { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 1rem; font-family: var(--cx-font-display); }
+.cx-perm-sub { font-weight: 600; margin-bottom: 6px; color: var(--cx-muted); text-transform: uppercase; font-size: .78em; letter-spacing: .04em; }
+.cx-perm-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cx-perm-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; background: var(--cx-neutral-bg); }
+.cx-perm-item > .ti { color: var(--cx-muted); }
+.cx-perm-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cx-perm-del { border: 0; background: none; padding: 0 2px; color: var(--cx-muted); cursor: pointer; line-height: 1; }
+.cx-perm-del:hover { color: var(--cx-danger); }
+.cx-perm-empty { margin: 0 0 8px; color: var(--cx-muted); font-style: italic; }
+.cx-perm-add { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cx-border); }
+.cx-perm-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.cx-perm-lbl { font-weight: 600; margin: 0; }
+.cx-perm-addbtn { white-space: nowrap; }
+.cx-perm-msg { min-height: 1.2em; margin: 6px 0 2px; font-size: .9em; color: var(--cx-muted); }
+.cx-perm-msg.is-erro { color: var(--cx-danger); }
+
+/* Auditor, revisor e janela de revisão (bloco R3d). */
+.cx-review-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: end; }
+@media (max-width: 700px) { .cx-review-grid { grid-template-columns: minmax(0, 1fr); } }
+.cx-review-lbl { display: block; font-size: .85em; color: var(--cx-muted); margin-bottom: 2px; }
+.cx-docform-readonly { padding: 6px 0; }
+
+/* "Aguardando você" no Painel (bloco R3d-1). */
+.cx-pending { margin: 16px 0; border-left: 4px solid var(--cx-accent); }
+.cx-pending-count { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 11px;
+    background: var(--cx-accent); color: #fff; font-size: .8em; text-align: center; line-height: 22px; }
+.cx-pending-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.cx-pending-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px;
+    align-items: center; padding: 8px 0; border-top: 1px solid var(--cx-border); }
+.cx-pending-item:first-child { border-top: 0; }
+.cx-pending-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-pending-meta { grid-column: 2; font-size: .88em; color: var(--cx-muted); }
+.cx-pending-go { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
+.cx-pending-block { display: block; color: var(--cx-warn); }
+.cx-review-form { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--cx-border); }
+.cx-review-form .codexplus-btn { margin-top: 10px; }
 
 .cx-notice {
     display: flex; gap: 10px; align-items: flex-start;

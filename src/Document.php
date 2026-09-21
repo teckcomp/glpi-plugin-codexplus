@@ -30,17 +30,29 @@ use Session;
  *            publicada visível); em validação, só devolvendo.
  *   Gerir    Atualizar + gestor do setor: editores, alvos de leitura,
  *            categorias (estas só em rascunho), responsável, obsoleto.
- *   Enviar   quem pode editar, com ao menos uma categoria com setor.
- *   Validar  Validar + validador do setor + NÃO ter alterado o documento na
- *            revisão atual (DocumentContributor).
+ *   Enviar   quem pode editar, com ao menos uma categoria com setor e o
+ *            auditor responsável escolhido.
+ *   Aprovar  (1ª etapa, R3d) Atualizar + gestor do setor. Vale mesmo para o
+ *            gestor que editou: só gestor cria, e ele é quase sempre o autor.
+ *   Validar  (2ª etapa) Validar + ser o AUDITOR RESPONSÁVEL do documento
+ *            (users_id_auditor), ainda auditor do setor, e NÃO ter alterado o
+ *            documento na revisão atual (DocumentContributor).
  *   Excluir  Excluir + gestor do setor (lixeira). Purgar: desligado.
  *   Ver todos  dispensa os papéis (inclusive "quem editou não valida"),
  *            sempre dentro dos outros bits do perfil.
  *
- * Status: rascunho -> validacao -> publicado -> obsoleto; validacao volta a
- * rascunho quando o validador devolve (motivo obrigatório). Status só muda
- * pelos métodos submit()/approve()/reject()/markObsolete(), nunca por update
- * direto.
+ * Status (R3d, Claudio, 21/09/2026 — validação em duas etapas):
+ *   rascunho -> aprovacao (aguarda o gestor) -> validacao (aguarda o
+ *   auditor) -> publicado -> obsoleto. Nas duas etapas dá para devolver a
+ *   rascunho (motivo obrigatório). Status só muda pelos métodos submit()/
+ *   managerApprove()/approve()/reject()/markObsolete(), nunca por update
+ *   direto.
+ *
+ * Revisão periódica (R3d): revisor (users_id_reviewer) e janela no calendário
+ * (review_start, review_end). Quem gere o documento escolhe; a janela vazia é
+ * calculada na publicação pela regra do tipo: fim = publicação + validade do
+ * tipo, início = fim - 30 dias. O vencimento passa a ser o fim da janela.
+ * Abrir a revisão e "revisado sem alteração" são da R6.
  *
  * A leitura existe em DUAS formas que precisam concordar: canViewItem() e
  * getVisibilityCriteria() (SQL, para as listagens da R5). O comando
@@ -49,12 +61,18 @@ use Session;
 class Document extends CommonDBTM
 {
     public const STATUS_DRAFT      = 'rascunho';
+    public const STATUS_APPROVAL   = 'aprovacao';
     public const STATUS_VALIDATION = 'validacao';
     public const STATUS_PUBLISHED  = 'publicado';
     public const STATUS_OBSOLETE   = 'obsoleto';
     public const STATUS_KEYS = [
-        self::STATUS_DRAFT, self::STATUS_VALIDATION, self::STATUS_PUBLISHED, self::STATUS_OBSOLETE,
+        self::STATUS_DRAFT, self::STATUS_APPROVAL, self::STATUS_VALIDATION, self::STATUS_PUBLISHED, self::STATUS_OBSOLETE,
     ];
+    /** Status "enviado": as duas etapas da validação. */
+    public const PENDING_STATUSES = [self::STATUS_APPROVAL, self::STATUS_VALIDATION];
+
+    /** Campos que só quem gere o documento escolhe (R3d). */
+    private const MANAGED_FIELDS = ['users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'];
     /** Status que o leitor comum (alvo) enxerga. */
     public const READER_STATUSES = [self::STATUS_PUBLISHED, self::STATUS_OBSOLETE];
 
@@ -87,7 +105,8 @@ class Document extends CommonDBTM
     {
         return [
             self::STATUS_DRAFT      => __('Rascunho', 'codexplus'),
-            self::STATUS_VALIDATION => __('Em validação', 'codexplus'),
+            self::STATUS_APPROVAL   => __('Aguardando gestor', 'codexplus'),
+            self::STATUS_VALIDATION => __('Aguardando auditor', 'codexplus'),
             self::STATUS_PUBLISHED  => __('Publicado', 'codexplus'),
             self::STATUS_OBSOLETE   => __('Obsoleto', 'codexplus'),
         ];
@@ -190,10 +209,44 @@ class Document extends CommonDBTM
             || (int) ($this->fields['users_id_owner'] ?? 0) === $me;
     }
 
+    /** É o auditor responsável deste documento (R3d)? */
+    public function isAuditor(): bool
+    {
+        $me = (int) Session::getLoginUserID();
+        return $me > 0 && (int) ($this->fields['users_id_auditor'] ?? 0) === $me;
+    }
+
+    /** É o revisor deste documento (R3d)? */
+    public function isReviewer(): bool
+    {
+        $me = (int) Session::getLoginUserID();
+        return $me > 0 && (int) ($this->fields['users_id_reviewer'] ?? 0) === $me;
+    }
+
     /** Tem algum papel no documento (vê em qualquer status). */
     public function hasRole(): bool
     {
-        return $this->isAuthorOrOwner() || $this->isEditor() || $this->isManager() || $this->isValidator();
+        return $this->isAuthorOrOwner() || $this->isEditor() || $this->isManager() || $this->isValidator()
+            || $this->isAuditor() || $this->isReviewer();
+    }
+
+    /**
+     * Quem responde pela etapa em que o documento está: gestores do setor
+     * (aprovacao) ou o auditor responsável (validacao). Para o aviso
+     * "aguardando …" da página. Vazio fora das duas etapas.
+     *
+     * @return int[]
+     */
+    public function pendingWith(): array
+    {
+        if ($this->status() === self::STATUS_APPROVAL) {
+            return SectorMember::usersOfRole($this->getSectorIds(), SectorMember::ROLE_MANAGER);
+        }
+        if ($this->status() === self::STATUS_VALIDATION) {
+            $a = (int) ($this->fields['users_id_auditor'] ?? 0);
+            return $a > 0 ? [$a] : [];
+        }
+        return [];
     }
 
     /** O usuário da sessão alterou o documento na revisão atual? */
@@ -293,6 +346,17 @@ class Document extends CommonDBTM
         return self::canUpdate() && $this->canUpdateItem();
     }
 
+    /** 1ª etapa (R3d): o gestor do setor aprova, mesmo tendo editado. */
+    public function canApprove(): bool
+    {
+        return $this->status() === self::STATUS_APPROVAL && $this->canManage();
+    }
+
+    /**
+     * 2ª etapa: o auditor responsável valida — com o bit Validar, ainda
+     * auditor do setor e sem ter alterado o documento nesta revisão. Ver
+     * todos dispensa tudo isso (Super-Admin pode tudo, Claudio, 21/09/2026).
+     */
     public function canValidate(): bool
     {
         if ($this->status() !== self::STATUS_VALIDATION || !self::bit(Rights::VALIDATE) || !$this->checkEntity()) {
@@ -301,7 +365,13 @@ class Document extends CommonDBTM
         if (self::hasViewAll()) {
             return true;
         }
-        return $this->isValidator() && !$this->isContributor();
+        return $this->isAuditor() && $this->isValidator() && !$this->isContributor();
+    }
+
+    /** Devolver para rascunho: quem pode decidir a etapa em que está. */
+    public function canReject(): bool
+    {
+        return $this->canApprove() || $this->canValidate();
     }
 
     public function canMarkObsolete(): bool
@@ -365,6 +435,42 @@ class Document extends CommonDBTM
     // ---------------------------------------------------------------------
 
     /**
+     * Alvos de leitura do documento, para a coluna "Permissões" (R3b2-a):
+     * grupos, depois perfis, depois usuários, cada bloco em ordem de nome.
+     * `ligacao` é o id da linha de ligação (é ela que se apaga ao tirar).
+     *
+     * @return array<int, array{tipo: string, ligacao: int, nome: string}>
+     */
+    public static function listTargets(int $documentId): array
+    {
+        $out = [];
+        $blocos = [
+            'group'   => [Document_Group::class, 'groups_id'],
+            'profile' => [Document_Profile::class, 'profiles_id'],
+            'user'    => [Document_User::class, 'users_id'],
+        ];
+        foreach ($blocos as $tipo => [$classe, $chave]) {
+            $bloco = [];
+            foreach ($classe::getForDocument($documentId) as $alvo => $linhas) {
+                foreach ($linhas as $linha) {
+                    $nome = $tipo === 'user'
+                        ? getUserName((int) $alvo)
+                        : \Dropdown::getDropdownName($tipo === 'group' ? 'glpi_groups' : 'glpi_profiles', (int) $alvo);
+                    // Alvo restrito a uma entidade (só pelo console, por ora):
+                    // a entidade aparece junto, para não parecer mais amplo do que é.
+                    if (($linha['no_entity_restriction'] ?? 1) == 0 && isset($linha['entities_id'])) {
+                        $nome .= ' (' . \Dropdown::getDropdownName('glpi_entities', (int) $linha['entities_id']) . ')';
+                    }
+                    $bloco[] = ['tipo' => $tipo, 'ligacao' => (int) $linha['id'], 'nome' => (string) $nome];
+                }
+            }
+            usort($bloco, static fn ($a, $b) => strcasecmp($a['nome'], $b['nome']));
+            $out = array_merge($out, $bloco);
+        }
+        return $out;
+    }
+
+    /**
      * Mesma regra de canViewItem(), para o construtor de consultas.
      * Formato de KnowbaseItem::getVisibilityCriteria(): ['LEFT JOIN', 'WHERE'].
      * Os LEFT JOIN multiplicam linhas: use 'DISTINCT' => true na consulta.
@@ -400,10 +506,13 @@ class Document extends CommonDBTM
 
         $groups = array_values($_SESSION['glpigroups'] ?? []);
 
-        // Papéis: autor, responsável, editor, gestor/validador do setor.
+        // Papéis: autor, responsável, auditor, revisor, editor, gestor/auditor do setor.
         $ors = [
             [$doc . '.users_id' => $me],
             [$doc . '.users_id_owner' => $me],
+            // R3d: auditor responsável e revisor também têm papel.
+            [$doc . '.users_id_auditor' => $me],
+            [$doc . '.users_id_reviewer' => $me],
         ];
 
         $edOr = [['users_id' => $me]];
@@ -471,19 +580,55 @@ class Document extends CommonDBTM
         if ($this->getSectorIds() === [] && !self::hasViewAll()) {
             return $this->deny(__('Sem categoria com setor: não há quem valide. Ligue o documento a uma categoria.', 'codexplus'));
         }
+        // 2ª etapa precisa de alguém: o auditor responsável, que ainda seja
+        // auditor do setor. Ver todos envia sem (e valida ele mesmo).
+        if (!self::hasViewAll()) {
+            $auditor = (int) ($this->fields['users_id_auditor'] ?? 0);
+            if ($auditor <= 0) {
+                return $this->deny(__('Escolha o auditor responsável antes de enviar.', 'codexplus'));
+            }
+            if (!in_array($auditor, SectorMember::usersOfRole($this->getSectorIds(), SectorMember::ROLE_VALIDATOR), true)) {
+                return $this->deny(__('O auditor escolhido não é mais auditor do setor. Escolha outro.', 'codexplus'));
+            }
+        }
         return $this->transition([
-            'status'             => self::STATUS_VALIDATION,
+            'status'             => self::STATUS_APPROVAL,
             'users_id_submitter' => (int) Session::getLoginUserID(),
             'date_submitted'     => $_SESSION['glpi_currenttime'],
+            'users_id_approver'  => 0,
+            'date_approved'      => null,
+            'validation_comment' => null,
         ]);
     }
 
-    /** Aprova: vira publicado. Quem alterou não aprova (salvo Ver todos). */
+    /** 1ª etapa: o gestor do setor aprova e o documento vai ao auditor. */
+    public function managerApprove(): bool
+    {
+        if (!$this->canApprove()) {
+            return $this->deny(__('Sem direito de aprovar este documento (é preciso ser gestor do setor).', 'codexplus'));
+        }
+        return $this->transition([
+            'status'            => self::STATUS_VALIDATION,
+            'users_id_approver' => (int) Session::getLoginUserID(),
+            'date_approved'     => $_SESSION['glpi_currenttime'],
+        ]);
+    }
+
+    /**
+     * 2ª etapa: o auditor valida e o documento é publicado. Janela de
+     * revisão vazia é calculada aqui pela regra do tipo.
+     */
     public function approve(): bool
     {
         if (!$this->canValidate()) {
-            if ($this->status() === self::STATUS_VALIDATION && $this->isValidator() && $this->isContributor()) {
+            if ($this->status() === self::STATUS_VALIDATION && $this->isAuditor() && $this->isContributor()) {
                 return $this->deny(__('Você alterou este documento nesta revisão: outra pessoa precisa validar.', 'codexplus'));
+            }
+            if ($this->status() === self::STATUS_APPROVAL) {
+                return $this->deny(__('Ainda na 1ª etapa: falta a aprovação do gestor do setor.', 'codexplus'));
+            }
+            if ($this->status() === self::STATUS_VALIDATION && !$this->isAuditor()) {
+                return $this->deny(__('Só o auditor responsável valida este documento.', 'codexplus'));
             }
             return $this->deny(__('Sem direito de validar este documento.', 'codexplus'));
         }
@@ -493,14 +638,42 @@ class Document extends CommonDBTM
             'date_validated'     => $_SESSION['glpi_currenttime'],
             'validation_comment' => null,
         ], $this->fields['date_published'] ?? null);
+        if (empty($this->fields['review_start']) && empty($this->fields['review_end'])) {
+            $win = self::defaultWindow(
+                (string) ($data['date_published'] ?? $this->fields['date_published'] ?? $_SESSION['glpi_currenttime']),
+                (int) ($this->fields['validity_months'] ?? 0)
+            );
+            if ($win !== null) {
+                $data['review_start'] = $win[0];
+                $data['review_end']   = $win[1];
+            }
+        }
         return $this->transition($data);
     }
 
-    /** Devolve para rascunho com o motivo (obrigatório). */
+    /**
+     * Janela padrão da revisão (R3d): fim = publicação + validade do tipo;
+     * início = fim - 30 dias (a mesma janela do "a vencer"). Validade 0
+     * (proposta, diversos): sem janela, quem publica define.
+     *
+     * @return array{0: string, 1: string}|null  [início, fim] em Y-m-d
+     */
+    public static function defaultWindow(string $published, int $months): ?array
+    {
+        $base = strtotime($published);
+        if ($months <= 0 || $base === false) {
+            return null;
+        }
+        $end = strtotime('+' . $months . ' months', $base);
+        $start = strtotime('-' . DocumentMeta::EXPIRY_WINDOW_DAYS . ' days', $end);
+        return [date('Y-m-d', $start), date('Y-m-d', $end)];
+    }
+
+    /** Devolve para rascunho com o motivo (obrigatório), em qualquer das etapas. */
     public function reject(string $comment): bool
     {
-        if (!$this->canValidate()) {
-            return $this->deny(__('Sem direito de validar este documento.', 'codexplus'));
+        if (!$this->canReject()) {
+            return $this->deny(__('Sem direito de devolver este documento.', 'codexplus'));
         }
         $comment = trim($comment);
         if ($comment === '') {
@@ -585,8 +758,79 @@ class Document extends CommonDBTM
             $input['validity_months'] = DocumentMeta::defaultValidity((string) $input['doctype']);
         }
         unset($input['date_published'], $input['users_id_validator'], $input['date_validated'],
-            $input['users_id_submitter'], $input['date_submitted'], $input['validation_comment']);
+            $input['users_id_submitter'], $input['date_submitted'], $input['validation_comment'],
+            $input['users_id_approver'], $input['date_approved']);
 
+        // Auditor, revisor e janela já na criação (R3d). Quem cria é gestor
+        // de todos os setores das categorias (ou Ver todos): pode escolher.
+        return $this->checkManagedFields($input, self::sectorsOfCategories($cats), true);
+    }
+
+    /**
+     * Auditor, revisor e janela de revisão (R3d): normaliza e confere.
+     *   - só quem gere o documento muda (na criação, quem cria já gere);
+     *   - o auditor muda só em rascunho e tem que ser auditor do setor;
+     *   - janela: as duas datas ou nenhuma, e início até o fim.
+     * Devolve o input ou false (com a mensagem na sessão).
+     *
+     * @param int[] $sectors setores do documento
+     * @return array<string, mixed>|false
+     */
+    private function checkManagedFields(array $input, array $sectors, bool $novo)
+    {
+        $old = static function (string $f, array $fields) {
+            if (str_starts_with($f, 'review_')) {
+                return empty($fields[$f]) ? null : substr((string) $fields[$f], 0, 10);
+            }
+            return (int) ($fields[$f] ?? 0);
+        };
+        $atual   = $novo ? [] : $this->fields;
+        $mudou   = [];
+        foreach (self::MANAGED_FIELDS as $f) {
+            if (!array_key_exists($f, $input)) {
+                continue;
+            }
+            if (str_starts_with($f, 'review_')) {
+                $v = trim((string) ($input[$f] ?? ''));
+                if ($v === '' || strtoupper($v) === 'NULL') {
+                    $input[$f] = null;
+                } else {
+                    $d = \DateTime::createFromFormat('!Y-m-d', substr($v, 0, 10));
+                    if ($d === false || $d->format('Y-m-d') !== substr($v, 0, 10)) {
+                        return $this->deny(__('Data da janela de revisão inválida.', 'codexplus'));
+                    }
+                    $input[$f] = $d->format('Y-m-d');
+                }
+            } else {
+                $input[$f] = max(0, (int) $input[$f]);
+            }
+            if ($input[$f] !== $old($f, $atual)) {
+                $mudou[$f] = true;
+            }
+        }
+        if ($mudou === []) {
+            return $input;
+        }
+        if (!$novo && !$this->canManage()) {
+            return $this->deny(__('Só quem gere o documento escolhe auditor, revisor e janela de revisão.', 'codexplus'));
+        }
+        if (isset($mudou['users_id_auditor'])) {
+            if (!$novo && $this->status() !== self::STATUS_DRAFT) {
+                return $this->deny(__('O auditor responsável só muda em rascunho.', 'codexplus'));
+            }
+            $a = (int) $input['users_id_auditor'];
+            if ($a > 0 && !in_array($a, SectorMember::usersOfRole($sectors, SectorMember::ROLE_VALIDATOR), true)) {
+                return $this->deny(__('O auditor responsável tem que ser auditor do setor do documento.', 'codexplus'));
+            }
+        }
+        $ini = array_key_exists('review_start', $input) ? $input['review_start'] : $old('review_start', $atual);
+        $fim = array_key_exists('review_end', $input) ? $input['review_end'] : $old('review_end', $atual);
+        if (($ini === null) !== ($fim === null)) {
+            return $this->deny(__('Informe as duas datas da janela de revisão, ou nenhuma.', 'codexplus'));
+        }
+        if ($ini !== null && $ini > $fim) {
+            return $this->deny(__('A janela de revisão começa depois de terminar.', 'codexplus'));
+        }
         return $input;
     }
 
@@ -619,9 +863,9 @@ class Document extends CommonDBTM
         if (!$this->inTransition) {
             // Status e dados de validação só mudam pelos métodos de fluxo.
             foreach (['status', 'users_id_submitter', 'date_submitted', 'users_id_validator',
-                'date_validated', 'validation_comment', 'date_published'] as $f) {
+                'date_validated', 'validation_comment', 'date_published', 'users_id_approver', 'date_approved'] as $f) {
                 if (array_key_exists($f, $input) && (string) $input[$f] !== (string) ($this->fields[$f] ?? '')) {
-                    return $this->deny(__('O status muda só pelo fluxo: enviar para validação, validar, devolver ou tornar obsoleto.', 'codexplus'));
+                    return $this->deny(__('O status muda só pelo fluxo: enviar, aprovar, validar, devolver ou tornar obsoleto.', 'codexplus'));
                 }
                 unset($input[$f]);
             }
@@ -632,6 +876,10 @@ class Document extends CommonDBTM
                         return $this->deny(__('Documento fora de rascunho não pode ser alterado.', 'codexplus'));
                     }
                 }
+            }
+            $input = $this->checkManagedFields($input, $this->getSectorIds(), false);
+            if ($input === false) {
+                return false;
             }
         }
 
@@ -831,6 +1079,37 @@ class Document extends CommonDBTM
             'datatype'      => 'text',
             'massiveaction' => false,
         ];
+        // R3d — sem opção de busca o Histórico não registra o campo (achado 33).
+        foreach ([
+            ['16', 'users_id_auditor', __('Auditor responsável', 'codexplus')],
+            ['17', 'users_id_approver', __('Aprovado pelo gestor', 'codexplus')],
+            ['18', 'users_id_reviewer', __('Revisor', 'codexplus')],
+        ] as [$sid, $link, $rotulo]) {
+            $tab[] = [
+                'id'            => $sid,
+                'table'         => 'glpi_users',
+                'field'         => 'name',
+                'linkfield'     => $link,
+                'name'          => $rotulo,
+                'datatype'      => 'dropdown',
+                'right'         => 'all',
+                'massiveaction' => false,
+            ];
+        }
+        foreach ([
+            ['20', 'date_approved', __('Aprovado em', 'codexplus'), 'datetime'],
+            ['22', 'review_start', __('Revisão: início', 'codexplus'), 'date'],
+            ['23', 'review_end', __('Revisão: fim', 'codexplus'), 'date'],
+        ] as [$sid, $campo, $rotulo, $tipo]) {
+            $tab[] = [
+                'id'            => $sid,
+                'table'         => static::getTable(),
+                'field'         => $campo,
+                'name'          => $rotulo,
+                'datatype'      => $tipo,
+                'massiveaction' => false,
+            ];
+        }
         $tab[] = [
             'id'            => '19',
             'table'         => static::getTable(),

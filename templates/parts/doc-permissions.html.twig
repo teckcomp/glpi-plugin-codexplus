@@ -1,0 +1,59 @@
+{# Codex+ — coluna "Permissões" da página do documento (bloco R3b2-a).
+   Layout decidido por Claudio em 20/09/2026: fica na própria página, à
+   direita de Categorias e Responsável, e não em abas.
+   Nesta etapa: alvos de LEITURA (grupo, perfil, usuário). Editores entram
+   na R3b2-b, nesta mesma coluna.
+
+   Não é formulário: pode estar dentro do formulário de edição ou fora dele
+   (documento publicado). Tudo vai por public/js/codexplus-perm.js para
+   ajax/document.targets.php, que confere de novo quem pode.
+   A marcação dos itens da lista é repetida no JS (listaHtml): mudou uma,
+   mude a outra.
+
+   Variáveis: perm (show, can_manage, targets, widgets, url), id, csrf_token. #}
+<aside class="cx-perm" data-cx-perm data-url="{{ perm.url }}" data-doc="{{ id }}"
+       data-manage="{{ perm.can_manage ? '1' : '0' }}" aria-label="{{ __('Permissões', 'codexplus') }}">
+    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+
+    <h3 class="cx-perm-title"><i class="ti ti-lock-access"></i> {{ __('Permissões', 'codexplus') }}</h3>
+
+    <div class="cx-perm-block">
+        <div class="cx-perm-sub">{{ __('Leitura', 'codexplus') }}</div>
+        <ul class="cx-perm-list" data-cxp-list>
+            {% for t in perm.targets %}
+                <li class="cx-perm-item" data-tipo="{{ t.tipo }}" data-ligacao="{{ t.ligacao }}">
+                    <i class="ti {{ t.tipo == 'group' ? 'ti-users' : (t.tipo == 'profile' ? 'ti-id-badge-2' : 'ti-user') }}"
+                       title="{{ t.tipo == 'group' ? __('Grupo', 'codexplus') : (t.tipo == 'profile' ? __('Perfil', 'codexplus') : __('Usuário', 'codexplus')) }}"></i>
+                    <span class="cx-perm-name">{{ t.nome }}</span>
+                    {% if perm.can_manage %}
+                        <button type="button" class="cx-perm-del" data-cxp-del
+                                aria-label="{{ __('Tirar', 'codexplus') }} {{ t.nome }}" title="{{ __('Tirar', 'codexplus') }}">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="cx-perm-empty" data-cxp-empty {% if perm.targets %}hidden{% endif %}>
+            {{ __('Nenhum leitor. Só quem tem papel no documento o vê.', 'codexplus') }}
+        </p>
+
+        {% if perm.can_manage %}
+            <div class="cx-perm-add">
+                {% for tipo, rotulo in {'group': __('Grupo', 'codexplus'), 'profile': __('Perfil', 'codexplus'), 'user': __('Usuário', 'codexplus')} %}
+                    <div class="cx-perm-row">
+                        <label class="cx-perm-lbl">{{ rotulo }}</label>
+                        <div class="cx-perm-sel" data-cxp-sel="{{ tipo }}">{{ perm.widgets[tipo]|raw }}</div>
+                        <button type="button" class="codexplus-btn cx-perm-addbtn" data-cxp-add="{{ tipo }}">
+                            <i class="ti ti-plus"></i> {{ __('Adicionar', 'codexplus') }}
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="cx-perm-msg" data-cxp-msg role="status" aria-live="polite"></div>
+            <div class="codexplus-form-hint">
+                {{ __('Leitores só veem a versão publicada. Grupo e perfil valem em todas as entidades. A mudança vale na hora, sem precisar salvar.', 'codexplus') }}
+            </div>
+        {% endif %}
+    </div>
+</aside>

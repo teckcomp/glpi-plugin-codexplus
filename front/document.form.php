@@ -150,6 +150,52 @@ if ($id > 0) {
 }
 
 // -------------------------------------------------------------------------
+// POST — duplicar (R3b2-b, parte 2)
+// Documento NOVO, com código novo, a partir deste: título, categorias,
+// corpo (ou diagrama) e cliente, em rascunho. Copia o que está GRAVADO — numa
+// revisão em andamento, a revisão. Não copia papéis, leitores, editores,
+// auditor, revisor nem janela: o novo documento nasce como qualquer outro, e
+// quem duplica escolhe tudo isso na página dele.
+// Quem pode: quem lê o documento e pode criar em TODAS as categorias dele (a
+// mesma regra da criação: Document::canCreateIn).
+// -------------------------------------------------------------------------
+if ($id > 0 && isset($_POST['duplicate'])) {
+    $cats = Document_Category::getCategoryIds($id);
+    if (!Document::canCreateIn($cats)) {
+        Session::addMessageAfterRedirect(
+            __('Para duplicar, é preciso poder criar documento em todas as categorias deste (ser gestor do setor de cada uma).', 'codexplus'),
+            false,
+            ERROR
+        );
+        Html::redirect($self . '?id=' . $id);
+    }
+    $copia = [
+        'name'           => sprintf(__('%s (cópia)', 'codexplus'), (string) $doc->fields['name']),
+        'doctype'        => (string) $doc->fields['doctype'],
+        'content'        => (string) ($doc->fields['content'] ?? ''),
+        'users_id_owner' => (int) Session::getLoginUserID(),
+        '_categories'    => $cats,
+    ];
+    if ($copia['doctype'] === 'PRP') {
+        $copia['client_name'] = (string) ($doc->fields['client_name'] ?? '');
+    }
+    $novo  = new Document();
+    $newId = $novo->add($copia);
+    if (!$newId) {
+        Html::redirect($self . '?id=' . $id);
+    }
+    if ($copia['doctype'] === 'DIA') {
+        $d = Diagram::load($id);
+        Diagram::save((int) $newId, $d['data'] ?? Diagram::starter());
+    }
+    Session::addMessageAfterRedirect(sprintf(
+        __('Cópia criada como rascunho, com código novo (%s). Escolha auditor, revisor e permissões antes de enviar.', 'codexplus'),
+        $novo->getCode()
+    ));
+    Html::redirect($self . '?id=' . $newId);
+}
+
+// -------------------------------------------------------------------------
 // POST — salvar edição
 // -------------------------------------------------------------------------
 if ($id > 0 && isset($_POST['update'])) {
@@ -629,6 +675,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         && $doc->isContributor()
         && !Session::haveRight(Rights::NAME, Rights::VIEWALL),
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
+    // R3b2-b parte 2: duplicar = poder criar em todas as categorias dele.
+    'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
     // R6-a
     'version'      => $version,
     'revinfo'      => $revinfo,

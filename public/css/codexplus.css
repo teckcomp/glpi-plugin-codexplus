@@ -1296,6 +1296,9 @@
    .codexplus-status--*, .cx-code-chip e .cx-card; aqui só o que faltava.
    ========================================================================= */
 .cx-docform-ident { display: flex; align-items: center; gap: 8px; }
+/* R3b2-b parte 2: Duplicar ao lado do código; ações dentro dos avisos. */
+.cx-docform-dup { margin: 0 0 0 6px; }
+.cx-notice-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .cx-docform-title { font-size: 1.25rem; font-weight: 600; }
 .cx-docform-grid {
     display: grid;

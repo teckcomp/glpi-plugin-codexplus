@@ -382,6 +382,20 @@ precisa, e o campo Cliente só em proposta.
 - **Limitação conhecida:** criação recusada (auditor fora do setor, janela
   com uma data só) volta com o formulário vazio. A tela evita os dois casos.
 
+#### Duplicar e botões da versão publicada (R3b2-b, parte 2, 22/09/2026)
+
+- **Duplicar** (botão ao lado do código): documento NOVO, com código novo,
+  a partir de um existente — título com "(cópia)", categorias, corpo (ou
+  diagrama) e, em proposta, o cliente. Copia o que está **gravado** (numa
+  revisão em andamento, a revisão). Responsável = quem duplica. **Não copia**
+  auditor, revisor, janela, leitores nem editores: a cópia nasce como
+  qualquer documento novo. Quem pode: quem lê o documento e pode criar em
+  todas as categorias dele (`Document::canCreateIn`, a regra da criação).
+  Não aparece na visão de uma versão publicada (`?version=N`).
+- **"Ver a versão publicada"** e **"Voltar para a revisão em andamento"**
+  deixaram de ser link no meio do texto e viraram botões dentro do aviso
+  (`.cx-notice-actions`) — Claudio não os achava.
+
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
 Decisões de Claudio, 21/09/2026, sobre as da R3c:

@@ -15,6 +15,19 @@
                 <span class="codexplus-code cx-code-chip">{{ code }}</span>
                 <span class="codexplus-muted">{{ doctype_label }}</span>
                 <span class="codexplus-status codexplus-status--{{ status }}">{{ status_label }}</span>
+                {% if can_duplicate %}
+                    {# R3b2-b parte 2: documento novo, código novo. Fora do
+                       formulário de edição: copia o que está gravado. #}
+                    <form method="post" action="{{ self }}" class="cx-docform-dup">
+                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="id" value="{{ id }}">
+                        <button type="submit" name="duplicate" value="1" class="codexplus-btn"
+                                title="{{ __('Cria um documento novo, com código novo, a partir deste', 'codexplus') }}"
+                                onclick="return confirm('{{ __('Criar um documento NOVO, com código novo, a partir deste? A cópia leva título, categorias e conteúdo como estão gravados (o que não foi salvo fica de fora), e nasce em rascunho sem auditor, revisor nem permissões.', 'codexplus')|e('js') }}');">
+                            <i class="ti ti-copy"></i> {{ __('Duplicar', 'codexplus') }}
+                        </button>
+                    </form>
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -30,7 +43,11 @@
                 {% else %}
                     <strong>{{ __('Versão publicada %s', 'codexplus')|format(version.code) }}</strong> —
                     {{ __('é o que os leitores veem enquanto a revisão não é validada.', 'codexplus') }}
-                    <a href="{{ version.link }}">{{ __('Voltar para a revisão em andamento', 'codexplus') }}</a>
+                    <div class="cx-notice-actions">
+                        <a href="{{ version.link }}" class="codexplus-btn codexplus-btn-primary">
+                            <i class="ti ti-pencil"></i> {{ __('Voltar para a revisão em andamento', 'codexplus') }}
+                        </a>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -41,7 +58,11 @@
             <div>
                 <strong>{{ __('Revisão %s em andamento.', 'codexplus')|format(code) }}</strong>
                 {{ __('Os leitores continuam vendo a versão publicada %s até esta ser validada.', 'codexplus')|format(revinfo.prev_code) }}
-                <a href="{{ revinfo.link }}">{{ __('Ver a versão publicada', 'codexplus') }}</a>
+                <div class="cx-notice-actions">
+                    <a href="{{ revinfo.link }}" class="codexplus-btn">
+                        <i class="ti ti-eye"></i> {{ __('Ver a versão publicada %s', 'codexplus')|format(revinfo.prev_code) }}
+                    </a>
+                </div>
             </div>
         </div>
     {% endif %}

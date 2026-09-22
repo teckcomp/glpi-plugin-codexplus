@@ -131,9 +131,13 @@
                     {% endif %}
 
                     {% if is_new or doctype == 'PRP' %}
-                        <div class="cx-docform-field">
-                            <label for="cx-docform-client">{{ __('Cliente (só propostas)', 'codexplus') }}</label>
+                        {# Só em proposta. Na criação o tipo ainda pode mudar: o
+                           campo aparece quando o tipo escolhido é PRP
+                           (public/js/codexplus-docform.js). #}
+                        <div class="cx-docform-field" data-cx-only-type="PRP" {% if is_new %}hidden{% endif %}>
+                            <label for="cx-docform-client">{{ __('Cliente', 'codexplus') }}</label>
                             <input type="text" id="cx-docform-client" name="client_name" value="{{ client_name }}" class="form-control">
+                            <div class="codexplus-form-hint">{{ __('A quem a proposta se destina. Sai na identificação do documento e no PDF.', 'codexplus') }}</div>
                         </div>
                     {% endif %}
                 </div>
@@ -201,7 +205,10 @@
                     <div class="codexplus-doc-edit-zone cx-docform-roles">
                         <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                         <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
-                        <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                        {# R3b2-b: com a coluna Permissões na tela, os editores estão nela. #}
+                        {% if not perm.show %}
+                            <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                        {% endif %}
                     </div>
                 {% endif %}
             </article>
@@ -231,7 +238,9 @@
                 <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
                 <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
-                <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                {% if not perm.show or version.on %}
+                    <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
+                {% endif %}
                 {% if status == 'publicado' and validator_name %}
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
                 {% endif %}

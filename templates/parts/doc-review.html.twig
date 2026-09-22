@@ -2,15 +2,21 @@
    Decisão de Claudio, 21/09/2026: validação em duas etapas (1ª o gestor do
    setor, 2ª o auditor responsável) e revisão periódica com um papel próprio
    (revisor) e uma janela no calendário, com início e fim.
-   Entra dentro de um .cx-docform-grid: na edição (formulário do documento)
-   e, fora de rascunho, no formulário "Salvar revisão periódica".
+   Entra dentro de um .cx-docform-grid: na criação e na edição (formulário
+   do documento) e, fora de rascunho, no formulário "Salvar revisão
+   periódica". Na criação (R3b2-b) a lista de auditores nasce vazia e
+   acompanha as categorias marcadas.
    Variável: review (ver front/document.form.php). #}
 
-<div class="cx-docform-field cx-docform-field--wide">
+<div class="cx-docform-field cx-docform-field--wide"{% if review.can_auditor %} data-cx-auditor data-url="{{ review.auditors_url }}"{% endif %}>
     <label>{{ __('Auditor responsável', 'codexplus') }}</label>
     {% if review.can_auditor %}
         {{ review.auditor_widget|raw }}
-        <div class="codexplus-form-hint">
+        {# R3b2-b: a lista acompanha as categorias marcadas (public/js/codexplus-docform.js). #}
+        <div class="codexplus-form-hint" data-cx-auditor-empty {% if not review.is_new %}hidden{% endif %}>
+            {{ __('Escolha a categoria primeiro: só aparecem os auditores do setor dela. Se o setor ainda não tiver auditor, dá para escolher depois, antes de enviar para validação.', 'codexplus') }}
+        </div>
+        <div class="codexplus-form-hint" data-cx-auditor-hint {% if review.is_new %}hidden{% endif %}>
             {% if review.no_auditors %}
                 {{ __('O setor deste documento ainda não tem auditor. Os auditores do setor são cadastrados nos papéis do setor.', 'codexplus') }}
             {% else %}
@@ -41,7 +47,9 @@
             </div>
         </div>
         <div class="codexplus-form-hint">
-            {% if review.validity_months > 0 %}
+            {% if review.is_new %}
+                {{ __('Em branco, a janela é calculada na publicação pela validade do tipo (POP e PSG 12 meses, Manual 6, Diagrama 3): termina nesse prazo e começa 30 dias antes do fim. Proposta: defina as duas datas.', 'codexplus') }}
+            {% elseif review.validity_months > 0 %}
                 {{ __('Em branco, a janela é calculada na publicação: termina %d meses depois e começa 30 dias antes do fim. O documento vence no fim da janela.', 'codexplus')|format(review.validity_months) }}
             {% else %}
                 {{ __('Este tipo não tem validade padrão: defina as duas datas.', 'codexplus') }}

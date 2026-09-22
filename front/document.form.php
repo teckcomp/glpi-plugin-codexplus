@@ -13,8 +13,9 @@
  * chama can*() e os métodos do fluxo. Nenhuma regra nova nesta página.
  *
  * Desde a R3b2-a, alvos de leitura pela coluna "Permissões" (endpoint
- * ajax/document.targets.php). Fora ainda (ROADMAP, R3b2-b a R3b4): editores
- * pela tela (hoje: pelo console), imagens coladas e anexos, leitura com PDF, e
+ * ajax/document.targets.php); desde a R3b2-b, editores na mesma coluna e a
+ * criação já com responsável, auditor, revisor, janela e permissões. Fora
+ * ainda (ROADMAP, R3b3 a R3b4): imagens coladas e anexos, leitura com PDF, e
  * trocar o "Novo documento" antigo. Por isso o TinyMCE está com
  * enable_images = false: imagem colada ainda não teria onde ser guardada.
  *
@@ -67,9 +68,21 @@ if (isset($_POST['add'])) {
         'name'        => (string) ($_POST['name'] ?? ''),
         'doctype'     => (string) ($_POST['doctype'] ?? ''),
         'content'     => (string) ($_POST['content'] ?? ''),
-        'client_name' => (string) ($_POST['client_name'] ?? ''),
         '_categories' => $postedCategories(),
     ];
+    // Cliente só existe em proposta (o campo some da tela nos outros tipos;
+    // aqui garante que valor esquecido nele não seja gravado).
+    if ($input['doctype'] === 'PRP') {
+        $input['client_name'] = (string) ($_POST['client_name'] ?? '');
+    }
+    // R3b2-b: responsável, auditor, revisor e janela já na criação. Quem cria
+    // gere o documento (é gestor do setor de todas as categorias, ou Ver
+    // todos); Document::prepareInputForAdd confere auditor e janela.
+    foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'] as $f) {
+        if (isset($_POST[$f])) {
+            $input[$f] = (string) $_POST[$f];
+        }
+    }
     if (!$doc->can(-1, CREATE, $input)) {
         Session::addMessageAfterRedirect(
             __('Sem direito de criar documento nestas categorias (é preciso ser gestor do setor de cada uma).', 'codexplus'),
@@ -85,6 +98,40 @@ if (isset($_POST['add'])) {
     }
     if ($newId) {
         Session::addMessageAfterRedirect(__('Documento criado como rascunho.', 'codexplus'));
+
+        // R3b2-b: leitores e editores escolhidos antes de o documento existir
+        // chegam como "tipo:id" (_cxn_perm[]) e são gravados agora, pelas
+        // mesmas classes e checagens do endpoint da coluna Permissões. Se
+        // algum falhar, o rascunho fica criado e a mensagem diz qual.
+        $falhas = [];
+        foreach (array_unique((array) ($_POST['_cxn_perm'] ?? [])) as $par) {
+            [$tipo, $alvo] = array_pad(explode(':', (string) $par, 2), 2, '0');
+            $linha = Document::permRow($tipo, (int) $newId, (int) $alvo);
+            if ($linha === null || (int) $alvo <= 0) {
+                continue;
+            }
+            $classe = Document::PERM_TYPES[$tipo][0];
+            $rel    = new $classe();
+            // Busca de repetido ANTES do can(): ele recebe o input por
+            // referência e acrescenta campos (ver ajax/document.targets.php).
+            if (
+                countElementsInTable($classe::getTable(), $linha) > 0
+                || ($rel->can(-1, CREATE, $linha) && $rel->add($linha))
+            ) {
+                continue;
+            }
+            $falhas[] = str_starts_with($tipo, 'editor_')
+                ? ($tipo === 'editor_user' ? getUserName((int) $alvo) : Dropdown::getDropdownName('glpi_groups', (int) $alvo))
+                : ($tipo === 'user' ? getUserName((int) $alvo)
+                    : Dropdown::getDropdownName($tipo === 'group' ? 'glpi_groups' : 'glpi_profiles', (int) $alvo));
+        }
+        if ($falhas) {
+            Session::addMessageAfterRedirect(
+                sprintf(__('Rascunho criado, mas não foi possível dar acesso a: %s. Tente de novo pela coluna Permissões.', 'codexplus'), implode(', ', $falhas)),
+                false,
+                WARNING
+            );
+        }
         Html::redirect($self . '?id=' . $newId);
     }
     Html::back();
@@ -342,10 +389,11 @@ if ($canEdit) {
             'width'   => '100%',
         ]);
     }
-    if ($canManage) {
+    if ($canManage || $isNew) {
+        // Na criação, o responsável começa sendo quem cria (troca na hora).
         $widgets['owner'] = User::dropdown([
             'name'    => 'users_id_owner',
-            'value'   => (int) ($doc->fields['users_id_owner'] ?? 0),
+            'value'   => $isNew ? (int) Session::getLoginUserID() : (int) ($doc->fields['users_id_owner'] ?? 0),
             'right'   => 'all',
             'display' => false,
             'width'   => '100%',
@@ -384,18 +432,28 @@ if (!$isNew) {
 // R3b2-a: coluna "Permissões" com os alvos de leitura. Quem gere o documento
 // muda (em qualquer status: é acesso, não conteúdo); quem tem papel nele ou
 // Ver todos só vê a lista. O leitor comum não vê quem mais lê.
+// R3b2-b: editores na mesma coluna, e a coluna já na criação ("pendente":
+// a lista fica no formulário e é gravada logo depois do Criar rascunho).
 $perm = [
     'show'       => false,
+    'pending'    => false,
     'can_manage' => false,
     'targets'    => [],
-    'widgets'    => ['group' => '', 'profile' => '', 'user' => ''],
+    'editors'    => [],
+    'widgets'    => ['group' => '', 'profile' => '', 'user' => '', 'editor_user' => '', 'editor_group' => ''],
     'url'        => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.targets.php',
 ];
-if (!$isNew && ($canManage || $doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL))) {
+// Na criação, gerir = Atualizar (quem cria já é gestor do setor de todas as
+// categorias, ou Ver todos: Document::canCreateIn). Sem Atualizar, a coluna
+// não aparece — as ligações seriam recusadas depois de criar.
+$manageNew = $isNew && Document::canUpdate();
+if ($manageNew || (!$isNew && ($canManage || $doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL)))) {
     $perm['show']       = true;
-    $perm['can_manage'] = $canManage;
-    $perm['targets']    = Document::listTargets($id);
-    if ($canManage) {
+    $perm['pending']    = $isNew;
+    $perm['can_manage'] = $manageNew || $canManage;
+    $perm['targets']    = $isNew ? [] : Document::listTargets($id);
+    $perm['editors']    = $isNew ? [] : Document::listEditors($id);
+    if ($perm['can_manage']) {
         // Nomes com "_cxt_": o Salvar do formulário não os lê. Os três vão
         // pelo endpoint, que confere de novo quem pode (TargetRelation).
         $perm['widgets']['group'] = Group::dropdown([
@@ -414,6 +472,17 @@ if (!$isNew && ($canManage || $doc->hasRole() || Session::haveRight(Rights::NAME
             'display' => false,
             'width'   => '100%',
         ]);
+        $perm['widgets']['editor_user'] = User::dropdown([
+            'name'    => '_cxt_editor_user',
+            'right'   => 'all',
+            'display' => false,
+            'width'   => '100%',
+        ]);
+        $perm['widgets']['editor_group'] = Group::dropdown([
+            'name'    => '_cxt_editor_group',
+            'display' => false,
+            'width'   => '100%',
+        ]);
     }
 }
 
@@ -424,7 +493,9 @@ $status = $isNew ? Document::STATUS_DRAFT : (string) $doc->fields['status'];
 // em qualquer status. Quem não gere o documento só vê.
 $fmtDate = static fn ($d) => empty($d) ? '' : substr((string) $d, 0, 10);
 $review = [
-    'show'             => !$isNew,
+    'show'             => true,
+    'is_new'           => $isNew,
+    'auditors_url'     => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.auditors.php',
     'can_auditor'      => false,
     'can_review'       => false,
     'auditor_widget'   => '',
@@ -438,6 +509,25 @@ $review = [
 ];
 $pending = ['label' => '', 'names' => []];
 $missingRight = '';
+if ($isNew) {
+    // R3b2-b: quem cria gere o documento. O auditor depende do setor, que
+    // depende das categorias: a lista nasce vazia e o JS a recarrega a cada
+    // troca de categoria (ajax/document.auditors.php).
+    $review['can_auditor']    = true;
+    $review['can_review']     = true;
+    $review['auditor_widget'] = Dropdown::showFromArray('users_id_auditor', [0 => Dropdown::EMPTY_VALUE], [
+        'value'   => 0,
+        'display' => false,
+        'width'   => '100%',
+    ]);
+    $review['reviewer_widget'] = User::dropdown([
+        'name'    => 'users_id_reviewer',
+        'value'   => 0,
+        'right'   => 'all',
+        'display' => false,
+        'width'   => '100%',
+    ]);
+}
 if (!$isNew) {
     $auditorId  = (int) ($doc->fields['users_id_auditor'] ?? 0);
     $reviewerId = (int) ($doc->fields['users_id_reviewer'] ?? 0);

@@ -518,6 +518,70 @@ class Document extends CommonDBTM
     }
 
     /**
+     * Tipos da coluna "Permissões" (R3b2-a leitores, R3b2-b editores):
+     * tipo => [classe da ligação, chave do alvo]. Fonte única para o endpoint
+     * ajax/document.targets.php e para a criação (front/document.form.php).
+     */
+    public const PERM_TYPES = [
+        'group'        => [Document_Group::class, 'groups_id'],
+        'profile'      => [Document_Profile::class, 'profiles_id'],
+        'user'         => [Document_User::class, 'users_id'],
+        'editor_user'  => [DocumentEditor::class, 'users_id'],
+        'editor_group' => [DocumentEditor::class, 'groups_id'],
+    ];
+
+    /**
+     * Linha de ligação para gravar um alvo da coluna "Permissões".
+     * Editor é usuário OU grupo: o outro lado vai zerado (DocumentEditor).
+     *
+     * @return array<string, int>|null null = tipo desconhecido
+     */
+    public static function permRow(string $tipo, int $documentId, int $alvo): ?array
+    {
+        if (!isset(self::PERM_TYPES[$tipo])) {
+            return null;
+        }
+        [$classe, $chave] = self::PERM_TYPES[$tipo];
+        if ($classe === DocumentEditor::class) {
+            return [
+                DocumentEditor::$items_id => $documentId,
+                'users_id'                => $chave === 'users_id' ? $alvo : 0,
+                'groups_id'               => $chave === 'groups_id' ? $alvo : 0,
+            ];
+        }
+        return [$classe::$items_id_1 => $documentId, $chave => $alvo];
+    }
+
+    /**
+     * Editores do documento, para a coluna "Permissões" (R3b2-b): grupos,
+     * depois usuários, cada bloco por nome. Mesmo formato de listTargets().
+     *
+     * @return array<int, array{tipo: string, ligacao: int, nome: string}>
+     */
+    public static function listEditors(int $documentId): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $grupos = $usuarios = [];
+        foreach ($DB->request([
+            'FROM'  => DocumentEditor::getTable(),
+            'WHERE' => [DocumentEditor::$items_id => $documentId],
+        ]) as $row) {
+            if ((int) $row['users_id'] > 0) {
+                $usuarios[] = ['tipo' => 'editor_user', 'ligacao' => (int) $row['id'], 'nome' => (string) getUserName((int) $row['users_id'])];
+            } elseif ((int) $row['groups_id'] > 0) {
+                $grupos[] = ['tipo' => 'editor_group', 'ligacao' => (int) $row['id'],
+                    'nome' => (string) \Dropdown::getDropdownName('glpi_groups', (int) $row['groups_id'])];
+            }
+        }
+        $ordem = static fn ($a, $b) => strcasecmp($a['nome'], $b['nome']);
+        usort($grupos, $ordem);
+        usort($usuarios, $ordem);
+        return array_merge($grupos, $usuarios);
+    }
+
+    /**
      * Mesma regra de canViewItem(), para o construtor de consultas.
      * Formato de KnowbaseItem::getVisibilityCriteria(): ['LEFT JOIN', 'WHERE'].
      * Os LEFT JOIN multiplicam linhas: use 'DISTINCT' => true na consulta.

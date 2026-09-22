@@ -2,8 +2,9 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.8-alpha` · atualizado em 21/09/2026 (R6-a: revisão de
-> documento publicado). Antes: (motor de diagrama em
+> Estado: `v0.6.8-alpha` · atualizado em 22/09/2026 (R3b2-b parte 1:
+> criação completa e editores). Antes, 21/09: R6-a, revisão de
+> documento publicado. Antes: (motor de diagrama em
 > grafo: posição livre, arraste próprio, ligações com chefia, salvamento
 > automático, PDF igual à tela e dobras à mão — seção 3.4; commits `bd41b7a`
 > a `9ae6110` e o do bloco 2d-2).
@@ -351,6 +352,35 @@ visão: alvo de leitura é acesso, não conteúdo, então muda em qualquer statu
 - **CSRF** como no autosave do diagrama (achado 43): a coluna tem o próprio
   campo de token, e o token novo de cada resposta vai para todos os campos da
   página.
+
+#### Criação completa e editores na coluna (R3b2-b, parte 1, 22/09/2026)
+
+Pedido de Claudio (21 e 22/09/2026): a criação já com tudo o que o documento
+precisa, e o campo Cliente só em proposta.
+
+- **Criação** mostra Responsável (começa com quem cria), Auditor
+  responsável, Revisor e janela, e a coluna Permissões. O modelo já aceitava
+  esses campos na criação (`Document::prepareInputForAdd` →
+  `checkManagedFields`); só a tela e o controller não os mandavam.
+- **Auditor por categoria:** a lista nasce vazia e é pedida a
+  `ajax/document.auditors.php` a cada troca de categoria
+  (`public/js/codexplus-docform.js`). O endpoint só lê e responde com a regra
+  de `Document::canCreateIn`; o escolhido é conferido de novo ao gravar.
+- **Cliente** (`client_name`) só em PRP: na criação o campo aparece e some
+  com o tipo (`[data-cx-only-type]`), e o controller descarta o valor nos
+  outros tipos.
+- **Coluna Permissões com duas seções**, Leitura e Edição. Editores (usuário
+  ou grupo) pelo mesmo endpoint `ajax/document.targets.php`, tipos
+  `editor_user` e `editor_group`. Fonte única: `Document::PERM_TYPES`,
+  `permRow()`, `listEditors()`. A linha "Editores" do rodapé só aparece
+  quando a coluna não está na tela (leitor comum).
+- **Coluna na criação ("pendente"):** o documento ainda não existe, então o
+  JS guarda cada escolha num `_cxn_perm[]` ("tipo:id") dentro do formulário e
+  o controller grava depois do Criar rascunho, pelas mesmas classes e
+  checagens. Falhou algum: o rascunho fica criado e o aviso diz qual. Só
+  aparece para quem tem Atualizar (sem ele, as ligações seriam recusadas).
+- **Limitação conhecida:** criação recusada (auditor fora do setor, janela
+  com uma data só) volta com o formulário vazio. A tela evita os dois casos.
 
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
@@ -876,6 +906,18 @@ depender do comportamento errático de `position: fixed` na impressão.
     mais de um bloco (DIA0001: o Tiago sem chefe e chefe do Rhuan) — o PDF saiu
     com 3 de 36 pessoas. Corrigido no 2d-3a. Regra: nada novo desenha a partir
     de `T`. O "Arrumar" revela a chefia gravada: vale conferir antes de usar.
+51. **Template Twig alterado só aparece depois de `cache:clear`**: o GLPI
+    guarda o Twig compilado e serve a versão antiga até limpar.
+52. **Comando de console de plugin não pode ter opção `--version`**: colide
+    com a opção global do Symfony Console.
+53. **Dá para renderizar a página real do plugin no GLPI de quem gera os
+    pacotes**: um comando de console temporário (fora do repositório) abre a
+    sessão de um usuário, faz `include` de `front/<página>.php` dentro de
+    `ob_start()` e grava o HTML. Apagar antes de empacotar.
+54. **`can()` recebe o input por referência e o altera.** Em `CommonDBChild`
+    (editores) ele acrescenta `entities_id` e `is_recursive`; usar o mesmo
+    array depois numa consulta à tabela de editores dá "Unknown column"
+    (1054). Busca de repetido com uma cópia, ou antes do `can()`.
 
 ## 6. Contrato de código — não quebrar
 

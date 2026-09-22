@@ -1337,6 +1337,9 @@
 .cx-perm-addbtn { white-space: nowrap; }
 .cx-perm-msg { min-height: 1.2em; margin: 6px 0 2px; font-size: .9em; color: var(--cx-muted); }
 .cx-perm-msg.is-erro { color: var(--cx-danger); }
+/* R3b2-b: duas seções (Leitura, Edição) e a coluna já na criação. */
+.cx-perm-block + .cx-perm-block { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--cx-border); }
+.cx-perm-block > .codexplus-form-hint { margin-top: 6px; }
 
 /* Auditor, revisor e janela de revisão (bloco R3d). */
 .cx-review-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: end; }

@@ -1,15 +1,17 @@
 <?php
 
 /**
- * Codex+ — alvos de leitura do documento pela tela (bloco R3b2-a).
+ * Codex+ — alvos de leitura (R3b2-a) e editores (R3b2-b) pela tela.
  *
- * Adiciona ou tira um leitor (grupo, perfil ou usuário) sem recarregar a
+ * Adiciona ou tira um leitor (grupo, perfil ou usuário) ou um editor
+ * (usuário ou grupo) sem recarregar a
  * página: a coluna "Permissões" vale também para documento publicado, fora
  * do formulário de edição, e recarregar no meio de uma edição perderia o que
  * não foi salvo.
  *
  * Nenhuma regra nova aqui. Quem pode é decidido pelas classes de ligação
- * (trait TargetRelation: gerir o documento = Atualizar + gestor do setor, ou
+ * (trait TargetRelation e DocumentEditor: gerir o documento = Atualizar +
+ * gestor do setor, ou
  * Ver todos, em qualquer status — decisão de Claudio, 20/09/2026). Sem
  * entidade informada, perfil e grupo entram "sem restrição de entidade"
  * (TargetRelation::prepareInputForAdd, achado 34).
@@ -19,9 +21,6 @@
  */
 
 use GlpiPlugin\Codexplus\Document;
-use GlpiPlugin\Codexplus\Document_Group;
-use GlpiPlugin\Codexplus\Document_Profile;
-use GlpiPlugin\Codexplus\Document_User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 include('../../../inc/includes.php');
@@ -29,12 +28,8 @@ include('../../../inc/includes.php');
 // Achado 9: arquivo de plugin roda em escopo de função.
 global $DB;
 
-/** Tipo de alvo => [classe de ligação, chave do alvo]. */
-$tipos = [
-    'group'   => [Document_Group::class, 'groups_id'],
-    'profile' => [Document_Profile::class, 'profiles_id'],
-    'user'    => [Document_User::class, 'users_id'],
-];
+/** Tipo de alvo => [classe de ligação, chave do alvo] (fonte única em Document). */
+$tipos = Document::PERM_TYPES;
 
 $responder = static function (array $corpo, int $status = 200): JsonResponse {
     $corpo['csrf'] = Session::getNewCSRFToken(true);
@@ -57,19 +52,23 @@ if ($acao === 'add') {
     if (!isset($tipos[$tipo])) {
         return $responder(['erro' => 'tipo_invalido'], 422);
     }
-    [$classe, $chave] = $tipos[$tipo];
+    [$classe] = $tipos[$tipo];
     $alvo = (int) ($_POST['alvo'] ?? 0);
     if ($alvo <= 0) {
         return $responder(['erro' => 'escolha_o_alvo'], 422);
     }
-    $linha = [$classe::$items_id_1 => $id, $chave => $alvo];
+    $linha = Document::permRow($tipo, $id, $alvo);
+    // Cópia para a busca de repetido: can() recebe o input por referência e
+    // o CommonDBChild (editores) acrescenta entities_id/is_recursive, que a
+    // tabela de editores não tem.
+    $busca = $linha;
     $rel   = new $classe();
     if (!$rel->can(-1, CREATE, $linha)) {
         return $responder(['erro' => 'sem_permissao'], 403);
     }
     // A tabela não tem chave única (espelha a nativa, que admite o mesmo
     // perfil em entidades diferentes); pela tela, o mesmo alvo entra uma vez.
-    if (countElementsInTable($classe::getTable(), $linha) > 0) {
+    if (countElementsInTable($classe::getTable(), $busca) > 0) {
         return $responder(['erro' => 'ja_existe'], 409);
     }
     if (!$rel->add($linha)) {
@@ -86,7 +85,7 @@ if ($acao === 'add') {
     if (
         $lig <= 0
         || !$rel->getFromDB($lig)
-        || (int) $rel->fields[$classe::$items_id_1] !== $id
+        || (int) $rel->fields[$classe === \GlpiPlugin\Codexplus\DocumentEditor::class ? $classe::$items_id : $classe::$items_id_1] !== $id
     ) {
         return $responder(['erro' => 'nao_encontrado'], 404);
     }
@@ -100,4 +99,4 @@ if ($acao === 'add') {
     return $responder(['erro' => 'acao_invalida'], 422);
 }
 
-return $responder(['ok' => true, 'alvos' => Document::listTargets($id)]);
+return $responder(['ok' => true, 'alvos' => Document::listTargets($id), 'editores' => Document::listEditors($id)]);

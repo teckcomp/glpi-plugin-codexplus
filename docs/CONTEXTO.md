@@ -2,8 +2,8 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.8-alpha` · atualizado em 22/09/2026 (R3b2-b parte 1:
-> criação completa e editores). Antes, 21/09: R6-a, revisão de
+> Estado: `v0.6.8-alpha` · atualizado em 22/09/2026 (criador de documentos
+> completo: R3b2-b e R3b3, commits `d06aa30` a `987636c`). Antes, 21/09: R6-a, revisão de
 > documento publicado. Antes: (motor de diagrama em
 > grafo: posição livre, arraste próprio, ligações com chefia, salvamento
 > automático, PDF igual à tela e dobras à mão — seção 3.4; commits `bd41b7a`
@@ -76,6 +76,10 @@ desta tabela sem alinhar antes.**
 > trabalho de enxugar e manter, para entregar o que o motor próprio já faz.
 > **Preço aceito:** desenho livre de verdade (forma arbitrária, curva à mão,
 > agrupamento) não existirá. Há caixa, seta e rótulo.
+> **Referência do fluxograma (Claudio, 22/09/2026): Miro**, pelo modelo de
+> interação (conectar pelas bordas, puxar a seta para o vazio e criar a forma
+> ligada, trocar a forma sem perder ligações, rótulo na seta). Não é
+> referência de escopo: o preço acima continua valendo.
 
 ---
 

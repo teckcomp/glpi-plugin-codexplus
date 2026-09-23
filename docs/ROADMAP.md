@@ -1,6 +1,7 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.7-alpha` · atualizado em 21/09/2026 (motor de diagrama em
+> Estado em `v0.6.8-alpha` · atualizado em 22/09/2026 (criador de documentos
+> completo: R3b2-b e R3b3, commits `d06aa30` a `987636c`). Antes, em 21/09/2026 (motor de diagrama em
 > grafo: 2d-1, 2d-2 e o PDF igual à tela (2d-3a) prontos; falta fechar o
 > 2d-3 e subir para `0.6.8-alpha`).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
@@ -52,7 +53,7 @@ foram levantados na conversa: eram pré-requisitos ou esquecimentos.
 4. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
    pré-requisito dos itens 5 e 7 (hoje o documento novo não aceita anexo nem
    imagem colada: `enable_images => false`, sem `Document_Item`)
-5. Editor de documentos com importação e exportação
+5. Editor de documentos com importação e exportação — **próximo passo** (Claudio, 22/09/2026: estilos/tamanho de fonte, importar e exportar, depois editor de imagem estilo paint)
 6. Fluxograma (sobre o motor próprio)
 7. Editor de propostas com mini excel e mini editor de desenho
 8. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
@@ -133,8 +134,8 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R3d | Validação em duas etapas (gestor do setor, depois auditor responsável), revisor e janela de revisão no calendário, vencimento pelo fim da janela; campos na página do documento e aviso "aguardando …". Super-Admin pode tudo (definitivo). Precisa reinstalar. ✅ pacote `codexplus-r3d-validacao-1` (Claudio, 21/09/2026) | Gestor aprova, auditor responsável publica, janela calculada; quem editou não valida na 2ª etapa |
 | R3d-1 | "Aguardando você" no Painel (gestor na 1ª etapa, auditor na 2ª, com o motivo quando falta o direito) e aviso na página do documento quando quem responde pela etapa não consegue agir. Sem schema ✅ pacote `codexplus-r3d1-aguardando-1` | O auditor entra no Codex+ e vê o que espera por ele |
 | R6-a | Revisão de publicado: abrir revisão (gestor, ou revisor na janela), leitores seguem na versão publicada com "Em atualização", resumo obrigatório no envio, cancelar revisão, "revisado sem alteração" sem auditor, versões com diagrama. `v0.6.8-alpha` (fecha também o 2d-3), precisa reinstalar ✅ pacote `codexplus-r6a-revisao-1`, commit `9aace43` | Abrir a :01, ver o aviso para o leitor, validar e ver a :01 publicada |
-| R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna — parte 1 (criação, editores, Cliente só em PRP) ✅ pacote `codexplus-r3b2b-criacao-1`, commit `d06aa30`; parte 2 (Duplicar, botões da versão publicada) ✅ pacote `codexplus-r3b2b-duplicar-1`, commit a registrar; **R3b2-c** aba **Papéis** no Setor. Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
-| R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF. **R3b3-1** imagem colada e anexos ✅ commit `f1916b9`; **R3b3-2** leitura e PDF do documento novo ✅ pacote `codexplus-r3b3-pdf-1` | POP com imagem e anexo, publicado e exportado |
+| R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna — parte 1 (criação, editores, Cliente só em PRP) ✅ pacote `codexplus-r3b2b-criacao-1`, commit `d06aa30`; parte 2 (Duplicar, botões da versão publicada) ✅ commit `31359de`; **R3b2-c** aba **Papéis** no Setor. Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
+| R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF. **R3b3-1** imagem colada e anexos ✅ commit `f1916b9`; **R3b3-2** leitura e PDF do documento novo ✅ commit `987636c` | POP com imagem e anexo, publicado e exportado |
 | R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa" | Nenhum caminho da interface cria artigo na Base de Conhecimento |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
 | R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; indicadores "Aguardando validação" e "Revisão atrasada"; etiqueta "em atualização" na estante; lixeira; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
@@ -222,7 +223,7 @@ não existirá.
 | 9c | Editor de organograma: protótipo + desfazer/refazer + salvamento automático do rascunho + publicar |
 | 9d | Vínculo com Usuários e Grupos; "gerar a partir do GLPI" (grupo pai + campo Supervisor) |
 | 9e | Matrizes: escalonamento e RACI |
-| 9f | Fluxograma: paleta de formas e setas sobre o motor próprio |
+| 9f | Fluxograma: paleta de formas e setas sobre o motor próprio. **Referência de interação: Miro** (Claudio, 22/09/2026) — alças de conexão nas bordas, puxar a seta para o vazio cria a forma já ligada, trocar a forma sem perder as ligações, rótulo da seta por duplo clique, estilo (reta, cotovelo, curva) por ligação. Referência de interação, não de escopo: desenho livre continua fora |
 | 9g | Modelos prontos de diagrama (reaproveita o sistema de modelos da etapa 3) |
 
 **Validar no 9b:** a leitura abre na **interface simplificada** (Self-Service)?

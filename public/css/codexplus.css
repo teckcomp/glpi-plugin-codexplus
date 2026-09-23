@@ -1298,6 +1298,7 @@
 .cx-docform-ident { display: flex; align-items: center; gap: 8px; }
 /* R3b2-b parte 2: Duplicar ao lado do código; ações dentro dos avisos. */
 .cx-docform-dup { margin: 0 0 0 6px; }
+.cx-att-del { display: inline; margin: 0 0 0 6px; }
 .cx-notice-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .cx-docform-title { font-size: 1.25rem; font-weight: 600; }
 .cx-docform-grid {
@@ -1841,3 +1842,21 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-org-draghint[hidden] { display: none; }
 .cx-org-move { width: min(560px, 92vw); }
 .cx-org-move .cx-org-btns { flex-direction: column; align-items: stretch; }
+
+/* =========================================================================
+   Página do documento larga na criação e na edição (Claudio, 22/09/2026)
+   A moldura de 900px (seção da folha) é boa para LER; para escrever, a
+   coluna Permissões e o editor pediam mais espaço. Só a edição alarga: a
+   visão de leitura continua com a proporção de folha, próxima do PDF.
+   ========================================================================= */
+.cx-docpage--wide .codexplus-doc,
+.cx-docpage--wide .codexplus-doc-edit-actions,
+.cx-docpage--wide .cx-notice,
+.cx-docpage--wide .cx-flow,
+.cx-docpage--wide .codexplus-attachments { max-width: 1320px; }
+/* Campos 60%, Permissões 40% (Claudio, 22/09/2026). Só em tela larga: abaixo
+   de 900px continua uma coluna só (regra da seção da coluna Permissões). */
+@media (min-width: 901px) {
+    .cx-docpage--wide .cx-docform-split--perm { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+}
+

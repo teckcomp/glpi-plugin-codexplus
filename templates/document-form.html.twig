@@ -4,7 +4,9 @@
    aqui só se mostra o que o controller liberou.
    Estilos: public/css/codexplus.css, seção 14. #}
 
-<div class="codexplus-app">
+{# 22/09/2026 (Claudio): na criação e na edição a página usa a largura da
+   tela (até 1320px); a visão de leitura continua na moldura de folha. #}
+<div class="codexplus-app{{ can_edit ? ' cx-docpage--wide' : '' }}">
 
     <div class="codexplus-article-bar">
         <a href="{{ glpi_root }}/plugins/codexplus/front/dashboard.php" class="codexplus-back">
@@ -190,7 +192,7 @@
                     </label>
                     {{ widgets.content|raw }}
                     <div class="codexplus-form-hint">
-                        {{ __('Imagens coladas e anexos chegam na próxima etapa (R3b3).', 'codexplus') }}
+                        {{ __('Cole ou arraste imagens direto no texto. Para anexar arquivos (planilhas, PDFs, fotos), use a área de arquivos abaixo do editor. Tudo é gravado ao clicar em Salvar.', 'codexplus') }}
                     </div>
                 </div>
                     {% if is_new %}
@@ -299,6 +301,37 @@
                 <div class="codexplus-content">{{ content_html|raw }}</div>
             {% endif %}
         </article>
+    {% endif %}
+
+
+    {# R3b3-1: anexos. FORA de #codexplus-doc de propósito: anexo é link de
+       download, não vai para o PDF (decisão de 19/09/2026; imagem no PDF só
+       em proposta, Etapa 3c). Tirar: só quem edita, em rascunho. #}
+    {% if attachments is not empty %}
+        <section class="codexplus-attachments">
+            <h2 class="codexplus-attachments-title"><i class="ti ti-paperclip"></i> {{ __('Anexos', 'codexplus') }}</h2>
+            <ul class="codexplus-attachments-list">
+                {% for att in attachments %}
+                    <li class="codexplus-attachment">
+                        <a href="{{ att.url }}" target="_blank" rel="noopener">
+                            <i class="ti ti-file-download"></i>
+                            <span class="codexplus-attachment-name">{{ att.name }}</span>
+                        </a>
+                        {% if can_edit %}
+                            <form method="post" action="{{ self }}" class="cx-att-del">
+                                <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="id" value="{{ id }}">
+                                <button type="submit" name="del_attachment" value="{{ att.link }}" class="cx-perm-del"
+                                        title="{{ __('Tirar do documento', 'codexplus') }}" aria-label="{{ __('Tirar do documento', 'codexplus') }} {{ att.name }}"
+                                        onclick="return confirm('{{ __('Tirar este anexo do documento? O que não foi salvo no formulário acima se perde.', 'codexplus')|e('js') }}');">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                            </form>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
     {% endif %}
 
     {# ================= FLUXO ================= #}

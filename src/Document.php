@@ -582,6 +582,52 @@ class Document extends CommonDBTM
     }
 
     /**
+     * Anexos do documento (R3b3-1): documentos do GLPI ligados a ele, fora
+     * os que são imagem colada no corpo (aparecem no texto, não na lista).
+     * O link de download leva itemtype/items_id: o GLPI confere de novo se
+     * quem baixa lê este documento (\Document::canViewFileFromItem).
+     *
+     * @return array<int, array{link: int, docid: int, name: string, mime: string, url: string, date: string}>
+     */
+    public static function listAttachments(int $documentId, string $content = ''): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB, $CFG_GLPI;
+
+        // Imagem colada: o corpo gravado aponta para document.send.php?docid=N.
+        preg_match_all('/docid=(\d+)/', $content, $m);
+        $inline = array_map('intval', $m[1] ?? []);
+
+        $out = [];
+        foreach ($DB->request([
+            'SELECT'     => ['glpi_documents.id', 'glpi_documents.name', 'glpi_documents.filename',
+                'glpi_documents.mime', 'glpi_documents_items.id AS link', 'glpi_documents_items.date_creation AS assocdate'],
+            'FROM'       => 'glpi_documents_items',
+            'INNER JOIN' => ['glpi_documents' => ['ON' => ['glpi_documents_items' => 'documents_id', 'glpi_documents' => 'id']]],
+            'WHERE'      => [
+                'glpi_documents_items.itemtype' => self::class,
+                'glpi_documents_items.items_id' => $documentId,
+                'glpi_documents.is_deleted'     => 0,
+            ],
+            'ORDER'      => ['glpi_documents.filename ASC'],
+        ]) as $row) {
+            if (in_array((int) $row['id'], $inline, true)) {
+                continue;
+            }
+            $out[] = [
+                'link'  => (int) $row['link'],
+                'docid' => (int) $row['id'],
+                'name'  => (string) ($row['filename'] !== '' ? $row['filename'] : $row['name']),
+                'mime'  => (string) $row['mime'],
+                'url'   => $CFG_GLPI['root_doc'] . '/front/document.send.php?docid=' . (int) $row['id']
+                    . '&itemtype=' . rawurlencode(self::class) . '&items_id=' . $documentId,
+                'date'  => (string) ($row['assocdate'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Mesma regra de canViewItem(), para o construtor de consultas.
      * Formato de KnowbaseItem::getVisibilityCriteria(): ['LEFT JOIN', 'WHERE'].
      * Os LEFT JOIN multiplicam linhas: use 'DISTINCT' => true na consulta.
@@ -942,9 +988,33 @@ class Document extends CommonDBTM
         $this->profiles = Document_Profile::getForDocument($id);
     }
 
+    /**
+     * Imagem colada sem link em volta (R3b3-1, correção de 22/09/2026).
+     * O GLPI (Toolbox::convertTagToImage, chamado pelo addFiles) embrulha
+     * cada imagem num <a target="_blank"> para abrir o arquivo. No documento
+     * isso atrapalha: o editor trata a imagem como link (botão de link aceso,
+     * ícone de "abrir") e o clique na imagem sai da página. Tira só o link
+     * que aponta para o próprio arquivo da imagem.
+     * Imagem nova já nasce sem o link (addFiles com `_add_link = false`);
+     * isto limpa o que foi gravado antes, no primeiro Salvar.
+     */
+    private static function unwrapImageLinks(string $html): string
+    {
+        $out = preg_replace(
+            '#<a\b[^>]*href=(["\'])[^"\']*document\.send\.php\?docid=(\d+)[^"\']*\1[^>]*>\s*'
+            . '(<img\b[^>]*document\.send\.php\?docid=\2(?!\d)[^>]*>)\s*</a>#i',
+            '$3',
+            $html
+        );
+        return $out ?? $html;
+    }
+
     public function prepareInputForAdd($input)
     {
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
+        if (isset($input['content'])) {
+            $input['content'] = self::unwrapImageLinks((string) $input['content']);
+        }
 
         $input['name'] = trim((string) ($input['name'] ?? ''));
         if ($input['name'] === '') {
@@ -1063,6 +1133,13 @@ class Document extends CommonDBTM
         }
 
         DocumentContributor::record($id, 0, (int) Session::getLoginUserID());
+
+        // R3b3-1: imagens coladas no corpo e arquivos anexados viram
+        // documentos do GLPI ligados a este (Document_Item), como no
+        // KnowbaseItem nativo. O link da imagem leva itemtype/items_id, e o
+        // download confere a leitura DESTE documento (canViewFileFromItem).
+        $this->input = $this->addFiles($this->input, ['force_update' => true, 'content_field' => 'content', '_add_link' => false]);
+
         parent::post_addItem();
     }
 
@@ -1077,6 +1154,11 @@ class Document extends CommonDBTM
         }
 
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
+        // Só em rascunho: fora dele o corpo não muda (e a comparação abaixo
+        // recusaria a diferença).
+        if (isset($input['content']) && $this->status() === self::STATUS_DRAFT) {
+            $input['content'] = self::unwrapImageLinks((string) $input['content']);
+        }
 
         if (!$this->inTransition) {
             // Status e dados de validação só mudam pelos métodos de fluxo.
@@ -1113,6 +1195,10 @@ class Document extends CommonDBTM
 
     public function post_updateItem($history = true)
     {
+        // R3b3-1: ver post_addItem. Com force_update, addFiles regrava o corpo
+        // com o link definitivo das imagens (volta aqui sem arquivos: para).
+        $this->input = $this->addFiles($this->input, ['force_update' => true, 'content_field' => 'content', '_add_link' => false]);
+
         if (array_intersect($this->updates, self::CONTENT_FIELDS)) {
             DocumentContributor::record(
                 (int) $this->fields['id'],

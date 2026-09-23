@@ -396,6 +396,34 @@ precisa, e o campo Cliente só em proposta.
   deixaram de ser link no meio do texto e viraram botões dentro do aviso
   (`.cx-notice-actions`) — Claudio não os achava.
 
+#### Imagem colada e anexos (R3b3-1, 22/09/2026)
+
+- **Mecanismo nativo, como no KnowbaseItem:** o TinyMCE do documento abre
+  com `enable_images` e `enable_fileupload`. O upload vai todo em `_filename`
+  (com `_tag_`/`_prefix_`) — imagem colada inclusive, quando há área de
+  anexos. O controller repassa esses campos (`$postedFiles`) e
+  `Document::post_addItem`/`post_updateItem` chamam `addFiles`
+  (`content_field = content`, `force_update`), que cria o documento do GLPI,
+  a ligação `Document_Item` e regrava o corpo com o link definitivo.
+- **Quem baixa:** o link leva `itemtype=GlpiPlugin\Codexplus\Document` e
+  `items_id`, e o GLPI entrega se a pessoa lê o documento
+  (`\Document::canViewFileFromItem` → nosso `can(READ)`). Conferido: leitor
+  do publicado baixa; auditor de outro setor, não (achado 55).
+- **Lista "Anexos"** (`Document::listAttachments`) fora de `#codexplus-doc`:
+  não vai para o PDF. Imagem colada no corpo não entra na lista. Tirar =
+  desfazer a ligação (o arquivo fica no GLPI), só quem edita, em rascunho;
+  conta como alteração (quem tirou não valida).
+- **Duplicar** liga os mesmos arquivos à cópia e reaponta o `items_id` dos
+  links das imagens para ela.
+- **Imagem sem link em volta** (Claudio, 22/09/2026): o GLPI embrulha a
+  imagem colada num `<a target="_blank">`, e o editor passava a tratá-la como
+  link. `addFiles` é chamado com `_add_link = false`, e
+  `Document::unwrapImageLinks()` limpa o que já estava gravado no primeiro
+  Salvar em rascunho (só o link para o próprio arquivo da imagem; links do
+  usuário ficam).
+- **Versões:** o corpo guardado na versão aponta para os mesmos arquivos,
+  ligados ao mesmo documento; nada muda na revisão.
+
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
 Decisões de Claudio, 21/09/2026, sobre as da R3c:
@@ -932,6 +960,12 @@ depender do comportamento errático de `position: fixed` na impressão.
     (editores) ele acrescenta `entities_id` e `is_recursive`; usar o mesmo
     array depois numa consulta à tabela de editores dá "Unknown column"
     (1054). Busca de repetido com uma cópia, ou antes do `can()`.
+55. **Direito nativo Gestão > Documentos: Ler libera qualquer arquivo.**
+    `\Document::canViewFile` testa primeiro `can(READ)` do próprio documento
+    do GLPI: perfil com esse direito baixa imagem e anexo de qualquer
+    documento do Codex+, mesmo sem ler o documento. É a mesma regra da base
+    nativa. Para o controle do Codex+ valer, esse direito tem que estar
+    desligado nos perfis de leitores comuns.
 
 ## 6. Contrato de código — não quebrar
 

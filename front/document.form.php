@@ -15,9 +15,8 @@
  * Desde a R3b2-a, alvos de leitura pela coluna "Permissões" (endpoint
  * ajax/document.targets.php); desde a R3b2-b, editores na mesma coluna e a
  * criação já com responsável, auditor, revisor, janela e permissões. Fora
- * ainda (ROADMAP, R3b3 a R3b4): imagens coladas e anexos, leitura com PDF, e
- * trocar o "Novo documento" antigo. Por isso o TinyMCE está com
- * enable_images = false: imagem colada ainda não teria onde ser guardada.
+ * ainda (ROADMAP, R3b3 a R3b4): leitura com PDF e trocar o "Novo documento"
+ * antigo. Desde a R3b3-1, imagem colada e anexos (Document_Item nativo).
  *
  * Roda em escopo de função (achado 9): `global` explícito.
  * CSRF: o núcleo valida o POST sozinho (achado 15); o template só inclui o
@@ -55,6 +54,23 @@ $allowedSectors = Session::haveRight(Rights::NAME, Rights::VIEWALL)
     ? null
     : SectorMember::mySectors(SectorMember::ROLE_MANAGER);
 
+/**
+ * R3b3-1: campos do upload nativo (imagem colada = _content, anexo =
+ * _filename, cada um com _tag_ e _prefix_). Vão como vieram para o
+ * Document::addFiles, que valida e move os arquivos da pasta temporária.
+ */
+$postedFiles = static function (): array {
+    $out = [];
+    foreach (['content', 'filename'] as $campo) {
+        foreach (['_', '_tag_', '_prefix_'] as $pre) {
+            if (isset($_POST[$pre . $campo]) && is_array($_POST[$pre . $campo])) {
+                $out[$pre . $campo] = array_map('strval', $_POST[$pre . $campo]);
+            }
+        }
+    }
+    return $out;
+};
+
 $postedCategories = static function (): array {
     $raw = $_POST['_categories'] ?? [];
     return array_values(array_unique(array_filter(array_map('intval', (array) $raw))));
@@ -69,7 +85,7 @@ if (isset($_POST['add'])) {
         'doctype'     => (string) ($_POST['doctype'] ?? ''),
         'content'     => (string) ($_POST['content'] ?? ''),
         '_categories' => $postedCategories(),
-    ];
+    ] + $postedFiles();
     // Cliente só existe em proposta (o campo some da tela nos outros tipos;
     // aqui garante que valor esquecido nele não seja gravado).
     if ($input['doctype'] === 'PRP') {
@@ -184,6 +200,31 @@ if ($id > 0 && isset($_POST['duplicate'])) {
     if (!$newId) {
         Html::redirect($self . '?id=' . $id);
     }
+    // R3b3-1: a cópia aponta para os MESMOS arquivos (imagens coladas e
+    // anexos). Sem a ligação, quem lê a cópia não veria as imagens: o GLPI
+    // só entrega o arquivo ligado ao item que está sendo lido.
+    foreach ($DB->request([
+        'SELECT' => ['documents_id'],
+        'FROM'   => 'glpi_documents_items',
+        'WHERE'  => ['itemtype' => Document::class, 'items_id' => $id],
+    ]) as $row) {
+        (new Document_Item())->add([
+            'documents_id' => (int) $row['documents_id'],
+            'itemtype'     => Document::class,
+            'items_id'     => (int) $newId,
+        ]);
+    }
+    // O link das imagens coladas leva o documento de origem (items_id): na
+    // cópia, passa a levar o da cópia, senão o leitor dela não as veria.
+    $corpo = (string) $copia['content'];
+    $novoCorpo = preg_replace(
+        '/(itemtype=GlpiPlugin%5CCodexplus%5CDocument(?:&amp;|&)items_id=)' . $id . '(?!\d)/',
+        '${1}' . (int) $newId,
+        $corpo
+    );
+    if ($novoCorpo !== null && $novoCorpo !== $corpo) {
+        $DB->update(Document::getTable(), ['content' => $novoCorpo], ['id' => (int) $newId]);
+    }
     if ($copia['doctype'] === 'DIA') {
         $d = Diagram::load($id);
         Diagram::save((int) $newId, $d['data'] ?? Diagram::starter());
@@ -193,6 +234,27 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         $novo->getCode()
     ));
     Html::redirect($self . '?id=' . $newId);
+}
+
+// -------------------------------------------------------------------------
+// POST — tirar um anexo (R3b3-1): quem edita, só em rascunho (can UPDATE).
+// Desfaz a ligação; o arquivo continua no GLPI (Gestão > Documentos), como
+// na base nativa.
+// -------------------------------------------------------------------------
+if ($id > 0 && isset($_POST['del_attachment'])) {
+    $di = new Document_Item();
+    if (
+        !$doc->can($id, UPDATE)
+        || !$di->getFromDB((int) $_POST['del_attachment'])
+        || $di->fields['itemtype'] !== Document::class
+        || (int) $di->fields['items_id'] !== $id
+    ) {
+        Session::addMessageAfterRedirect(__('Sem direito de tirar este anexo.', 'codexplus'), false, ERROR);
+    } elseif ($di->delete(['id' => $di->getID()], true)) {
+        DocumentContributor::record($id, (int) $doc->fields['revision'], (int) Session::getLoginUserID());
+        Session::addMessageAfterRedirect(__('Anexo retirado do documento.', 'codexplus'));
+    }
+    Html::redirect($self . '?id=' . $id);
 }
 
 // -------------------------------------------------------------------------
@@ -208,7 +270,7 @@ if ($id > 0 && isset($_POST['update'])) {
         'id'      => $id,
         'name'    => (string) ($_POST['name'] ?? $doc->fields['name']),
         'content' => (string) ($_POST['content'] ?? $doc->fields['content']),
-    ];
+    ] + $postedFiles();
     if ($doc->fields['doctype'] === 'PRP') {
         $data['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
@@ -450,8 +512,11 @@ if ($canEdit) {
         'value'           => (string) ($isNew ? '' : ($doc->fields['content'] ?? '')),
         'editor_id'       => 'codexplus-doc-content',
         'enable_richtext' => true,
-        'enable_images'   => false,
-        'rows'            => 20,
+        // R3b3-1: imagem colada no corpo e área de anexos (arrastar ou
+        // escolher arquivo). Gravados ao Salvar, por Document::addFiles.
+        'enable_images'     => true,
+        'enable_fileupload' => true,
+        'rows'              => 20,
         'display'         => false,
     ]);
 }
@@ -677,6 +742,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
     // R3b2-b parte 2: duplicar = poder criar em todas as categorias dele.
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
+    // R3b3-1: anexos (fora as imagens coladas no corpo mostrado).
+    'attachments'   => $isNew || $isDiagram ? [] : Document::listAttachments($id, (string) ($shown['content'] ?? $doc->fields['content'] ?? '')),
     // R6-a
     'version'      => $version,
     'revinfo'      => $revinfo,

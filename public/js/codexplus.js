@@ -71,9 +71,13 @@
  * gravado no banco deixava documentos antigos sem cabeçalho e congelava o
  * endereço da logo.
  *
- * Rodapé: `cfg.document.footer_text` (documento) tem prioridade sobre
- * `cfg.brand.footer_text` como TEXTO, resolvido por resolveMarkers(). O
- * toggle `footer_show` continua sendo o interruptor geral.
+ * 22/09/2026 (Claudio): o TEXTO do rodapé configurado
+ * (`cfg.document.footer_text`, senão `cfg.brand.footer_text`, com os
+ * marcadores de resolveMarkers()) passou a ser o cabeçalho corrido, no lugar
+ * do título pequeno. O rodapé leva a linha de identificação (buildIdentLine)
+ * em todas as páginas, mais a paginação. `footer_show` continua sendo o
+ * interruptor do rodapé; desligado, a identificação volta para baixo do
+ * título grande.
  *
  * Nome do arquivo sugerido: fileTitle() — "POP0014-01 - Título".
  * =========================================================================
@@ -154,7 +158,9 @@
                 title: '', code: '', revision: '', client: '', date_mod: '',
                 header_html: '', footer_text: '',
                 // 0.5.8: linha de identificação montada aqui, não raspada da tela
-                doctype: '', owner: '', date_published: '', sector: ''
+                doctype: '', owner: '', date_published: '', sector: '',
+                // R3b3-2: aviso de versão não vigente (rascunho, em validação)
+                draft: ''
             }
         };
 
@@ -275,7 +281,7 @@
             + 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
             + 'border-top:1px solid #d1d5db;padding-top:6px;'
             + 'font-size:8.5pt;color:#6b7280;}'
-            + '.cx-page-footer-left{white-space:pre-wrap;overflow:hidden;}'
+            + '.cx-page-footer-left{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'
             + '.cx-page-footer-right{flex:0 0 auto;font-weight:600;}';
     }
 
@@ -295,7 +301,8 @@
         }
         var map = {
             '{codigo}':  cfg.document.code || '',
-            '{revisao}': cfg.document.revision || '',
+            // Revisão 0 é valor (":00"), não ausência — `|| ''` a apagava.
+            '{revisao}': (cfg.document.revision === 0 || cfg.document.revision) ? String(cfg.document.revision) : '',
             '{titulo}':  cfg.document.title || '',
             '{empresa}': cfg.brand.company || '',
             '{data}':    formatDate(cfg.document.date_mod),
@@ -327,9 +334,12 @@
         var header = idoc.createElement('div');
         header.className = 'cx-page-header'
             + (cfg.brand.logo_pos === 'left' ? ' cx-page-header--logo-left' : '');
+        // 22/09/2026 (Claudio): o texto do rodapé (código · revisão, com os
+        // marcadores) sobe para cá, acima do título; sem ele, o título.
+        var runText = resolveMarkers(cfg.document.footer_text || cfg.brand.footer_text, cfg, pageIndex + 1, total);
         var run = idoc.createElement('span');
         run.className = 'cx-run-title';
-        run.textContent = cfg.document.title || '';
+        run.textContent = runText || cfg.document.title || '';
         header.appendChild(run);
         if (cfg.brand.show_logo && (pageIndex === 0 || cfg.brand.repeat_logo)) {
             var img = idoc.createElement('img');
@@ -351,13 +361,13 @@
             var footer = idoc.createElement('div');
             footer.className = 'cx-page-footer';
 
-            // Etapa 4e: rodapé do documento tem prioridade como TEXTO; o
-            // interruptor continua sendo footer_show (marca), inalterado.
-            var footerText = cfg.document.footer_text || cfg.brand.footer_text;
-
+            // 22/09/2026 (Claudio): o rodapé passa a levar a linha de
+            // identificação (aviso de rascunho · setor · responsável · data),
+            // em todas as páginas. O texto do rodapé configurado subiu para o
+            // cabeçalho. O interruptor continua sendo footer_show.
             var left = idoc.createElement('span');
             left.className = 'cx-page-footer-left';
-            left.textContent = resolveMarkers(footerText, cfg, pageIndex + 1, total);
+            left.textContent = cfg._ident || '';
             footer.appendChild(left);
 
             if (cfg.brand.footer_pages) {
@@ -382,6 +392,9 @@
     function buildIdentLine(cfg) {
         var d = cfg.document;
         var parts = [];
+        // R3b3-2: documento fora da versão vigente (rascunho, em validação)
+        // sai marcado, para ninguém imprimir como se fosse o publicado.
+        if (d.draft) { parts.push(d.draft); }
         if (d.doctype === 'PRP' && d.client) { parts.push('Cliente: ' + d.client); }
         if (d.sector) { parts.push('Setor: ' + d.sector); }
         if (d.doctype !== 'PRP' && d.owner) { parts.push('Responsável: ' + d.owner); }
@@ -538,6 +551,14 @@
                 if (txt) { parts.push(txt); }
             }
             meta = parts.join('  ·  ');
+        }
+
+        // 22/09/2026: com rodapé ligado, a identificação vai para o rodapé
+        // de cada página (buildPageEl) e sai de baixo do título; com rodapé
+        // desligado, continua sob o título, para não se perder.
+        if (cfg.brand.footer_show) {
+            cfg._ident = meta;
+            meta = '';
         }
 
         var safeTitle = title.replace(/</g, '&lt;');

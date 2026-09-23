@@ -25,6 +25,7 @@
 
 use Glpi\Application\View\TemplateRenderer;
 use Glpi\RichText\RichText;
+use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\Category;
 use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\DocumentContributor;
@@ -415,6 +416,13 @@ if ($isNew && !(Document::canCreate() && ($allowedSectors === null || $allowedSe
 
 $canEdit = $isNew || $doc->can($id, UPDATE);
 
+// R3b3-2: ?view=1 mostra a visão de leitura (com Exportar PDF) mesmo para
+// quem pode editar — é como o autor confere o documento antes de enviar.
+$canEditDoc = $canEdit;
+if (!$isNew && isset($_GET['view'])) {
+    $canEdit = false;
+}
+
 // Etapa 9: documento DIA desenha o organograma no lugar do corpo de texto.
 $isDiagram   = !$isNew && $doc->fields['doctype'] === 'DIA';
 $diagramJson = '';
@@ -753,6 +761,31 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_confirm_nochange' => !$isNew && $doc->canConfirmNoChange(),
     'can_cancel_revision'  => !$isNew && $doc->canCancelRevision(),
     'csrf_token'   => Session::getNewCSRFToken(),
+    // R3b3-2: leitura com Exportar PDF (texto; o DIA tem o PDF do próprio motor).
+    'can_edit_doc' => $canEditDoc,
+    'view_link'    => $isNew ? '' : $self . '?id=' . $id . '&view=1',
+    'edit_link'    => $isNew ? '' : $self . '?id=' . $id,
+    'print_config' => $isNew || $isDiagram ? '{}' : Branding::printConfig([
+        'title'          => $version['on'] ? (string) ($shown['name'] ?? '') : (string) $doc->fields['name'],
+        'code'           => $version['on'] ? $version['code'] : $doc->getCode(),
+        'revision'       => $version['on'] ? $version['rev'] : (int) $doc->fields['revision'],
+        'client'         => (string) ($doc->fields['client_name'] ?? ''),
+        'date_mod'       => (string) ($doc->fields['date_mod'] ?? ''),
+        'doctype'        => (string) $doc->fields['doctype'],
+        'owner'          => (int) $doc->fields['users_id_owner'] > 0
+            ? getUserName((int) $doc->fields['users_id_owner']) : getUserName((int) $doc->fields['users_id']),
+        'sector'         => implode(', ', $sectorNames),
+        // A versão mostrada é a publicada? Então data de publicação; senão,
+        // o aviso de que não é a versão vigente.
+        'date_published' => $version['on'] ? $version['date']
+            : ($status === Document::STATUS_PUBLISHED || $status === Document::STATUS_OBSOLETE
+                ? (string) ($doc->fields['date_published'] ?? '') : ''),
+        'draft'          => $version['on'] || $status === Document::STATUS_PUBLISHED ? ''
+            : ($status === Document::STATUS_OBSOLETE ? __('OBSOLETO', 'codexplus')
+                : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(Document::getStatuses()[$status] ?? $status))),
+        'header_html'    => '',
+        'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
+    ]),
 ]);
 
 Html::footer();

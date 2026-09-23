@@ -122,6 +122,40 @@ class Branding
     }
 
     /**
+     * JSON de #codexplus-print-config (contrato com public/js/codexplus.js):
+     * a marca vem daqui, o documento vem de quem chama. Criado na R3b3-2 para
+     * a página do documento do modelo novo. front/article.php (modelo antigo)
+     * ainda monta o seu igual, à mão: sai na R5 com a base nativa.
+     *
+     * Chaves de $document: title, code, revision, client, date_mod, doctype,
+     * owner, date_published, header_html, footer_text; opcionais sector e
+     * draft (aviso na linha de identificação quando não é a versão vigente).
+     * As flags JSON_HEX_* não são opcionais (achado 14).
+     */
+    public static function printConfig(array $document): string
+    {
+        $json = json_encode(
+            [
+                'brand'    => [
+                    'company'      => self::get('company_name'),
+                    'logo_url'     => self::getLogoUrl(),
+                    'show_logo'    => self::get('header_show_logo') === '1',
+                    'repeat_logo'  => self::get('header_repeat') === '1',
+                    'logo_pos'     => self::get('header_logo_position'),
+                    'logo_mm'      => (int) self::get('header_logo_height'),
+                    'title_upper'  => self::get('title_uppercase') === '1',
+                    'footer_show'  => self::get('footer_show') === '1',
+                    'footer_text'  => self::get('footer_text'),
+                    'footer_pages' => self::get('footer_show_pagination') === '1',
+                ],
+                'document' => $document,
+            ],
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+        );
+        return $json !== false ? $json : '{}';
+    }
+
+    /**
      * Grava a configuração. Só as chaves de DEFAULTS são aceitas.
      * Caixas de seleção não enviam nada quando desmarcadas, então cada
      * chave booleana é normalizada explicitamente para '0' ou '1'.

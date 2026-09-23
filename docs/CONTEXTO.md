@@ -424,6 +424,33 @@ precisa, e o campo Cliente só em proposta.
 - **Versões:** o corpo guardado na versão aponta para os mesmos arquivos,
   ligados ao mesmo documento; nada muda na revisão.
 
+#### Leitura e PDF do documento novo (R3b3-2, 22/09/2026)
+
+- A **visão** de `front/document.form.php` leva os cinco seletores do PDF
+  (`#codexplus-doc`, `.codexplus-doc-title`, `.codexplus-content`,
+  `#codexplus-pdf`, `#codexplus-print-config`) e usa o motor da 4c sem
+  mudança: cabeçalho com título e logo, rodapé com marcadores, paginação.
+  O JSON vem de `Branding::printConfig()` (o `front/article.php` do modelo
+  antigo ainda monta o seu à mão até a R5).
+- **Visualizar e PDF:** quem edita vê o botão na edição; `?view=1` abre a
+  visão de leitura (com Editar para voltar). Mostra o que está salvo.
+- **Versão não vigente sai marcada:** rascunho e etapas de validação levam
+  "RASCUNHO — não é a versão vigente" (ou a etapa) na linha de
+  identificação; obsoleto, "OBSOLETO". Chave `draft` no JSON, aceita por
+  `getPrintConfig()` (que só copia chaves conhecidas — chave nova no JSON
+  exige a linha lá também).
+- **Leitor durante a revisão** imprime a versão publicada em vigor (código,
+  título, corpo e data de publicação dela).
+- **Diagrama** continua com o PDF do próprio motor (seção 3.4).
+- **Cabeçalho e rodapé trocados** (Claudio, 22/09/2026, sobre o PDF real):
+  o texto do rodapé configurado (código · revisão, com marcadores) vai para
+  o cabeçalho corrido, acima do título, no lugar do título pequeno; a linha
+  de identificação (aviso de rascunho · setor · responsável · data) sai de
+  baixo do título grande e vai para o rodapé de todas as páginas, com a
+  paginação. Com o rodapé desligado, a identificação fica sob o título. Vale
+  para os dois modelos (o motor é um só). De passagem: `{revisao}` 0 saía
+  vazio.
+
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
 Decisões de Claudio, 21/09/2026, sobre as da R3c:
@@ -972,7 +999,8 @@ depender do comportamento errático de `position: fixed` na impressão.
 ### Os cinco seletores do PDF
 
 `public/js/codexplus.js` remonta o documento para impressão a partir destes
-seletores. **São interface, não decoração.** Renomear qualquer um quebra a
+seletores. Desde a R3b3-2 eles existem em dois templates: `article.html.twig`
+(modelo antigo) e a visão de `document-form.html.twig` (modelo novo). **São interface, não decoração.** Renomear qualquer um quebra a
 exportação silenciosamente, sem erro no console:
 
 ```

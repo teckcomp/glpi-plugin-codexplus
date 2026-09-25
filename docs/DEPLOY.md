@@ -51,7 +51,7 @@ cd /var/www/html/glpi/plugins && tar -xzf /tmp/codexplus-<versao>.tar.gz
 chown -R www-data:www-data /var/www/html/glpi/plugins/codexplus
 
 cd /var/www/html/glpi
-sudo -u www-data php bin/console plugin:install --username=glpi codexplus
+sudo -u www-data php bin/console plugin:install --force --username=glpi codexplus
 sudo -u www-data php bin/console plugin:activate codexplus
 sudo -u www-data php bin/console cache:clear
 systemctl restart apache2
@@ -59,6 +59,10 @@ systemctl restart apache2
 sudo -u www-data php bin/console plugin:list | grep -i codexplus
 ```
 
+> **Sempre `--force`** (achado 63): com a versão do `setup.php` igual à
+> instalada, `plugin:install` sem ele só avisa "já está instalado" e não roda
+> o Install — a coluna nova não é criada e nada acusa erro.
+>
 > **Regra do projeto:** todo bloco com `plugin:install` **precisa** de
 > `plugin:activate` logo em seguida (o install **desativa** o plugin) e
 > termina com `plugin:list | grep` para confirmar estado e versão.

@@ -173,6 +173,12 @@ class Install
         // --- Etapa R6-a: revisão de documento publicado ---
         self::installR6a($migration);
 
+        // --- Bloco T1: cliente vinculado (Laudo e Documentação Técnica) ---
+        self::installT1($migration);
+
+        // --- Bloco A2: setor de auditoria ---
+        self::installA2($migration);
+
         $migration->executeMigration();
         return true;
     }
@@ -431,6 +437,32 @@ class Install
         $migration->addField(self::DOCUMENTS_TABLE, 'revision_summary', 'text');
     }
 
+    /**
+     * Bloco T1 (Claudio, 24/09/2026): tipos LAU, DTC e DIV (sem schema: o
+     * tipo é texto) e o cliente VINCULADO a um usuário ou a uma entidade do
+     * GLPI, no padrão itemtype + items_id do Document_Item nativo. Com o
+     * tipo gravado junto, mudar a configuração da instalação não estraga os
+     * documentos antigos. client_name continua: texto da proposta e retrato
+     * do nome do cliente vinculado.
+     */
+    private static function installT1(Migration $migration): void
+    {
+        $doc = self::DOCUMENTS_TABLE;
+        $migration->addField($doc, 'client_itemtype', 'string', ['after' => 'client_name']);
+        $migration->addField($doc, 'client_items_id', 'fkey', ['after' => 'client_itemtype']);
+        $migration->addKey($doc, ['client_itemtype', 'client_items_id'], 'client');
+    }
+
+    /**
+     * Bloco A2 (Claudio, 25/09/2026): setor marcado como de auditoria. Nos
+     * documentos só desse(s) setor(es), quem aprovou a 1ª etapa pode validar
+     * a 2ª; nos demais, não.
+     */
+    private static function installA2(Migration $migration): void
+    {
+        $migration->addField(self::SECTORS_TABLE, 'is_audit', 'bool');
+    }
+
     private static function installR3c(Migration $migration): void
     {
         /** @var \DBmysql $DB */
@@ -510,7 +542,11 @@ class Install
             ) $opts", "Codex+ (9a): erro ao criar $t");
         }
 
-        // Super-Admin herda tudo: perfis com Configurar > Atualizar.
+        // Super-Admin herda tudo: perfis com Configurar > Atualizar. Menos o
+        // bit Auditor (A2, Claudio, 25/09/2026): o Super-Admin valida sem ele
+        // e, com ele, entraria na lista de auditores. OU bit a bit: nunca
+        // tira bit, então quem já tinha o Auditor desmarca na aba de Perfis.
+        $all = Rights::ALL & ~Rights::VALIDATE;
         $admins = [];
         foreach ($DB->request([
             'SELECT' => ['profiles_id', 'rights'],
@@ -536,12 +572,12 @@ class Install
                 $DB->insert('glpi_profilerights', [
                     'profiles_id' => $pid,
                     'name'        => Rights::NAME,
-                    'rights'      => Rights::ALL,
+                    'rights'      => $all,
                 ]);
-            } elseif (($cur | Rights::ALL) !== $cur) {
+            } elseif (($cur | $all) !== $cur) {
                 $DB->update(
                     'glpi_profilerights',
-                    ['rights' => $cur | Rights::ALL],
+                    ['rights' => $cur | $all],
                     ['profiles_id' => $pid, 'name' => Rights::NAME]
                 );
             }

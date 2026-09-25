@@ -2,9 +2,14 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.8-alpha` · atualizado em 24/09/2026 (editor de documentos
+> Estado: `v0.6.9-alpha` · atualizado em 25/09/2026 (blocos A1 e A2: auditor
+> pelo perfil, Super-Admin pelo perfil, setor de auditoria — subseções
+> "Auditor pelo perfil" e "Quem aprovou não valida"). Antes, 24/09: bloco T1
+> (tipos LAU, DTC e DIV e cliente vinculado — subseção "Tipos novos e cliente
+> vinculado"; instalado na homologação sem commit, juntado ao A2 em 25/09).
+> Antes, no mesmo dia: editor de documentos
 > completo: E1 a E4, commits `1c793c8` a `68b7b09` — subseção "Editor de
-> documentos"). Antes, 22/09: criador de documentos (R3b2-b e R3b3, commits
+> documentos". Antes, 22/09: criador de documentos (R3b2-b e R3b3, commits
 > `d06aa30` a `987636c`). Antes, 21/09: R6-a, revisão de
 > documento publicado. Antes: (motor de diagrama em
 > grafo: posição livre, arraste próprio, ligações com chefia, salvamento
@@ -19,14 +24,23 @@ Plugin de **gestão documental dentro do GLPI 11.0.6**. Serve como wiki, base
 de conhecimento e ferramenta de produção de documentos controlados, com
 exportação em PDF com a marca da empresa.
 
-Quatro tipos de documento:
+Tipos de documento (os quatro originais, o `DIA` da Etapa 9 e os três do
+bloco T1, decididos por Claudio em 24/09/2026):
 
-| Sigla | Nome | Vence? | Observação |
-|---|---|---|---|
-| `POP` | Procedimento Operacional Padrão | sim | |
-| `PSG` | Procedimento do Sistema de Gestão | sim | Regimento de setor que **associa POPs** |
-| `MAN` | Manual | sim | Manual técnico / de uso |
-| `PRP` | Proposta | **não** | Escopo comercial para cliente. Entregável, não conhecimento |
+| Sigla | Nome | Vence? | Cliente | Observação |
+|---|---|---|---|---|
+| `POP` | Procedimento Operacional Padrão | 12 meses | — | |
+| `PSG` | Procedimento do Sistema de Gestão | 12 meses | — | Regimento de setor que **associa POPs** |
+| `MAN` | Manual | 6 meses | — | Manual técnico / de uso |
+| `PRP` | Proposta | **não** | texto livre | Escopo comercial para cliente. Entregável, não conhecimento |
+| `LAU` | Laudo Técnico | **não** | vinculado | Registra um momento; laudo novo é outro documento |
+| `DTC` | Documentação Técnica | 12 meses | vinculado | Ganha o desenho embutido junto com a proposta (item 7 da ordem até produção) |
+| `DIV` | Documento Diverso | **não** (provisório) | — | Qualquer documento sem classificação; validade "definida por quem publica" quando essa escolha existir |
+| `DIA` | Diagrama | 3 meses | — | Organograma (e depois cronograma, matrizes, fluxograma) |
+
+`LAU`, `DTC`, `DIV` e `DIA` existem só no modelo novo (`NEW_MODEL_ONLY`).
+Todos seguem as mesmas permissões (setor pela categoria, papéis, validação em
+duas etapas).
 
 **Tipo não é categoria.** São dois eixos independentes: um POP de Redes e um
 Manual de Redes vivem na mesma categoria. A estante filtra por tipo primeiro,
@@ -208,6 +222,7 @@ histórico; renomear exigiria migrar todos os perfis sem ganho). Bits em
 | 1024 | Ver todos (ignora os alvos de leitura) |
 | 2048 | Publicar para acesso anônimo |
 | 4096 | Gerenciar modelos, setores e categorias (R2) |
+| 8192 | **Auditor** (R3c como "Validar"; rótulo e sentido novos na A1) |
 
 Os bits novos **nascem desmarcados em todos os perfis**, inclusive
 Super-Admin: se o Install concedesse, cada reinstalação devolveria o que foi
@@ -284,7 +299,7 @@ Install, por OU bit a bit (reinstalar nunca tira bit).
 | Editar | Atualizar | Editor do documento ou gestor do setor, **só em rascunho** |
 | Gerir (editores, alvos, responsável, obsoleto) | Atualizar | Gestor do setor. Categorias só em rascunho e só para setor que ele gere |
 | Enviar para validação | Atualizar | Quem pode editar; exige categoria com setor (salvo Ver todos) |
-| Validar ou devolver | **Validar** (8192) | Validador do setor que **não alterou** o documento na revisão atual |
+| Validar ou devolver | **Validar** (8192; "Auditor" desde a A1) | Validador do setor que **não alterou** o documento na revisão atual. *Desde a A1: o auditor responsável do documento, escolhido entre quem tem o bit no perfil* |
 | Excluir (lixeira) | Excluir | Gestor do setor |
 | Setores, categorias, papéis de setor, modelos | Gerenciar modelos, setores e categorias | — |
 
@@ -441,6 +456,11 @@ precisa, e o campo Cliente só em proposta.
   antigo ainda monta o seu à mão até a R5).
 - **Visualizar e PDF:** quem edita vê o botão na edição; `?view=1` abre a
   visão de leitura (com Editar para voltar). Mostra o que está salvo.
+  **Só o documento** (Claudio, 25/09/2026): nessa janela não aparecem a
+  revisão periódica editável, a coluna Permissões nem o fluxo; auditor,
+  revisor, janela e editores saem como texto na linha de dados. Sem
+  `?view=1` (documento fora de rascunho, que não tem janela de edição) a
+  página continua com a gestão.
 - **Versão não vigente sai marcada:** rascunho e etapas de validação levam
   "RASCUNHO — não é a versão vigente" (ou a etapa) na linha de
   identificação; obsoleto, "OBSOLETO". Chave `draft` no JSON, aceita por
@@ -460,7 +480,7 @@ precisa, e o campo Cliente só em proposta.
 
 #### Editor de documentos (E1 a E4, 22 a 24/09/2026)
 
-Item 5 da ordem até produção, pedido de Claudio: "TinyMCE melhorado",
+Item 6 da ordem até produção, pedido de Claudio: "TinyMCE melhorado",
 tamanho de fonte, importar, exportar e editor de imagem. Tudo no navegador,
 sem schema novo e sem tocar no núcleo. Arquivos: `public/js/codexplus-editor.js`
 (E1, E2, ligação do E4), `public/js/codexplus-export.js` (E3),
@@ -531,6 +551,42 @@ configuração passa por `customize()` antes do init. Só o editor
   e arrastar continuam pelo `glpi_upload_doc`. Bônus: imagem por endereço
   externo, que não sairia no PDF nem no acesso anônimo (R7), deixa de existir.
 
+#### Tipos novos e cliente vinculado (bloco T1, `v0.6.9-alpha`, 24/09/2026)
+
+Decisões de Claudio, 24/09/2026. Tipos na tabela da seção 1; aqui, o cliente.
+
+- **Onde os clientes estão depende da instalação.** Na Teckcomp, cadastrados
+  como usuários; em outros cenários, como entidades. A configuração do
+  Codex+ (`front/config.form.php`, seção "Clientes dos documentos") grava
+  `client_source` (`User` ou `Entity`) no contexto `plugin:codexplus`
+  (`Branding::DEFAULTS`, `getClientSources()`, `clientSource()`).
+- **Vínculo no padrão do `Document_Item` nativo:** colunas
+  `client_itemtype` + `client_items_id` no documento, com índice `client`.
+  O tipo vai gravado junto: mudar a configuração não estraga os documentos
+  antigos, e documento já vinculado mantém a lista do tipo dele na edição.
+- **Só em `LAU` e `DTC`** (`DocumentMeta::CLIENT_LINK_TYPES`,
+  `linksClient()`). Proposta continua em texto livre
+  (`CLIENT_TEXT_TYPES`): o cliente pode ainda não estar cadastrado.
+  `hasClient()` cobre os dois.
+- **Regra com fonte única em `Document::normalizeClient()`**, chamada no
+  `prepareInputForAdd` e no `prepareInputForUpdate`: tipo sem vínculo
+  ignora os campos; id 0 ou -1 tira o cliente; itemtype fora da lista vira
+  o da configuração; cadastro inexistente é recusado; a entidade raiz não é
+  cliente (a lista usa `used => [0]` e `-1` como vazio). Os dois campos
+  estão em `CONTENT_FIELDS`: fora de rascunho não mudam, e mudar conta como
+  alteração (quem mudou não valida).
+- **`client_name` vira o retrato do nome** na hora da escolha. Por isso o
+  Histórico (opção de busca 9, achado 33), o Painel e a estante funcionam sem
+  mudança. A tela e o PDF usam o nome **atual** (`Document::clientLabel()`),
+  e o retrato só se o cadastro sumiu.
+- **Não dá leitura a ninguém.** Quem lê continua na coluna Permissões.
+- **PDF e Word:** "Cliente:" na linha de identificação de qualquer tipo que
+  tenha cliente (`buildIdentLine` deixou de testar `PRP`; quem monta o JSON
+  só manda cliente nesses tipos). Proposta continua sem "Responsável".
+- **Formulário:** `data-cx-only-type` aceita lista separada por espaço
+  (`"LAU DTC"`) em `codexplus-docform.js`.
+- **Duplicar** copia o vínculo.
+
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
 Decisões de Claudio, 21/09/2026, sobre as da R3c:
@@ -549,6 +605,8 @@ Decisões de Claudio, 21/09/2026, sobre as da R3c:
   `SectorMember::usersOfRole()`), só em rascunho; enviar exige auditor.
 - **Super-Admin pode tudo, definitivo** (Claudio, 21/09/2026): "Ver todos"
   envia sem auditor e passa pelas duas etapas. Não é pendência de produção.
+  *Desde a A2 o Super-Admin é o perfil com Configurar > Atualizar, não o Ver
+  todos (subseção "Quem aprovou não valida").*
 - **Revisor** (`users_id_reviewer`): papel novo, só para a revisão
   periódica. Tem papel no documento (lê em qualquer status). Abrir a revisão e
   "revisado sem alteração" continuam na R6.
@@ -570,6 +628,68 @@ Decisões de Claudio, 21/09/2026, sobre as da R3c:
   sem o bit Validar, 21/09/2026).
 - Documento que estava em `validacao` antes da R3d fica na 2ª etapa, sem
   auditor: só o Super-Admin valida (ou devolve, para escolher o auditor).
+
+#### Auditor pelo perfil (bloco A1, 25/09/2026)
+
+Decisão de Claudio, 25/09/2026: o auditor, na rotina, é alguém do setor de
+Auditoria, e cadastrá-lo como auditor em cada setor não faz sentido. **O
+auditor passa a vir do perfil**, e o papel "auditor" do setor sai de uso.
+Substitui o que a R3d diz sobre auditores do setor.
+
+- **Coluna "Auditor"** na aba Codex+ de Perfis: é o bit 8192, antes rotulado
+  "Validar". Mesmo bit, sem migração: perfil que o tinha continua valendo.
+- **Quem pode ser auditor** (`Rights::auditorUsers($entidade)`): usuário
+  ativo, não excluído, com um perfil da interface padrão que tenha o bit,
+  atribuído na entidade do documento ou numa entidade acima com recursivo.
+  Vale para **qualquer setor**. Perfil Self-Service fica fora (achado 27). O
+  Super-Admin aparece na lista (tem todos os bits).
+- **Validar** (`canValidate`): bit no perfil **ativo** + ser o auditor
+  responsável + não ter alterado nesta revisão. Quem tem mais de um perfil
+  precisa estar no que tem o bit; o aviso da página e o motivo do Painel
+  dizem isso.
+- **Lista na página:** vem pronta do servidor, pela entidade (na criação, a
+  entidade ativa). `ajax/document.auditors.php` e a parte do auditor em
+  `codexplus-docform.js` saíram: a lista não depende mais das categorias.
+  Auditor gravado que perdeu o perfil aparece como "(sem perfil de auditor)";
+  enviar recusa.
+- **Setor:** só Gestores. Linhas antigas `validador` em `sectormembers`
+  continuam no banco, não são lidas por regra nenhuma e aparecem no console
+  como "Auditor (fora de uso)"; `--role=auditor` é recusado (serve só com
+  `--remove`, para limpar). Higiene fora do Install.
+- **Leitura:** o auditor de setor dava papel (lia rascunho de todo o setor).
+  Isso acabou: o auditor lê em qualquer status só os documentos em que é o
+  auditor responsável.
+
+#### Quem aprovou não valida; Super-Admin pelo perfil (bloco A2, 25/09/2026)
+
+Decisões de Claudio, 25/09/2026. **Precisa reinstalar** (coluna nova).
+
+- **Super-Admin = perfil com Configurar > Atualizar** (`Rights::isSuperAdmin()`,
+  o mesmo critério do Install), e não mais "Ver todos". **Pode tudo no fluxo,
+  sem regra**: valida qualquer documento sem o bit Auditor, e só ele envia sem
+  auditor escolhido. Não aparece na lista de auditores, mesmo com o bit.
+- **O Install deixa de dar o bit Auditor ao Super-Admin** (`Rights::ALL &
+  ~Rights::VALIDATE`). É OU bit a bit, então não tira: quem já tinha desmarca
+  uma vez na aba de Perfis, e a reinstalação não devolve.
+- **"Ver todos" não dispensa mais as regras da validação.** Continua valendo
+  para leitura, criação e gestão. Motivo: na homologação o perfil Auditoria
+  tem Ver todos, e com a regra antiga validava qualquer documento, sem ter
+  sido escolhido e mesmo tendo editado.
+- **Quem aprovou a 1ª etapa não valida a 2ª** (`users_id_approver`), salvo em
+  documento **só de setor de auditoria** (`Document::isAuditSectorOnly()`:
+  todos os setores do documento marcados; basta um setor comum para a regra
+  valer). "Quem editou não valida" continua valendo também no setor de
+  auditoria.
+- **Setor de auditoria:** campo `is_audit` em `glpi_plugin_codexplus_sectors`
+  (Sim/Não no cadastro do Setor, coluna na lista, no Histórico pela opção de
+  busca 10).
+- **O auditor impedido pode devolver** (`canReject`): editou ou aprovou a 1ª
+  etapa, com o bit Auditor. Sem isso o documento ficava preso até o
+  Super-Admin agir.
+- **Motivo com fonte única:** `Document::validationBlocker()` devolve
+  `perfil`, `alterou` ou `aprovou`; a página (`validation_block`,
+  `missing_right`), o Painel e a mensagem do `approve()` leem dele.
+- **A seguir:** R3b2-c (aba Papéis no Setor, só Gestores).
 
 #### Revisão de documento publicado (R6-a, `v0.6.8-alpha`, 21/09/2026)
 
@@ -1110,6 +1230,24 @@ depender do comportamento errático de `position: fixed` na impressão.
     `docx` `Packer.toBlob` não termina no jsdom (no teste, usar o Packer do
     Node); o anotador precisa do pacote `canvas`. Conferência visual do
     `.docx` pelo LibreOffice (`soffice --headless --convert-to pdf`).
+62. **Clicar fora do editor "clica" os botões ativos da barra.**
+    `Html::initEditorSystem` (11.0.6) liga em `document` um clique que faz
+    `$('.tox-tbtn.tox-tbtn--enabled').trigger('click')` para fechar menus;
+    `tox-tbtn--enabled` é também a classe do botão de alternar **ativo**. Com
+    o cursor em texto normal o "A" do tamanho (E1) fica ativo: clicar no
+    título executava o A, que chama `editor.focus()`, e a página voltava ao
+    corpo sem deixar digitar (Claudio, 25/09/2026). Negrito ativo sofria o
+    mesmo. Correção em `codexplus-editor.js` (`guardSyntheticClicks`): clique
+    sem `isTrusted` num botão deste editor é barrado na captura.
+63. **`plugin:install` sem `--force` não roda o Install quando a versão é a
+    mesma**: responde "já está instalado" e sai. Bloco com schema novo sem
+    subir a versão (A2, 25/09/2026) precisa de `--force` (o `DEPLOY.md` já
+    traz). Com `--force` o plugin é desativado: `plugin:activate` em seguida.
+64. **Pacote instalado e não commitado some da história.** O T1 (0.6.9) foi
+    instalado na homologação em 24/09 e ficou fora do GitHub; o A1 e o A2
+    foram gerados a partir do GitHub e sobrescreveram 8 arquivos dele (o
+    conteúdo foi recuperado do pacote em `/tmp` e juntado em 25/09). Antes de
+    gerar pacote: `git status --short` no servidor tem que vir vazio.
 
 ## 6. Contrato de código — não quebrar
 

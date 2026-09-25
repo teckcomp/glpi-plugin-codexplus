@@ -77,6 +77,20 @@ $postedCategories = static function (): array {
     return array_values(array_unique(array_filter(array_map('intval', (array) $raw))));
 };
 
+/**
+ * Bloco T1: cliente vinculado (Laudo e Documentação Técnica). O tipo do
+ * vínculo vem num campo oculto; Document::normalizeClient confere tudo.
+ */
+$postedClient = static function (string $doctype): array {
+    if (!DocumentMeta::linksClient($doctype) || !isset($_POST['client_items_id'])) {
+        return [];
+    }
+    return [
+        'client_itemtype' => (string) ($_POST['client_itemtype'] ?? ''),
+        'client_items_id' => (int) $_POST['client_items_id'],
+    ];
+};
+
 // -------------------------------------------------------------------------
 // POST — criar
 // -------------------------------------------------------------------------
@@ -92,6 +106,7 @@ if (isset($_POST['add'])) {
     if ($input['doctype'] === 'PRP') {
         $input['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
+    $input += $postedClient($input['doctype']);
     // R3b2-b: responsável, auditor, revisor e janela já na criação. Quem cria
     // gere o documento (é gestor do setor de todas as categorias, ou Ver
     // todos); Document::prepareInputForAdd confere auditor e janela.
@@ -196,6 +211,10 @@ if ($id > 0 && isset($_POST['duplicate'])) {
     if ($copia['doctype'] === 'PRP') {
         $copia['client_name'] = (string) ($doc->fields['client_name'] ?? '');
     }
+    if (DocumentMeta::linksClient($copia['doctype'])) {
+        $copia['client_itemtype'] = (string) ($doc->fields['client_itemtype'] ?? '');
+        $copia['client_items_id'] = (int) ($doc->fields['client_items_id'] ?? 0);
+    }
     $novo  = new Document();
     $newId = $novo->add($copia);
     if (!$newId) {
@@ -275,6 +294,7 @@ if ($id > 0 && isset($_POST['update'])) {
     if ($doc->fields['doctype'] === 'PRP') {
         $data['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
+    $data += $postedClient((string) $doc->fields['doctype']);
 
     $ok = true;
     if ($doc->canManage()) {
@@ -419,7 +439,11 @@ $canEdit = $isNew || $doc->can($id, UPDATE);
 // R3b3-2: ?view=1 mostra a visão de leitura (com Exportar PDF) mesmo para
 // quem pode editar — é como o autor confere o documento antes de enviar.
 $canEditDoc = $canEdit;
-if (!$isNew && isset($_GET['view'])) {
+// Claudio, 25/09/2026: a janela "Visualizar e PDF" mostra SÓ o documento.
+// Revisão periódica, Permissões e fluxo ficam fora dela (quem edita volta
+// pelo botão Editar). Sem ?view=1 a página continua como era.
+$preview = !$isNew && isset($_GET['view']);
+if ($preview) {
     $canEdit = false;
 }
 
@@ -475,6 +499,13 @@ $canManage   = !$isNew && $doc->canManage();
 
 // Campos de formulário gerados pelo GLPI (devolvem string com display=false).
 $widgets = [];
+// Bloco T1: cliente para a tela. name = o que se mostra (vinculado pelo nome
+// atual, ou o texto da proposta); itemtype e source_label = o campo de edição.
+$client = [
+    'name'         => $isNew ? '' : $doc->clientLabel(),
+    'itemtype'     => '',
+    'source_label' => '',
+];
 if ($canEdit) {
     $catCanChange = $isNew || ($canManage && $doc->fields['status'] === Document::STATUS_DRAFT);
     // Select múltiplo por AJAX: o GLPI usa o nome como veio (precisa do
@@ -514,6 +545,35 @@ if ($canEdit) {
             'display' => false,
             'width'   => '100%',
         ]);
+    }
+    // Bloco T1: Cliente vinculado. Na criação, sempre (aparece com LAU/DTC);
+    // na edição, só nesses tipos. A lista segue a configuração da
+    // instalação; documento já vinculado a outro tipo mantém o dele.
+    if ($isNew || DocumentMeta::linksClient((string) $doc->fields['doctype'])) {
+        $cType = $isNew ? '' : (string) ($doc->fields['client_itemtype'] ?? '');
+        $cId   = $isNew ? 0 : (int) ($doc->fields['client_items_id'] ?? 0);
+        if (!array_key_exists($cType, Branding::getClientSources()) || $cId <= 0) {
+            $cType = Branding::clientSource();
+        }
+        $client['itemtype'] = $cType;
+        $client['source_label'] = $cType === 'Entity' ? __('entidade do GLPI', 'codexplus') : __('usuário do GLPI', 'codexplus');
+        $widgets['client'] = $cType === 'Entity'
+            ? Entity::dropdown([
+                'name'    => 'client_items_id',
+                // -1 = sem cliente; a raiz (0) é a própria empresa e fica fora.
+                'value'   => $cId > 0 ? $cId : -1,
+                'toadd'   => [-1 => Dropdown::EMPTY_VALUE],
+                'used'    => [0],
+                'display' => false,
+                'width'   => '100%',
+            ])
+            : User::dropdown([
+                'name'    => 'client_items_id',
+                'value'   => $cId,
+                'right'   => 'all',
+                'display' => false,
+                'width'   => '100%',
+            ]);
     }
     $widgets['content'] = $isDiagram ? '' : Html::textarea([
         'name'            => 'content',
@@ -608,13 +668,26 @@ if ($manageNew || (!$isNew && ($canManage || $doc->hasRole() || Session::haveRig
 $status = $isNew ? Document::STATUS_DRAFT : (string) $doc->fields['status'];
 
 // R3d: auditor responsável, revisor e janela de revisão. O auditor muda só em
-// rascunho e é escolhido entre os auditores do setor; revisor e janela mudam
-// em qualquer status. Quem não gere o documento só vê.
+// rascunho; revisor e janela mudam em qualquer status. Quem não gere o
+// documento só vê. A1 (Claudio, 25/09/2026): o auditor é escolhido entre quem
+// tem um perfil com o bit Auditor na entidade do documento, em qualquer setor
+// (Rights::auditorUsers) — a lista não depende mais das categorias.
 $fmtDate = static fn ($d) => empty($d) ? '' : substr((string) $d, 0, 10);
+$auditorOptions = static function (int $entityId, int $atual): array {
+    $opcoes = [0 => Dropdown::EMPTY_VALUE];
+    foreach (Rights::auditorUsers($entityId) as $uid) {
+        $opcoes[$uid] = getUserName($uid);
+    }
+    // Auditor gravado que perdeu o perfil continua visível, para não sumir
+    // em silêncio; o envio avisa que precisa trocar.
+    if ($atual > 0 && !isset($opcoes[$atual])) {
+        $opcoes[$atual] = getUserName($atual) . ' ' . __('(sem perfil de auditor)', 'codexplus');
+    }
+    return $opcoes;
+};
 $review = [
     'show'             => true,
     'is_new'           => $isNew,
-    'auditors_url'     => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.auditors.php',
     'can_auditor'      => false,
     'can_review'       => false,
     'auditor_widget'   => '',
@@ -629,12 +702,12 @@ $review = [
 $pending = ['label' => '', 'names' => []];
 $missingRight = '';
 if ($isNew) {
-    // R3b2-b: quem cria gere o documento. O auditor depende do setor, que
-    // depende das categorias: a lista nasce vazia e o JS a recarrega a cada
-    // troca de categoria (ajax/document.auditors.php).
+    // R3b2-b: quem cria gere o documento. O documento nasce na entidade ativa.
     $review['can_auditor']    = true;
     $review['can_review']     = true;
-    $review['auditor_widget'] = Dropdown::showFromArray('users_id_auditor', [0 => Dropdown::EMPTY_VALUE], [
+    $opcoes = $auditorOptions((int) Session::getActiveEntity(), 0);
+    $review['no_auditors']    = count($opcoes) === 1;
+    $review['auditor_widget'] = Dropdown::showFromArray('users_id_auditor', $opcoes, [
         'value'   => 0,
         'display' => false,
         'width'   => '100%',
@@ -659,15 +732,7 @@ if (!$isNew) {
     $review['can_auditor']     = $canManage && $canEdit && $doc->fields['status'] === Document::STATUS_DRAFT;
 
     if ($review['can_auditor']) {
-        $opcoes = [0 => Dropdown::EMPTY_VALUE];
-        foreach (SectorMember::usersOfRole($doc->getSectorIds(), SectorMember::ROLE_VALIDATOR) as $uid) {
-            $opcoes[$uid] = getUserName($uid);
-        }
-        // Auditor gravado que saiu do setor continua visível, para não sumir
-        // em silêncio; o envio avisa que precisa trocar.
-        if ($auditorId > 0 && !isset($opcoes[$auditorId])) {
-            $opcoes[$auditorId] = getUserName($auditorId) . ' ' . __('(não é mais auditor do setor)', 'codexplus');
-        }
+        $opcoes = $auditorOptions((int) $doc->fields['entities_id'], $auditorId);
         $review['no_auditors']    = count($opcoes) === 1;
         $review['auditor_widget'] = Dropdown::showFromArray('users_id_auditor', $opcoes, [
             'value'   => $auditorId,
@@ -691,10 +756,8 @@ if (!$isNew) {
     $st0 = (string) $doc->fields['status'];
     if ($st0 === Document::STATUS_APPROVAL && $doc->isManager() && !$doc->canApprove()) {
         $missingRight = __('Você é gestor do setor deste documento, mas seu perfil não tem o direito Atualizar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
-    } elseif ($st0 === Document::STATUS_VALIDATION && $doc->isAuditor() && !$doc->canValidate() && !$doc->isContributor()) {
-        $missingRight = !$doc->isValidator()
-            ? __('Você é o auditor responsável deste documento, mas não está mais entre os auditores do setor. Quem gere o documento precisa devolvê-lo e escolher outro auditor.', 'codexplus')
-            : __('Você é o auditor responsável deste documento, mas seu perfil não tem o direito Validar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+    } elseif ($doc->validationBlocker() === 'perfil') {
+        $missingRight = __('Você é o auditor responsável deste documento, mas o perfil em uso não tem o direito Auditor do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
     }
 
     // Aviso "aguardando …": quem responde pela etapa atual.
@@ -721,6 +784,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'status_label' => $version['on'] ? Document::getStatuses()[Document::STATUS_PUBLISHED] : (Document::getStatuses()[$status] ?? $status),
     'name'        => $isNew ? '' : ($shown['name'] ?? (string) $doc->fields['name']),
     'client_name' => $isNew ? '' : (string) ($doc->fields['client_name'] ?? ''),
+    'client'      => $client,
     'content_html' => $isNew ? '' : RichText::getEnhancedHtml($shown['content'] ?? (string) ($doc->fields['content'] ?? '')),
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
@@ -734,6 +798,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'widgets'     => $widgets,
     'perm'        => $perm,
     'review'      => $review,
+    'preview'     => $preview,
     'pending'     => $pending,
     'missing_right' => $missingRight,
     'is_diagram'   => $isDiagram,
@@ -742,11 +807,13 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_validate' => !$isNew && $doc->canValidate(),
     'can_approve'  => !$isNew && $doc->canApprove(),
     'can_reject'   => !$isNew && $doc->canReject(),
-    'is_blocked_contributor' => !$isNew
-        && $status === Document::STATUS_VALIDATION
-        && $doc->isAuditor()
-        && $doc->isContributor()
-        && !Session::haveRight(Rights::NAME, Rights::VIEWALL),
+    // A2: auditor responsável impedido de validar (editou ou aprovou a 1ª
+    // etapa). O motivo 'perfil' vai em missing_right.
+    'validation_block' => $isNew || $version['on'] ? '' : match ($doc->validationBlocker()) {
+        'alterou' => __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
+        'aprovou' => __('Você aprovou a 1ª etapa deste documento: outro auditor precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
+        default   => '',
+    },
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
     // R3b2-b parte 2: duplicar = poder criar em todas as categorias dele.
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
@@ -769,7 +836,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         'title'          => $version['on'] ? (string) ($shown['name'] ?? '') : (string) $doc->fields['name'],
         'code'           => $version['on'] ? $version['code'] : $doc->getCode(),
         'revision'       => $version['on'] ? $version['rev'] : (int) $doc->fields['revision'],
-        'client'         => (string) ($doc->fields['client_name'] ?? ''),
+        'client'         => $client['name'],
         'date_mod'       => (string) ($doc->fields['date_mod'] ?? ''),
         'doctype'        => (string) $doc->fields['doctype'],
         'owner'          => (int) $doc->fields['users_id_owner'] > 0

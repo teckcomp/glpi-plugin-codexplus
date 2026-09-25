@@ -30,6 +30,63 @@ class Sector extends CommonDropdown
         return 'ti ti-building';
     }
 
+    /**
+     * Bloco A2 (Claudio, 25/09/2026): "Setor de auditoria". Nos documentos
+     * cujos setores são todos de auditoria, quem aprovou a 1ª etapa pode
+     * validar a 2ª (lá gestor e auditor costumam ser as mesmas pessoas).
+     */
+    public function getAdditionalFields()
+    {
+        $fields = parent::getAdditionalFields();
+        $fields[] = [
+            'name'  => 'is_audit',
+            'label' => __('Setor de auditoria', 'codexplus'),
+            'type'  => 'bool',
+            'list'  => true,
+        ];
+        return $fields;
+    }
+
+    /** Opção de busca: coluna na lista e registro no Histórico (achado 33). */
+    public function rawSearchOptions()
+    {
+        $tab = parent::rawSearchOptions();
+        $tab[] = [
+            'id'       => '10',
+            'table'    => $this->getTable(),
+            'field'    => 'is_audit',
+            'name'     => __('Setor de auditoria', 'codexplus'),
+            'datatype' => 'bool',
+        ];
+        return $tab;
+    }
+
+    /**
+     * Setores de auditoria entre os informados.
+     *
+     * @param int[] $ids
+     * @return int[]
+     */
+    public static function auditOnes(array $ids): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if ($ids === []) {
+            return [];
+        }
+        $out = [];
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => self::getTable(),
+            'WHERE'  => ['id' => $ids, 'is_audit' => 1],
+        ]) as $row) {
+            $out[] = (int) $row['id'];
+        }
+        return $out;
+    }
+
     /** Papéis do setor (R3c) saem junto com o setor. */
     public function cleanDBonPurge()
     {

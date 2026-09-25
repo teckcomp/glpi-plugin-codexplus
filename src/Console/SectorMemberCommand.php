@@ -9,12 +9,15 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * R3c — dá (ou tira) papel de GESTOR ou VALIDADOR num setor, a um usuário ou
- * grupo, como o usuário de --username (exige o bit Gerenciar modelos,
- * setores e categorias). Sem --user/--group, só lista os papéis do setor.
+ * R3c — dá (ou tira) papel de GESTOR num setor, a um usuário ou grupo, como
+ * o usuário de --username (exige o bit Gerenciar modelos, setores e
+ * categorias). Sem --user/--group, só lista os papéis do setor.
+ * Desde a A1 o auditor vem do perfil (coluna Auditor na aba Codex+ de
+ * Perfis); --role=auditor é recusado. --remove ainda tira linha antiga de
+ * auditor, para limpeza.
  *
  *   ... sector:member --username=glpi --sector="Qualidade" --role=gestor --user=joao
- *   ... sector:member --username=glpi --sector="Qualidade" --role=auditor --group="Auditoria"
+ *   ... sector:member --username=glpi --sector="Qualidade" --role=gestor --group="Qualidade"
  *   ... sector:member --username=glpi --sector="Qualidade" --role=gestor --user=joao --remove
  */
 class SectorMemberCommand extends AbstractCommand
@@ -25,11 +28,11 @@ class SectorMemberCommand extends AbstractCommand
     {
         parent::configure();
         $this->setName('plugins:codexplus:sector:member');
-        $this->setDescription('Codex+ (R3c): gestores e validadores de um setor');
+        $this->setDescription('Codex+ (R3c): gestores de um setor (auditor é pelo perfil desde a A1)');
         $this->addOption('username', null, InputOption::VALUE_REQUIRED, 'Login de quem executa');
         $this->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Perfil a usar (nome)');
         $this->addOption('sector', null, InputOption::VALUE_REQUIRED, 'Setor (nome ou ID)');
-        $this->addOption('role', null, InputOption::VALUE_REQUIRED, 'gestor ou auditor (validador = auditor)');
+        $this->addOption('role', null, InputOption::VALUE_REQUIRED, 'gestor (auditor é pelo perfil desde a A1)');
         $this->addOption('user', null, InputOption::VALUE_REQUIRED, 'Usuário (login)');
         $this->addOption('group', null, InputOption::VALUE_REQUIRED, 'Grupo (nome)');
         $this->addOption('remove', null, InputOption::VALUE_NONE, 'Tira o papel em vez de dar');
@@ -48,7 +51,7 @@ class SectorMemberCommand extends AbstractCommand
 
         if ($input->getOption('user') !== null || $input->getOption('group') !== null) {
             $row['role']      = (string) $input->getOption('role');
-            if ($row['role'] === 'auditor') {        // R3d: nome novo, chave antiga
+            if ($row['role'] === 'auditor') {        // só para --remove de linha antiga
                 $row['role'] = SectorMember::ROLE_VALIDATOR;
             }
             $row['users_id']  = $input->getOption('user') !== null ? self::userId((string) $input->getOption('user')) : 0;

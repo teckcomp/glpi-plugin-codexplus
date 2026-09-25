@@ -69,6 +69,10 @@
     --cx-type-MAN: #7a4fb5;  --cx-type-MAN-bg: #efe8f8;  --cx-type-MAN-ink: #5e3a92;
     --cx-type-PRP: #c4860e;  --cx-type-PRP-bg: #fbf0dc;  --cx-type-PRP-ink: #8a5500;
     --cx-type-DIA: #cf4b66;  --cx-type-DIA-bg: #fbe6eb;  --cx-type-DIA-ink: #a3304b;
+    /* Bloco T1 (24/09/2026): Laudo, Documentação Técnica, Documento Diverso */
+    --cx-type-LAU: #c2562f;  --cx-type-LAU-bg: #fbe9e2;  --cx-type-LAU-ink: #933c1c;
+    --cx-type-DTC: #4f7d1f;  --cx-type-DTC-bg: #eaf2dc;  --cx-type-DTC-ink: #3a5e14;
+    --cx-type-DIV: #6b6a64;  --cx-type-DIV-bg: #eeede8;  --cx-type-DIV-ink: #4a4944;
 
     /* Níveis do organograma (Etapa 9), do protótipo aprovado. */
     --cx-l-diretoria:  #22314f;
@@ -1489,11 +1493,17 @@
 .cx-code-type-MAN { background: var(--cx-type-MAN-bg); color: var(--cx-type-MAN-ink); }
 .cx-code-type-PRP { background: var(--cx-type-PRP-bg); color: var(--cx-type-PRP-ink); }
 .cx-code-type-DIA { background: var(--cx-type-DIA-bg); color: var(--cx-type-DIA-ink); }
+.cx-code-type-LAU { background: var(--cx-type-LAU-bg); color: var(--cx-type-LAU-ink); }
+.cx-code-type-DTC { background: var(--cx-type-DTC-bg); color: var(--cx-type-DTC-ink); }
+.cx-code-type-DIV { background: var(--cx-type-DIV-bg); color: var(--cx-type-DIV-ink); }
 .cx-dot-POP { background: var(--cx-type-POP); }
 .cx-dot-PSG { background: var(--cx-type-PSG); }
 .cx-dot-MAN { background: var(--cx-type-MAN); }
 .cx-dot-PRP { background: var(--cx-type-PRP); }
 .cx-dot-DIA { background: var(--cx-type-DIA); }
+.cx-dot-LAU { background: var(--cx-type-LAU); }
+.cx-dot-DTC { background: var(--cx-type-DTC); }
+.cx-dot-DIV { background: var(--cx-type-DIV); }
 
 /* ---- 0.6.6: cinco indicadores, legenda sem link, recentes com setor ---- */
 .cx-dash-stats--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }

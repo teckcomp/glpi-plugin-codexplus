@@ -462,8 +462,31 @@
         cfg.setup = function (editor) {
             if (typeof original === 'function') { original.call(this, editor); }
             register(editor);
+            guardSyntheticClicks(editor);
         };
         return cfg;
+    }
+
+    /* GLPI 11.0.6 (Html::initEditorSystem): todo clique fora da barra de um
+       editor faz $('.tox-tbtn.tox-tbtn--enabled').trigger('click') — para
+       fechar menus abertos. Só que essa é também a classe do botão de
+       alternar ATIVO. Com o cursor em texto normal o "A" do tamanho está
+       ativo: clicar no título "clicava" o A, que chama editor.focus() e a
+       página voltava para o corpo, sem deixar digitar (achado 62; o mesmo
+       valia para Negrito etc. com o cursor em negrito, que ainda tirava o
+       negrito da seleção). Clique de verdade tem isTrusted; o do jQuery não.
+       O falso é barrado aqui, na captura, antes do TinyMCE, e só nos botões
+       deste editor. */
+    function guardSyntheticClicks(editor) {
+        document.addEventListener('click', function (e) {
+            if (e.isTrusted) { return; }
+            var t = e.target;
+            var btn = t && t.closest ? t.closest('.tox-tbtn') : null;
+            var box = editor.getContainer && editor.getContainer();
+            if (!btn || !box || !box.contains(btn)) { return; }
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        }, true);
     }
 
     /* Intercepta a gravação da configuração pelo GLPI. Se ela já estiver lá

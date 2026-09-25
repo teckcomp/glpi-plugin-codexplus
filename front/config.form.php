@@ -65,6 +65,7 @@ TemplateRenderer::getInstance()->display('@codexplus/config.html.twig', [
     'logo_url'       => Branding::getLogoUrl(),
     'logo_positions' => Branding::getLogoPositions(),
     'markers'        => Branding::getMarkers(),
+    'client_sources' => Branding::getClientSources(),
     'max_mb'         => (int) (Branding::LOGO_MAX_BYTES / 1048576),
 ]);
 

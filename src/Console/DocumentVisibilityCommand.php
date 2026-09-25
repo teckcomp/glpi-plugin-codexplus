@@ -75,7 +75,6 @@ class DocumentVisibilityCommand extends AbstractCommand
             $apr  = $doc->canApprove();
             $roles = array_filter([
                 $doc->isManager() ? 'G' : '',
-                $doc->isValidator() ? 'A' : '',
                 $doc->isAuditor() ? 'AR' : '',
                 $doc->isReviewer() ? 'R' : '',
                 $doc->isEditor() ? 'E' : '',
@@ -107,7 +106,7 @@ class DocumentVisibilityCommand extends AbstractCommand
 
         $legacy = countElementsInTable($table, ['knowbaseitems_id' => ['>', 0]]);
         $output->writeln(sprintf('(%d linha(s) de artigo nativo na mesma tabela, fora desta lista até a R4)', $legacy));
-        $output->writeln('Papéis: G = gestor do setor, A = auditor do setor, AR = auditor responsável, R = revisor, E = editor; "alterou" = mexeu nesta revisão (não valida). Aprovação: APROVA = 1ª etapa (gestor), VALIDA = 2ª etapa (auditor).');
+        $output->writeln('Papéis: G = gestor do setor, AR = auditor responsável, R = revisor, E = editor; "alterou" = mexeu nesta revisão (não valida). Aprovação: APROVA = 1ª etapa (gestor), VALIDA = 2ª etapa (auditor).');
 
         if ($diverge > 0) {
             $output->writeln("<error>$diverge divergência(s) entre SQL e canViewItem.</error>");

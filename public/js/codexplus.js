@@ -405,7 +405,10 @@
         // R3b3-2: documento fora da versão vigente (rascunho, em validação)
         // sai marcado, para ninguém imprimir como se fosse o publicado.
         if (d.draft) { parts.push(d.draft); }
-        if (d.doctype === 'PRP' && d.client) { parts.push('Cliente: ' + d.client); }
+        // Bloco T1: cliente em qualquer tipo que o tenha (proposta em texto;
+        // laudo e documentação técnica, vinculado). Quem monta o JSON só manda
+        // cliente nesses tipos.
+        if (d.client) { parts.push('Cliente: ' + d.client); }
         if (d.sector) { parts.push('Setor: ' + d.sector); }
         if (d.doctype !== 'PRP' && d.owner) { parts.push('Responsável: ' + d.owner); }
         var pub = formatDate(d.date_published);

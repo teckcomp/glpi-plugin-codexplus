@@ -108,10 +108,10 @@
             </div>
         </div>
     {% endif %}
-    {% if is_blocked_contributor %}
+    {% if validation_block %}
         <div class="cx-notice">
             <i class="ti ti-user-exclamation"></i>
-            <div>{{ __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo.', 'codexplus') }}</div>
+            <div>{{ validation_block }}</div>
         </div>
     {% endif %}
     {% if missing_right and not version.on %}
@@ -188,6 +188,19 @@
                             <label for="cx-docform-client">{{ __('Cliente', 'codexplus') }}</label>
                             <input type="text" id="cx-docform-client" name="client_name" value="{{ client_name }}" class="form-control">
                             <div class="codexplus-form-hint">{{ __('A quem a proposta se destina. Sai na identificação do documento e no PDF.', 'codexplus') }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if widgets.client is defined %}
+                        {# Bloco T1: Laudo e Documentação Técnica, cliente
+                           vinculado a um usuário ou entidade do GLPI (a
+                           configuração do Codex+ diz qual). Na criação aparece
+                           com o tipo (public/js/codexplus-docform.js). #}
+                        <div class="cx-docform-field" data-cx-only-type="LAU DTC" {% if is_new %}hidden{% endif %}>
+                            <label>{{ __('Cliente', 'codexplus') }} <span class="codexplus-muted">({{ client.source_label }})</span></label>
+                            <input type="hidden" name="client_itemtype" value="{{ client.itemtype }}">
+                            {{ widgets.client|raw }}
+                            <div class="codexplus-form-hint">{{ __('Sai na identificação do documento e no PDF. Não dá acesso ao documento: quem lê continua na coluna Permissões.', 'codexplus') }}</div>
                         </div>
                     {% endif %}
                 </div>
@@ -289,27 +302,32 @@
            ficam dentro, mas o PDF só lê título e .codexplus-content. #}
         <article class="codexplus-doc" id="codexplus-doc">
             <h1 class="cx-docform-view-title codexplus-doc-title">{{ name }}</h1>
-            <div class="cx-docform-split{{ perm.show ? ' cx-docform-split--perm' : '' }}">
+            {# preview: janela "Visualizar e PDF" — só o documento, sem
+               revisão periódica, Permissões nem fluxo (Claudio, 25/09/2026). #}
+            <div class="cx-docform-split{{ perm.show and not preview ? ' cx-docform-split--perm' : '' }}">
             <div>
             <div class="cx-docform-roles">
                 <span><strong>{{ __('Categorias', 'codexplus') }}:</strong> {{ category_names ? category_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
                 <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
-                {% if not perm.show or version.on %}
+                {% if client.name %}
+                    <span><strong>{{ __('Cliente', 'codexplus') }}:</strong> {{ client.name }}</span>
+                {% endif %}
+                {% if not perm.show or version.on or preview %}
                     <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
                 {% endif %}
                 {% if status == 'publicado' and validator_name %}
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
                 {% endif %}
-                {% if review.show and not review.can_review %}
+                {% if review.show and (not review.can_review or preview) %}
                     <span><strong>{{ __('Auditor responsável', 'codexplus') }}:</strong> {{ review.auditor_name ?: '—' }}</span>
                     <span><strong>{{ __('Revisor', 'codexplus') }}:</strong> {{ review.reviewer_name ?: '—' }}</span>
                     <span><strong>{{ __('Revisão', 'codexplus') }}:</strong>
                         {% if review.start and review.end %}{{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% else %}—{% endif %}</span>
                 {% endif %}
             </div>
-            {% if review.show and review.can_review and not version.on %}
+            {% if review.show and review.can_review and not version.on and not preview %}
                 {# R3d: fora de rascunho, quem gere o documento ainda muda
                    revisor e janela (o auditor, não: só em rascunho). #}
                 <form method="post" action="{{ self }}" class="cx-review-form">
@@ -324,7 +342,7 @@
                 </form>
             {% endif %}
             </div>
-            {% if perm.show and not version.on %}
+            {% if perm.show and not version.on and not preview %}
                 {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
             {% endif %}
             </div>
@@ -371,7 +389,7 @@
     {% endif %}
 
     {# ================= FLUXO ================= #}
-    {% if not is_new and not version.on and (can_submit or can_approve or can_validate or can_reject or can_obsolete
+    {% if not is_new and not version.on and not preview and (can_submit or can_approve or can_validate or can_reject or can_obsolete
         or can_open_revision or can_confirm_nochange or can_cancel_revision) %}
         <section class="cx-flow">
             <h3 class="cx-card-title">{{ __('Fluxo do documento', 'codexplus') }}</h3>

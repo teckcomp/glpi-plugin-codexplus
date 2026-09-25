@@ -1,6 +1,9 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.8-alpha` · atualizado em 24/09/2026 (editor de documentos
+> Estado em `v0.6.9-alpha` · atualizado em 25/09/2026 (blocos A1 e A2: auditor
+> pelo perfil, Super-Admin pelo perfil, quem aprovou não valida, setor de
+> auditoria). Antes, 24/09/2026 (bloco T1: tipos LAU, DTC e DIV e cliente
+> vinculado). Antes, no mesmo dia (editor de documentos
 > completo: E1 a E4, commits `1c793c8` a `68b7b09`). Antes, em 22/09/2026
 > (criador de documentos completo: R3b2-b e R3b3, commits `d06aa30` a
 > `987636c`). Antes, em 21/09/2026 (motor de diagrama em
@@ -49,28 +52,32 @@ Vale sobre a lista acima quando houver conflito. Os itens marcados como novos
 foram levantados na conversa: eram pré-requisitos ou esquecimentos.
 
 1. Finalizar organograma (blocos do motor: falta fechar o 2d-3)
-2. Cronograma e matrizes — **próximo**, salvo se Claudio antecipar a R3b2-c
-   (sugestão de 24/09: a aba Papéis no Setor acaba com o console para dar
-   papel de auditor, e é pequena) — outros dois subtipos de `DIA`, baratos porque
+2. **Papéis e validação** (Claudio, 25/09/2026, antecipado ao cronograma):
+   **A1** auditor pelo perfil ✅; **A2** quem aprovou a 1ª etapa não valida
+   a 2ª (exceto setor de Auditoria e Super-Admin) ✅; **R3b2-c** aba Papéis
+   no Setor, só Gestores — **próximo**
+3. Cronograma e matrizes — outros dois subtipos de `DIA`, baratos porque
    reusam a mesma tabela e o mesmo motor
-3. Permissões (R3b2)
-4. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
-   pré-requisito dos itens 5 e 7 (hoje o documento novo não aceita anexo nem
+4. Permissões (R3b2)
+5. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
+   pré-requisito dos itens 6 e 8 (hoje o documento novo não aceita anexo nem
    imagem colada: `enable_images => false`, sem `Document_Item`)
-5. ~~Editor de documentos com importação e exportação~~ ✅ 24/09/2026 — blocos
+6. ~~Editor de documentos com importação e exportação~~ ✅ 24/09/2026 — blocos
    E1 a E4 (tabela "Editor de documentos" abaixo)
-6. Fluxograma (sobre o motor próprio)
-7. Editor de propostas com mini excel e mini editor de desenho
-8. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
+7. Fluxograma (sobre o motor próprio)
+8. Editor de propostas com mini excel e mini editor de desenho — o desenho
+   embutido vale também para a **Documentação Técnica** (`DTC`), no mesmo
+   bloco (Claudio, 24/09/2026)
+9. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
    vazia enquanto os documentos reais seguem na base nativa
-9. Prateleira de Documentos e Modelos, e corte da base nativa (R5)
-10. **Modelos com conteúdo real (3c)** — novo
-11. Revisão (R6)
-12. **Acesso anônimo (R7)** — novo; era requisito original dos diagramas
+10. Prateleira de Documentos e Modelos, e corte da base nativa (R5)
+11. **Modelos com conteúdo real (3c)** — novo
+12. Revisão (R6)
+13. **Acesso anônimo (R7)** — novo; era requisito original dos diagramas
     ("visível a toda a instituição de forma fácil e rápida")
-13. **PSG com POPs e PDF composto (Etapa 5)** — novo
-14. Caça a bugs
-15. Produção, com o alerta de vencimento (Etapa 7) logo depois
+14. **PSG com POPs e PDF composto (Etapa 5)** — novo
+15. Caça a bugs
+16. Produção, com o alerta de vencimento (Etapa 7) logo depois
 
 A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
 "permissões e acesso anônimo".
@@ -140,6 +147,8 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R3d-1 | "Aguardando você" no Painel (gestor na 1ª etapa, auditor na 2ª, com o motivo quando falta o direito) e aviso na página do documento quando quem responde pela etapa não consegue agir. Sem schema ✅ pacote `codexplus-r3d1-aguardando-1` | O auditor entra no Codex+ e vê o que espera por ele |
 | R6-a | Revisão de publicado: abrir revisão (gestor, ou revisor na janela), leitores seguem na versão publicada com "Em atualização", resumo obrigatório no envio, cancelar revisão, "revisado sem alteração" sem auditor, versões com diagrama. `v0.6.8-alpha` (fecha também o 2d-3), precisa reinstalar ✅ pacote `codexplus-r6a-revisao-1`, commit `9aace43` | Abrir a :01, ver o aviso para o leitor, validar e ver a :01 publicada |
 | R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna — parte 1 (criação, editores, Cliente só em PRP) ✅ pacote `codexplus-r3b2b-criacao-1`, commit `d06aa30`; parte 2 (Duplicar, botões da versão publicada) ✅ commit `31359de`; **R3b2-c** aba **Papéis** no Setor. Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
+| A1 | Auditor pelo perfil (Claudio, 25/09/2026): bit 8192 vira a coluna **Auditor**; auditor escolhido entre quem tem o bit na entidade, em qualquer setor; papel "auditor" do setor fora de uso; `ajax/document.auditors.php` removido. Sem schema | Auditor sem papel no setor valida; gestor sem o bit é recusado como auditor |
+| A2 | Quem aprovou a 1ª etapa não valida a 2ª, salvo setor de Auditoria (caixa nova no Setor) e Super-Admin; impedido pode devolver. Super-Admin passa a ser o perfil com Configurar > Atualizar e pode tudo no fluxo; Install não lhe dá mais o bit Auditor; Ver todos não dispensa mais a validação. Schema: precisa reinstalar | Gestor-auditor aprova e não publica; no setor de Auditoria, publica; Super-Admin publica sem o bit |
 | R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF. **R3b3-1** imagem colada e anexos ✅ commit `f1916b9`; **R3b3-2** leitura e PDF do documento novo ✅ commit `987636c` | POP com imagem e anexo, publicado e exportado |
 | R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa" | Nenhum caminho da interface cria artigo na Base de Conhecimento |
 | R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
@@ -147,7 +156,7 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R6 | Revisão de documento publicado: a publicada segue visível com o aviso **"Em atualização"** (tela e link anônimo, não no PDF) até a nova ser validada; **prazo de revisão** (padrão 30 dias, configurável) com prorrogação motivada ou cancelamento pelo gestor; "**revisado sem alteração**" (renova a validade, mantém a revisão); versões com resumo; histórico de revisão no fim do PDF; indicador "Sem responsável" | Abrir a :01, ver o aviso para o leitor, validar e ver a tabela no PDF |
 | R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
 
-## Editor de documentos (item 5, 22 a 24/09/2026)
+## Editor de documentos (item 6, 22 a 24/09/2026)
 
 Detalhes em `CONTEXTO.md`, subseção "Editor de documentos".
 
@@ -163,6 +172,16 @@ POP ou manual feito fora (Word `.docx`, Markdown, texto de um chat) para um
 documento novo, que segue editável. Hoje já funciona colando no corpo
 (TinyMCE mantém títulos, listas e tabelas); arquivo `.docx`/`.md` e imagens
 dependem da R3b3 (onde a imagem é guardada). Entra logo depois da R3b3.
+
+## Tipos novos (bloco T1, 24/09/2026)
+
+Pedido de Claudio: Laudo Técnico, Documentação Técnica e Documento Diverso,
+no padrão de POP e Manual. Detalhes em `CONTEXTO.md`, seção 1 e subseção
+"Tipos novos e cliente vinculado".
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| T1 | Tipos `LAU` (não vence), `DTC` (12 meses) e `DIV` (não vence, provisório), só no modelo novo, com cor própria; cliente **vinculado** a usuário ou entidade do GLPI em `LAU` e `DTC`, conforme a configuração da instalação; "Cliente" na identificação do PDF/Word e no Painel. Precisa reinstalar (`v0.6.9-alpha`). Instalado na homologação em 24/09 sem commit; juntado ao A1/A2 em 25/09 | — |
 
 **Candidatos, a decidir durante a Etapa R:** quadro **Atividade** no fim da
 leitura (quem, quando, o quê); indicador "Sem setor" no Painel.
@@ -333,14 +352,17 @@ os critérios abaixo estiverem cumpridos:
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
-- [ ] **Mesmo usuário nas duas etapas da validação?** Hoje a regra só impede
-      quem **alterou** o documento de validar; quem é gestor e auditor do mesmo
-      setor (caso de teste: Teste 001 no setor Qualidade, 24/09/2026) aprova a
-      1ª etapa e publica a 2ª. Útil em teste; em produção, esvazia as duas
-      etapas. Levantado em 24/09, sem decisão de Claudio
 - [ ] **Self-Service vê o Codex+?** Decidir na Etapa R. Atenção ao achado 27: o GLPI tira da sessão do Self-Service todo direito de plugin; liberar exige acrescentar o direito a `Profile::$helpdesk_rights`
 
 **Decididas:**
+
+- [x] **Auditor pelo perfil**, não pelo setor (bit Auditor na aba Codex+ de
+      Perfis) — Claudio, 25/09/2026 (A1)
+- [x] **Mesmo usuário nas duas etapas:** não, salvo Super-Admin e documentos
+      do setor de Auditoria — Claudio, 25/09/2026 (A2)
+- [x] **Super-Admin = perfil com Configurar > Atualizar**, pode tudo no
+      fluxo sem regra; "Ver todos" não dispensa a validação — Claudio,
+      25/09/2026 (A2)
 
 - [x] Diagramas dentro do Codex+ — 09/2026
 - [x] **draw.io descartado**; fluxograma sobre o motor próprio — 20/09/2026
@@ -366,8 +388,14 @@ os critérios abaixo estiverem cumpridos:
 - [x] **Validades por tipo** (Claudio, 20/09/2026): POP e PSG 12 meses;
       Manual **6**; diagramas (organograma, fluxograma, matrizes) **3**;
       Proposta e "documentos diversos" **definida por quem publica**. Manual
-      e DIA entram no pacote de diagramas; a escolha na publicação e o tipo
-      "documentos diversos" (sigla e nome a definir) ficam para depois
+      e DIA entram no pacote de diagramas; a escolha na publicação fica para
+      depois (até lá, Proposta e Diverso não vencem)
+- [x] **Tipos `LAU`, `DTC` e `DIV`** (Claudio, 24/09/2026): Laudo Técnico
+      não vence; Documentação Técnica 12 meses; Documento Diverso é o
+      "documentos diversos" acima. Mesmas permissões de todos os tipos
+- [x] **Cliente vinculado** (Claudio, 24/09/2026): em Laudo e Documentação
+      Técnica, a usuário OU entidade do GLPI, escolhido na configuração da
+      instalação; proposta segue em texto livre
 - [x] **Identidade visual** (Claudio, 20/09/2026): mockup do Painel aprovado;
       donuts voltam no lugar das barras de proporção de 07/2026; marca do
       produto = monograma C+ (a logo da empresa continua no PDF)

@@ -35,7 +35,7 @@ class DocumentCreateCommand extends AbstractCommand
         $this->addOption('username', null, InputOption::VALUE_REQUIRED, 'Login de quem cria');
         $this->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Perfil a usar (nome); padrão: o do usuário');
         $this->addOption('name', null, InputOption::VALUE_REQUIRED, 'Título');
-        $this->addOption('doctype', null, InputOption::VALUE_REQUIRED, 'POP, PSG, MAN, PRP ou DIA', 'POP');
+        $this->addOption('doctype', null, InputOption::VALUE_REQUIRED, 'POP, PSG, MAN, PRP, LAU, DTC, DIV ou DIA', 'POP');
         $this->addOption('owner', null, InputOption::VALUE_REQUIRED, 'Login do responsável');
         $this->addOption('recursive', null, InputOption::VALUE_NONE, 'Visível nas entidades filhas');
         $this->addOption('group', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: grupo (nome), repetível');

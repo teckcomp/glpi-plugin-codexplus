@@ -160,7 +160,7 @@ class Dashboard
      *   - 2ª etapa (validacao): o auditor responsável, com o botão Validar
      *     liberado (canValidate — quem editou não entra).
      * A regra é a mesma dos botões. Quem responde pela etapa mas não consegue
-     * agir (perfil sem o bit, auditor que editou ou que saiu do setor) aparece
+     * agir (perfil sem o bit, auditor que editou ou que aprovou a 1ª etapa) aparece
      * também, com o motivo e sem o botão de ação — senão nunca saberia que o
      * documento espera por ele. O Ver todos NÃO entra só por poder tudo (a lista viraria a de todos os
      * pendentes); o Super-Admin aparece onde estiver como gestor ou auditor.
@@ -215,12 +215,12 @@ class Dashboard
             if (!$pode) {
                 if ($etapa1) {
                     $bloqueio = __('seu perfil não tem o direito Atualizar do Codex+', 'codexplus');
-                } elseif ($doc->isContributor() && !\Session::haveRight(Rights::NAME, Rights::VIEWALL)) {
-                    $bloqueio = __('você alterou o documento: outro auditor precisa validar', 'codexplus');
-                } elseif (!$doc->isValidator()) {
-                    $bloqueio = __('você não está mais entre os auditores do setor', 'codexplus');
                 } else {
-                    $bloqueio = __('seu perfil não tem o direito Validar do Codex+', 'codexplus');
+                    $bloqueio = match ($doc->validationBlocker()) {
+                        'alterou' => __('você alterou o documento: outro auditor precisa validar (você pode devolver)', 'codexplus'),
+                        'aprovou' => __('você aprovou a 1ª etapa: outro auditor precisa validar (você pode devolver)', 'codexplus'),
+                        default   => __('seu perfil atual não tem o direito Auditor do Codex+ (se outro perfil seu tem, troque para ele)', 'codexplus'),
+                    };
                 }
             }
             // Desde quando espera por esta etapa: envio (1ª) ou aprovação (2ª).
@@ -526,9 +526,10 @@ class Dashboard
         $out = [];
 
         foreach (array_slice($docs, 0, $limit) as $d) {
-            // Coluna de contexto: proposta mostra o cliente; os demais, a
-            // categoria. (Na Etapa 5 o PSG passa a mostrar os POPs vinculados.)
-            $d['context'] = ($d['doctype'] === 'PRP' && $d['client_name'] !== '')
+            // Coluna de contexto: proposta, laudo e documentação técnica
+            // mostram o cliente (bloco T1); os demais, a categoria. (Na Etapa 5
+            // o PSG passa a mostrar os POPs vinculados.)
+            $d['context'] = (DocumentMeta::hasClient((string) $d['doctype']) && $d['client_name'] !== '')
                 ? $d['client_name']
                 : $d['category'];
 

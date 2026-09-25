@@ -7,12 +7,16 @@ use Session;
 use User;
 
 /**
- * Papel no setor (Etapa R3c): GESTOR ou VALIDADOR, dado a um usuário ou a um
- * grupo. Decisão de Claudio, 20/09/2026:
- *   - gestor: cria documentos nas categorias do setor, edita os do setor,
- *     atribui editores e alvos de leitura, marca obsoleto, exclui;
- *   - validador: aprova ou devolve documentos do setor (com o bit Validar
- *     no perfil).
+ * Papel no setor (Etapa R3c): GESTOR, dado a um usuário ou a um grupo.
+ * Decisão de Claudio, 20/09/2026: o gestor cria documentos nas categorias do
+ * setor, edita os do setor, atribui editores e alvos de leitura, aprova a 1ª
+ * etapa, marca obsoleto, exclui.
+ *
+ * O papel VALIDADOR (rotulado "Auditor" na R3d) saiu de uso no bloco A1
+ * (Claudio, 25/09/2026): o auditor passou a vir do PERFIL (bit Auditor,
+ * Rights::auditorUsers()), valendo para qualquer setor. Linhas antigas com
+ * esse papel continuam na tabela, não são lidas por regra nenhuma e não se
+ * cadastram mais.
  * Quem atribui papéis de setor: quem gerencia a estrutura (bit Gerenciar
  * modelos, setores e categorias) — herdado de Sector pelo CommonDBChild.
  *
@@ -24,7 +28,8 @@ class SectorMember extends CommonDBChild
 {
     public const ROLE_MANAGER   = 'gestor';
     public const ROLE_VALIDATOR = 'validador';
-    public const ROLES          = [self::ROLE_MANAGER, self::ROLE_VALIDATOR];
+    /** Fora de uso desde a A1: só para mostrar linhas antigas. */
+    public const ROLES          = [self::ROLE_MANAGER];
 
     public static $itemtype = Sector::class;
     public static $items_id = 'plugin_codexplus_sectors_id';
@@ -43,19 +48,24 @@ class SectorMember extends CommonDBChild
     {
         return [
             self::ROLE_MANAGER   => __('Gestor', 'codexplus'),
-            // R3d (Claudio, 21/09/2026): o validador do setor é o AUDITOR, a
-            // 2ª etapa da validação. A chave gravada continua 'validador'.
-            self::ROLE_VALIDATOR => __('Auditor', 'codexplus'),
+            // A1 (Claudio, 25/09/2026): o auditor vem do perfil. Linhas
+            // antigas com este papel aparecem assim e não valem nada.
+            self::ROLE_VALIDATOR => __('Auditor (fora de uso: agora é pelo perfil)', 'codexplus'),
         ];
     }
 
     public function prepareInputForAdd($input)
     {
-        if (($input['role'] ?? '') === 'auditor') {
-            $input['role'] = self::ROLE_VALIDATOR;
+        if (in_array($input['role'] ?? '', ['auditor', self::ROLE_VALIDATOR], true)) {
+            Session::addMessageAfterRedirect(
+                __('Auditor não é mais papel de setor: marque a coluna Auditor no perfil (Administração → Perfis → aba Codex+).', 'codexplus'),
+                false,
+                ERROR
+            );
+            return false;
         }
         if (!in_array($input['role'] ?? '', self::ROLES, true)) {
-            Session::addMessageAfterRedirect(__('Papel inválido: use gestor ou auditor.', 'codexplus'), false, ERROR);
+            Session::addMessageAfterRedirect(__('Papel inválido: use gestor.', 'codexplus'), false, ERROR);
             return false;
         }
         $u = (int) ($input['users_id'] ?? 0);

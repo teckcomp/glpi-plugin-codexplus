@@ -4,23 +4,19 @@
    (revisor) e uma janela no calendário, com início e fim.
    Entra dentro de um .cx-docform-grid: na criação e na edição (formulário
    do documento) e, fora de rascunho, no formulário "Salvar revisão
-   periódica". Na criação (R3b2-b) a lista de auditores nasce vazia e
-   acompanha as categorias marcadas.
+   periódica". Desde a A1 (Claudio, 25/09/2026) a lista de auditores vem do
+   perfil (bit Auditor), não do setor: não depende das categorias.
    Variável: review (ver front/document.form.php). #}
 
-<div class="cx-docform-field cx-docform-field--wide"{% if review.can_auditor %} data-cx-auditor data-url="{{ review.auditors_url }}"{% endif %}>
+<div class="cx-docform-field cx-docform-field--wide">
     <label>{{ __('Auditor responsável', 'codexplus') }}</label>
     {% if review.can_auditor %}
         {{ review.auditor_widget|raw }}
-        {# R3b2-b: a lista acompanha as categorias marcadas (public/js/codexplus-docform.js). #}
-        <div class="codexplus-form-hint" data-cx-auditor-empty {% if not review.is_new %}hidden{% endif %}>
-            {{ __('Escolha a categoria primeiro: só aparecem os auditores do setor dela. Se o setor ainda não tiver auditor, dá para escolher depois, antes de enviar para validação.', 'codexplus') }}
-        </div>
-        <div class="codexplus-form-hint" data-cx-auditor-hint {% if review.is_new %}hidden{% endif %}>
+        <div class="codexplus-form-hint">
             {% if review.no_auditors %}
-                {{ __('O setor deste documento ainda não tem auditor. Os auditores do setor são cadastrados nos papéis do setor.', 'codexplus') }}
+                {{ __('Ninguém tem perfil de auditor nesta entidade. O auditor é quem tem a coluna Auditor marcada no perfil (Administração → Perfis → aba Codex+). Dá para escolher depois, antes de enviar para validação.', 'codexplus') }}
             {% else %}
-                {{ __('2ª etapa da validação: quem valida e publica, depois do gestor do setor. Só aparecem os auditores do setor.', 'codexplus') }}
+                {{ __('2ª etapa da validação: quem valida e publica, depois do gestor do setor. Aparece quem tem perfil de auditor.', 'codexplus') }}
             {% endif %}
         </div>
     {% else %}

@@ -70,7 +70,27 @@ class Branding
         'footer_show'            => '1',
         'footer_text'            => '{codigo} · rev. {revisao}',
         'footer_show_pagination' => '1',
+
+        // Bloco T1 (Claudio, 24/09/2026): onde os clientes estão cadastrados
+        // nesta instalação. Vale para Laudo e Documentação Técnica.
+        'client_source'          => 'User',     // User | Entity
     ];
+
+    /** Fontes aceitas para o cliente vinculado (itemtype do GLPI). */
+    public static function getClientSources(): array
+    {
+        return [
+            'User'   => __('Usuários do GLPI', 'codexplus'),
+            'Entity' => __('Entidades do GLPI', 'codexplus'),
+        ];
+    }
+
+    /** Itemtype usado no campo Cliente dos documentos novos. */
+    public static function clientSource(): string
+    {
+        $v = self::get('client_source');
+        return array_key_exists($v, self::getClientSources()) ? $v : 'User';
+    }
 
     /**
      * Marcadores aceitos no texto do rodapé.
@@ -206,6 +226,13 @@ class Branding
             && !array_key_exists($values['header_logo_position'], self::getLogoPositions())
         ) {
             $values['header_logo_position'] = 'right';
+        }
+
+        if (
+            isset($values['client_source'])
+            && !array_key_exists($values['client_source'], self::getClientSources())
+        ) {
+            $values['client_source'] = 'User';
         }
 
         // Nome da empresa e rodapé são texto livre: guarda cru, escapa na

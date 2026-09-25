@@ -22,8 +22,8 @@ use Session;
  * O perfil (Rights) diz O QUE; o plugin diz EM QUAIS documentos:
  *
  *   Ler      Ler + alvo de leitura, só publicado/obsoleto. Quem tem papel no
- *            documento (gestor ou validador do setor, editor) e o autor e o
- *            responsável leem em qualquer status.
+ *            documento (gestor do setor, editor, auditor, revisor) e o autor e
+ *            o responsável leem em qualquer status.
  *   Criar    Criar + ser gestor do setor de TODAS as categorias informadas.
  *   Editar   Atualizar + (editor do documento ou gestor do setor), e só em
  *            rascunho. Publicado não se edita até a R6 (revisão com a
@@ -34,12 +34,19 @@ use Session;
  *            auditor responsável escolhido.
  *   Aprovar  (1ª etapa, R3d) Atualizar + gestor do setor. Vale mesmo para o
  *            gestor que editou: só gestor cria, e ele é quase sempre o autor.
- *   Validar  (2ª etapa) Validar + ser o AUDITOR RESPONSÁVEL do documento
- *            (users_id_auditor), ainda auditor do setor, e NÃO ter alterado o
- *            documento na revisão atual (DocumentContributor).
+ *   Validar  (2ª etapa) bit Auditor no perfil ativo + ser o AUDITOR
+ *            RESPONSÁVEL do documento (users_id_auditor) + NÃO ter alterado o
+ *            documento na revisão atual (DocumentContributor) + NÃO ter
+ *            aprovado a 1ª etapa, salvo documento só de setor de auditoria
+ *            (A2). Desde a A1 (Claudio, 25/09/2026) o auditor vem do PERFIL,
+ *            não do setor: Rights::auditorUsers(). O auditor impedido ainda
+ *            pode DEVOLVER (senão o documento ficaria preso).
+ *   Super-Admin (A2, Rights::isSuperAdmin(): Configurar > Atualizar) valida
+ *            qualquer documento, sem regra nenhuma.
  *   Excluir  Excluir + gestor do setor (lixeira). Purgar: desligado.
- *   Ver todos  dispensa os papéis (inclusive "quem editou não valida"),
- *            sempre dentro dos outros bits do perfil.
+ *   Ver todos  dispensa os papéis de leitura, criação e gestão, sempre
+ *            dentro dos outros bits do perfil. Desde a A2 NÃO dispensa as
+ *            regras da validação (isso é só do Super-Admin).
  *
  * Status (R3d, Claudio, 21/09/2026 — validação em duas etapas):
  *   rascunho -> aprovacao (aguarda o gestor) -> validacao (aguarda o
@@ -77,7 +84,7 @@ class Document extends CommonDBTM
     public const READER_STATUSES = [self::STATUS_PUBLISHED, self::STATUS_OBSOLETE];
 
     /** Campos cuja mudança conta como "alterar o documento" (contribuição). */
-    private const CONTENT_FIELDS = ['name', 'content', 'header_html', 'footer_text', 'client_name'];
+    private const CONTENT_FIELDS = ['name', 'content', 'header_html', 'footer_text', 'client_name', 'client_itemtype', 'client_items_id'];
 
     public static $rightname = Rights::NAME;
 
@@ -188,11 +195,6 @@ class Document extends CommonDBTM
         return (bool) array_intersect($this->getSectorIds(), SectorMember::mySectors(SectorMember::ROLE_MANAGER));
     }
 
-    public function isValidator(): bool
-    {
-        return (bool) array_intersect($this->getSectorIds(), SectorMember::mySectors(SectorMember::ROLE_VALIDATOR));
-    }
-
     public function isEditor(): bool
     {
         return DocumentEditor::isMine((int) ($this->fields['id'] ?? 0));
@@ -216,6 +218,47 @@ class Document extends CommonDBTM
         return $me > 0 && (int) ($this->fields['users_id_auditor'] ?? 0) === $me;
     }
 
+    /** Foi quem aprovou a 1ª etapa (A2)? */
+    public function isApprover(): bool
+    {
+        $me = (int) Session::getLoginUserID();
+        return $me > 0 && (int) ($this->fields['users_id_approver'] ?? 0) === $me;
+    }
+
+    /**
+     * Documento só de setor de auditoria (A2): tem setor e TODOS os setores
+     * dele estão marcados como de auditoria. Basta um setor comum para a
+     * regra "quem aprovou não valida" valer.
+     */
+    public function isAuditSectorOnly(): bool
+    {
+        $s = $this->getSectorIds();
+        return $s !== [] && count(Sector::auditOnes($s)) === count($s);
+    }
+
+    /**
+     * Por que o auditor responsável não consegue validar (A2), para os avisos
+     * da página e do Painel: 'perfil' (perfil ativo sem o bit Auditor),
+     * 'alterou' (mexeu nesta revisão), 'aprovou' (aprovou a 1ª etapa). Vazio
+     * se ele pode validar ou se não é o auditor desta etapa.
+     */
+    public function validationBlocker(): string
+    {
+        if ($this->status() !== self::STATUS_VALIDATION || !$this->isAuditor() || $this->canValidate()) {
+            return '';
+        }
+        if (!self::bit(Rights::VALIDATE)) {
+            return 'perfil';
+        }
+        if ($this->isContributor()) {
+            return 'alterou';
+        }
+        if ($this->isApprover() && !$this->isAuditSectorOnly()) {
+            return 'aprovou';
+        }
+        return '';
+    }
+
     /** É o revisor deste documento (R3d)? */
     public function isReviewer(): bool
     {
@@ -226,7 +269,7 @@ class Document extends CommonDBTM
     /** Tem algum papel no documento (vê em qualquer status). */
     public function hasRole(): bool
     {
-        return $this->isAuthorOrOwner() || $this->isEditor() || $this->isManager() || $this->isValidator()
+        return $this->isAuthorOrOwner() || $this->isEditor() || $this->isManager()
             || $this->isAuditor() || $this->isReviewer();
     }
 
@@ -400,25 +443,42 @@ class Document extends CommonDBTM
     }
 
     /**
-     * 2ª etapa: o auditor responsável valida — com o bit Validar, ainda
-     * auditor do setor e sem ter alterado o documento nesta revisão. Ver
-     * todos dispensa tudo isso (Super-Admin pode tudo, Claudio, 21/09/2026).
+     * 2ª etapa: o auditor responsável valida — com o bit Auditor no perfil
+     * ativo, sem ter alterado o documento nesta revisão (A1: o auditor vem
+     * do perfil, não do setor) e sem ter aprovado a 1ª etapa, salvo em
+     * documento só de setor de auditoria (A2). O Super-Admin (Configurar >
+     * Atualizar) valida qualquer um, sem regra (Claudio, 25/09/2026); Ver
+     * todos não dispensa mais nada aqui.
      */
     public function canValidate(): bool
     {
-        if ($this->status() !== self::STATUS_VALIDATION || !self::bit(Rights::VALIDATE) || !$this->checkEntity()) {
+        if ($this->status() !== self::STATUS_VALIDATION || !$this->checkEntity()) {
             return false;
         }
-        if (self::hasViewAll()) {
+        if (Rights::isSuperAdmin()) {
             return true;
         }
-        return $this->isAuditor() && $this->isValidator() && !$this->isContributor();
+        return self::bit(Rights::VALIDATE)
+            && $this->isAuditor()
+            && !$this->isContributor()
+            && (!$this->isApprover() || $this->isAuditSectorOnly());
     }
 
-    /** Devolver para rascunho: quem pode decidir a etapa em que está. */
+    /**
+     * Devolver para rascunho: quem pode decidir a etapa em que está. Na 2ª
+     * etapa, também o auditor responsável impedido de validar (editou ou
+     * aprovou a 1ª etapa, A2): devolver não publica nada, e sem isso o
+     * documento ficaria preso esperando por ele.
+     */
     public function canReject(): bool
     {
-        return $this->canApprove() || $this->canValidate();
+        if ($this->canApprove() || $this->canValidate()) {
+            return true;
+        }
+        return $this->status() === self::STATUS_VALIDATION
+            && $this->checkEntity()
+            && self::bit(Rights::VALIDATE)
+            && $this->isAuditor();
     }
 
     public function canMarkObsolete(): bool
@@ -668,7 +728,7 @@ class Document extends CommonDBTM
 
         $groups = array_values($_SESSION['glpigroups'] ?? []);
 
-        // Papéis: autor, responsável, auditor, revisor, editor, gestor/auditor do setor.
+        // Papéis: autor, responsável, auditor, revisor, editor, gestor do setor.
         $ors = [
             [$doc . '.users_id' => $me],
             [$doc . '.users_id_owner' => $me],
@@ -687,10 +747,7 @@ class Document extends CommonDBTM
             'WHERE'  => ['OR' => $edOr],
         ])];
 
-        $sectors = array_values(array_unique(array_merge(
-            SectorMember::mySectors(SectorMember::ROLE_MANAGER),
-            SectorMember::mySectors(SectorMember::ROLE_VALIDATOR)
-        )));
+        $sectors = SectorMember::mySectors(SectorMember::ROLE_MANAGER);
         if ($sectors) {
             $dc  = Document_Category::getTable();
             $cat = Category::getTable();
@@ -753,15 +810,16 @@ class Document extends CommonDBTM
         if ($this->getSectorIds() === [] && !self::hasViewAll()) {
             return $this->deny(__('Sem categoria com setor: não há quem valide. Ligue o documento a uma categoria.', 'codexplus'));
         }
-        // 2ª etapa precisa de alguém: o auditor responsável, que ainda seja
-        // auditor do setor. Ver todos envia sem (e valida ele mesmo).
-        if (!self::hasViewAll()) {
+        // 2ª etapa precisa de alguém: o auditor responsável, que ainda tenha
+        // um perfil com o bit Auditor na entidade (A1). Só o Super-Admin
+        // envia sem (e valida ele mesmo) — A2: Ver todos não basta mais.
+        if (!Rights::isSuperAdmin()) {
             $auditor = (int) ($this->fields['users_id_auditor'] ?? 0);
             if ($auditor <= 0) {
                 return $this->deny(__('Escolha o auditor responsável antes de enviar.', 'codexplus'));
             }
-            if (!in_array($auditor, SectorMember::usersOfRole($this->getSectorIds(), SectorMember::ROLE_VALIDATOR), true)) {
-                return $this->deny(__('O auditor escolhido não é mais auditor do setor. Escolha outro.', 'codexplus'));
+            if (!in_array($auditor, Rights::auditorUsers((int) $this->fields['entities_id']), true)) {
+                return $this->deny(__('O auditor escolhido não tem mais um perfil de auditor. Escolha outro.', 'codexplus'));
             }
         }
         $extra = [];
@@ -802,8 +860,11 @@ class Document extends CommonDBTM
     public function approve(): bool
     {
         if (!$this->canValidate()) {
-            if ($this->status() === self::STATUS_VALIDATION && $this->isAuditor() && $this->isContributor()) {
+            if ($this->validationBlocker() === 'alterou') {
                 return $this->deny(__('Você alterou este documento nesta revisão: outra pessoa precisa validar.', 'codexplus'));
+            }
+            if ($this->validationBlocker() === 'aprovou') {
+                return $this->deny(__('Você aprovou a 1ª etapa deste documento: outro auditor precisa validar. Você ainda pode devolvê-lo.', 'codexplus'));
             }
             if ($this->status() === self::STATUS_APPROVAL) {
                 return $this->deny(__('Ainda na 1ª etapa: falta a aprovação do gestor do setor.', 'codexplus'));
@@ -1028,6 +1089,10 @@ class Document extends CommonDBTM
         if (empty($input['doctype'])) {
             return $this->deny(__('Informe o tipo do documento.', 'codexplus'));
         }
+        $input = $this->normalizeClient($input, (string) $input['doctype']);
+        if ($input === false) {
+            return false;
+        }
 
         // Categorias: obrigatórias e todas em setor do gestor (ou Ver todos).
         // Checado aqui também — não só no can() — para valer em qualquer
@@ -1053,20 +1118,105 @@ class Document extends CommonDBTM
 
         // Auditor, revisor e janela já na criação (R3d). Quem cria é gestor
         // de todos os setores das categorias (ou Ver todos): pode escolher.
-        return $this->checkManagedFields($input, self::sectorsOfCategories($cats), true);
+        $ent = (int) ($input['entities_id'] ?? Session::getActiveEntity());
+        return $this->checkManagedFields($input, $ent, true);
+    }
+
+    /**
+     * Cliente vinculado (bloco T1): Laudo e Documentação Técnica apontam para
+     * um usuário ou uma entidade do GLPI (client_itemtype + client_items_id,
+     * o padrão do Document_Item nativo). O nome vai também para client_name,
+     * que já está no Histórico, no Painel e no PDF: é o retrato do nome na
+     * hora da escolha; a tela mostra o nome atual (clientName).
+     *   - tipo sem cliente vinculado: os dois campos são ignorados;
+     *   - id vazio (0 ou -1): tira o cliente;
+     *   - itemtype fora da lista: o da configuração da instalação;
+     *   - a entidade raiz (0) não é cliente (é a própria empresa).
+     * O vínculo não dá leitura a ninguém.
+     *
+     * @return array<string, mixed>|false
+     */
+    private function normalizeClient(array $input, string $doctype)
+    {
+        if (!array_key_exists('client_items_id', $input) && !array_key_exists('client_itemtype', $input)) {
+            return $input;
+        }
+        if (!DocumentMeta::linksClient($doctype)) {
+            unset($input['client_itemtype'], $input['client_items_id']);
+            return $input;
+        }
+        $cid  = (int) ($input['client_items_id'] ?? 0);
+        $type = (string) ($input['client_itemtype'] ?? '');
+        if ($cid <= 0) {
+            $input['client_itemtype'] = '';
+            $input['client_items_id'] = 0;
+            $input['client_name']     = '';
+            return $input;
+        }
+        if (!array_key_exists($type, Branding::getClientSources())) {
+            $type = Branding::clientSource();
+        }
+        $nome = self::clientName($type, $cid);
+        if ($nome === '') {
+            return $this->deny(__('Cliente não encontrado no GLPI.', 'codexplus'));
+        }
+        $input['client_itemtype'] = $type;
+        $input['client_items_id'] = $cid;
+        $input['client_name']     = $nome;
+        return $input;
+    }
+
+    /**
+     * Nome atual do cliente vinculado ('' se não existe mais). Usuário: o nome
+     * de exibição do GLPI; entidade: o nome curto (o completo repetiria a
+     * raiz em todos).
+     */
+    public static function clientName(string $itemtype, int $id): string
+    {
+        if ($id <= 0) {
+            return '';
+        }
+        if ($itemtype === 'User') {
+            $u = new \User();
+            return $u->getFromDB($id) ? (string) getUserName($id) : '';
+        }
+        if ($itemtype === 'Entity') {
+            $e = new \Entity();
+            return $e->getFromDB($id) ? (string) $e->fields['name'] : '';
+        }
+        return '';
+    }
+
+    /**
+     * Cliente para exibir (tela, Painel, PDF): o vinculado pelo nome atual
+     * (ou o retrato gravado, se o cadastro sumiu), senão o texto da proposta.
+     */
+    public function clientLabel(): string
+    {
+        $doctype = (string) ($this->fields['doctype'] ?? '');
+        if (!DocumentMeta::hasClient($doctype)) {
+            return '';
+        }
+        $gravado = (string) ($this->fields['client_name'] ?? '');
+        if (DocumentMeta::linksClient($doctype)) {
+            $atual = self::clientName((string) ($this->fields['client_itemtype'] ?? ''), (int) ($this->fields['client_items_id'] ?? 0));
+            return $atual !== '' ? $atual : $gravado;
+        }
+        return $gravado;
     }
 
     /**
      * Auditor, revisor e janela de revisão (R3d): normaliza e confere.
      *   - só quem gere o documento muda (na criação, quem cria já gere);
-     *   - o auditor muda só em rascunho e tem que ser auditor do setor;
+     *   - o auditor muda só em rascunho e tem que ter um perfil com o bit
+     *     Auditor na entidade do documento (A1);
      *   - janela: as duas datas ou nenhuma, e início até o fim.
      * Devolve o input ou false (com a mensagem na sessão).
      *
-     * @param int[] $sectors setores do documento
+     * @param int $entityId entidade do documento
      * @return array<string, mixed>|false
      */
-    private function checkManagedFields(array $input, array $sectors, bool $novo)
+    private function checkManagedFields(array $input, int $entityId, bool $novo)
     {
         $old = static function (string $f, array $fields) {
             if (str_starts_with($f, 'review_')) {
@@ -1109,8 +1259,8 @@ class Document extends CommonDBTM
                 return $this->deny(__('O auditor responsável só muda em rascunho.', 'codexplus'));
             }
             $a = (int) $input['users_id_auditor'];
-            if ($a > 0 && !in_array($a, SectorMember::usersOfRole($sectors, SectorMember::ROLE_VALIDATOR), true)) {
-                return $this->deny(__('O auditor responsável tem que ser auditor do setor do documento.', 'codexplus'));
+            if ($a > 0 && !in_array($a, Rights::auditorUsers($entityId), true)) {
+                return $this->deny(__('O auditor responsável tem que ter um perfil de auditor (Administração → Perfis → aba Codex+, coluna Auditor).', 'codexplus'));
             }
         }
         $ini = array_key_exists('review_start', $input) ? $input['review_start'] : $old('review_start', $atual);
@@ -1159,6 +1309,10 @@ class Document extends CommonDBTM
         }
 
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
+        $input = $this->normalizeClient($input, (string) ($this->fields['doctype'] ?? ''));
+        if ($input === false) {
+            return false;
+        }
         // Só em rascunho: fora dele o corpo não muda (e a comparação abaixo
         // recusaria a diferença).
         if (isset($input['content']) && $this->status() === self::STATUS_DRAFT) {
@@ -1182,7 +1336,7 @@ class Document extends CommonDBTM
                     }
                 }
             }
-            $input = $this->checkManagedFields($input, $this->getSectorIds(), false);
+            $input = $this->checkManagedFields($input, (int) $this->fields['entities_id'], false);
             if ($input === false) {
                 return false;
             }

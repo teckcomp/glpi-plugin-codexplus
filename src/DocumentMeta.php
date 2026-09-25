@@ -33,21 +33,49 @@ class DocumentMeta extends CommonDBTM
     public const EXPIRY_WINDOW_DAYS = 30;
 
     /** Prefixos válidos (viram o começo do código, gravado no sequencial). */
-    public const DOCTYPE_KEYS = ['POP', 'PSG', 'MAN', 'PRP', 'DIA'];
+    public const DOCTYPE_KEYS = ['POP', 'PSG', 'MAN', 'PRP', 'LAU', 'DTC', 'DIV', 'DIA'];
 
     /**
      * Tipos que só existem no MODELO NOVO (Document). O fluxo antigo de
      * "Novo documento" (artigo da Base de Conhecimento) não os oferece.
-     * DIA: diagrama institucional, Etapa 9 (0.6.7).
+     * DIA: diagrama institucional, Etapa 9 (0.6.7). LAU, DTC e DIV: bloco T1
+     * (Claudio, 24/09/2026), nascem só no modelo novo.
      */
-    public const NEW_MODEL_ONLY = ['DIA'];
+    public const NEW_MODEL_ONLY = ['LAU', 'DTC', 'DIV', 'DIA'];
+
+    /**
+     * Cliente (bloco T1, Claudio, 24/09/2026). Proposta: texto livre (o
+     * cliente pode ainda não estar cadastrado). Laudo e Documentação
+     * Técnica: VÍNCULO com um usuário ou uma entidade do GLPI, conforme a
+     * configuração da instalação (Branding::clientSource). O vínculo é só um
+     * dado do documento: não dá leitura a ninguém.
+     */
+    public const CLIENT_TEXT_TYPES = ['PRP'];
+    public const CLIENT_LINK_TYPES = ['LAU', 'DTC'];
+
+    public static function linksClient(string $doctype): bool
+    {
+        return in_array($doctype, self::CLIENT_LINK_TYPES, true);
+    }
+
+    /** O tipo tem cliente (em texto ou vinculado)? */
+    public static function hasClient(string $doctype): bool
+    {
+        return self::linksClient($doctype) || in_array($doctype, self::CLIENT_TEXT_TYPES, true);
+    }
 
     /**
      * Validade padrão por tipo, em meses (Claudio, 20/09/2026). 0 = não
-     * vence. Proposta: definida por quem publica (ainda não implementado:
-     * até lá, 0). Tipo fora da lista: DEFAULT_VALIDITY_MONTHS.
+     * vence. Proposta e Documento Diverso: definida por quem publica (ainda
+     * não implementado: até lá, 0). Laudo não vence: registra um momento;
+     * um laudo novo é outro documento. Documentação Técnica: 12, como o POP
+     * (bloco T1, Claudio, 24/09/2026). Tipo fora da lista:
+     * DEFAULT_VALIDITY_MONTHS.
      */
-    public const VALIDITY_BY_TYPE = ['POP' => 12, 'PSG' => 12, 'MAN' => 6, 'PRP' => 0, 'DIA' => 3];
+    public const VALIDITY_BY_TYPE = [
+        'POP' => 12, 'PSG' => 12, 'MAN' => 6, 'PRP' => 0,
+        'LAU' => 0, 'DTC' => 12, 'DIV' => 0, 'DIA' => 3,
+    ];
 
     public static function defaultValidity(string $doctype): int
     {
@@ -88,6 +116,9 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('PSG — Procedimento do Sistema de Gestão', 'codexplus'),
             'MAN' => __('MAN — Manual', 'codexplus'),
             'PRP' => __('PRP — Proposta', 'codexplus'),
+            'LAU' => __('LAU — Laudo Técnico', 'codexplus'),
+            'DTC' => __('DTC — Documentação Técnica', 'codexplus'),
+            'DIV' => __('DIV — Documento Diverso', 'codexplus'),
             'DIA' => __('DIA — Diagrama (organograma)', 'codexplus'),
         ];
     }
@@ -107,6 +138,9 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('PSG', 'codexplus'),
             'MAN' => __('Manual', 'codexplus'),
             'PRP' => __('Proposta', 'codexplus'),
+            'LAU' => __('Laudo', 'codexplus'),
+            'DTC' => __('Doc. técnica', 'codexplus'),
+            'DIV' => __('Diverso', 'codexplus'),
             'DIA' => __('Diagrama', 'codexplus'),
         ];
     }
@@ -129,6 +163,9 @@ class DocumentMeta extends CommonDBTM
             'PSG' => __('Procedimento do Sistema de Gestão', 'codexplus'),
             'MAN' => __('Manual', 'codexplus'),
             'PRP' => __('Proposta', 'codexplus'),
+            'LAU' => __('Laudo Técnico', 'codexplus'),
+            'DTC' => __('Documentação Técnica', 'codexplus'),
+            'DIV' => __('Documento Diverso', 'codexplus'),
             'DIA' => __('Diagrama institucional', 'codexplus'),
         ];
     }

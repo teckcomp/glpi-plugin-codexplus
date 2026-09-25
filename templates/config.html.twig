@@ -147,6 +147,24 @@
             </div>
         </fieldset>
 
+        {# ---------------------------------------------------------------- #}
+        {# Bloco T1: onde estão os clientes de Laudo e Documentação Técnica. #}
+        <fieldset class="cx-cfg-block">
+            <legend>{{ __('Clientes dos documentos', 'codexplus') }}</legend>
+
+            <div class="codexplus-form-row">
+                <label for="cx-clientsrc">{{ __('Os clientes estão cadastrados como', 'codexplus') }}</label>
+                <select id="cx-clientsrc" name="client_source">
+                    {% for key, label in client_sources %}
+                        <option value="{{ key }}" {{ cfg.client_source == key ? 'selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="codexplus-form-hint">
+                    {{ __('Define a lista do campo Cliente no Laudo e na Documentação Técnica. Documentos já vinculados continuam apontando para o que era. A proposta segue com o cliente em texto livre.', 'codexplus') }}
+                </p>
+            </div>
+        </fieldset>
+
         <div class="codexplus-form-actions">
             <button type="submit" name="update" value="1" class="cx-btn cx-btn-primary">
                 <i class="ti ti-device-floppy"></i> {{ __('Salvar', 'codexplus') }}

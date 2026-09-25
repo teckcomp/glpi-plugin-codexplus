@@ -1,7 +1,9 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.8-alpha` · atualizado em 22/09/2026 (criador de documentos
-> completo: R3b2-b e R3b3, commits `d06aa30` a `987636c`). Antes, em 21/09/2026 (motor de diagrama em
+> Estado em `v0.6.8-alpha` · atualizado em 24/09/2026 (editor de documentos
+> completo: E1 a E4, commits `1c793c8` a `68b7b09`). Antes, em 22/09/2026
+> (criador de documentos completo: R3b2-b e R3b3, commits `d06aa30` a
+> `987636c`). Antes, em 21/09/2026 (motor de diagrama em
 > grafo: 2d-1, 2d-2 e o PDF igual à tela (2d-3a) prontos; falta fechar o
 > 2d-3 e subir para `0.6.8-alpha`).
 > Método: cada etapa é um pacote, um deploy, um teste. Nenhuma etapa depende
@@ -47,13 +49,16 @@ Vale sobre a lista acima quando houver conflito. Os itens marcados como novos
 foram levantados na conversa: eram pré-requisitos ou esquecimentos.
 
 1. Finalizar organograma (blocos do motor: falta fechar o 2d-3)
-2. Cronograma e matrizes — outros dois subtipos de `DIA`, baratos porque
+2. Cronograma e matrizes — **próximo**, salvo se Claudio antecipar a R3b2-c
+   (sugestão de 24/09: a aba Papéis no Setor acaba com o console para dar
+   papel de auditor, e é pequena) — outros dois subtipos de `DIA`, baratos porque
    reusam a mesma tabela e o mesmo motor
 3. Permissões (R3b2)
 4. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
    pré-requisito dos itens 5 e 7 (hoje o documento novo não aceita anexo nem
    imagem colada: `enable_images => false`, sem `Document_Item`)
-5. Editor de documentos com importação e exportação — **próximo passo** (Claudio, 22/09/2026: estilos/tamanho de fonte, importar e exportar, depois editor de imagem estilo paint)
+5. ~~Editor de documentos com importação e exportação~~ ✅ 24/09/2026 — blocos
+   E1 a E4 (tabela "Editor de documentos" abaixo)
 6. Fluxograma (sobre o motor próprio)
 7. Editor de propostas com mini excel e mini editor de desenho
 8. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
@@ -142,7 +147,18 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R6 | Revisão de documento publicado: a publicada segue visível com o aviso **"Em atualização"** (tela e link anônimo, não no PDF) até a nova ser validada; **prazo de revisão** (padrão 30 dias, configurável) com prorrogação motivada ou cancelamento pelo gestor; "**revisado sem alteração**" (renova a validade, mantém a revisão); versões com resumo; histórico de revisão no fim do PDF; indicador "Sem responsável" | Abrir a :01, ver o aviso para o leitor, validar e ver a tabela no PDF |
 | R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
 
-**Importar documento pronto** (pedido de Claudio, 20/09/2026): trazer um
+## Editor de documentos (item 5, 22 a 24/09/2026)
+
+Detalhes em `CONTEXTO.md`, subseção "Editor de documentos".
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| E1 | Menu Estilo (Título 1-3, Parágrafo, Nota, Atenção) e A−/A/A+ só na seleção, medidas nos tokens `--cx-size-*`; sem cor e tamanho livres; colado perde fonte, tamanho e cor | `1c793c8` |
+| E2 | Importar `.docx` (mammoth) e `.md` (marked) só com o corpo em branco; imagens pelo envio das coladas | `3118dd8` |
+| E3 | Exportar Word (docx) com as regras do PDF (`window.CodexplusPrint`); tabela com bordas no editor | `1eaf22e` |
+| E4 | Anotador de imagens editável (seta, retângulo, círculo, destaque, texto, passo, ocultar, recortar; tamanho/intensidade; marcas no `span.cx-annot`); janela nativa de imagem trocada por botão próprio | `68b7b09` |
+
+**Importar documento pronto** — ✅ entregue no E2. Registro original (pedido de Claudio, 20/09/2026): trazer um
 POP ou manual feito fora (Word `.docx`, Markdown, texto de um chat) para um
 documento novo, que segue editável. Hoje já funciona colando no corpo
 (TinyMCE mantém títulos, listas e tabelas); arquivo `.docx`/`.md` e imagens
@@ -317,6 +333,11 @@ os critérios abaixo estiverem cumpridos:
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
+- [ ] **Mesmo usuário nas duas etapas da validação?** Hoje a regra só impede
+      quem **alterou** o documento de validar; quem é gestor e auditor do mesmo
+      setor (caso de teste: Teste 001 no setor Qualidade, 24/09/2026) aprova a
+      1ª etapa e publica a 2ª. Útil em teste; em produção, esvazia as duas
+      etapas. Levantado em 24/09, sem decisão de Claudio
 - [ ] **Self-Service vê o Codex+?** Decidir na Etapa R. Atenção ao achado 27: o GLPI tira da sessão do Self-Service todo direito de plugin; liberar exige acrescentar o direito a `Profile::$helpdesk_rights`
 
 **Decididas:**

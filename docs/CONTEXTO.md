@@ -2,8 +2,10 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.8-alpha` · atualizado em 22/09/2026 (criador de documentos
-> completo: R3b2-b e R3b3, commits `d06aa30` a `987636c`). Antes, 21/09: R6-a, revisão de
+> Estado: `v0.6.8-alpha` · atualizado em 24/09/2026 (editor de documentos
+> completo: E1 a E4, commits `1c793c8` a `68b7b09` — subseção "Editor de
+> documentos"). Antes, 22/09: criador de documentos (R3b2-b e R3b3, commits
+> `d06aa30` a `987636c`). Antes, 21/09: R6-a, revisão de
 > documento publicado. Antes: (motor de diagrama em
 > grafo: posição livre, arraste próprio, ligações com chefia, salvamento
 > automático, PDF igual à tela e dobras à mão — seção 3.4; commits `bd41b7a`
@@ -63,7 +65,8 @@ desta tabela sem alinhar antes.**
 | Caixa de tarefas pendentes | "Aguardando validação" e "Revisão atrasada" são indicadores do "Precisa de atenção" do Painel (R5), não caixa de tarefas |
 | Trilha de auditoria para auditor externo | O histórico nativo do GLPI já registra alterações. O histórico de revisão com resumo (Etapa R6) é do documento, não aparato de auditoria |
 | Permissão separada de ver / imprimir / baixar | O GLPI já controla visibilidade por perfil, grupo e entidade |
-| Editor Markdown | O TinyMCE nativo atende |
+| Editor Markdown | O TinyMCE nativo atende. Markdown entra só como **importação** (E2) |
+| Tamanho, fonte e cor livres no editor | Padronização (Claudio, 22/09/2026): estilos fixos e três tamanhos (E1) |
 | Hierarquia livro → capítulo → página | Categoria → subcategoria resolve; o PSG cobre o agrupamento por setor |
 | PDF via TCPDF (server-side) | Testado e descartado — ver seção 4 |
 | Reskin por CSS sobre telas nativas | Abordagem original, **abandonada** — ver seção 4 |
@@ -454,6 +457,79 @@ precisa, e o campo Cliente só em proposta.
   paginação. Com o rodapé desligado, a identificação fica sob o título. Vale
   para os dois modelos (o motor é um só). De passagem: `{revisao}` 0 saía
   vazio.
+
+#### Editor de documentos (E1 a E4, 22 a 24/09/2026)
+
+Item 5 da ordem até produção, pedido de Claudio: "TinyMCE melhorado",
+tamanho de fonte, importar, exportar e editor de imagem. Tudo no navegador,
+sem schema novo e sem tocar no núcleo. Arquivos: `public/js/codexplus-editor.js`
+(E1, E2, ligação do E4), `public/js/codexplus-export.js` (E3),
+`public/js/codexplus-annotate.js` (E4) e as bibliotecas em `public/lib/`
+(cada uma com LICENSE e VERSION, carregadas só no clique).
+
+**Como o plugin mexe no TinyMCE do GLPI (achado 59).** `Html::initEditorSystem`
+guarda a configuração em `tinymce_editor_configs[id]` e chama `tinyMCE.init` no
+mesmo passo. `CodexplusEditor.prepare(id)` põe um *setter* nessa chave: a
+configuração passa por `customize()` antes do init. Só o editor
+`codexplus-doc-content` é alterado. A linha no template antes de
+`widgets.content` garante a ordem.
+
+- **E1 — estilos fixos** (`1c793c8`). Menu **Estilo**: Título 1, 2 e 3 (`h2`,
+  `h3`, `h4`: o `h1` é o título do documento no PDF), Parágrafo, **Nota** e
+  **Atenção** (`p.cx-callout` + `cx-callout-note`/`-attention`, as classes que
+  o PDF já conhecia). Botões **A− A A+** só na **seleção** (`span.cx-size-sm`/
+  `-lg`, formato em linha como o negrito; na 1ª versão era o bloco inteiro e
+  Claudio recusou). Trocar tamanho tira o outro antes: nunca span dentro de
+  span (com `em`, multiplicaria). Título tira os tamanhos de dentro. **Medidas
+  com fonte única nos tokens `--cx-size-sm` e `--cx-size-lg`** (seção 1 do
+  CSS): tela, editor e PDF leem de lá; mudar o valor muda até os documentos já
+  gravados. Barra sem cor livre; colado ou importado perde `font-family`,
+  `font-size`, `color` e `background-color` (`invalid_styles`) — cor que já
+  estava gravada some no próximo Salvar do rascunho.
+- **E2 — importar** (`3118dd8`). Botão **Importar** só com o **corpo em
+  branco** (decisão de Claudio: documento em andamento não importa; copiar e
+  colar é livre). `.docx` pelo mammoth.js 1.12.3 (BSD-2), `.md` pelo marked
+  18.0.14 (MIT). Títulos deslocados um nível (h1→h2, h2→h3, h3+→h4), âncoras
+  vazias do Word fora. Inserção por `setRichTextEditorContent` do GLPI (o
+  caminho da colagem): as imagens do arquivo sobem como imagem colada e são
+  gravadas ao Salvar. `.doc` antigo é recusado com a instrução de salvar como
+  `.docx`.
+- **E3 — exportar Word** (`1eaf22e`). Botão **Exportar Word** ao lado do
+  Exportar PDF, na visão de leitura (não em diagrama). Biblioteca docx 9.7.2
+  (MIT, `dist/index.iife.js` minificado com terser). **Usa as regras do PDF**:
+  `codexplus.js` expõe `window.CodexplusPrint` (config, marcadores, linha de
+  identificação, nome do arquivo) — nada copiado. Cabeçalho com código · rev e
+  logo; título com traço; rodapé com a identificação (inclusive RASCUNHO) e
+  `N / M` em campos do Word. Títulos viram os **estilos de título do Word**
+  (painel de navegação e sumário funcionam). Nota/Atenção com faixa e fundo,
+  A−/A+ como tamanho, listas numeradas recomeçando a cada lista, tabelas,
+  links e imagens (baixadas com a sessão; SVG/WebP passam por canvas e viram
+  PNG). No mesmo pacote: tabela no **editor** com largura total e bordas.
+- **E4 — anotador de imagens** (`68b7b09`). Botão **Anotar** na barra e na
+  barrinha que aparece ao clicar numa imagem. Ferramentas: Selecionar, Seta,
+  Retângulo, Círculo, Destaque, Texto, Passo (①②③ automático, renumera ao
+  excluir), Ocultar (pixela: senha, IP, dado pessoal) e Recortar; 5 cores
+  fixas; **Tamanho P/M/G** por marca, que no Destaque e no Ocultar é a
+  **intensidade**. Destaque nasce amarelo e aceita as outras cores (cor
+  guardada à parte). Desfazer, refazer, Delete, duplo clique edita texto.
+  **Editável depois** (opção 2 de Claudio), sem tabela nova:
+  `<span class="cx-annot" data-cx-orig="URL do print" data-cx-annot='{"v":1,
+  "w","h","crop","marks":[…]}'><img src="PNG anotado"></span>`. Marcas em
+  pixels do **original**. Ao Salvar o GLPI troca só a `<img>` (achado 56) e o
+  span fica. O PNG anotado sobe por `uploadFile` + `uploaded_images` do
+  `fileupload.js` (achado 60), com nome `cx-anotacao-*.png`; PNG de anotação
+  substituída fica órfão e `Document::listAttachments` o ignora pelo nome. O
+  original não aparece em Anexos porque a URL dele (com `docid=`) está no
+  corpo. **Imagem recém-colada precisa ser salva antes de anotar** (sem
+  endereço fixo do original). O Salvar espera o envio da imagem anotada
+  terminar (senão gravaria `blob:`). Duplicar reaponta também o `data-cx-orig`
+  (a regex do `items_id` pega todas as ocorrências). Leitura, PDF e Word usam
+  só a `<img>`.
+- **Janela nativa "Inserir/editar imagem" removida** (E4-3, achado 58): o
+  plugin `image` do TinyMCE sai da configuração; no lugar, o botão próprio
+  `cxinsertimage` (arquivo do computador, pelo mesmo envio das coladas). Colar
+  e arrastar continuam pelo `glpi_upload_doc`. Bônus: imagem por endereço
+  externo, que não sairia no PDF nem no acesso anônimo (R7), deixa de existir.
 
 #### Validação em duas etapas e revisão periódica (R3d, 21/09/2026)
 
@@ -998,6 +1074,43 @@ depender do comportamento errático de `position: fixed` na impressão.
     nativa. Para o controle do Codex+ valer, esse direito tem que estar
     desligado nos perfis de leitores comuns.
 
+56. **Ao Salvar, o GLPI troca só a tag `<img>` da imagem enviada.**
+    `Toolbox::convertTagToImage` (11.0.6) acha `<img ...id="tag"...>` por regex
+    e põe no lugar a `<img>` definitiva, levando só `width`/`height`. O que
+    está em volta (um `<span>` com dados) fica intacto — é onde o anotador (E4)
+    guarda as marcas.
+57. **A leitura passa pelo sanitizador do GLPI**
+    (`RichText::getEnhancedHtml` → `getSafeHtml`, Symfony HtmlSanitizer):
+    `class` e `style` ficam em qualquer elemento; `data-*` só os de menção em
+    `span`. Por isso os dados do anotador existem no gravado e no editor, não
+    na leitura — que não precisa deles.
+58. **A janela nativa "Inserir/editar imagem" do TinyMCE prendia o Salvar**
+    (24/09/2026): na largura normal ela abria sobre o Salvar com a imagem
+    anotada ainda em `blob:`; com o F12 aberto (editor estreito, barra
+    recolhida em "…") não acontecia. O gatilho exato não foi achado; o plugin
+    `image` saiu do editor do Codex+ e o problema sumiu. Se voltar, o sintoma
+    será o seletor de arquivos do botão próprio abrindo no Salvar.
+59. **Configuração do TinyMCE do GLPI é interceptável sem mexer no núcleo:**
+    `tinymce_editor_configs[id]` é gravada e usada no mesmo passo (dentro de
+    `$(function(){})`); um `Object.defineProperty` com *setter* nessa chave,
+    instalado antes, recebe a configuração e a devolve ajustada.
+60. **Inserir HTML ou imagem pelo caminho da colagem do GLPI:**
+    `setRichTextEditorContent(id, html)` (fileupload.js) usa
+    `mceInsertClipboardContent`, e o `PastePreProcess` do `glpi_upload_doc`
+    envia toda `<img>` `data:`/`blob:`. Para enviar um blob próprio já no
+    corpo: `data-upload_id` na `<img>`, `uploaded_images.push({upload_id,
+    filename})` e `uploadFile(blob, editor)` (blob com `.name`); ao terminar o
+    GLPI põe o `id` da tag na `<img>` — antes disso, Salvar grava `blob:`.
+61. **Testar o editor em jsdom (quem gera os pacotes):** TinyMCE 7.9.2 do npm
+    roda, mas seleção e formatação só no modo `inline` (a seleção dentro do
+    iframe não funciona); é preciso simular `isContentEditable` (jsdom não
+    tem; considerar a propriedade `contentEditable`), `Range.
+    getBoundingClientRect`, `URL.createObjectURL` e `matchMedia`; ArrayBuffer
+    tem que ser do mesmo *realm* da janela (`new w.Uint8Array(buf).buffer`);
+    `docx` `Packer.toBlob` não termina no jsdom (no teste, usar o Packer do
+    Node); o anotador precisa do pacote `canvas`. Conferência visual do
+    `.docx` pelo LibreOffice (`soffice --headless --convert-to pdf`).
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -1019,13 +1132,18 @@ Desde a 0.5.8, a linha de identificação da 1ª página vem de
 `#codexplus-print-config` (`buildIdentLine()`), não da raspagem de
 `.codexplus-doc-meta` — que trazia a contagem de visualizações.
 
+Desde o E3 os mesmos seletores alimentam o **Word** (`codexplus-export.js`,
+botão `#codexplus-docx`), que lê a configuração por `window.CodexplusPrint`.
+
 Elemento novo dentro de `#codexplus-doc` **não** entra no PDF
 automaticamente — o JS monta o HTML a partir dos seletores acima, não clona o
 contêiner inteiro.
 
 ### Outras regras
 
-- Design tokens CSS com prefixo `--cx-`, declarados em `:root`
+- Design tokens CSS com prefixo `--cx-`, declarados em `:root`. Os tamanhos
+  do editor (`--cx-size-sm`, `--cx-size-lg`) são **proporção** (0,87 e 1,2),
+  lida também pelo JS do editor, do PDF e do Word — não trocar por px
 - CSS em **arquivo único** (`public/css/codexplus.css`), seções numeradas
 - Antes de criar classe nova, procure a existente — `.codexplus-status--*` já
   cobre status e vencimento; `.cx-code-chip` já cobre o código colorido
@@ -1089,7 +1207,11 @@ codexplus/
 │   └── document.form.php      documento no modelo novo (R3b1)
 ├── templates/                 Twig (parts/brand.html.twig: cabeçalho com a marca, 0.6.5)
 ├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
-│   └── js/codexplus-org.js    motor do diagrama: grafo, canvas, gesto, ligações
+│   ├── js/codexplus-org.js    motor do diagrama: grafo, canvas, gesto, ligações
+│   ├── js/codexplus-editor.js estilos, tamanhos, importar, ligação do anotador (E1, E2, E4)
+│   ├── js/codexplus-export.js exportar Word (E3)
+│   ├── js/codexplus-annotate.js anotador de imagens editável (E4)
+│   └── lib/                   mammoth, marked, docx (licença e versão em cada pasta)
 └── docs/                      esta documentação
 ```
 

@@ -639,6 +639,16 @@
         document.body.appendChild(iframe);
     }
 
+    // E3 (22/09/2026): a exportação em Word (codexplus-export.js) usa a
+    // MESMA configuração, marcadores, linha de identificação e nome de
+    // arquivo do PDF — fonte única, sem cópia das regras.
+    window.CodexplusPrint = {
+        config: getPrintConfig,
+        markers: resolveMarkers,
+        ident: buildIdentLine,
+        fileTitle: fileTitle
+    };
+
     document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('codexplus-pdf');
         if (btn) {

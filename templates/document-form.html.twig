@@ -47,6 +47,11 @@
                         </a>
                     {% endif %}
                     {% if not is_diagram %}
+                        {# E3: Word, com a mesma configuração do PDF (codexplus-export.js). #}
+                        <button type="button" class="codexplus-btn" id="codexplus-docx"
+                                title="{{ __('Baixa o documento em Word (.docx), para editar ou enviar fora do GLPI', 'codexplus') }}">
+                            <i class="ti ti-file-type-docx"></i> {{ __('Exportar Word', 'codexplus') }}
+                        </button>
                         <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">
                             <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
                         </button>

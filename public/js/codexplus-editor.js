@@ -81,7 +81,10 @@
             + 'border-left:4px solid;}'
             + '.cx-callout-attention{background:#fcebeb;border-color:#e24b4a;}'
             + '.cx-callout-tip{background:#eaf3de;border-color:#639922;}'
-            + '.cx-callout-note{background:#e6f1fb;border-color:#378add;}';
+            + '.cx-callout-note{background:#e6f1fb;border-color:#378add;}'
+            // Tabela como na leitura e no PDF (E3): largura total e bordas.
+            + 'table{border-collapse:collapse;width:100%;}'
+            + 'td,th{border:1px solid #d3d9e0;padding:6px 8px;}th{background:#f6f8fa;}';
     }
 
     function hasClass(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }

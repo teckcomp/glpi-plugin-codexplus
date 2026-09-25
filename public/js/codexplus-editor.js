@@ -179,6 +179,137 @@
         return editor.dom.getParent(n, selector);
     }
 
+
+    /* ---------------------------------------------------------------- */
+    /* Importar .docx e .md (bloco E2)                                   */
+    /* ---------------------------------------------------------------- */
+
+    // Pasta pública do plugin, deduzida do próprio script (achado 3: sem
+    // Plugin::getWebDir). Ex.: /glpi/plugins/codexplus
+    var BASE = (function () {
+        var sc = document.currentScript;
+        return sc && sc.src ? sc.src.replace(/\/js\/codexplus-editor\.js.*$/, '') : '';
+    })();
+    var LIBS = {
+        mammoth: '/lib/mammoth/mammoth.browser.min.js',
+        marked:  '/lib/marked/marked.umd.js'
+    };
+    var loading = {};
+
+    function loadLib(name) {
+        if (window[name]) { return Promise.resolve(window[name]); }
+        if (!loading[name]) {
+            loading[name] = new Promise(function (ok, fail) {
+                var el = document.createElement('script');
+                el.src = BASE + LIBS[name];
+                el.onload = function () { window[name] ? ok(window[name]) : fail(new Error(name)); };
+                el.onerror = function () { delete loading[name]; fail(new Error(name)); };
+                document.head.appendChild(el);
+            });
+        }
+        return loading[name];
+    }
+
+    /* Corpo em branco = sem texto e sem imagem, tabela ou linha. */
+    function isBlank(editor) {
+        var body = editor.getBody();
+        if (!body) { return false; }
+        if (body.querySelector('img,table,hr,iframe,video')) { return false; }
+        return (body.textContent || '').replace(/\u00a0|\ufeff/g, '').trim() === '';
+    }
+
+    /* HTML do arquivo -> padrão do Codex+: títulos deslocados um nível
+       (o h1 é o título do documento), âncoras vazias do Word fora. Fonte,
+       tamanho e cor saem pelo invalid_styles do editor. */
+    function normalize(html) {
+        var box = document.createElement('div');
+        box.innerHTML = html;
+        var heads = Array.prototype.slice.call(box.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+        heads.forEach(function (h) {
+            var n = parseInt(h.nodeName.substring(1), 10);
+            var tag = n === 1 ? 'h2' : (n === 2 ? 'h3' : 'h4');
+            var nh = document.createElement(tag);
+            while (h.firstChild) { nh.appendChild(h.firstChild); }
+            h.parentNode.replaceChild(nh, h);
+        });
+        Array.prototype.slice.call(box.querySelectorAll('a[id]:not([href])')).forEach(function (a) {
+            if (!(a.textContent || '').trim()) { a.parentNode.removeChild(a); }
+        });
+        return box.innerHTML;
+    }
+
+    var DOCX_STYLES = [
+        "p[style-name='Title'] => h1:fresh",
+        "p[style-name='Subtitle'] => h2:fresh"
+    ];
+
+    function convert(file) {
+        var name = (file.name || '').toLowerCase();
+        if (/\.docx$/.test(name)) {
+            return loadLib('mammoth').then(function (m) {
+                return file.arrayBuffer().then(function (buf) {
+                    return m.convertToHtml({ arrayBuffer: buf }, { styleMap: DOCX_STYLES });
+                });
+            }).then(function (r) { return r.value; });
+        }
+        if (/\.(md|markdown)$/.test(name)) {
+            return loadLib('marked').then(function (mk) {
+                return file.text().then(function (txt) { return mk.parse(txt); });
+            });
+        }
+        return Promise.reject(new Error('tipo'));
+    }
+
+    function notify(editor, text, type) {
+        if (editor.notificationManager) {
+            editor.notificationManager.open({ text: text, type: type || 'info', timeout: type === 'error' ? 0 : 4000 });
+        } else {
+            window.alert(text);
+        }
+    }
+
+    function importFile(editor, file) {
+        if (!isBlank(editor)) {
+            notify(editor, 'A importação só vale com o corpo em branco. Para trazer um trecho, copie e cole.', 'error');
+            return Promise.resolve(false);
+        }
+        return convert(file).then(function (html) {
+            html = normalize(html);
+            if (!html.replace(/<[^>]*>/g, '').trim() && !/<img/i.test(html)) {
+                notify(editor, 'O arquivo não tem conteúdo para importar.', 'error');
+                return false;
+            }
+            if (typeof window.setRichTextEditorContent === 'function') {
+                window.setRichTextEditorContent(editor.id, html);
+            } else {
+                editor.setContent('');
+                editor.execCommand('mceInsertClipboardContent', false, { html: html, internal: true });
+            }
+            editor.nodeChanged();
+            notify(editor, 'Arquivo importado. As imagens são gravadas ao Salvar.', 'success');
+            return true;
+        }, function (err) {
+            notify(editor, err && err.message === 'tipo'
+                ? 'Formato não aceito. Use .docx (Word) ou .md (Markdown).'
+                : 'Não foi possível ler o arquivo. Se for .doc antigo, salve como .docx no Word.', 'error');
+            return false;
+        });
+    }
+
+    function pickFile(editor) {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.docx,.md,.markdown';
+        input.style.display = 'none';
+        input.addEventListener('change', function () {
+            var f = input.files && input.files[0];
+            input.parentNode && input.parentNode.removeChild(input);
+            if (f) { importFile(editor, f); }
+        });
+        document.body.appendChild(input);
+        input.click();
+    }
+
     function register(editor) {
         var ui = editor.ui.registry;
 
@@ -212,6 +343,18 @@
             }
         });
 
+        ui.addButton('cximport', {
+            text: 'Importar',
+            tooltip: 'Importar .docx ou .md (só com o corpo em branco)',
+            onAction: function () { pickFile(editor); },
+            onSetup: function (api) {
+                var upd = function () { api.setEnabled(isBlank(editor)); };
+                editor.on('NodeChange SetContent input keyup Change', upd);
+                upd();
+                return function () { editor.off('NodeChange SetContent input keyup Change', upd); };
+            }
+        });
+
         SIZES.forEach(function (sz) {
             ui.addToggleButton('cxsize' + sz.key, {
                 text: sz.label,
@@ -236,13 +379,17 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline'
-                + ' | bullist numlist outdent indent | table link image | code fullscreen';
+                + ' | bullist numlist outdent indent | table link image | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic | cxstyles | cxsizesm cxsizemd cxsizelg';
+            if (typeof cfg.quickbars_insert_toolbar === 'string') {
+                cfg.quickbars_insert_toolbar += ' | cximport';
+            }
         }
-        // Texto colado do Word ou da web não traz fonte nem tamanho próprios.
+        // Texto colado ou importado não traz fonte, tamanho nem cor próprios
+        // (cor incluída no E2, Claudio 22/09/2026).
         cfg.paste_webkit_styles = 'none';
-        cfg.invalid_styles = { '*': 'font-family font-size' };
+        cfg.invalid_styles = { '*': 'font-family font-size color background-color' };
         cfg.content_style = (cfg.content_style || '') + contentCss();
 
         var original = cfg.setup;
@@ -284,7 +431,9 @@
         // Expostos para os testes (jsdom) e para depuração no console.
         _customize: customize,
         _applyStyle: applyStyle,
-        _applySize: applySize
+        _applySize: applySize,
+        _importFile: importFile,
+        _normalize: normalize
     };
 
     prepare(EDITOR_ID);

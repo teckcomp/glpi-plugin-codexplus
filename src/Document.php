@@ -614,6 +614,11 @@ class Document extends CommonDBTM
             if (in_array((int) $row['id'], $inline, true)) {
                 continue;
             }
+            // E4: PNG de uma anotação substituída (a atual está no corpo e já
+            // saiu acima). É derivado, não anexo de ninguém.
+            if (str_starts_with(strtolower((string) $row['filename']), 'cx-anotacao-')) {
+                continue;
+            }
             $out[] = [
                 'link'  => (int) $row['link'],
                 'docid' => (int) $row['id'],

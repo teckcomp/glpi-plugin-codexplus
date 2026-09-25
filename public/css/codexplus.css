@@ -1880,3 +1880,44 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .codexplus-content .cx-callout-note { background: var(--cx-accent-soft); border-color: var(--cx-accent); }
 .codexplus-content .cx-callout-attention { background: var(--cx-danger-bg); border-color: var(--cx-danger); }
 .codexplus-content .cx-callout-tip { background: var(--cx-ok-bg); border-color: var(--cx-ok); }
+
+/* =========================================================================
+   Anotador de imagens (bloco E4, Claudio 24/09/2026) — codexplus-annotate.js
+   Janela sobre a página inteira; o canvas usa as medidas do ORIGINAL e é
+   reduzido pelo CSS para caber.
+   ========================================================================= */
+.cx-anno-overlay {
+    position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .55);
+    display: flex; align-items: center; justify-content: center; padding: 2vh 2vw;
+}
+.cx-anno {
+    background: var(--cx-surface); border-radius: var(--cx-radius); display: flex; flex-direction: column;
+    max-width: 96vw; max-height: 96vh; min-width: min(720px, 96vw); overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .3); font-family: var(--cx-font);
+}
+.cx-anno-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--cx-border); }
+.cx-anno-hint { color: var(--cx-muted); font-size: 12px; margin-left: 6px; }
+.cx-anno-sp { flex: 1; }
+.cx-anno-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px 14px; background: var(--cx-surface-1); border-bottom: 1px solid var(--cx-border); }
+.cx-anno-tool {
+    display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; font-size: 13px;
+    border: 1px solid transparent; border-radius: var(--cx-radius-sm); background: transparent; color: var(--cx-text); cursor: pointer;
+}
+.cx-anno-tool:hover { background: var(--cx-surface-2); }
+.cx-anno-tool.is-on { background: var(--cx-accent-soft); border-color: var(--cx-accent); color: var(--cx-accent-strong); }
+.cx-anno-sep { width: 1px; height: 22px; background: var(--cx-border); margin: 0 6px; }
+.cx-anno-color { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--cx-border); cursor: pointer; padding: 0; }
+.cx-anno-color.is-on { box-shadow: 0 0 0 2px var(--cx-text); }
+.cx-anno-sizelabel { font-size: 12px; color: var(--cx-muted); margin-right: 2px; }
+.cx-anno-size {
+    min-width: 30px; height: 30px; font-size: 13px; font-weight: 600; border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius-sm); background: var(--cx-surface); color: var(--cx-text); cursor: pointer;
+}
+.cx-anno-size.is-on { background: var(--cx-accent-soft); border-color: var(--cx-accent); color: var(--cx-accent-strong); }
+.cx-anno-stage { overflow: auto; padding: 14px; background: var(--cx-surface-2); display: flex; justify-content: center; align-items: flex-start; min-height: 0; }
+.cx-anno-canvas { display: block; max-width: 100%; max-height: calc(96vh - 150px); width: auto; height: auto; touch-action: none; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.cx-anno-text {
+    position: fixed; z-index: 2001; min-width: 180px; padding: 4px 6px; font: bold 16px Arial, sans-serif;
+    border: 2px solid var(--cx-accent); border-radius: 4px; background: #fff;
+}
+

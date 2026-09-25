@@ -346,6 +346,61 @@
             }
         });
 
+        // E4: anotar a imagem selecionada (codexplus-annotate.js).
+        var isImg = function () {
+            var n = editor.selection && editor.selection.getNode();
+            return !!(n && n.nodeName === 'IMG');
+        };
+        var annotate = function () {
+            if (window.CodexplusAnnotate) { window.CodexplusAnnotate.open(editor, editor.selection.getNode()); }
+        };
+        ui.addButton('cxannotate', {
+            text: 'Anotar',
+            tooltip: 'Anotar a imagem selecionada (setas, formas, passos, ocultar, recortar)',
+            onAction: annotate,
+            onSetup: function (api) {
+                var upd = function () { api.setEnabled(isImg()); };
+                editor.on('NodeChange', upd);
+                upd();
+                return function () { editor.off('NodeChange', upd); };
+            }
+        });
+        ui.addContextToolbar('cximagectx', {
+            predicate: function (node) { return node.nodeName === 'IMG'; },
+            items: 'cxannotate',
+            position: 'node',
+            scope: 'node'
+        });
+
+        // E4-3: imagem só por arquivo (ou colar/arrastar), pelo mesmo envio das
+        // coladas. A janela nativa "Inserir/editar imagem" saiu: ela prendia o
+        // Salvar (relato de Claudio, 24/09/2026) e aceitava endereço externo,
+        // que não sai no PDF nem no acesso sem login.
+        ui.addButton('cxinsertimage', {
+            icon: 'image',
+            tooltip: 'Inserir imagem (ou cole / arraste direto no texto)',
+            onAction: function () {
+                var input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+                input.style.display = 'none';
+                input.addEventListener('change', function () {
+                    var f = input.files && input.files[0];
+                    input.remove();
+                    if (!f) { return; }
+                    var rd = new FileReader();
+                    rd.onload = function () {
+                        editor.focus();
+                        editor.execCommand('mceInsertClipboardContent', false,
+                            { html: '<img src="' + rd.result + '">', internal: true });
+                    };
+                    rd.readAsDataURL(f);
+                });
+                document.body.appendChild(input);
+                input.click();
+            }
+        });
+
         ui.addButton('cximport', {
             text: 'Importar',
             tooltip: 'Importar .docx ou .md (só com o corpo em branco)',
@@ -382,7 +437,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline'
-                + ' | bullist numlist outdent indent | table link image | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table link cxinsertimage cxannotate | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {
@@ -392,6 +447,14 @@
         // Texto colado ou importado não traz fonte, tamanho nem cor próprios
         // (cor incluída no E2, Claudio 22/09/2026).
         cfg.paste_webkit_styles = 'none';
+        // Sem o plugin "image" do TinyMCE (janela Inserir/editar imagem). Colar e
+        // arrastar imagem continuam: quem sobe é o glpi_upload_doc do GLPI.
+        if (Array.isArray(cfg.plugins)) {
+            cfg.plugins = cfg.plugins.filter(function (p) { return p !== 'image'; });
+        }
+        if (typeof cfg.quickbars_insert_toolbar === 'string') {
+            cfg.quickbars_insert_toolbar = cfg.quickbars_insert_toolbar.replace(/\bquickimage\b/, 'cxinsertimage');
+        }
         cfg.invalid_styles = { '*': 'font-family font-size color background-color' };
         cfg.content_style = (cfg.content_style || '') + contentCss();
 

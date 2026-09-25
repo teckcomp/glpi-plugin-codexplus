@@ -212,6 +212,10 @@
                     <label class="codexplus-doc-edit-zone-label">
                         <i class="ti ti-article"></i> {{ __('Corpo do documento', 'codexplus') }}
                     </label>
+                    {# Bloco E1: estilos fixos no editor. Normalmente já preparado ao
+                       carregar codexplus-editor.js; a chamada aqui garante, antes
+                       do script do GLPI que inicia o editor. #}
+                    <script>window.CodexplusEditor && window.CodexplusEditor.prepare('codexplus-doc-content');</script>
                     {{ widgets.content|raw }}
                     <div class="codexplus-form-hint">
                         {{ __('Cole ou arraste imagens direto no texto. Para anexar arquivos (planilhas, PDFs, fotos), use a área de arquivos abaixo do editor. Tudo é gravado ao clicar em Salvar.', 'codexplus') }}

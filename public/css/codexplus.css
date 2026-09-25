@@ -88,6 +88,11 @@
     /* Tipografia — IBM Plex, servida de public/fonts (seção 15). */
     --cx-font:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     --cx-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+    /* Tamanhos do editor (bloco E1, Claudio 22/09/2026): A− e A+, em
+       proporção do texto normal. Fonte ÚNICA: tela, editor e PDF leem daqui
+       (codexplus-editor.js). Ajustar depois do teste com POP real. */
+    --cx-size-sm: 0.87;
+    --cx-size-lg: 1.2;
     --cx-mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -1860,3 +1865,18 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
     .cx-docpage--wide .cx-docform-split--perm { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 }
 
+/* =========================================================================
+   Estilos do editor (bloco E1, Claudio 22/09/2026)
+   O editor grava só tag e classe (codexplus-editor.js): Título 1/2/3 = h2/
+   h3/h4, Nota e Atenção = .cx-callout, A−/A+ = .cx-size-sm/.cx-size-lg.
+   Medidas nos tokens --cx-size-* (o PDF lê os mesmos, via codexplus-editor.js).
+   ========================================================================= */
+.codexplus-content h4 { color: var(--cx-accent); font-size: 15px; margin: 20px 0 8px; }
+.codexplus-content .cx-size-sm { font-size: calc(var(--cx-size-sm) * 1em); }
+.codexplus-content .cx-size-lg { font-size: calc(var(--cx-size-lg) * 1em); }
+.codexplus-content .cx-callout {
+    margin: 0 0 14px; padding: 9px 14px; border-left: 4px solid; border-radius: 0;
+}
+.codexplus-content .cx-callout-note { background: var(--cx-accent-soft); border-color: var(--cx-accent); }
+.codexplus-content .cx-callout-attention { background: var(--cx-danger-bg); border-color: var(--cx-danger); }
+.codexplus-content .cx-callout-tip { background: var(--cx-ok-bg); border-color: var(--cx-ok); }

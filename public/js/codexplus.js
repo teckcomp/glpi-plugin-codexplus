@@ -106,6 +106,8 @@
         + 'padding-bottom:8px;margin-bottom:18px;}'
         + 'h1,h2,h3,h4{color:#0c447c;page-break-after:avoid;}'
         + 'h2{font-size:14pt;margin:18px 0 8px;}h3{font-size:12pt;margin:14px 0 6px;}'
+        // Título 3 do editor (bloco E1) é <h4>.
+        + 'h4{font-size:11.5pt;margin:12px 0 6px;}'
         + 'p{margin:0 0 9px;}'
         + 'table{border-collapse:collapse;width:100%;margin:0 0 12px;}'
         + 'td,th{border:1px solid #d1d5db;padding:6px;font-size:10.5pt;}'
@@ -254,6 +256,14 @@
     }
 
     /** CSS que depende da configuração — geometria de página, cabeçalho, rodapé. */
+    /* Tamanhos A−/A+ do editor (bloco E1): medidas dos tokens --cx-size-*,
+       lidas por codexplus-editor.js. Sem ele, texto pequeno e grande saem no
+       tamanho normal (nunca quebra a impressão). */
+    function editorSizeCss() {
+        return (window.CodexplusEditor && typeof window.CodexplusEditor.sizeCss === 'function')
+            ? window.CodexplusEditor.sizeCss() : '';
+    }
+
     function buildPageCss(geo) {
         return ''
             + '@page{size:A4;margin:0;}'
@@ -575,7 +585,7 @@
         var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
             + '<base href="' + window.location.origin + '/">'
             + '<title>' + fileTitle(cfg, title).replace(/</g, '&lt;') + '</title>'
-            + '<style>' + PRINT_CSS + buildPageCss(geo) + '</style></head><body>'
+            + '<style>' + PRINT_CSS + editorSizeCss() + buildPageCss(geo) + '</style></head><body>'
             + '<div id="cx-stage">' + heading + clone.innerHTML + '</div>'
             + '</body></html>';
 

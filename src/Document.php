@@ -125,7 +125,16 @@ class Document extends CommonDBTM
 
     public static function canView(): bool
     {
+        if (self::helpdesk()) {
+            return self::bit(Rights::READ);
+        }
         return (bool) Session::haveRightsOr(Rights::NAME, [Rights::READ, Rights::VIEWALL]);
+    }
+
+    /** S1: na interface simplificada o Codex+ é só leitura. */
+    private static function helpdesk(): bool
+    {
+        return Session::getCurrentInterface() === 'helpdesk';
     }
 
     public static function canCreate(): bool
@@ -151,6 +160,10 @@ class Document extends CommonDBTM
 
     private static function bit(int $bit): bool
     {
+        // S1: Self-Service só lê, mesmo que o perfil tenha outro bit gravado.
+        if ($bit !== Rights::READ && self::helpdesk()) {
+            return false;
+        }
         return (bool) Session::haveRight(Rights::NAME, $bit);
     }
 

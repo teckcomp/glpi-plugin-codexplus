@@ -18,12 +18,13 @@ global $DB, $CFG_GLPI;
 
 Session::checkRight('plugin_codexplus_wiki', READ);
 
-Html::header(
-    Wiki::getMenuName(),
-    $_SERVER['PHP_SELF'],
-    'tools',
-    Wiki::class
-);
+// B1 (Claudio, 26/09/2026): quem só lê (e o Self-Service) não tem Painel:
+// entra direto na Biblioteca.
+if (!Rights::isProducer()) {
+    Html::redirect($CFG_GLPI['root_doc'] . '/plugins/codexplus/front/library.php');
+}
+
+Wiki::pageHeader(); // S1: Self-Service usa o cabeçalho da interface simplificada
 
 // 0.6.6 (Claudio, 20/09/2026): o Painel lê o MODELO NOVO. O quadro
 // provisório da R3b1 saiu; "Novo documento" cria direto no modelo novo.
@@ -42,6 +43,8 @@ TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
     // R3d-1: o que espera por quem está logado (gestor ou auditor).
     'pending'    => Dashboard::pendingForMe(),
     'form_url'   => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php',
+    'reader_only' => Session::getCurrentInterface() === 'helpdesk',
+    'can_templates' => Session::haveRight(Rights::NAME, Rights::TEMPLATES),
 ]);
 
-Html::footer();
+Wiki::pageFooter();

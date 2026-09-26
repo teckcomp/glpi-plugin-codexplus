@@ -17,16 +17,24 @@
     {# ============ ZONA A — navegação e ação ============ #}
     <nav class="codexplus-nav">
         <a href="dashboard.php" class="is-active">{{ __('Painel', 'codexplus') }}</a>
+        <a href="library.php">{{ __('Biblioteca', 'codexplus') }}</a>
+        {% if not reader_only %}
+        {# S1: no Self-Service só o Painel (lê o modelo novo); a tela
+           Documentos ainda é a da Base de Conhecimento até a R5. #}
         <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
-        <a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>
+        {% if can_templates %}<a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>{% endif %}
+        {% endif %}
     </nav>
 
     <div class="cx-dash-actionbar">
+        {% if not reader_only %}
+        {# S1: a busca ainda é a da tela Documentos (modelo antigo) até a R5. #}
         <form method="get" action="wiki.php" class="cx-dash-search">
             <i class="ti ti-search"></i>
             <input type="text" name="q"
                    placeholder="{{ __('Buscar por título, código ou conteúdo…', 'codexplus') }}">
         </form>
+        {% endif %}
         {% if can_create %}
             <a href="document.form.php?doctype=DIA" class="cx-btn">
                 <i class="ti ti-sitemap"></i> {{ __('Novo diagrama', 'codexplus') }}

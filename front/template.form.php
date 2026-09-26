@@ -5,11 +5,13 @@
  * Gerir modelos exige permissão nativa de escrita na base (knowbase UPDATE).
  */
 
+use GlpiPlugin\Codexplus\Rights;
 use GlpiPlugin\Codexplus\Template;
 
 include('../../../inc/includes.php');
 
-Session::checkRight('knowbase', UPDATE);
+// M1 (Claudio, 26/09/2026): o direito do Codex+, não o da Base de Conhecimento.
+Session::checkRight(Rights::NAME, Rights::TEMPLATES);
 
 $tpl = new Template();
 

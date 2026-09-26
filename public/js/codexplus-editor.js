@@ -31,6 +31,9 @@
     'use strict';
 
     var EDITOR_ID = 'codexplus-doc-content';
+    // M1: o editor da tela Modelos usa a mesma barra, sem imagem (modelo não
+    // guarda imagem: Template::stripImages).
+    var TEMPLATE_EDITOR_ID = 'codexplus_tpl_content';
 
     var STYLES = [
         { key: 'h1',   label: 'Título 1', tag: 'h2', cls: '' },
@@ -47,6 +50,32 @@
         { key: 'lg', label: 'A+', tip: 'Texto grande',   cls: 'cx-size-lg' }
     ];
     var SIZE_CLASSES = ['cx-size-sm', 'cx-size-lg'];
+    /* Cor do texto e realce (bloco E5, Claudio 26/09/2026): PALETA FIXA, por
+       classe, como os tamanhos — a padronização do E1 continua (cor livre
+       colada ou importada ainda sai pelo invalid_styles). Fonte única: o PDF
+       (sizeCss) e o Word (codexplus-export.js, via PALETTE) leem daqui. */
+    var PALETTE = {
+        fg: [
+            { key: 'red',    label: 'Vermelho', hex: '#c62828' },
+            { key: 'orange', label: 'Laranja',  hex: '#b45309' },
+            { key: 'green',  label: 'Verde',    hex: '#2e7d32' },
+            { key: 'blue',   label: 'Azul',     hex: '#1f5fbf' },
+            { key: 'gray',   label: 'Cinza',    hex: '#5f6b7a' }
+        ],
+        // Tons mais fortes (Claudio, 26/09/2026): os claros puxavam para o pastel.
+        bg: [
+            { key: 'yellow', label: 'Amarelo',  hex: '#ffe45c' },
+            { key: 'green',  label: 'Verde',    hex: '#a8dc9a' },
+            { key: 'blue',   label: 'Azul',     hex: '#a9cdf7' },
+            { key: 'red',    label: 'Vermelho', hex: '#f5a3a3' }
+        ]
+    };
+    function colorCss() {
+        return PALETTE.fg.map(function (c) { return '.cx-fg-' + c.key + '{color:' + c.hex + ';}'; }).join('')
+            + PALETTE.bg.map(function (c) {
+                return '.cx-bg-' + c.key + '{background-color:' + c.hex + ';-webkit-print-color-adjust:exact;print-color-adjust:exact;}';
+            }).join('');
+    }
     // Blocos que recebem estilo e tamanho. Célula de tabela e item de lista
     // só recebem tamanho (não viram título nem nota).
     var TEXT_BLOCKS = 'p,h1,h2,h3,h4,h5,h6,div,pre,blockquote';
@@ -66,8 +95,9 @@
     /* Tamanhos: usados pelo editor e pelo PDF (codexplus.js). */
     function sizeCss() {
         var s = sizes();
+        // E5: as cores vão junto (o PDF só chama sizeCss()).
         return '.cx-size-sm{font-size:' + s.sm + 'em;}'
-            + '.cx-size-lg{font-size:' + s.lg + 'em;}';
+            + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss();
     }
 
     /* CSS dentro do editor (iframe do TinyMCE, que não carrega o CSS do
@@ -94,7 +124,25 @@
     }
 
     function selectedBlocks(editor, selector) {
-        var blocks = editor.selection.getSelectedBlocks() || [];
+        var blocks = (editor.selection.getSelectedBlocks() || []).slice();
+        // Seleção com o mouse costuma começar no FIM da linha de cima (ou
+        // terminar no início da de baixo): esse bloco só encostado não entra,
+        // senão o título de cima muda junto (Claudio, 26/09/2026).
+        var rng = editor.selection.getRng();
+        if (rng && !rng.collapsed && blocks.length > 1) {
+            var doc = editor.getDoc();
+            var first = blocks[0], last = blocks[blocks.length - 1];
+            var r1 = doc.createRange();
+            r1.setStart(rng.startContainer, rng.startOffset);
+            r1.setEnd(first, first.childNodes.length);
+            if (!r1.toString().replace(/\u00a0/g, ' ').trim()) { blocks.shift(); }
+            if (blocks.length > 1) {
+                var r2 = doc.createRange();
+                r2.setStart(last, 0);
+                r2.setEnd(rng.endContainer, rng.endOffset);
+                if (!r2.toString().replace(/\u00a0/g, ' ').trim()) { blocks.pop(); }
+            }
+        }
         var out = [];
         blocks.forEach(function (b) {
             var el = b.matches && b.matches(selector) ? b : editor.dom.getParent(b, selector);
@@ -314,11 +362,59 @@
     }
 
     function register(editor) {
+        // Linha nova criada a partir de um título nasce Parágrafo, mesmo quando
+        // o TinyMCE repetiria o título (Enter no meio/fim com quebra dentro).
+        editor.on('NewBlock', function (e) {
+            var nb = e && e.newBlock;
+            if (!nb || !/^H[1-6]$/.test(nb.nodeName)) { return; }
+            if ((nb.textContent || '').replace(/\u00a0/g, '').trim() !== '') { return; }
+            var p = editor.dom.rename(nb, 'p');
+            editor.selection.setCursorLocation(p, 0);
+        });
+
         var ui = editor.ui.registry;
 
         editor.on('PreInit', function () {
             editor.formatter.register('cxsize_sm', { inline: 'span', classes: 'cx-size-sm' });
             editor.formatter.register('cxsize_lg', { inline: 'span', classes: 'cx-size-lg' });
+            ['fg', 'bg'].forEach(function (k) {
+                PALETTE[k].forEach(function (c) {
+                    editor.formatter.register('cx' + k + '_' + c.key, { inline: 'span', classes: 'cx-' + k + '-' + c.key });
+                });
+            });
+        });
+
+        // E5: cor do texto e realce, só da paleta. Trocar tira a outra antes
+        // (nunca span de cor dentro de span de cor).
+        var applyColor = function (k, key) {
+            editor.undoManager.transact(function () {
+                editor.focus();
+                PALETTE[k].forEach(function (c) { editor.formatter.remove('cx' + k + '_' + c.key); });
+                if (key) { editor.formatter.apply('cx' + k + '_' + key); }
+            });
+            editor.nodeChanged();
+        };
+        ['fg', 'bg'].forEach(function (k) {
+            PALETTE[k].forEach(function (c) {
+                ui.addIcon('cx-sw-' + k + '-' + c.key, '<svg width="24" height="24"><rect x="4" y="4" width="16" height="16" rx="3" fill="' + c.hex + '" stroke="#8a94a3" stroke-width="1"/></svg>');
+            });
+        });
+        [['fg', 'cxcolor', 'text-color', 'Cor do texto', 'Cor padrão'], ['bg', 'cxmark', 'highlight-bg-color', 'Realce do texto', 'Sem realce']].forEach(function (d) {
+            ui.addMenuButton(d[1], {
+                icon: d[2],
+                tooltip: d[3],
+                fetch: function (cb) {
+                    cb(PALETTE[d[0]].map(function (c) {
+                        return {
+                            type: 'togglemenuitem',
+                            text: c.label,
+                            icon: 'cx-sw-' + d[0] + '-' + c.key,
+                            active: editor.formatter.match('cx' + d[0] + '_' + c.key),
+                            onAction: function () { applyColor(d[0], c.key); }
+                        };
+                    }).concat([{ type: 'menuitem', text: d[4], onAction: function () { applyColor(d[0], ''); } }]));
+                }
+            });
         });
 
         ui.addMenuButton('cxstyles', {
@@ -434,12 +530,13 @@
         cfg.__cxCustomized = true;
 
         var layout = typeof cfg.toolbar === 'string' ? 'classic' : 'inline';
+        var isTpl = String(cfg.selector || '').indexOf(TEMPLATE_EDITOR_ID) !== -1;
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
-            cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline'
-                + ' | bullist numlist outdent indent | table link cxinsertimage cxannotate | cximport | code fullscreen';
+            cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
+                + ' | bullist numlist outdent indent | table link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
-            cfg.quickbars_selection_toolbar = 'bold italic | cxstyles | cxsizesm cxsizemd cxsizelg';
+            cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {
                 cfg.quickbars_insert_toolbar += ' | cximport';
             }
@@ -517,6 +614,7 @@
         prepare: prepare,
         contentCss: contentCss,
         sizeCss: sizeCss,
+        palette: PALETTE,
         // Expostos para os testes (jsdom) e para depuração no console.
         _customize: customize,
         _applyStyle: applyStyle,
@@ -526,4 +624,14 @@
     };
 
     prepare(EDITOR_ID);
+    prepare(TEMPLATE_EDITOR_ID);
+
+    // E5: as classes de cor valem também na leitura (fora do editor).
+    (function injectPageColors() {
+        if (!document.head || document.getElementById('cx-palette-css')) { return; }
+        var st = document.createElement('style');
+        st.id = 'cx-palette-css';
+        st.textContent = colorCss();
+        document.head.appendChild(st);
+    })();
 })();

@@ -30,6 +30,19 @@
                         </button>
                     </form>
                 {% endif %}
+                {% if can_save_template %}
+                    {# M1: o corpo gravado vira modelo do mesmo tipo. #}
+                    <form method="post" action="{{ self }}" class="cx-docform-dup">
+                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="id" value="{{ id }}">
+                        <input type="hidden" name="tpl_name" value="">
+                        <button type="submit" name="save_template" value="1" class="codexplus-btn"
+                                title="{{ __('Cria um modelo a partir do corpo gravado deste documento', 'codexplus') }}"
+                                onclick="var n = prompt('{{ __('Nome do modelo (o corpo gravado vira um modelo deste tipo; imagens não vão):', 'codexplus')|e('js') }}', '{{ name|e('js') }}'); if (!n) { return false; } this.form.tpl_name.value = n;">
+                            <i class="ti ti-template"></i> {{ __('Salvar como modelo', 'codexplus') }}
+                        </button>
+                    </form>
+                {% endif %}
             </div>
             {# R3b3-2: ler e exportar (texto; o diagrama tem PDF no próprio motor). #}
             <div class="codexplus-actions">
@@ -174,6 +187,15 @@
                             <label>{{ __('Tipo', 'codexplus') }}</label>
                             {{ widgets.doctype|raw }}
                             <div class="codexplus-form-hint">{{ __('O tipo forma o código e não muda depois.', 'codexplus') }}</div>
+                        </div>
+                        <div class="cx-docform-field" data-cx-only-type="{{ template_types }}">
+                            {# R3b4: modelo do tipo escolhido; preenche o corpo
+                               (public/js/codexplus-docform.js). Busca a partir de
+                               10 modelos. #}
+                            <label for="cx-template">{{ __('Modelo', 'codexplus') }}</label>
+                            <select id="cx-template" class="form-select" aria-label="{{ __('Modelo', 'codexplus') }}"></select>
+                            <script type="application/json" id="cx-templates-data">{{ templates_json|raw }}</script>
+                            <div class="codexplus-form-hint">{{ __('Preenche o corpo ao criar. Dá para apagar ou mudar tudo depois.', 'codexplus') }}</div>
                         </div>
                         <div class="cx-docform-field" data-cx-only-type="DIA">
                             <label>{{ __('Subtipo do diagrama', 'codexplus') }}</label>

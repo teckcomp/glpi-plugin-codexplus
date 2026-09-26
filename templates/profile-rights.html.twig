@@ -13,6 +13,11 @@
         title: cx_title
     }) %}
     <div class="px-3 pb-3 text-muted small codexplus-profile-help">
+        {% if cx_helpdesk %}
+        <p class="mb-1">
+            {{ __('Interface simplificada: o Codex+ é só leitura. A pessoa vê os documentos publicados em que o perfil, um grupo dela ou ela mesma estiver na coluna Leitura do documento (menu Plugins > Codex+). Depois de mudar, ela precisa sair e entrar no GLPI.', 'codexplus') }}
+        </p>
+        {% else %}
         <p class="mb-1">
             {{ __('Criação e edição dependem só destes direitos. A leitura de cada documento depende também dos alvos definidos no próprio documento (perfis, grupos e usuários); "Ver todos" ignora os alvos.', 'codexplus') }}
         </p>
@@ -25,5 +30,6 @@
         <p class="mb-0">
             {{ __('Etapa de transição: as telas atuais do Codex+ ainda usam os direitos da Base de Conhecimento. Estes passam a valer quando os documentos próprios entrarem em uso.', 'codexplus') }}
         </p>
+        {% endif %}
     </div>
 {% endblock %}

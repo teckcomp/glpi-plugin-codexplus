@@ -22,11 +22,6 @@
                    href="article.form.php?id={{ article.id }}">
                     <i class="ti ti-pencil"></i> {{ __('Editar', 'codexplus') }}
                 </a>
-                <a class="cx-btn cx-btn-ghost"
-                   href="{{ glpi_root }}/front/knowbaseitem.form.php?id={{ article.id }}"
-                   title="{{ __('Categoria, FAQ, anexos e outras opções da ficha nativa', 'codexplus') }}">
-                    <i class="ti ti-adjustments"></i> {{ __('Ficha nativa', 'codexplus') }}
-                </a>
             {% endif %}
             <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">
                 <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}

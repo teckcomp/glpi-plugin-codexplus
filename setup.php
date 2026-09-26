@@ -26,8 +26,27 @@ function plugin_init_codexplus(): void
     if (!$plugin->isActivated('codexplus')) {
         return;
     }
+    // S1 (Claudio, 26/09/2026): Self-Service LÊ o Codex+, condicionado à
+    // permissão de cada documento. O núcleo tira da sessão da interface
+    // simplificada todo direito fora de Profile::$helpdesk_rights (achado
+    // 27): o do Codex+ entra na lista. Lá ele vale só como Ler — qualquer
+    // outro bit é descartado da sessão a cada requisição.
+    if (!in_array('plugin_codexplus_wiki', Profile::$helpdesk_rights, true)) {
+        Profile::$helpdesk_rights[] = 'plugin_codexplus_wiki';
+    }
+    if (Session::getCurrentInterface() === 'helpdesk') {
+        if (isset($_SESSION['glpiactiveprofile']['plugin_codexplus_wiki'])) {
+            $_SESSION['glpiactiveprofile']['plugin_codexplus_wiki'] = (int) $_SESSION['glpiactiveprofile']['plugin_codexplus_wiki'] & READ;
+        }
+        // B1: entrada própria na barra (não dentro de Plug-ins), abrindo a
+        // Biblioteca. plugin_codexplus_redefine_menus, no hook.php.
+        if (Session::haveRight('plugin_codexplus_wiki', READ)) {
+            $PLUGIN_HOOKS[Hooks::REDEFINE_MENUS]['codexplus'] = 'plugin_codexplus_redefine_menus';
+        }
+    }
+
     // Item de menu: Ferramentas > Codex+
-    if (Session::haveRight('plugin_codexplus_wiki', READ)) {
+    if (Session::getCurrentInterface() !== 'helpdesk' && Session::haveRight('plugin_codexplus_wiki', READ)) {
         $PLUGIN_HOOKS['menu_toadd']['codexplus'] = [
             'tools' => Wiki::class,
         ];

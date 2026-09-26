@@ -67,6 +67,21 @@ final class Rights
     }
 
     /**
+     * Quem PRODUZ documentos (B1, Claudio 26/09/2026): Super-Admin ou quem
+     * tem algum direito além de Ler. Os demais só leem: entram direto na
+     * Biblioteca, sem o Painel. O Self-Service é sempre leitor (S1).
+     */
+    public static function isProducer(): bool
+    {
+        if (\Session::getCurrentInterface() === 'helpdesk') {
+            return false;
+        }
+        return self::isSuperAdmin() || (bool) \Session::haveRightsOr(self::NAME, [
+            self::CREATE, self::UPDATE, self::APPROVE, self::VALIDATE, self::VIEWALL, self::TEMPLATES,
+        ]);
+    }
+
+    /**
      * Super-Admin do Codex+ (A2): perfil ativo com Configurar > Atualizar.
      * Pode tudo no fluxo de validação, sem precisar de nenhum bit do Codex+.
      */

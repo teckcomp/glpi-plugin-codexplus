@@ -266,6 +266,29 @@ if ($id > 0 && isset($_POST['duplicate'])) {
 }
 
 // -------------------------------------------------------------------------
+// POST — salvar como modelo (M1, Claudio 26/09/2026): o corpo GRAVADO vira um
+// modelo novo do mesmo tipo, para quem tem "Gerenciar modelos". Imagens não
+// vão (Template::stripImages): são arquivos deste documento.
+// -------------------------------------------------------------------------
+if ($id > 0 && isset($_POST['save_template'])) {
+    if (!Session::haveRight(Rights::NAME, Rights::TEMPLATES) || $doc->fields['doctype'] === 'DIA') {
+        Session::addMessageAfterRedirect(__('Sem direito de criar modelos.', 'codexplus'), false, ERROR);
+        Html::redirect($self . '?id=' . $id);
+    }
+    $nome   = trim((string) ($_POST['tpl_name'] ?? '')) ?: (string) $doc->fields['name'];
+    $corpo  = (string) ($doc->fields['content'] ?? '');
+    $tinha  = stripos($corpo, '<img') !== false;
+    $tpl    = new \GlpiPlugin\Codexplus\Template();
+    if ($tpl->add(['name' => $nome, 'doctype' => (string) $doc->fields['doctype'], 'content' => $corpo, 'is_default' => 0])) {
+        Session::addMessageAfterRedirect(sprintf(
+            __('Modelo "%s" criado. Ele aparece no campo Modelo da criação e na tela Modelos.', 'codexplus'),
+            $nome
+        ) . ($tinha ? ' ' . __('As imagens não vão para o modelo.', 'codexplus') : ''));
+    }
+    Html::redirect($self . '?id=' . $id);
+}
+
+// -------------------------------------------------------------------------
 // POST — tirar um anexo (R3b3-1): quem edita, só em rascunho (can UPDATE).
 // Desfaz a ligação; o arquivo continua no GLPI (Gestão > Documentos), como
 // na base nativa.
@@ -500,7 +523,7 @@ if ($inRevision) {
     }
 }
 
-Html::header(Wiki::getMenuName(), $_SERVER['PHP_SELF'], 'tools', Wiki::class);
+Wiki::pageHeader(); // S1
 
 $categoryIds = $isNew ? [] : Document_Category::getCategoryIds($id);
 $canManage   = !$isNew && $doc->canManage();
@@ -784,6 +807,12 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'pending'     => $pending,
     'missing_right' => $missingRight,
     'is_diagram'   => $isDiagram,
+    // R3b4: modelos por tipo para a criação (o JS filtra e preenche o corpo).
+    'templates_json' => $isNew ? json_encode(
+        \GlpiPlugin\Codexplus\Template::listForCreation(),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
+    ) : '[]',
+    'template_types' => implode(' ', array_diff(array_keys(DocumentMeta::getDoctypes()), ['DIA'])),
     'diagram_kind' => $diagramKind,
     'diagram_kind_label' => Diagram::getSubtypes()[$diagramKind] ?? '',
     'diagram_json' => $diagramJson,
@@ -801,6 +830,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
     // Duplicar = poder criar (P1).
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
+    // M1: salvar o corpo gravado como modelo.
+    'can_save_template' => !$isNew && !$version['on'] && !$isDiagram && Session::haveRight(Rights::NAME, Rights::TEMPLATES),
     // R3b3-1: anexos (fora as imagens coladas no corpo mostrado).
     'attachments'   => $isNew || $isDiagram ? [] : Document::listAttachments($id, (string) ($shown['content'] ?? $doc->fields['content'] ?? '')),
     // R6-a
@@ -839,4 +870,4 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     ]),
 ]);
 
-Html::footer();
+Wiki::pageFooter();

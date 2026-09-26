@@ -41,7 +41,7 @@ class ProfileTab extends CommonGLPI
         if (
             $item instanceof Profile
             && !$withtemplate
-            && ($item->fields['interface'] ?? '') === 'central'
+            && in_array($item->fields['interface'] ?? '', ['central', 'helpdesk'], true)
         ) {
             return self::createTabEntry(self::getTypeName(), 0, $item::class, self::getIcon());
         }
@@ -56,7 +56,8 @@ class ProfileTab extends CommonGLPI
 
         TemplateRenderer::getInstance()->display('@codexplus/profile-rights.html.twig', [
             'item'       => $item,
-            'cx_matrix'  => self::getMatrixRows(),
+            'cx_matrix'  => self::getMatrixRows(($item->fields['interface'] ?? '') === 'helpdesk'),
+            'cx_helpdesk' => ($item->fields['interface'] ?? '') === 'helpdesk',
             'cx_canedit' => self::canEditProfiles(),
             'cx_title'   => __('Codex+ — documentos', 'codexplus'),
         ]);
@@ -69,11 +70,12 @@ class ProfileTab extends CommonGLPI
      *
      * @return array<int, array{rights: array<int,string>, label: string, field: string}>
      */
-    public static function getMatrixRows(): array
+    public static function getMatrixRows(bool $helpdesk = false): array
     {
+        // S1: na interface simplificada o Codex+ é só leitura.
         return [
             [
-                'rights' => Rights::getLabels(),
+                'rights' => $helpdesk ? [Rights::READ => Rights::getLabels()[Rights::READ]] : Rights::getLabels(),
                 'label'  => __('Documentos', 'codexplus'),
                 'field'  => Rights::NAME,
             ],

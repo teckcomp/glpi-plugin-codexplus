@@ -1884,6 +1884,17 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .codexplus-content h4 { color: var(--cx-accent); font-size: 15px; margin: 20px 0 8px; }
 .codexplus-content .cx-size-sm { font-size: calc(var(--cx-size-sm) * 1em); }
 .codexplus-content .cx-size-lg { font-size: calc(var(--cx-size-lg) * 1em); }
+/* E5: cor do texto e realce, paleta fixa (mesmos valores de PALETTE em
+   codexplus-editor.js, que alimenta o editor, o PDF e o Word). */
+.codexplus-content .cx-fg-red { color: #c62828; }
+.codexplus-content .cx-fg-orange { color: #b45309; }
+.codexplus-content .cx-fg-green { color: #2e7d32; }
+.codexplus-content .cx-fg-blue { color: #1f5fbf; }
+.codexplus-content .cx-fg-gray { color: #5f6b7a; }
+.codexplus-content .cx-bg-yellow { background-color: #fff3a3; }
+.codexplus-content .cx-bg-green { background-color: #d9f2d0; }
+.codexplus-content .cx-bg-blue { background-color: #dbeafe; }
+.codexplus-content .cx-bg-red { background-color: #fde2e2; }
 .codexplus-content .cx-callout {
     margin: 0 0 14px; padding: 9px 14px; border-left: 4px solid; border-radius: 0;
 }
@@ -1969,3 +1980,33 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-grid-legend span { display: inline-flex; align-items: center; }
 .cx-grid-legend b { display: inline-block; min-width: 22px; height: 18px; line-height: 18px; margin-right: 4px;
     text-align: center; border-radius: 4px; }
+
+/* =========================================================================
+   21. BIBLIOTECA (bloco B1) — templates/library.html.twig
+   Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.
+   ========================================================================= */
+.cx-lib-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0 20px; }
+.cx-lib-search { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; max-width: 480px;
+    border: 1px solid var(--cx-border); border-radius: 8px; padding: 0 10px; background: var(--cx-surface); margin: 0; }
+.cx-lib-search input { border: 0; outline: 0; flex: 1; height: 38px; background: transparent; font: inherit; }
+.cx-lib-types { display: flex; flex-wrap: wrap; gap: 6px; }
+.cx-lib-type { border: 1px solid var(--cx-border); background: var(--cx-surface); border-radius: 999px;
+    padding: 4px 12px; font-size: .88em; cursor: pointer; }
+.cx-lib-type span { color: var(--cx-muted); margin-left: 4px; }
+.cx-lib-type.is-active { border-color: var(--cx-accent); color: var(--cx-accent); }
+.cx-lib-sector { background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: 10px;
+    margin-bottom: 14px; padding: 4px 18px 10px; }
+.cx-lib-sector > summary { cursor: pointer; font-family: var(--cx-font-display); font-size: 1.1rem; font-weight: 600;
+    padding: 10px 0; display: flex; align-items: center; gap: 8px; }
+.cx-lib-count { color: var(--cx-muted); font-size: .8em; font-weight: 400; }
+.cx-lib-category h3 { font-size: .92rem; color: var(--cx-muted); margin: 10px 0 6px; display: flex; align-items: center; gap: 6px; }
+.cx-lib-list { list-style: none; margin: 0 0 6px; padding: 0; }
+.cx-lib-doc { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 4px;
+    border-top: 1px solid var(--cx-border-soft); }
+.cx-lib-doc:first-child { border-top: 0; }
+.cx-lib-meta { color: var(--cx-muted); font-size: .85em; }
+.cx-lib-tag { font-size: .78em; padding: 2px 8px; border-radius: 999px; background: var(--cx-surface-1); color: var(--cx-muted); }
+.cx-lib-tag--warn { background: #fcebeb; color: #a32d2d; }
+.cx-lib-empty { text-align: center; color: var(--cx-muted); padding: 40px 10px; }
+.cx-lib-empty .ti { font-size: 2.2rem; }
+.cx-lib-none { color: var(--cx-muted); text-align: center; padding: 20px; }

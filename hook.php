@@ -57,3 +57,36 @@ function plugin_codexplus_getDatabaseRelations(): array
         ],
     ];
 }
+
+/**
+ * B1 (Claudio, 26/09/2026): no Self-Service o Codex+ entra direto na barra,
+ * ao lado de FAQ, abrindo a Biblioteca. Registrado em setup.php só para a
+ * interface simplificada com o direito Ler; o menu da interface padrão
+ * continua em Ferramentas.
+ *
+ * @param array<string, mixed> $menu
+ * @return array<string, mixed>
+ */
+function plugin_codexplus_redefine_menus($menu)
+{
+    if (!is_array($menu) || Session::getCurrentInterface() !== 'helpdesk') {
+        return $menu;
+    }
+    $entrada = [
+        'default' => '/plugins/codexplus/front/library.php',
+        'title'   => __('Codex+', 'codexplus'),
+        'icon'    => 'ti ti-books',
+    ];
+    // Logo depois de FAQ, se existir; senão, no fim.
+    $out = [];
+    foreach ($menu as $k => $v) {
+        $out[$k] = $v;
+        if ($k === 'faq') {
+            $out['codexplus'] = $entrada;
+        }
+    }
+    if (!isset($out['codexplus'])) {
+        $out['codexplus'] = $entrada;
+    }
+    return $out;
+}

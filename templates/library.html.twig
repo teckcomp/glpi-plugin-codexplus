@@ -1,0 +1,117 @@
+{# Codex+ — Biblioteca (bloco B1, Claudio 26/09/2026).
+   Prateleira dos documentos publicados que a pessoa lê, Setor → Categoria.
+   Entrada de quem só lê (e do Self-Service); aba do Painel para quem produz.
+   Busca e filtro por tipo no navegador (public/js/codexplus.js não é
+   envolvido: o script abaixo só esconde linhas).
+   Variáveis: shelf (sectors, total, types), doctypes, client_types, producer, form_url.
+   Estilos em public/css/codexplus.css, seção 21. #}
+<div class="codexplus-app cx-lib" data-cx-lib>
+
+    {% include '@codexplus/parts/brand.html.twig' with {
+        title: __('Codex+', 'codexplus'),
+        subtitle: __('Biblioteca de documentos', 'codexplus'),
+    } only %}
+
+    <nav class="codexplus-nav">
+        {% if producer %}
+            <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
+        {% endif %}
+        <a href="library.php" class="is-active">{{ __('Biblioteca', 'codexplus') }}</a>
+        {% if producer %}
+            <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
+            {% if can_templates %}<a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>{% endif %}
+        {% endif %}
+    </nav>
+
+    <div class="cx-lib-bar">
+        <label class="cx-lib-search">
+            <i class="ti ti-search"></i>
+            <input type="search" data-cx-lib-q placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
+                   aria-label="{{ __('Buscar por título ou código', 'codexplus') }}">
+        </label>
+        <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por tipo', 'codexplus') }}">
+            <button type="button" class="cx-lib-type is-active" data-cx-lib-type="">{{ __('Todos', 'codexplus') }} <span>{{ shelf.total }}</span></button>
+            {% for t, n in shelf.types %}
+                <button type="button" class="cx-lib-type" data-cx-lib-type="{{ t }}">{{ t }} <span>{{ n }}</span></button>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if shelf.total == 0 %}
+        <div class="cx-lib-empty">
+            <i class="ti ti-books"></i>
+            <p>{{ __('Nenhum documento publicado para você ainda. Quando um documento for publicado com você, seu grupo ou seu perfil na leitura, ele aparece aqui.', 'codexplus') }}</p>
+        </div>
+    {% endif %}
+
+    {% for s in shelf.sectors %}
+        <details class="cx-lib-sector" open>
+            <summary>
+                <i class="ti ti-building"></i> {{ s.name }}
+                <span class="cx-lib-count">{{ s.total }}</span>
+            </summary>
+            {% for c in s.categories %}
+                <section class="cx-lib-category">
+                    <h3><i class="ti ti-folder"></i> {{ c.name }}</h3>
+                    <ul class="cx-lib-list">
+                        {% for d in c.docs %}
+                            <li class="cx-lib-doc" data-type="{{ d.doctype }}"
+                                data-text="{{ (d.code ~ ' ' ~ d.name)|lower }}">
+                                <span class="codexplus-code cx-code-chip cx-code-type-{{ d.doctype }}">{{ d.code }}</span>
+                                <a class="codexplus-doc-link" href="{{ form_url }}?id={{ d.id }}">{{ d.name }}</a>
+                                <span class="cx-lib-meta">
+                                    {{ doctypes[d.doctype] ?? d.doctype }}
+                                    {% if d.client_name and d.doctype in client_types %} · {{ d.client_name }}{% endif %}
+                                </span>
+                                {% if d.in_revision %}
+                                    <span class="cx-lib-tag">{{ __('em atualização', 'codexplus') }}</span>
+                                {% endif %}
+                                {% if d.expiry == 'vencido' %}
+                                    <span class="cx-lib-tag cx-lib-tag--warn">{{ __('revisão vencida', 'codexplus') }}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endfor %}
+        </details>
+    {% endfor %}
+
+    <p class="cx-lib-none" data-cx-lib-none hidden>{{ __('Nada encontrado com esse filtro.', 'codexplus') }}</p>
+</div>
+
+<script>
+(function () {
+    var root = document.querySelector('[data-cx-lib]');
+    if (!root) { return; }
+    var q = root.querySelector('[data-cx-lib-q]');
+    var tipo = '';
+    function aplica() {
+        var termo = (q.value || '').trim().toLowerCase();
+        var algum = false;
+        root.querySelectorAll('.cx-lib-doc').forEach(function (li) {
+            var ok = (!tipo || li.getAttribute('data-type') === tipo)
+                && (!termo || li.getAttribute('data-text').indexOf(termo) >= 0);
+            li.hidden = !ok;
+            algum = algum || ok;
+        });
+        root.querySelectorAll('.cx-lib-category').forEach(function (sec) {
+            sec.hidden = !sec.querySelector('.cx-lib-doc:not([hidden])');
+        });
+        root.querySelectorAll('.cx-lib-sector').forEach(function (s) {
+            s.hidden = !s.querySelector('.cx-lib-doc:not([hidden])');
+            if (termo || tipo) { s.open = true; }
+        });
+        var none = root.querySelector('[data-cx-lib-none]');
+        if (none) { none.hidden = algum || !root.querySelector('.cx-lib-doc'); }
+    }
+    q.addEventListener('input', aplica);
+    root.querySelectorAll('[data-cx-lib-type]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            tipo = b.getAttribute('data-cx-lib-type');
+            root.querySelectorAll('[data-cx-lib-type]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+            aplica();
+        });
+    });
+})();
+</script>

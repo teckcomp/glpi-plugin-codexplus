@@ -154,6 +154,8 @@
         if (f.mono) { p.font = 'Courier New'; }
         if (f.size) { p.size = f.size; }
         if (f.link) { p.style = 'Hyperlink'; }
+        if (f.color) { p.color = f.color; }
+        if (f.mark) { p.shading = { type: this.D.ShadingType.CLEAR, color: 'auto', fill: f.mark }; }
         return p;
     };
 
@@ -198,6 +200,10 @@
         if (tag === 'CODE' || tag === 'KBD' || tag === 'SAMP') { g.mono = true; }
         if (hasClass(node, 'cx-size-sm')) { g.size = Math.round(BASE_HALF_PT * this.sz.sm); }
         if (hasClass(node, 'cx-size-lg')) { g.size = Math.round(BASE_HALF_PT * this.sz.lg); }
+        // E5: cor e realce da paleta (a mesma do editor).
+        var pal = (window.CodexplusEditor && window.CodexplusEditor.palette) || { fg: [], bg: [] };
+        pal.fg.forEach(function (c) { if (hasClass(node, 'cx-fg-' + c.key)) { g.color = c.hex.slice(1).toUpperCase(); } });
+        pal.bg.forEach(function (c) { if (hasClass(node, 'cx-bg-' + c.key)) { g.mark = c.hex.slice(1).toUpperCase(); } });
         if (tag === 'A' && node.getAttribute('href') && !/^#/.test(node.getAttribute('href'))) {
             g.link = true;
             var sub = [];

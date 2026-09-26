@@ -1,93 +1,13 @@
 <?php
-
 /**
- * Codex+ — criação do documento (Etapa 3b).
- *
- * Cria o artigo NATIVO (glpi_knowbaseitems) com o conteúdo do modelo e, na
- * sequência, o registro de metadados do Codex+ — que gera o sequencial e,
- * portanto, o código (POP0001:00). Depois manda o usuário para a edição
- * nativa, para ele escrever o documento.
+ * Codex+ — caminho antigo de criação (artigo da Base de Conhecimento).
+ * Desde a R3b4 (Claudio, 26/09/2026) todo documento nasce no modelo novo, a
+ * partir dos Modelos: este endereço só leva para a página de criação nova.
  */
-
-use GlpiPlugin\Codexplus\Branding;
-use GlpiPlugin\Codexplus\DocumentMeta;
-use GlpiPlugin\Codexplus\Template;
-
 include('../../../inc/includes.php');
 
-global $CFG_GLPI;
+/** @var array $CFG_GLPI */
+global $CFG_GLPI; // achado 9
 
-Session::checkRight('plugin_codexplus_wiki', READ);
-
-if (!KnowbaseItem::canCreate()) {
-    Html::displayRightError();
-}
-
-$doctype = isset($_POST['doctype']) && array_key_exists($_POST['doctype'], DocumentMeta::getLegacyDoctypes())
-    ? (string) $_POST['doctype']
-    : '';
-$templateId = isset($_POST['templates_id']) ? (int) $_POST['templates_id'] : 0;
-$title      = isset($_POST['name']) ? trim((string) $_POST['name']) : '';
-
-if ($doctype === '' || $title === '') {
-    Session::addMessageAfterRedirect(
-        __('Informe o tipo e o título do documento.', 'codexplus'),
-        false,
-        ERROR
-    );
-    Html::back();
-}
-
-// Conteúdo inicial: o do modelo escolhido (vazio se nenhum).
-$content = '';
-if ($templateId > 0) {
-    $tpl = new Template();
-    if ($tpl->getFromDB($templateId)) {
-        $content = (string) $tpl->fields['content'];
-    }
-}
-
-// 1) Artigo nativo.
-$kb    = new KnowbaseItem();
-$newId = $kb->add([
-    'name'   => $title,
-    'answer' => $content,
-]);
-
-if (!$newId) {
-    Session::addMessageAfterRedirect(
-        __('Não foi possível criar o documento.', 'codexplus'),
-        false,
-        ERROR
-    );
-    Html::back();
-}
-
-// 2) Metadados do Codex+ — o sequencial (e o código) sai daqui.
-// Proposta não vence: validade 0. Os demais usam o padrão de 12 meses.
-$meta = new DocumentMeta();
-$meta->add([
-    'knowbaseitems_id' => $newId,
-    'doctype'          => $doctype,
-    'status'           => 'rascunho',
-    'revision'         => 0,
-    'users_id_owner'   => Session::getLoginUserID(),
-    'validity_months'  => DocumentMeta::defaultValidity($doctype),
-    'client_name'      => '',
-]);
-
-// Etapa 4f: header_html só pode ser composto DEPOIS do add() acima, porque
-// depende do sequencial (getBareCode()) que o próprio add() acabou de
-// gerar — por isso um update() imediato, em vez de entrar no add() inicial.
-$meta->update([
-    'id'          => $meta->getID(),
-    'header_html' => Branding::composeHeaderHtml(
-        $title,
-        $meta->getBareCode(),
-        sprintf('%02d', (int) $meta->fields['revision']),
-        date('d/m/Y')
-    ),
-]);
-
-// 3) Vai direto para a edição nativa, para escrever o documento.
-Html::redirect($CFG_GLPI['root_doc'] . '/front/knowbaseitem.form.php?id=' . $newId);
+Html::redirect($CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php'
+    . (isset($_GET['doctype']) ? '?doctype=' . urlencode((string) $_GET['doctype']) : ''));

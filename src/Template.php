@@ -35,6 +35,33 @@ class Template extends CommonDBTM
      * Modelo padrão de um tipo (para o "Novo documento" da 3b). Cai para
      * qualquer modelo do tipo se não houver um marcado como padrão.
      */
+    /**
+     * Modelos para a criação no modelo novo (R3b4, Claudio 26/09/2026): todos
+     * os tipos de uma vez; a tela filtra pelo tipo escolhido. Padrão primeiro.
+     *
+     * @return array<int, array{id:int, name:string, doctype:string, is_default:bool, content:string}>
+     */
+    public static function listForCreation(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $out = [];
+        foreach ($DB->request([
+            'FROM'  => self::getTable(),
+            'ORDER' => ['doctype', 'is_default DESC', 'name'],
+        ]) as $r) {
+            $out[] = [
+                'id'         => (int) $r['id'],
+                'name'       => (string) $r['name'],
+                'doctype'    => (string) $r['doctype'],
+                'is_default' => (bool) $r['is_default'],
+                'content'    => (string) ($r['content'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
     public static function getDefaultForDoctype(string $doctype): ?self
     {
         $tpl = new self();
@@ -64,7 +91,20 @@ class Template extends CommonDBTM
         }
         // Checkbox: ausente no POST = desmarcado.
         $input['is_default'] = !empty($input['is_default']) ? 1 : 0;
+        // M1: modelo não guarda imagem. A imagem é arquivo ligado a UM
+        // documento (Document_Item): num documento novo ela não abriria.
+        if (isset($input['content'])) {
+            $input['content'] = self::stripImages((string) $input['content']);
+        }
         return $input;
+    }
+
+    /** Tira imagens (e o invólucro do anotador, E4) do HTML do modelo. */
+    public static function stripImages(string $html): string
+    {
+        $html = preg_replace('#<span[^>]*class="[^"]*\bcx-annot\b[^"]*"[^>]*>.*?</span>#si', '', $html) ?? $html;
+        $html = preg_replace('#<img\b[^>]*>#i', '', $html) ?? $html;
+        return $html;
     }
 
     public function post_addItem()

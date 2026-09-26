@@ -34,6 +34,29 @@ class Wiki extends CommonGLPI
         return 'ti ti-square-rounded-letter-c-filled';
     }
 
+    /**
+     * Cabeçalho das páginas do Codex+ (S1, Claudio 26/09/2026): na interface
+     * simplificada (Self-Service, só leitura) usa o cabeçalho dela; senão, o
+     * da interface padrão, no menu Ferramentas.
+     */
+    public static function pageHeader(): void
+    {
+        if (\Session::getCurrentInterface() === 'helpdesk') {
+            \Html::helpHeader(self::getMenuName(), 'codexplus', 'codexplus'); // B1: acende a entrada da barra
+            return;
+        }
+        \Html::header(self::getMenuName(), $_SERVER['PHP_SELF'], 'tools', self::class);
+    }
+
+    public static function pageFooter(): void
+    {
+        if (\Session::getCurrentInterface() === 'helpdesk') {
+            \Html::helpFooter();
+            return;
+        }
+        \Html::footer();
+    }
+
     public static function getMenuName()
     {
         return __('Codex+', 'codexplus');
@@ -49,7 +72,8 @@ class Wiki extends CommonGLPI
         // O menu passa a abrir o PAINEL (Etapa 6b), que é a primeira aba.
         return [
             'title' => self::getMenuName(),
-            'page'  => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/dashboard.php',
+            // B1: quem só lê entra direto na Biblioteca.
+            'page'  => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/' . (Rights::isProducer() ? 'dashboard.php' : 'library.php'),
             'icon'  => self::getIcon(), // 0.6.6: o mais próximo da marca C+ entre os ícones Tabler
         ];
     }

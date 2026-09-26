@@ -7,6 +7,7 @@
 
 use Glpi\Application\View\TemplateRenderer;
 use GlpiPlugin\Codexplus\DocumentMeta;
+use GlpiPlugin\Codexplus\Rights;
 use GlpiPlugin\Codexplus\Template;
 use GlpiPlugin\Codexplus\Wiki;
 
@@ -17,17 +18,15 @@ include('../../../inc/includes.php');
 // $DB->request() estoura "Call to a member function request() on null".
 global $DB, $CFG_GLPI;
 
-Session::checkRight('plugin_codexplus_wiki', READ);
+// M1 (Claudio, 26/09/2026): Modelos é de quem tem "Gerenciar modelos,
+// setores e categorias" (antes: o direito nativo da Base de Conhecimento).
+Session::checkRight(Rights::NAME, Rights::TEMPLATES);
 
-Html::header(
-    Wiki::getMenuName(),
-    $_SERVER['PHP_SELF'],
-    'tools',
-    Wiki::class
-);
+Wiki::pageHeader();
 
-// Gerir modelos é tarefa de quem escreve a base (permissão nativa de KB).
-$canEdit = Session::haveRight('knowbase', UPDATE);
+$canEdit = true;
+// Diagrama não tem modelo de texto (o subtipo faz esse papel).
+$tplDoctypes = array_diff_key(DocumentMeta::getDoctypes(), ['DIA' => true]);
 
 $id  = isset($_GET['id']) && ctype_digit((string) $_GET['id']) ? (int) $_GET['id'] : 0;
 $new = isset($_GET['new']);
@@ -60,7 +59,7 @@ if (($id > 0 || $new) && $canEdit) {
         'can_edit'    => $canEdit,
         'tpl'         => $tpl->fields,
         'is_new'      => $id === 0,
-        'doctypes'    => DocumentMeta::getDoctypes(),
+        'doctypes'    => $tplDoctypes,
         'editor_html' => $editor,
         'csrf'        => Session::getNewCSRFToken(),
     ]);
@@ -84,4 +83,4 @@ if (($id > 0 || $new) && $canEdit) {
     ]);
 }
 
-Html::footer();
+Wiki::pageFooter();

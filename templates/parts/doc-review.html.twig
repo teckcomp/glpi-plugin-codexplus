@@ -8,7 +8,9 @@
    perfil (bit Auditor), não do setor: não depende das categorias.
    Variável: review (ver front/document.form.php). #}
 
-<div class="cx-docform-field cx-docform-field--wide">
+{# P2: auditor só no fluxo completo; revisão periódica fora do fluxo direto. #}
+{% if review.show_auditor %}
+<div class="cx-docform-field cx-docform-field--wide"{% if review.is_new %} data-cx-only-type="{{ review.auditor_types }}"{% endif %}>
     <label>{{ __('Auditor responsável', 'codexplus') }}</label>
     {% if review.can_auditor %}
         {{ review.auditor_widget|raw }}
@@ -24,8 +26,10 @@
         <div class="codexplus-form-hint">{{ __('O auditor responsável só muda em rascunho, por quem gere o documento.', 'codexplus') }}</div>
     {% endif %}
 </div>
+{% endif %}
 
-<div class="cx-docform-field cx-docform-field--wide cx-review">
+{% if review.show_reviewer %}
+<div class="cx-docform-field cx-docform-field--wide cx-review"{% if review.is_new %} data-cx-only-type="{{ review.reviewer_types }}"{% endif %}>
     <label>{{ __('Revisão periódica', 'codexplus') }}</label>
     {% if review.can_review %}
         <div class="cx-review-grid">
@@ -58,3 +62,4 @@
         </div>
     {% endif %}
 </div>
+{% endif %}

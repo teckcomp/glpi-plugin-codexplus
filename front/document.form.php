@@ -404,6 +404,10 @@ if ($id > 0) {
     } elseif (isset($_POST['reject'])) {
         $flow = static fn () => $doc->reject((string) ($_POST['validation_comment'] ?? ''));
         $okMsg = __('Documento devolvido para rascunho.', 'codexplus');
+    } elseif (isset($_POST['publish_direct'])) {
+        // P2: Proposta e Laudo, o responsável publica direto.
+        $flow = static fn () => $doc->publishDirect((string) ($_POST['revision_summary'] ?? ''));
+        $okMsg = __('Documento publicado.', 'codexplus');
     } elseif (isset($_POST['obsolete'])) {
         $flow = static fn () => $doc->markObsolete();
         $okMsg = __('Documento marcado como obsoleto.', 'codexplus');
@@ -666,6 +670,12 @@ $review = [
     'end'              => '',
     'no_auditors'      => false,
     'validity_months'  => 0,
+    // P2: o fluxo do tipo decide quais papéis aparecem. Na criação o tipo
+    // ainda muda: os campos levam a lista de tipos e o JS esconde.
+    'show_auditor'     => $isNew || $doc->flow() === DocumentMeta::FLOW_FULL,
+    'show_reviewer'    => $isNew || $doc->flow() !== DocumentMeta::FLOW_DIRECT,
+    'auditor_types'    => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_FULL]),
+    'reviewer_types'   => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_FULL, DocumentMeta::FLOW_ONE]),
 ];
 $pending = ['label' => '', 'names' => []];
 $missingRight = '';
@@ -767,6 +777,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'is_diagram'   => $isDiagram,
     'diagram_json' => $diagramJson,
     'can_submit'   => !$isNew && $doc->canSubmit(),
+    'can_publish_direct' => !$isNew && !$version['on'] && $doc->canPublishDirect(),
+    'flow'         => $isNew ? DocumentMeta::FLOW_FULL : $doc->flow(),
     'can_validate' => !$isNew && $doc->canValidate(),
     'can_approve'  => !$isNew && $doc->canApprove(),
     'can_reject'   => !$isNew && $doc->canReject(),

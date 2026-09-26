@@ -82,6 +82,34 @@ class DocumentMeta extends CommonDBTM
         return self::VALIDITY_BY_TYPE[$doctype] ?? self::DEFAULT_VALIDITY_MONTHS;
     }
 
+    /**
+     * Fluxo de publicação por tipo (bloco P2, Claudio, 26/09/2026):
+     *   - full: responsável aprova, auditor audita (POP, PSG, Manual e os
+     *     demais por enquanto);
+     *   - one: só o responsável aprova, com revisor e revisão periódica
+     *     (Documentação Técnica);
+     *   - direct: o responsável publica direto, sem auditor, revisor nem
+     *     revisão periódica (Proposta e Laudo).
+     */
+    public const FLOW_FULL   = 'full';
+    public const FLOW_ONE    = 'one';
+    public const FLOW_DIRECT = 'direct';
+    public const FLOW_BY_TYPE = ['DTC' => self::FLOW_ONE, 'PRP' => self::FLOW_DIRECT, 'LAU' => self::FLOW_DIRECT];
+
+    public static function flowOf(string $doctype): string
+    {
+        return self::FLOW_BY_TYPE[$doctype] ?? self::FLOW_FULL;
+    }
+
+    /** Tipos (separados por espaço) que usam o fluxo informado ou algum da lista. */
+    public static function typesWithFlow(array $flows): string
+    {
+        return implode(' ', array_filter(
+            array_keys(self::getDoctypes()),
+            static fn ($t) => in_array(self::flowOf((string) $t), $flows, true)
+        ));
+    }
+
     /** Tipos oferecidos pelo fluxo antigo (artigo da Base de Conhecimento). */
     public static function getLegacyDoctypes(): array
     {

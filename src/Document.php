@@ -312,6 +312,12 @@ class Document extends CommonDBTM
         );
     }
 
+    /** Fluxo do tipo deste documento (P2): full, one ou direct. */
+    public function flow(): string
+    {
+        return DocumentMeta::flowOf((string) ($this->fields['doctype'] ?? ''));
+    }
+
     private function status(): string
     {
         return (string) ($this->fields['status'] ?? '');
@@ -425,7 +431,16 @@ class Document extends CommonDBTM
 
     public function canSubmit(): bool
     {
-        return $this->canUpdateItem();
+        return $this->flow() !== DocumentMeta::FLOW_DIRECT && $this->canUpdateItem();
+    }
+
+    /** Publicar direto (P2, Proposta e Laudo): o responsável, em rascunho. */
+    public function canPublishDirect(): bool
+    {
+        return $this->flow() === DocumentMeta::FLOW_DIRECT
+            && $this->status() === self::STATUS_DRAFT
+            && $this->checkEntity()
+            && (Rights::isSuperAdmin() || (self::bit(Rights::APPROVE) && $this->isOwner()));
     }
 
     /** 1ª etapa (P1): o responsável, com o bit Aprovar, aprova. */
@@ -746,10 +761,10 @@ class Document extends CommonDBTM
                 return $this->deny(__('O responsável escolhido não tem o direito Aprovar no perfil. Escolha outro.', 'codexplus'));
             }
         }
-        // 2ª etapa precisa de alguém: o auditor responsável, que ainda tenha
+        // 2ª etapa precisa de alguém (só no fluxo completo, P2): o auditor responsável, que ainda tenha
         // um perfil com o bit Auditor na entidade (A1). Só o Super-Admin
         // envia sem (e valida ele mesmo) — A2: Ver todos não basta mais.
-        if (!Rights::isSuperAdmin()) {
+        if (!Rights::isSuperAdmin() && $this->flow() === DocumentMeta::FLOW_FULL) {
             $auditor = (int) ($this->fields['users_id_auditor'] ?? 0);
             if ($auditor <= 0) {
                 return $this->deny(__('Escolha o auditor responsável antes de enviar.', 'codexplus'));
@@ -789,11 +804,43 @@ class Document extends CommonDBTM
             return $this->deny(__('Sem direito de aprovar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
         }
         $comment = trim($comment);
-        return $this->transition([
+        $aprov = [
+            'users_id_approver' => (int) Session::getLoginUserID(),
+            'date_approved'     => $_SESSION['glpi_currenttime'],
+        ];
+        // P2: sem auditor (Documentação Técnica), a aprovação já publica.
+        if ($this->flow() !== DocumentMeta::FLOW_FULL) {
+            return $this->publishNow($comment, $aprov);
+        }
+        return $this->transition($aprov + [
             'status'             => self::STATUS_VALIDATION,
-            'users_id_approver'  => (int) Session::getLoginUserID(),
-            'date_approved'      => $_SESSION['glpi_currenttime'],
             'validation_comment' => $comment === '' ? null : $comment,
+        ]);
+    }
+
+    /**
+     * Publicar direto (P2, Proposta e Laudo): o responsável publica o
+     * rascunho, sem etapas. Numa revisão, com o resumo do que mudou.
+     */
+    public function publishDirect(string $summary = ''): bool
+    {
+        if (!$this->canPublishDirect()) {
+            return $this->deny(__('Sem direito de publicar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
+        }
+        $extra = [];
+        if ((int) $this->fields['revision'] > 0) {
+            $summary = trim($summary);
+            if ($summary === '') {
+                return $this->deny(__('Numa revisão, informe o resumo do que mudou antes de publicar.', 'codexplus'));
+            }
+            $extra['revision_summary'] = $summary;
+        }
+        $me = (int) Session::getLoginUserID();
+        return $this->publishNow('', $extra + [
+            'users_id_submitter' => $me,
+            'date_submitted'     => $_SESSION['glpi_currenttime'],
+            'users_id_approver'  => $me,
+            'date_approved'      => $_SESSION['glpi_currenttime'],
         ]);
     }
 
@@ -815,7 +862,16 @@ class Document extends CommonDBTM
             }
             return $this->deny(__('Sem direito de validar este documento.', 'codexplus'));
         }
-        $data = DocumentMeta::stampPublishDate([
+        return $this->publishNow($comment);
+    }
+
+    /**
+     * Publica (fim de qualquer fluxo): data, janela de revisão pela regra do
+     * tipo e cópia da versão. $extra vai junto na mesma gravação.
+     */
+    private function publishNow(string $comment, array $extra = []): bool
+    {
+        $data = DocumentMeta::stampPublishDate($extra + [
             'status'             => self::STATUS_PUBLISHED,
             'users_id_validator' => (int) Session::getLoginUserID(),
             'date_validated'     => $_SESSION['glpi_currenttime'],
@@ -1056,7 +1112,23 @@ class Document extends CommonDBTM
 
         // Responsável, auditor, revisor e janela já na criação: quem cria escolhe.
         $ent = (int) ($input['entities_id'] ?? Session::getActiveEntity());
-        return $this->checkManagedFields($input, $ent, true);
+        return $this->checkManagedFields(self::dropUnusedRoles($input, (string) $input['doctype']), $ent, true);
+    }
+
+    /**
+     * P2: papéis que o fluxo do tipo não usa são ignorados — auditor fora do
+     * fluxo completo; revisor e janela no fluxo direto.
+     */
+    private static function dropUnusedRoles(array $input, string $doctype): array
+    {
+        $flow = DocumentMeta::flowOf($doctype);
+        if ($flow !== DocumentMeta::FLOW_FULL) {
+            unset($input['users_id_auditor']);
+        }
+        if ($flow === DocumentMeta::FLOW_DIRECT) {
+            unset($input['users_id_reviewer'], $input['review_start'], $input['review_end']);
+        }
+        return $input;
     }
 
     /**
@@ -1282,7 +1354,11 @@ class Document extends CommonDBTM
                     }
                 }
             }
-            $input = $this->checkManagedFields($input, (int) $this->fields['entities_id'], false);
+            $input = $this->checkManagedFields(
+                self::dropUnusedRoles($input, (string) ($this->fields['doctype'] ?? '')),
+                (int) $this->fields['entities_id'],
+                false
+            );
             if ($input === false) {
                 return false;
             }

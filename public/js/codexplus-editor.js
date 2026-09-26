@@ -99,6 +99,9 @@
         return '.cx-size-sm{font-size:' + s.sm + 'em;}'
             + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss()
             // PL1: planilha — números à direita, total em destaque (PDF e tela).
+            + '.cx-sheet-table{border-collapse:collapse;width:100%;}'
+            + '.cx-sheet-table td,.cx-sheet-table th{border:1px solid #d3d9e0;padding:6px 8px;}'
+            + '.cx-sheet-table th{background-color:#f6f8fa;}'
             + '.cx-sheet-num{text-align:right;white-space:nowrap;}'
             + '.cx-sheet-total td{border-top:2px solid #5f6b7a;}'
             + '.cx-sheet-alt td{background-color:#e6f1fb;-webkit-print-color-adjust:exact;print-color-adjust:exact;}';

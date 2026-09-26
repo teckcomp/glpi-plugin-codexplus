@@ -2018,6 +2018,9 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
    22. PLANILHA (bloco PL1) — public/js/codexplus-sheet.js
    Leitura: a <table> gravada no corpo. Edição: janela própria.
    ========================================================================= */
+.codexplus-content .cx-sheet-table { border-collapse: collapse; width: 100%; }
+.codexplus-content .cx-sheet-table td, .codexplus-content .cx-sheet-table th { border: 1px solid #d3d9e0; padding: 6px 8px; }
+.codexplus-content .cx-sheet-table th { background: #f6f8fa; }
 .codexplus-content .cx-sheet-num, .cx-sheet .cx-sheet-num { text-align: right; white-space: nowrap; }
 .codexplus-content .cx-sheet-total td { border-top: 2px solid #5f6b7a; }
 .codexplus-content .cx-sheet-alt td { background: #e6f1fb; }

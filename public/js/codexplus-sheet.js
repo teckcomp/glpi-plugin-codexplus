@@ -191,7 +191,8 @@
             h += '<tr' + (r % 2 === 1 ? ' class="cx-sheet-alt"' : '') + '>';
             row.forEach(function (v, c) {
                 var t = data.cols[c].type;
-                h += '<td' + (t !== 'text' ? ' class="cx-sheet-num"' : '') + '>' + (vazia ? '' : esc(fmt(v, t))) + '</td>';
+                // &nbsp; na linha vazia: sem ele a linha encolhe até sumir.
+                h += '<td' + (t !== 'text' ? ' class="cx-sheet-num"' : '') + '>' + (vazia ? '&nbsp;' : esc(fmt(v, t))) + '</td>';
             });
             h += '</tr>';
         });
@@ -203,7 +204,7 @@
             data.cols.forEach(function (c, i) {
                 var show = somar.indexOf(i) >= 0;
                 var txt = show ? fmt(ev.totals[i], c.type) : (i === labelAt ? (data.totalLabel || 'Total') : '');
-                h += '<td class="cx-sheet-num">' + (txt ? '<strong>' + esc(txt) + '</strong>' : '') + '</td>';
+                h += '<td class="cx-sheet-num">' + (txt ? '<strong>' + esc(txt) + '</strong>' : '&nbsp;') + '</td>';
             });
             h += '</tr></tfoot>';
         }

@@ -1931,3 +1931,41 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
     border: 2px solid var(--cx-accent); border-radius: 4px; background: #fff;
 }
 
+
+/* =========================================================================
+   20. CRONOGRAMA E MATRIZ RACI (bloco D1) — public/js/codexplus-grid.js
+   Cores iguais às do PDF (o JS embute as mesmas no iframe de impressão).
+   ========================================================================= */
+.cx-grid-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.cx-grid-spacer { flex: 1; }
+.cx-grid-savestate { font-size: .85em; color: var(--cx-muted); }
+.cx-grid-savestate.is-erro { color: #a32d2d; }
+.cx-grid-wrap { overflow-x: auto; }
+.cx-grid-table { min-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .92em; }
+.cx-grid-table th, .cx-grid-table td { border: 1px solid var(--cx-border); height: 34px; text-align: center; padding: 0 6px; }
+.cx-grid-table th { background: var(--cx-surface-1); color: var(--cx-muted); font-weight: 600; position: relative; }
+.cx-grid-table th, .cx-grid-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Larguras vêm do <colgroup> (codexplus-grid.js); passou da tela, rola, e a
+   coluna da tarefa/atividade (e o responsável) fica fixa à esquerda. */
+.cx-grid-table .cx-grid-name { text-align: left; position: sticky; left: 0; z-index: 1; background: var(--cx-surface); }
+.cx-grid-table .cx-grid-owner { color: var(--cx-muted); position: sticky; left: 260px; z-index: 1; background: var(--cx-surface); }
+.cx-grid-table th.cx-grid-name, .cx-grid-table th.cx-grid-owner { background: var(--cx-surface-1); z-index: 2; }
+.cx-grid-unit { width: auto; min-width: 130px; }
+.cx-grid-cell { font-weight: 600; user-select: none; }
+[data-editable="1"] .cx-grid-cell,
+[data-editable="1"] [data-edit-name], [data-editable="1"] [data-edit-owner], [data-editable="1"] [data-edit-col] { cursor: pointer; }
+.cx-grid-del { display: none; position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; color: var(--cx-muted); padding: 0 2px; cursor: pointer; }
+.cx-grid-table th:hover .cx-grid-del, .cx-grid-table td:hover .cx-grid-del { display: inline-block; }
+.cx-grid-input { width: 100%; border: 1px solid var(--cx-border); border-radius: 4px; padding: 2px 4px; font: inherit; }
+.cx-grid-warn { color: #ba7517; margin-left: 4px; }
+.cx-sched-b { background: #9fe1cb; }
+.cx-sched-m { background: #1d9e75; color: #fff; }
+.cx-raci-R { background: #cecbf6; color: #3c3489; }
+.cx-raci-A { background: #f5c4b3; color: #712b13; }
+.cx-raci-C { background: #9fe1cb; color: #085041; }
+.cx-raci-I { background: #f1efe8; color: #444441; }
+.cx-grid-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: .85em; color: var(--cx-muted); }
+.cx-grid-legend span { display: inline-flex; align-items: center; }
+.cx-grid-legend b { display: inline-block; min-width: 22px; height: 18px; line-height: 18px; margin-right: 4px;
+    text-align: center; border-radius: 4px; }

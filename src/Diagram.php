@@ -57,8 +57,54 @@ class Diagram
      *
      * @return array<string, mixed>
      */
-    public static function starter(): array
+    /**
+     * Subtipos (bloco D1, Claudio, 26/09/2026): o organograma usa o motor de
+     * grafo; cronograma e matriz RACI são grades (codexplus-grid.js). O
+     * subtipo vem de `kind` no próprio JSON — fonte única.
+     */
+    public const SUBTYPE_SCHEDULE = 'cronograma';
+    public const SUBTYPE_RACI     = 'raci';
+    public const GRID_SUBTYPES    = [self::SUBTYPE_SCHEDULE, self::SUBTYPE_RACI];
+    public const MAX_GRID_ROWS    = 300;
+    public const MAX_GRID_COLS    = 104;
+    public const RACI_VALUES      = ['', 'R', 'A', 'C', 'I'];
+    public const SCHEDULE_VALUES  = ['', 'b', 'm']; // vazio, barra, marco
+    public const SCHEDULE_UNITS   = ['S', 'M', 'T', 'A'];
+
+    /** @return array<string, string> subtipo => rótulo */
+    public static function getSubtypes(): array
     {
+        return [
+            self::SUBTYPE_ORG      => __('Organograma', 'codexplus'),
+            self::SUBTYPE_SCHEDULE => __('Cronograma', 'codexplus'),
+            self::SUBTYPE_RACI     => __('Matriz RACI', 'codexplus'),
+        ];
+    }
+
+    public static function subtypeOf(array $data): string
+    {
+        $k = (string) ($data['kind'] ?? '');
+        return in_array($k, self::GRID_SUBTYPES, true) ? $k : self::SUBTYPE_ORG;
+    }
+
+    /** @return array<string, mixed> */
+    public static function starter(string $subtype = self::SUBTYPE_ORG): array
+    {
+        if ($subtype === self::SUBTYPE_SCHEDULE) {
+            return [
+                'kind'    => self::SUBTYPE_SCHEDULE,
+                'unit'    => 'S',
+                'periods' => ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'],
+                'rows'    => [['name' => '', 'owner' => '', 'cells' => array_fill(0, 8, '')]],
+            ];
+        }
+        if ($subtype === self::SUBTYPE_RACI) {
+            return [
+                'kind'  => self::SUBTYPE_RACI,
+                'roles' => ['Diretoria', 'Coordenação', 'Execução'],
+                'rows'  => [['name' => '', 'cells' => array_fill(0, 3, '')]],
+            ];
+        }
         return [
             'kind'  => 'organograma',
             'nodes' => [
@@ -91,9 +137,10 @@ class Diagram
             'LIMIT' => 1,
         ]) as $row) {
             $data = json_decode((string) ($row['data'] ?? ''), true);
+            $data = self::validate($data) ?? self::starter((string) $row['subtype']);
             return [
-                'subtype' => (string) $row['subtype'],
-                'data'    => self::validate($data) ?? self::starter(),
+                'subtype' => self::subtypeOf($data),
+                'data'    => $data,
             ];
         }
         return null;
@@ -109,8 +156,9 @@ class Diagram
         /** @var \DBmysql $DB */
         global $DB;
 
-        $json = json_encode($data, JSON_UNESCAPED_UNICODE);
-        $now  = date('Y-m-d H:i:s');
+        $json    = json_encode($data, JSON_UNESCAPED_UNICODE);
+        $now     = date('Y-m-d H:i:s');
+        $subtype = self::subtypeOf($data); // D1: o JSON manda, não o parâmetro
 
         $current = null;
         foreach ($DB->request([
@@ -134,7 +182,7 @@ class Diagram
         if ((string) $current['data'] === $json) {
             return false;
         }
-        $DB->update(self::getTable(), ['data' => $json, 'date_mod' => $now], ['id' => (int) $current['id']]);
+        $DB->update(self::getTable(), ['data' => $json, 'subtype' => $subtype, 'date_mod' => $now], ['id' => (int) $current['id']]);
         return true;
     }
 
@@ -161,6 +209,9 @@ class Diagram
     {
         if (!is_array($data)) {
             return null;
+        }
+        if (in_array($data['kind'] ?? '', self::GRID_SUBTYPES, true)) {
+            return self::validateGrid($data);
         }
 
         $levels = [];
@@ -328,6 +379,51 @@ class Diagram
      *
      * @return array{nodes: array<int, mixed>, edges: array<int, mixed>}|null
      */
+    /**
+     * Grade (D1): cronograma (períodos x tarefas, célula '', 'b' barra ou 'm'
+     * marco) ou matriz RACI (papéis x atividades, célula '', R, A, C ou I).
+     * Cada linha tem exatamente uma célula por coluna.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function validateGrid(array $data): ?array
+    {
+        $raci    = $data['kind'] === self::SUBTYPE_RACI;
+        $colKey  = $raci ? 'roles' : 'periods';
+        $allowed = $raci ? self::RACI_VALUES : self::SCHEDULE_VALUES;
+
+        $cols = [];
+        foreach (array_slice((array) ($data[$colKey] ?? []), 0, self::MAX_GRID_COLS) as $c) {
+            $cols[] = self::text(is_scalar($c) ? $c : '', 60);
+        }
+        if ($cols === []) {
+            return null;
+        }
+        $rows = [];
+        foreach (array_slice((array) ($data['rows'] ?? []), 0, self::MAX_GRID_ROWS) as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $raw   = array_values((array) ($r['cells'] ?? []));
+            $cells = [];
+            foreach (array_keys($cols) as $i) {
+                $v = is_scalar($raw[$i] ?? '') ? (string) ($raw[$i] ?? '') : '';
+                $cells[] = in_array($v, $allowed, true) ? $v : '';
+            }
+            $row = ['name' => self::text($r['name'] ?? '', 200), 'cells' => $cells];
+            if (!$raci) {
+                $row['owner'] = self::text($r['owner'] ?? '', 120);
+            }
+            $rows[] = $row;
+        }
+        $out = ['kind' => $data['kind'], $colKey => $cols, 'rows' => $rows];
+        if (!$raci) {
+            // D1-2: unidade dos períodos (Semanas, Meses, Trimestres, Anos).
+            $out['unit'] = in_array($data['unit'] ?? '', self::SCHEDULE_UNITS, true) ? $data['unit'] : 'S';
+        }
+        return $out;
+    }
+
     private static function fromTree($tree): ?array
     {
         $nodes = [];

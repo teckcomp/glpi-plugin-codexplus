@@ -34,17 +34,25 @@
             {# R3b3-2: ler e exportar (texto; o diagrama tem PDF no próprio motor). #}
             <div class="codexplus-actions">
                 {% if can_edit %}
-                    {% if not is_diagram %}
-                        <a href="{{ view_link }}" class="codexplus-btn"
-                           title="{{ __('Como o documento fica para quem lê, com Exportar PDF. Mostra o que está salvo.', 'codexplus') }}">
-                            <i class="ti ti-eye"></i> {{ __('Visualizar e PDF', 'codexplus') }}
-                        </a>
-                    {% endif %}
+                    {# D1: também no diagrama (o PDF dele fica no próprio motor). #}
+                    <a href="{{ view_link }}" class="codexplus-btn"
+                       title="{{ __('Como o documento fica para quem lê, com Exportar PDF. Mostra o que está salvo.', 'codexplus') }}">
+                        <i class="ti ti-eye"></i> {{ __('Visualizar e PDF', 'codexplus') }}
+                    </a>
                 {% else %}
                     {% if can_edit_doc and not version.on %}
                         <a href="{{ edit_link }}" class="codexplus-btn">
                             <i class="ti ti-pencil"></i> {{ __('Editar', 'codexplus') }}
                         </a>
+                    {% endif %}
+                    {% if is_diagram %}
+                        {# D1-4: o PDF do diagrama é o do próprio motor (grade ou
+                           organograma); este botão só o aciona, no mesmo lugar
+                           do Exportar PDF dos documentos de texto. #}
+                        <button type="button" class="codexplus-btn codexplus-btn-primary"
+                                onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-org] [data-act=print]'); if (b) { b.click(); }">
+                            <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
+                        </button>
                     {% endif %}
                     {% if not is_diagram %}
                         {# E3: Word, com a mesma configuração do PDF (codexplus-export.js). #}
@@ -167,6 +175,11 @@
                             {{ widgets.doctype|raw }}
                             <div class="codexplus-form-hint">{{ __('O tipo forma o código e não muda depois.', 'codexplus') }}</div>
                         </div>
+                        <div class="cx-docform-field" data-cx-only-type="DIA">
+                            <label>{{ __('Subtipo do diagrama', 'codexplus') }}</label>
+                            {{ widgets.subtype|raw }}
+                            <div class="codexplus-form-hint">{{ __('Organograma, cronograma ou matriz RACI. Não muda depois.', 'codexplus') }}</div>
+                        </div>
                     {% endif %}
 
                     <div class="cx-docform-field cx-docform-field--wide">
@@ -218,7 +231,27 @@
                 {% endif %}
                 </div>
 
-                {% if is_diagram %}
+                {% if is_diagram and diagram_kind != 'organograma' %}
+                    {# D1: cronograma ou matriz RACI (public/js/codexplus-grid.js),
+                       mesmo contrato do organograma: JSON em _diagram, salvamento
+                       automático e o Salvar do formulário. #}
+                    <div class="codexplus-doc-edit-zone cx-docform-diagram">
+                        <label class="codexplus-doc-edit-zone-label">
+                            <i class="ti {{ diagram_kind == 'raci' ? 'ti-table' : 'ti-calendar-time' }}"></i> {{ diagram_kind_label }}
+                        </label>
+                        <script type="application/json" id="cx-grid-data">{{ diagram_json|raw }}</script>
+                        <input type="hidden" name="_diagram" id="cx-grid-input" value="">
+                        <div data-cx-grid data-editable="1" data-source="cx-grid-data" data-input="cx-grid-input"
+                             data-title="{{ name }}" data-code="{{ code }}"
+                             data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
+                        <div class="codexplus-form-hint">
+                            {{ diagram_kind == 'raci'
+                                ? __('Clique na célula para trocar entre R, A, C, I e vazio. Clique no nome de uma atividade ou papel para editar. Cada atividade deve ter um só A.', 'codexplus')
+                                : __('Clique na célula para trocar entre vazio, período (barra) e marco. Clique no nome de uma tarefa, responsável ou período para editar.', 'codexplus') }}
+                            {{ __('Gravado sozinho pouco depois de cada mudança.', 'codexplus') }}
+                        </div>
+                    </div>
+                {% elseif is_diagram %}
                     {# Etapa 9: organograma no lugar do corpo. O motor grava o
                        JSON em _diagram a cada mudança; vai no Salvar. #}
                     <div class="codexplus-doc-edit-zone cx-docform-diagram">
@@ -255,7 +288,7 @@
                             <i class="ti ti-sitemap"></i>
                             <div>
                                 <strong>{{ __('Diagrama', 'codexplus') }}</strong>
-                                <div class="cx-notice-text">{{ __('Informe o título e a categoria e clique em "Criar rascunho". Na página seguinte aparece o organograma, com o botão "Importar ou exportar" para colar um organograma pronto.', 'codexplus') }}</div>
+                                <div class="cx-notice-text">{{ __('Escolha o subtipo, informe o título e clique em "Criar rascunho". Na página seguinte aparece o diagrama para editar (no organograma, "Importar ou exportar" cola um organograma pronto).', 'codexplus') }}</div>
                             </div>
                         </div>
                         <script>
@@ -352,7 +385,11 @@
                 {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
             {% endif %}
             </div>
-            {% if is_diagram %}
+            {% if is_diagram and diagram_kind != 'organograma' %}
+                <script type="application/json" id="cx-grid-data">{{ diagram_json|raw }}</script>
+                <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-source="cx-grid-data"
+                     data-title="{{ name }}" data-code="{{ code }}"></div>
+            {% elseif is_diagram %}
                 <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
                 <div class="cx-docform-diagram" data-cx-org data-editable="0" data-source="cx-org-data"
                      data-title="{{ name }}" data-code="{{ code }}"></div>

@@ -133,8 +133,9 @@ if (isset($_POST['add'])) {
     }
     $newId = $doc->add($input);
     if ($newId && $input['doctype'] === 'DIA') {
-        // Etapa 9: o DIA nasce com o diagrama inicial (só o topo).
-        Diagram::save((int) $newId, Diagram::starter());
+        // Etapa 9: o DIA nasce com o diagrama inicial do subtipo (D1).
+        $sub = (string) ($_POST['_subtype'] ?? Diagram::SUBTYPE_ORG);
+        Diagram::save((int) $newId, Diagram::starter(array_key_exists($sub, Diagram::getSubtypes()) ? $sub : Diagram::SUBTYPE_ORG));
     }
     if ($newId) {
         Session::addMessageAfterRedirect(__('Documento criado como rascunho.', 'codexplus'));
@@ -455,8 +456,10 @@ if ($preview) {
 // Etapa 9: documento DIA desenha o organograma no lugar do corpo de texto.
 $isDiagram   = !$isNew && $doc->fields['doctype'] === 'DIA';
 $diagramJson = '';
+$diagramKind = Diagram::SUBTYPE_ORG;
 if ($isDiagram) {
     $diagram     = Diagram::load($id) ?? ['data' => Diagram::starter()];
+    $diagramKind = Diagram::subtypeOf($diagram['data']);
     $diagramJson = json_encode(
         $diagram['data'],
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
@@ -531,6 +534,12 @@ if ($canEdit) {
 
     if ($isNew) {
         $preset = (string) ($_GET['doctype'] ?? 'POP');
+        // D1: subtipo do diagrama, só com o tipo DIA (o JS mostra e esconde).
+        $widgets['subtype'] = Dropdown::showFromArray('_subtype', Diagram::getSubtypes(), [
+            'display' => false,
+            'value'   => (string) ($_GET['subtype'] ?? Diagram::SUBTYPE_ORG),
+            'width'   => '100%',
+        ]);
         $widgets['doctype'] = Dropdown::showFromArray('doctype', DocumentMeta::getDoctypes(), [
             'display' => false,
             'value'   => array_key_exists($preset, DocumentMeta::getDoctypes()) ? $preset : 'POP',
@@ -775,6 +784,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'pending'     => $pending,
     'missing_right' => $missingRight,
     'is_diagram'   => $isDiagram,
+    'diagram_kind' => $diagramKind,
+    'diagram_kind_label' => Diagram::getSubtypes()[$diagramKind] ?? '',
     'diagram_json' => $diagramJson,
     'can_submit'   => !$isNew && $doc->canSubmit(),
     'can_publish_direct' => !$isNew && !$version['on'] && $doc->canPublishDirect(),

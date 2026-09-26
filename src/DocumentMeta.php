@@ -147,7 +147,7 @@ class DocumentMeta extends CommonDBTM
             'LAU' => __('LAU — Laudo Técnico', 'codexplus'),
             'DTC' => __('DTC — Documentação Técnica', 'codexplus'),
             'DIV' => __('DIV — Documento Diverso', 'codexplus'),
-            'DIA' => __('DIA — Diagrama (organograma)', 'codexplus'),
+            'DIA' => __('DIA — Diagrama', 'codexplus'),
         ];
     }
 

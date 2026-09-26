@@ -2,7 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.9-alpha` · atualizado em 25/09/2026 (blocos A1 e A2: auditor
+> Estado: `v0.6.9-alpha` · atualizado em 26/09/2026 (P1 papéis pelo perfil,
+> P2 fluxo por tipo, D1 cronograma e RACI, S1 Self-Service, B1 Biblioteca,
+> R3b4 e M1 modelos, E5 cor e realce, R4 migração, R5 fim da Base de
+> Conhecimento, PL1 planilha, Q1 motor de quadro com Planta e Topologia —
+> seção 3.5; commits `66f9b2b` a `6a1f8ee`). Antes, 25/09/2026 (blocos A1 e A2: auditor
 > pelo perfil, Super-Admin pelo perfil, setor de auditoria — subseções
 > "Auditor pelo perfil" e "Quem aprovou não valida"). Antes, 24/09: bloco T1
 > (tipos LAU, DTC e DIV e cliente vinculado — subseção "Tipos novos e cliente
@@ -84,6 +88,8 @@ desta tabela sem alinhar antes.**
 | Hierarquia livro → capítulo → página | Categoria → subcategoria resolve; o PSG cobre o agrupamento por setor |
 | PDF via TCPDF (server-side) | Testado e descartado — ver seção 4 |
 | Reskin por CSS sobre telas nativas | Abordagem original, **abandonada** — ver seção 4 |
+| Caneta livre, marca-texto e reconhecimento de forma no quadro | Claudio, 26/09/2026: não precisa para o projeto (a decisão de 20/09 continua) |
+| Colaboração em tempo real, comentários, votação, apresentação e IA no quadro | Funções do Miro fora do escopo; uma edição por vez, como todo documento |
 
 > **Saiu desta tabela em 09/2026:** draw.io embutido. Entrou na Etapa 9.
 > **Voltou para cá em 20/09/2026 (Claudio):** com o motor de canvas do Codex+
@@ -222,7 +228,11 @@ histórico; renomear exigiria migrar todos os perfis sem ganho). Bits em
 | 1024 | Ver todos (ignora os alvos de leitura) |
 | 2048 | Publicar para acesso anônimo |
 | 4096 | Gerenciar modelos, setores e categorias (R2) |
-| 8192 | **Auditor** (R3c como "Validar"; rótulo e sentido novos na A1) |
+| 8192 | **Auditar** (R3c como "Validar"; "Auditor" na A1; "Auditar" na P1) |
+| 16384 | **Aprovar** (P1): pode ser o responsável, que aprova a 1ª etapa |
+
+Desde a P1 o bit 2 se chama **Revisar e editar** (pode ser revisor). Ver
+seção 3.5 para o que cada bit faz hoje.
 
 Os bits novos **nascem desmarcados em todos os perfis**, inclusive
 Super-Admin: se o Install concedesse, cada reinstalação devolveria o que foi
@@ -285,6 +295,9 @@ próprio (`knowbaseitems_id = 0`). As telas atuais partem de
   gravada no Install só se ainda não houver nenhuma para Category).
 
 #### Papéis e validação (R3c, `v0.6.3-alpha`)
+
+> **Substituído em 26/09/2026 (P1, seção 3.5):** não há mais gestor de setor
+> nem editores do documento. Mantido como histórico.
 
 Decisões de Claudio, 20/09/2026. **Duas camadas:** o perfil diz o que; o
 plugin diz em quais documentos. A ação só vale quando as duas concordam.
@@ -727,6 +740,191 @@ Decisões de Claudio, 21/09/2026.
 
 Perde-se: tradução de artigos e a integração com FAQ nativa/Self-Service
 (o acesso anônimo cobre a necessidade de leitura sem login).
+
+### 3.5 Sessão de 26/09/2026 — papéis, fluxos, Biblioteca, planilha e quadro
+
+> Decisões de Claudio, 26/09/2026. **Substituem** o que as subseções R3c,
+> R3b2-a/b (editores) e R3d dizem sobre gestor do setor, editores do
+> documento e "quem editou não valida". O que vale hoje está aqui.
+> Commits `66f9b2b` a `6a1f8ee`.
+
+#### Papéis pelo perfil (bloco P1, `66f9b2b`)
+
+- **Sem papel de setor e sem lista de editores.** O setor é só organização
+  da estante. `SectorMember`, `DocumentEditor` e o comando `sector:member`
+  saíram; as tabelas `sectormembers` e `documenteditors` ficam no banco sem
+  uso (limpeza no backlog).
+- **Bits do perfil** (aba Codex+ de Perfis): **Ler** (1), **Criar** (4),
+  **Revisar e editar** (2), **Aprovar** (16384, novo), **Auditar** (8192),
+  Excluir (8), Ver todos (1024), Publicar anônimo (2048), Gerenciar modelos,
+  setores e categorias (4096). `Rights::usersWithBit()` monta as listas:
+  `approverUsers` (Aprovar, com Super-Admin), `auditorUsers` (Auditar, sem
+  Super-Admin), `reviewerUsers` (Revisar e editar, com Super-Admin).
+- **No documento:** **Responsável** = gestor do documento (escolhido entre
+  quem tem Aprovar; aprova a 1ª etapa e gere o documento), **Auditor**
+  (Auditar; aprova e publica ou devolve com o que corrigir, **não edita**),
+  **Revisor** (Revisar e editar). **Editam o rascunho:** responsável, revisor
+  e autor. **Gere** (leitores, papéis, janela, categorias, obsoleto,
+  excluir): o responsável; em rascunho, também o autor. Criar exige só o
+  bit Criar, em qualquer categoria.
+- **Observação na aprovação e na auditoria** (opcional), em
+  `validation_comment`, mostrada na página ("Observação do responsável" /
+  "Observação da auditoria"). Devolver exige "o que corrigir".
+- **Regras que ficam:** "quem aprovou não audita" (salvo setor de auditoria
+  e Super-Admin); responsável e auditor não podem ser a mesma pessoa no
+  envio. **Saiu:** "quem editou não valida" (o auditor não edita).
+- **Super-Admin** (Configurar > Atualizar) pode tudo e **lê tudo pela
+  regra** (`canViewItem` e `getVisibilityCriteria`), mesmo sem Ver todos.
+  **"Ver todos" é só leitura** — é onde mora a "leitura completa" de
+  auditoria e revisão (decisão de 20/09: "auditor com Ler e Ver todos lê
+  tudo, mas não edita").
+
+#### Fluxo por tipo (bloco P2, `8348aee`)
+
+Fonte única em `DocumentMeta::FLOW_BY_TYPE` / `flowOf()`:
+
+| Fluxo | Tipos | Como publica |
+|---|---|---|
+| `full` | POP, PSG, MAN, DIV, DIA | Responsável aprova → auditor audita e publica |
+| `one` | DTC | Responsável aprova e já publica; tem revisor e revisão periódica, sem auditor |
+| `direct` | PRP, LAU | O responsável clica **Publicar** no rascunho; sem auditor, revisor nem revisão periódica; revisão (:01) também publica direto, com resumo |
+
+`Document::dropUnusedRoles()` ignora os papéis que o tipo não usa; na
+criação, `data-cx-only-type` mostra e esconde os campos. No PDF e no Word
+dos tipos `direct` o "rev. {revisao}" sai do cabeçalho (`norev` no JSON de
+impressão).
+
+#### Self-Service e Biblioteca (blocos S1 e B1, `a9d5ef4`)
+
+- **Self-Service só lê**, condicionado à coluna Leitura do documento.
+  `plugin_init` acrescenta `plugin_codexplus_wiki` a
+  `Profile::$helpdesk_rights` (achado 27) e reduz o direito da sessão a Ler.
+  `Document::bit()` recusa qualquer bit além de Ler na interface
+  simplificada (defesa). Aba Codex+ em Perfis aparece também no perfil
+  Self-Service, só com "Ler". Páginas usam `Wiki::pageHeader()` /
+  `pageFooter()` (`Html::helpHeader` na interface simplificada).
+- **Menu:** no Self-Service o Codex+ entra **direto na barra** (depois de
+  FAQ) por `Hooks::REDEFINE_MENUS` (`plugin_codexplus_redefine_menus` no
+  hook.php).
+- **Quem só lê entra na Biblioteca; quem produz, no Painel.**
+  `Rights::isProducer()` = Super-Admin ou qualquer bit além de Ler (Criar,
+  Revisar e editar, Aprovar, Auditar, Ver todos, Gerenciar). O Self-Service
+  nunca é produtor. O Painel redireciona leitores para a Biblioteca.
+- **Biblioteca** (`src/Library.php`, `front/library.php`,
+  `templates/library.html.twig`): prateleira **Setor → Categoria** (blocos
+  que abrem e fecham), busca por título/código e filtro por tipo no
+  navegador; documento em várias categorias aparece em cada uma; sem
+  categoria vai para "Sem setor / Sem categoria". Cliente só nos tipos com
+  cliente.
+
+#### Criação pelos modelos e tela Modelos (blocos R3b4 e M1, `a9d5ef4`)
+
+- Campo **Modelo** ao lado do Tipo (no DIA o lugar é do Subtipo): modelos do
+  tipo, padrão marcado, "Em branco"; preenche o corpo; pergunta antes de
+  substituir texto escrito; busca (Select2) a partir de 10 opções
+  (`Template::listForCreation`, `codexplus-docform.js`).
+- **Salvar como modelo** na página do documento (quem tem Gerenciar
+  modelos; não em diagrama): o corpo gravado vira modelo do mesmo tipo.
+  **Modelo não guarda imagem** (`Template::stripImages`): a imagem é arquivo
+  de um documento só.
+- Tela **Modelos**: direito do Codex+ (Gerenciar modelos), mesmo editor dos
+  documentos (sem botões de imagem), tipos sem DIA.
+- Saíram os caminhos que criavam artigo na Base de Conhecimento.
+
+#### Editor: cor, realce e estilo (bloco E5, `a9d5ef4`)
+
+- **Cor do texto** (5) e **realce** (4) em **paleta fixa**, por classe
+  (`cx-fg-*`, `cx-bg-*`), fonte única em `PALETTE` (`codexplus-editor.js`):
+  editor, leitura (folha injetada na página), PDF (`sizeCss`) e Word.
+  Realces em tom forte (Claudio pediu: os claros puxavam para o pastel).
+- Estilo (título/parágrafo) é **de bloco** por natureza; a seleção que só
+  encosta na linha vizinha não a leva junto; Enter depois de título gera
+  parágrafo.
+- O E5 foi pedido num trecho de conversa que se perdeu; apareceu na cópia
+  de trabalho de quem gera pacotes antes de ser explicado (achado 71).
+
+#### Migração e fim da Base de Conhecimento (blocos R4 e R5, `8d6c017`)
+
+- **R4** (`src/LegacyMigration.php`, `front/migrate.php`, só Super-Admin,
+  prévia e confirmação): a linha do documento é a mesma (código, situação,
+  responsável, datas preservados); do artigo vêm título, corpo, entidade,
+  autor, categorias (criadas no Codex+ pelo caminho, sem setor), leitores
+  (perfil, grupo, usuário; por entidade não existe no Codex+ e é avisado) e
+  arquivos (Document_Item a mais e links das imagens reapontados). Grava a
+  data de hoje e "Migrado do artigo #N" no Histórico. Artigo intocado.
+  **Os 5 documentos foram migrados em 26/09/2026.**
+- **R5:** Biblioteca para quem produz com **Situação** (padrão Publicados),
+  "Só os meus" (responsável) e **Lixeira** com Restaurar; botão **Excluir**
+  na página do documento; busca do Painel abre a Biblioteca em "Todos".
+  **Saíram** a aba Documentos antiga (`wiki.php`), leitura/edição de artigo,
+  "Novo documento" antigo, a aba Codex+ na ficha do artigo e o envio de logo
+  da edição antiga. Abas: Painel · Biblioteca · Modelos (Modelos só para
+  quem gerencia). O Codex+ não lê mais `glpi_knowbaseitems` (só a Migração,
+  enquanto houver o que migrar). Recomendação a Claudio: tirar o direito
+  nativo da Base de Conhecimento dos perfis (menos Super-Admin) e o "Ler"
+  de Gestão > Documentos dos leitores (achado 55).
+
+#### Cronograma e matriz RACI (bloco D1, `9d30375`)
+
+Subtipos de `DIA` (campo Subtipo na criação; `kind` no JSON é a fonte do
+subtipo, `Diagram::subtypeOf`). Motor de grade `public/js/codexplus-grid.js`:
+cronograma (tarefas × períodos relativos S/M/T/A, célula vazio → período →
+marco) e RACI (atividades × papéis, R/A/C/I, aviso de "A" ausente ou
+repetido). Colunas com largura mínima e rolagem, primeira coluna fixa. PDF
+com **orientação automática** (retrato se couber; senão paisagem, colunas
+em blocos repetindo Tarefa/Responsável). Diagramas seguem o fluxo de POP e
+Manual.
+
+#### Planilha no editor (bloco PL1, `820236c` e `974fa23`)
+
+Botão **Planilha** (`public/js/codexplus-sheet.js`): bloco
+`div.cx-sheet[contenteditable=false][data-cx-sheet]` com a `<table>` já
+calculada; duplo clique reabre. Colunas texto/número/moeda; fórmula da
+coluna (`=A*C`) e da célula (`=A1*C1`, SOMA, MÉDIA, MIN, MAX), sem eval;
+números pt-BR. Modelo padrão da proposta: **Qtd, Item, Unitário, Total**.
+Total soma a coluna calculada, com "Total" colado no valor; linhas
+alternadas em azul; linha vazia sai em branco; bordas próprias. Leitura,
+PDF e Word usam a tabela.
+
+#### Motor de quadro — Planta e Topologia (bloco Q1, `6a1f8ee`)
+
+**Decisão: um motor de quadro só, no estilo Miro, com paletas** —
+Planta (Proposta), Topologia (Documentação Técnica), depois Fluxograma e
+Organograma (migrado, conferindo item por item). Os dois blocos (Planta e
+Topologia) ficam disponíveis no editor dos dois tipos.
+
+- Arquivos: `public/js/codexplus-board.js` (motor) e
+  `public/js/codexplus-icons.js` (ícones).
+- **Ícones próprios** (34, sem terceiros), 6 categorias com cor
+  (rede, núcleo, segurança, estações, infraestrutura, proteção), padrão:
+  viewBox 48, área útil 44, traço 2 arredondado, preenchimento claro + traço
+  da categoria, sem texto, câmeras apontando para a direita. **Equipamento
+  genérico** com categoria escolhida. Ícone novo = uma linha em `LIST`.
+- **Gravado no corpo:** `span.cx-board[data-cx-board=JSON]` com, na planta,
+  a imagem da planta (primeira `<img>`, escondida) e o **PNG do quadro**
+  (última `<img>`, a única que aparece). Imagens sobem como coladas
+  (`cx-quadro-*.png`, `cx-quadro-fundo-*.jpg`), ignoradas na lista de
+  Anexos. **Regra por posição**, não por classe (achado 67).
+- **Quadro:** paleta com busca; arrastar o fundo move a vista, roda dá
+  zoom, Shift + arrastar seleciona em área; grade 10 e guias de
+  alinhamento; zona/área, texto; agrupar, travar, copiar/colar, duplicar,
+  excluir, desfazer/refazer; Ícone −/+ e alça de tamanho; **girar** ícone
+  (R, 90°; painel de 15 em 15°); o nome acompanha o tamanho e não gira.
+- **Câmeras:** um ícone por câmera, nascem **sem cone**; "Mostrar o cone"
+  no painel, com direção, abertura e **alcance em metros** (rótulo na ponta).
+- **Planta:** enviar planta (imagem, até 2400 px), transparência, **girar
+  planta 90°** (itens giram junto), **Escala** (dois pontos + metros;
+  `pxm` no JSON; sem escala, 1 m = 20 px aproximado; trocar a planta zera).
+- **Painel do ícone:** rótulo, modelo, IP, VLAN, observação.
+- **Especificação de ícones** para o conjunto oficial combinada com Claudio
+  (SVG simples, viewBox 48, traço 2, cores da tabela de categorias, nome
+  `categoria-nome.svg`, `icones.csv` com nome, categoria, busca, cone).
+
+#### Leitura sem recolher (achado 65)
+
+`RichText::getEnhancedHtml(..., ['text_maxsize' => 0])` na página do
+documento: o GLPI recolhia corpo acima de ~4000 caracteres ("..." com
+degradê) e o PDF saía em branco. Vale para todos os tipos.
 
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
@@ -1249,6 +1447,37 @@ depender do comportamento errático de `position: fixed` na impressão.
     conteúdo foi recuperado do pacote em `/tmp` e juntado em 25/09). Antes de
     gerar pacote: `git status --short` no servidor tem que vir vazio.
 
+65. **O GLPI recolhe texto longo na leitura.** `RichText::getEnhancedHtml`
+    embrulha em `div.long_text` com "..." todo conteúdo acima de
+    `GLPI_TEXT_MAXSIZE` (~4000 caracteres). Planilha e quadro guardam dados
+    no corpo e passam disso; o PDF paginava o bloco recolhido e saía em
+    branco. Usar `['text_maxsize' => 0]`.
+66. **`<img data:>` inserida pelo `insertContent` é enviada pelo GLPI.** O
+    `glpi_upload_doc` (achado 60) sobe e troca a imagem no meio do caminho —
+    o bloco do quadro ficava vazio. Criar o bloco com marcador de texto e a
+    `<img>` pelo DOM, já com o blob e o `data-upload_id`.
+67. **Classe da `<img>` não sobrevive ao Salvar** (consequência do achado
+    56: o GLPI troca a tag inteira). Marcar imagem por **posição** dentro do
+    invólucro, não por classe: no quadro, a planta é a primeira `<img>` e só a
+    última aparece (`img:not(:last-of-type)` escondida).
+68. **Bloco `contenteditable="false"` com `data-*` sobrevive ao Salvar** no
+    TinyMCE do GLPI (planilha, quadro). Na leitura o sanitizador tira os
+    `data-*` (achado 57): leitura, PDF e Word usam o HTML renderizado.
+69. **Self-Service e plugin:** a sessão começa antes do `plugin_init`
+    (`SessionStart` 130 > `InitializePlugins` 110), então o `plugin_init`
+    pode acrescentar o direito a `Profile::$helpdesk_rights` e reduzir o
+    direito da sessão. `Hooks::REDEFINE_MENUS` vale também para o menu da
+    interface simplificada (entrada direta na barra). Páginas próprias usam
+    `Html::helpHeader()` / `helpFooter()` nessa interface.
+70. **Planilha: célula vazia encolhe a linha** e as bordas dependiam da
+    regra geral de tabela do editor. Célula vazia leva `&nbsp;`, e a
+    planilha tem bordas próprias (`.cx-sheet-table`).
+71. **Alterações que não foram pedidas na cópia de trabalho de quem gera os
+    pacotes** (26/09: o E5 apareceu antes de ser explicado, vindo de um
+    trecho de conversa perdido). Antes de empacotar: `git status` e
+    `git diff` da cópia; nada entra no pacote sem ter sido pedido e
+    explicado a Claudio.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -1315,40 +1544,50 @@ Ver `docs/DEPLOY.md` para o fluxo completo de publicação e teste.
 
 ```
 codexplus/
-├── setup.php                  registro do plugin, hooks, versão
-├── hook.php                   install/uninstall
+├── setup.php                  registro do plugin, hooks, versão, Self-Service (S1)
+├── hook.php                   install/uninstall, menu direto no Self-Service (B1)
 ├── src/
 │   ├── Install.php            schema, direitos, modelos semeados
-│   ├── Wiki.php               estante, listagem, leitura do artigo
-│   ├── DocumentMeta.php       metadados, código derivado, vencimento
-│   ├── Template.php           modelos por tipo
-│   ├── Dashboard.php          indicadores do painel
-│   ├── Branding.php           configuração de marca (4a), cabeçalho (4f)
-│   ├── Rights.php             bits da matriz de direitos (R1)
-│   ├── ProfileTab.php         aba Codex+ em Perfis (R1)
+│   ├── Wiki.php               entrada do menu e cabeçalho das páginas (R5)
+│   ├── Library.php            Biblioteca: Setor → Categoria, lixeira (B1, R5)
+│   ├── LegacyMigration.php    migração da Base de Conhecimento (R4)
+│   ├── DocumentMeta.php       tipos, código, vencimento, fluxo por tipo (P2)
+│   ├── Template.php           modelos por tipo, lista da criação, sem imagem (R3b4, M1)
+│   ├── Dashboard.php          indicadores do Painel (modelo novo)
+│   ├── Branding.php           marca, cabeçalho, JSON de impressão
+│   ├── Rights.php             bits, Super-Admin, listas por bit, isProducer (P1, B1)
+│   ├── ProfileTab.php         aba Codex+ em Perfis (Self-Service só Ler)
 │   ├── StructureRights.php    direitos de setores e categorias (R2)
-│   ├── Sector.php             setor, lista simples (R2)
+│   ├── Sector.php             setor (organização; setor de auditoria)
 │   ├── Category.php           categoria em árvore com setor herdado (R2)
-│   ├── Document.php           documento próprio, direitos, visibilidade (R3a)
+│   ├── Document.php           documento, papéis, fluxo, visibilidade
 │   ├── Document_*.php         ligações: categoria, perfil, grupo, usuário (R3a)
 │   ├── TargetRelation.php     comum aos três alvos de leitura (R3a)
-│   ├── SectorMember.php       gestores e validadores do setor (R3c)
-│   ├── DocumentEditor.php     editores do documento (R3c)
-│   ├── DocumentContributor.php quem alterou cada revisão (R3c)
-│   ├── Diagram.php            diagrama do documento DIA: ler, gravar, validar (0.6.7)
-│   └── Console/               comandos de teste da R3a (plugins:codexplus:…)
+│   ├── DocumentContributor.php quem alterou cada revisão (histórico)
+│   ├── DocumentVersion.php    versões publicadas (R6-a)
+│   ├── Diagram.php            diagrama DIA: organograma, cronograma, RACI (D1)
+│   └── Console/               comandos de teste (plugins:codexplus:…)
 ├── ajax/
-│   ├── diagram.save.php       grava só o diagrama, sem recarregar (bloco 1b)
-│   └── document.targets.php   leitores do documento pela coluna Permissões (R3b2-a)
-│   (templates/parts/doc-review.html.twig: auditor, revisor e janela — R3d)
+│   ├── diagram.save.php       grava só o diagrama, sem recarregar
+│   └── document.targets.php   leitores pela coluna Permissões
 ├── front/                     controllers (rodam em escopo de função!)
-│   └── document.form.php      documento no modelo novo (R3b1)
-├── templates/                 Twig (parts/brand.html.twig: cabeçalho com a marca, 0.6.5)
+│   ├── dashboard.php          Painel (quem produz)
+│   ├── library.php            Biblioteca (entrada de quem só lê)
+│   ├── document.form.php      documento: criar, editar, ler, fluxo
+│   ├── templates.php          Modelos (Gerenciar modelos)
+│   ├── migrate.php            Migração (Super-Admin, R4)
+│   └── config.form.php        configuração de marca e clientes
+├── templates/                 Twig (library, migrate, document-form, parts/…)
 ├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
-│   ├── js/codexplus-org.js    motor do diagrama: grafo, canvas, gesto, ligações
-│   ├── js/codexplus-editor.js estilos, tamanhos, importar, ligação do anotador (E1, E2, E4)
+│   ├── js/codexplus.js        PDF (paginação manual)
+│   ├── js/codexplus-org.js    motor do organograma (grafo)
+│   ├── js/codexplus-grid.js   cronograma e RACI (D1)
+│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5)
+│   ├── js/codexplus-sheet.js  planilha no editor (PL1)
+│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1)
+│   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1)
 │   ├── js/codexplus-export.js exportar Word (E3)
-│   ├── js/codexplus-annotate.js anotador de imagens editável (E4)
+│   ├── js/codexplus-annotate.js anotador de imagens (E4)
 │   └── lib/                   mammoth, marked, docx (licença e versão em cada pasta)
 └── docs/                      esta documentação
 ```
@@ -1369,4 +1608,3 @@ Mais de uma pessoa trabalha no plugin. Regras (definidas em 19/09/2026):
    usuário" é ambíguo com mais de uma pessoa no projeto.
 5. Seguir o `docs/DEPLOY.md` à risca, inclusive o comando de cópia com
    `pasta/.` (achado 22).
-

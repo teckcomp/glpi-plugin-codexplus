@@ -1,6 +1,10 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.9-alpha` · atualizado em 25/09/2026 (blocos A1 e A2: auditor
+> Estado em `v0.6.9-alpha` · atualizado em 26/09/2026: P1, P2, D1, S1, B1,
+> R3b4, M1, E5, R4, R5, PL1 e Q1 (commits `66f9b2b` a `6a1f8ee`; detalhes no
+> CONTEXTO, seção 3.5). A Etapa R está fechada, salvo R6-b e R7; o Codex+ não
+> depende mais da Base de Conhecimento. Próximo: **Q2** (ligações e cabos no
+> quadro). Antes, 25/09/2026 (blocos A1 e A2: auditor
 > pelo perfil, Super-Admin pelo perfil, quem aprovou não valida, setor de
 > auditoria). Antes, 24/09/2026 (bloco T1: tipos LAU, DTC e DIV e cliente
 > vinculado). Antes, no mesmo dia (editor de documentos
@@ -46,36 +50,35 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 13. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
 14. **Etapa 8** — personalização completa do PDF
 
-### Ordem até produção, acordada com Claudio em 20/09/2026
+### Ordem até produção, acordada com Claudio em 20/09/2026 (revista em 26/09)
 
-Vale sobre a lista acima quando houver conflito. Os itens marcados como novos
-foram levantados na conversa: eram pré-requisitos ou esquecimentos.
+Vale sobre a lista acima quando houver conflito.
 
-1. Finalizar organograma (blocos do motor: falta fechar o 2d-3)
-2. **Papéis e validação** (Claudio, 25/09/2026, antecipado ao cronograma):
-   **A1** auditor pelo perfil ✅; **A2** quem aprovou a 1ª etapa não valida
-   a 2ª (exceto setor de Auditoria e Super-Admin) ✅; **R3b2-c** aba Papéis
-   no Setor, só Gestores — **próximo**
-3. Cronograma e matrizes — outros dois subtipos de `DIA`, baratos porque
-   reusam a mesma tabela e o mesmo motor
-4. Permissões (R3b2)
-5. **Anexos, imagens, leitura e PDF do modelo novo (R3b3)** — novo;
-   pré-requisito dos itens 6 e 8 (hoje o documento novo não aceita anexo nem
-   imagem colada: `enable_images => false`, sem `Document_Item`)
-6. ~~Editor de documentos com importação e exportação~~ ✅ 24/09/2026 — blocos
-   E1 a E4 (tabela "Editor de documentos" abaixo)
-7. Fluxograma (sobre o motor próprio)
-8. Editor de propostas com mini excel e mini editor de desenho — o desenho
-   embutido vale também para a **Documentação Técnica** (`DTC`), no mesmo
-   bloco (Claudio, 24/09/2026)
-9. **Migração dos 5 documentos (R4)** — novo; senão a prateleira nova sobe
-   vazia enquanto os documentos reais seguem na base nativa
-10. Prateleira de Documentos e Modelos, e corte da base nativa (R5)
-11. **Modelos com conteúdo real (3c)** — novo
-12. Revisão (R6)
-13. **Acesso anônimo (R7)** — novo; era requisito original dos diagramas
-    ("visível a toda a instituição de forma fácil e rápida")
-14. **PSG com POPs e PDF composto (Etapa 5)** — novo
+1. ~~Finalizar organograma~~ ✅ (2d-3 fechado na R6-a)
+2. ~~Papéis e validação~~ ✅ A1, A2 (25/09) e **P1** (26/09: papéis pelo
+   perfil, sem gestor de setor nem editores; a R3b2-c foi **descartada**)
+   e **P2** (fluxo por tipo)
+3. ~~Cronograma e matrizes~~ ✅ **D1** (26/09)
+4. ~~Permissões e Self-Service~~ ✅ **S1** (Self-Service só lê) e **B1**
+   (Biblioteca como entrada de quem só lê)
+5. ~~Anexos, imagens, leitura e PDF (R3b3)~~ ✅ 22/09
+6. ~~Editor de documentos~~ ✅ E1 a E4 (24/09) e **E5** (cor e realce, 26/09)
+7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
+   Planta, Topologia, Fluxograma e Organograma) — **Q1 ✅**; faltam Q2, Q3,
+   Q4, Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
+   quadro" abaixo
+8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
+   a **Planta** do motor de quadro (Q1), também na Documentação Técnica
+9. ~~Migração dos 5 documentos (R4)~~ ✅ 26/09 (os 5 migrados)
+10. ~~Prateleira e corte da base nativa (R5)~~ ✅ 26/09 (Biblioteca com
+    situação e lixeira; Modelos por setor/categoria foi para o backlog)
+11. **Modelos com conteúdo real (3c)**
+12. **Revisão R6-b** (prazo da revisão aberta, "Revisão atrasada",
+    prorrogação, histórico de revisões no fim do PDF)
+13. **Acesso anônimo (R7)** — seção "Acesso anônimo" na coluna Permissões,
+    abaixo de Leitura (sugestão de Claudio, 26/09)
+14. **PSG com POPs e PDF composto (Etapa 5)** — o link de forma do
+    fluxograma para documento do Codex+ conversa com isso
 15. Caça a bugs
 16. Produção, com o alerta de vencimento (Etapa 7) logo depois
 
@@ -146,13 +149,13 @@ Conhecimento nativa. Arquitetura-alvo em `CONTEXTO.md`, seção 3.1.
 | R3d | Validação em duas etapas (gestor do setor, depois auditor responsável), revisor e janela de revisão no calendário, vencimento pelo fim da janela; campos na página do documento e aviso "aguardando …". Super-Admin pode tudo (definitivo). Precisa reinstalar. ✅ pacote `codexplus-r3d-validacao-1` (Claudio, 21/09/2026) | Gestor aprova, auditor responsável publica, janela calculada; quem editou não valida na 2ª etapa |
 | R3d-1 | "Aguardando você" no Painel (gestor na 1ª etapa, auditor na 2ª, com o motivo quando falta o direito) e aviso na página do documento quando quem responde pela etapa não consegue agir. Sem schema ✅ pacote `codexplus-r3d1-aguardando-1` | O auditor entra no Codex+ e vê o que espera por ele |
 | R6-a | Revisão de publicado: abrir revisão (gestor, ou revisor na janela), leitores seguem na versão publicada com "Em atualização", resumo obrigatório no envio, cancelar revisão, "revisado sem alteração" sem auditor, versões com diagrama. `v0.6.8-alpha` (fecha também o 2d-3), precisa reinstalar ✅ pacote `codexplus-r6a-revisao-1`, commit `9aace43` | Abrir a :01, ver o aviso para o leitor, validar e ver a :01 publicada |
-| R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna — parte 1 (criação, editores, Cliente só em PRP) ✅ pacote `codexplus-r3b2b-criacao-1`, commit `d06aa30`; parte 2 (Duplicar, botões da versão publicada) ✅ commit `31359de`; **R3b2-c** aba **Papéis** no Setor. Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
+| R3b2 | Em três blocos (Claudio, 21/09/2026): **R3b2-a** Leitura (alvos) na coluna "Permissões" do documento ✅ (pacote `codexplus-r3b2a-leitura-1`); **R3b2-b** criação já com todos os campos (categorias, responsável, auditor, revisor, janela, leitores) e Editores na mesma coluna — parte 1 (criação, editores, Cliente só em PRP) ✅ pacote `codexplus-r3b2b-criacao-1`, commit `d06aa30`; parte 2 (Duplicar, botões da versão publicada) ✅ commit `31359de`; ~~**R3b2-c** aba **Papéis** no Setor~~ (descartada: papéis pelo perfil, P1, 26/09). Self-Service é o último item desta sessão de permissões. Aba Histórico nativa. **Layout (Claudio, 20/09/2026):** editores e alvos de leitura ficam na própria página do documento, no espaço livre à direita de Categorias e Responsável (coluna "Permissões"), não em abas separadas | Montar o cenário da R3c pela interface, sem console |
 | A1 | Auditor pelo perfil (Claudio, 25/09/2026): bit 8192 vira a coluna **Auditor**; auditor escolhido entre quem tem o bit na entidade, em qualquer setor; papel "auditor" do setor fora de uso; `ajax/document.auditors.php` removido. Sem schema | Auditor sem papel no setor valida; gestor sem o bit é recusado como auditor |
 | A2 | Quem aprovou a 1ª etapa não valida a 2ª, salvo setor de Auditoria (caixa nova no Setor) e Super-Admin; impedido pode devolver. Super-Admin passa a ser o perfil com Configurar > Atualizar e pode tudo no fluxo; Install não lhe dá mais o bit Auditor; Ver todos não dispensa mais a validação. Schema: precisa reinstalar | Gestor-auditor aprova e não publica; no setor de Auditoria, publica; Super-Admin publica sem o bit |
 | R3b3 | Imagens coladas, anexos, página de leitura com os cinco seletores do PDF e exportação em PDF. **R3b3-1** imagem colada e anexos ✅ commit `f1916b9`; **R3b3-2** leitura e PDF do documento novo ✅ commit `987636c` | POP com imagem e anexo, publicado e exportado |
-| R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa" | Nenhum caminho da interface cria artigo na Base de Conhecimento |
-| R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação | Os 5 aparecem no modelo novo com anexos e código preservados |
-| R5 | Tela Documentos (estante Setor → Categoria, filtros), Painel e busca no modelo novo; indicadores "Aguardando validação" e "Revisão atrasada"; etiqueta "em atualização" na estante; lixeira; remoção da dependência da base | Estante agrupada, indicadores corretos, nada lendo `glpi_knowbaseitems` |
+| R3b4 | "Novo documento" passa a criar no modelo novo, com os modelos (Template); somem "Mais opções" e "Ficha nativa". ✅ 26/09, `a9d5ef4` (com M1: salvar como modelo, editor e direito do Codex+ em Modelos) | Nenhum caminho da interface cria artigo na Base de Conhecimento |
+| R4 | Ferramenta de migração dos 5 documentos, com prévia e confirmação. ✅ 26/09, `8d6c017`; os 5 migrados | Os 5 aparecem no modelo novo com anexos e código preservados |
+| R5 | Biblioteca Setor → Categoria com Situação, "Só os meus" e Lixeira; Excluir/Restaurar; busca do Painel; fim das telas antigas. ✅ 26/09, `8d6c017`. Ficaram para depois: Modelos por setor/categoria (schema) e o indicador "Revisão atrasada" (R6-b) | Estante agrupada, nada lendo `glpi_knowbaseitems` |
 | R6 | Revisão de documento publicado: a publicada segue visível com o aviso **"Em atualização"** (tela e link anônimo, não no PDF) até a nova ser validada; **prazo de revisão** (padrão 30 dias, configurável) com prorrogação motivada ou cancelamento pelo gestor; "**revisado sem alteração**" (renova a validade, mantém a revisão); versões com resumo; histórico de revisão no fim do PDF; indicador "Sem responsável" | Abrir a :01, ver o aviso para o leitor, validar e ver a tabela no PDF |
 | R7 | Acesso anônimo: marcar, gerar e revogar link; leitura e PDF sem login; entrega controlada de imagens e anexos (reaproveitar a abordagem de rota anônima já validada no plugin QR Service) | Abrir o link numa janela anônima; revogar e ver o link morrer |
 
@@ -347,14 +350,70 @@ os critérios abaixo estiverem cumpridos:
 
 ---
 
+## Sessão de 26/09/2026 — blocos entregues
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| P1 | Papéis pelo perfil: Responsável (Aprovar), Auditor (Auditar, não edita), Revisor (Revisar e editar); editam responsável, revisor e autor; observação na aprovação; sem gestor de setor nem editores | `66f9b2b` |
+| P2 | Fluxo por tipo: POP/PSG/MAN/DIV/DIA completo; DTC uma etapa; PRP/LAU publicação direta | `8348aee` |
+| D1 | Cronograma e matriz RACI (subtipos de DIA), grades largas, unidade dos períodos, PDF com orientação automática | `9d30375` |
+| S1, B1 | Self-Service só lê (menu direto na barra); Biblioteca Setor → Categoria como entrada de quem só lê | `a9d5ef4` |
+| R3b4, M1 | Criação a partir dos modelos (busca a partir de 10); Salvar como modelo; tela Modelos com o editor e o direito do Codex+ | `a9d5ef4` |
+| E5 | Cor do texto e realce em paleta fixa; estilo só na linha; Enter após título vira parágrafo | `a9d5ef4` |
+| R4, R5 | Migração da Base de Conhecimento; Biblioteca com situação, só os meus e lixeira; fim das telas antigas | `8d6c017` |
+| PL1 | Planilha no editor (Qtd, Item, Unitário, Total; fórmulas; total perto do valor; linhas alternadas) | `820236c`, `974fa23` |
+| Q1 | Motor de quadro: Planta e Topologia, 34 ícones próprios, cone em metros com escala, girar, tamanho; leitura sem recolher; PDF sem "rev." em PRP/LAU | `6a1f8ee` |
+
+## Motor de quadro (decidido em 26/09/2026)
+
+Um motor, no estilo Miro, com paletas. Detalhes e decisões no CONTEXTO,
+seção 3.5.
+
+| Bloco | Entrega | Situação |
+|---|---|---|
+| Q1 | Quadro, ícones, Planta (fundo, transparência, girar, escala) e Topologia (zonas); agrupar, travar, tamanho, girar; cone em metros | ✅ `6a1f8ee` |
+| Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | **próximo** |
+| Q3 | Legenda automática; **lista de materiais** (ícones e metros de cabo, conectores) com "Levar para a planilha" | |
+| Q4 | **"+ Ícone" a partir de imagem** (PNG/JPG/SVG: recorte, fundo transparente, modo silhueta na cor da categoria; nome, categoria, busca; lista para renomear/excluir) | |
+| Q5 | **Fluxograma** sobre o motor (subtipo de DIA): formas básicas, de fluxograma e BPMN simples, raias, moldura, nota, tabela, ícones, imagem; alças, "+" rápido, trocar forma, alinhar e distribuir, minimapa, busca, link para documento do Codex+ | |
+| Q6 | **Organograma migrado para o motor**, conferindo item por item com o atual (chefia, Arrumar, matriz, busca, modelos, PDF); só então o motor antigo sai | |
+
+Fora (Claudio, 26/09): caneta livre, marca-texto, reconhecimento de forma,
+colaboração em tempo real, comentários, votação, apresentação, IA.
+
+## Backlog (pequenos ajustes, revisar no fim das etapas)
+
+- Tabelas `sectormembers` e `documenteditors` sem uso: apagar
+- Textos de ajuda dos comandos de console (ainda citam gestor do setor)
+- Biblioteca: filtro "incluir obsoletos" para quem só lê; estante e busca no
+  Self-Service já existem pela Biblioteca
+- Modelos organizados por setor e categoria (schema)
+- Imagens dentro de modelos (copiar o arquivo para cada documento novo)
+- "Autor:" vazio em documentos migrados sem autor: mostrar "—"
+- Planilha: gráficos, SE/PROCV e mesclar células ficam fora por ora
+
 ## Decisões pendentes
 
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
-- [ ] **Self-Service vê o Codex+?** Decidir na Etapa R. Atenção ao achado 27: o GLPI tira da sessão do Self-Service todo direito de plugin; liberar exige acrescentar o direito a `Profile::$helpdesk_rights`
+- [x] **Self-Service vê o Codex+?** Sim, só leitura, condicionado à coluna
+      Leitura do documento — Claudio, 26/09/2026 (S1)
 
 **Decididas:**
+
+- [x] **Papéis pelo perfil** (Responsável/Aprovar, Auditor/Auditar,
+      Revisor/Revisar e editar), sem gestor de setor nem editores; o
+      auditor não edita — Claudio, 26/09/2026 (P1)
+- [x] **Fluxo por tipo**: DTC uma etapa; PRP e LAU publicação direta;
+      diagramas seguem POP e Manual — Claudio, 26/09/2026 (P2)
+- [x] **Quem só lê entra na Biblioteca; quem produz, no Painel**; a aba
+      Documentos antiga sai — Claudio, 26/09/2026 (B1, R5)
+- [x] **Um motor de quadro só**, estilo Miro, com Planta, Topologia,
+      Fluxograma e Organograma; ícones próprios; caneta livre fora —
+      Claudio, 26/09/2026
+- [x] **Ícone que falta**: genérico na hora, "+ Ícone" a partir de imagem,
+      e o conjunto oficial pela especificação — Claudio, 26/09/2026
 
 - [x] **Auditor pelo perfil**, não pelo setor (bit Auditor na aba Codex+ de
       Perfis) — Claudio, 25/09/2026 (A1)

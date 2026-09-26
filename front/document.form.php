@@ -807,7 +807,10 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'name'        => $isNew ? '' : ($shown['name'] ?? (string) $doc->fields['name']),
     'client_name' => $isNew ? '' : (string) ($doc->fields['client_name'] ?? ''),
     'client'      => $client,
-    'content_html' => $isNew ? '' : RichText::getEnhancedHtml($shown['content'] ?? (string) ($doc->fields['content'] ?? '')),
+    // text_maxsize 0: sem o "ler mais" do GLPI. Documento longo (ou com
+    // planilha/quadro, que guardam dados no corpo) era recolhido na leitura e
+    // o PDF paginava o bloco recolhido — saía em branco (Claudio, 26/09/2026).
+    'content_html' => $isNew ? '' : RichText::getEnhancedHtml($shown['content'] ?? (string) ($doc->fields['content'] ?? ''), ['text_maxsize' => 0]),
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
     'category_names' => $categoryNames,
@@ -884,6 +887,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
             : ($status === Document::STATUS_OBSOLETE ? __('OBSOLETO', 'codexplus')
                 : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(Document::getStatuses()[$status] ?? $status))),
         'header_html'    => '',
+        // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
+        'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
         'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
     ]),
 ]);

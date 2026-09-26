@@ -184,6 +184,11 @@
         if (node.nodeType !== 1) { return; }
         var tag = node.nodeName;
         if (tag === 'BR') { out.push(new D.TextRun({ break: 1 })); st.atStart = true; return; }
+        // Q1: a planta de fundo guardada junto do quadro não vai para o Word.
+        if (tag === 'IMG' && ((' ' + (node.className || '') + ' ').indexOf(' cx-board-bg ') !== -1
+            || (node.parentNode && (' ' + (node.parentNode.className || '') + ' ').indexOf(' cx-board ') !== -1
+                && node.parentNode.querySelectorAll('img').length > 1
+                && node !== node.parentNode.querySelectorAll('img')[node.parentNode.querySelectorAll('img').length - 1]))) { return; }
         if (tag === 'IMG') {
             var ir = this.imageRun(node);
             if (ir) { out.push(ir); st.atStart = false; }

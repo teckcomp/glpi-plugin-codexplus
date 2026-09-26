@@ -661,7 +661,9 @@ class Document extends CommonDBTM
             }
             // E4: PNG de uma anotação substituída (a atual está no corpo e já
             // saiu acima). É derivado, não anexo de ninguém.
-            if (str_starts_with(strtolower((string) $row['filename']), 'cx-anotacao-')) {
+            // Q1: PNG e planta de fundo dos quadros, idem.
+            if (str_starts_with(strtolower((string) $row['filename']), 'cx-anotacao-')
+                || str_starts_with(strtolower((string) $row['filename']), 'cx-quadro-')) {
                 continue;
             }
             $out[] = [

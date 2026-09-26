@@ -104,7 +104,9 @@
             + '.cx-sheet-table th{background-color:#f6f8fa;}'
             + '.cx-sheet-num{text-align:right;white-space:nowrap;}'
             + '.cx-sheet-total td{border-top:2px solid #5f6b7a;}'
-            + '.cx-sheet-alt td{background-color:#e6f1fb;-webkit-print-color-adjust:exact;print-color-adjust:exact;}';
+            + '.cx-sheet-alt td{background-color:#e6f1fb;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+            // Q1: a planta de fundo guardada junto do quadro não aparece (só o PNG).
+            + '.cx-board-bg,.cx-board img:not(:last-of-type){display:none!important;}.cx-board img{max-width:100%;height:auto;}';
     }
 
     /* CSS dentro do editor (iframe do TinyMCE, que não carrega o CSS do
@@ -124,7 +126,8 @@
             + 'td,th{border:1px solid #d3d9e0;padding:6px 8px;}th{background:#f6f8fa;}'
             // PL1: a planilha é um bloco só (duplo clique edita).
             + '.cx-sheet{outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;margin:0 0 12px;}'
-            + '.cx-sheet table{margin:0;}';
+            + '.cx-sheet table{margin:0;}'
+            + '.cx-board{display:inline-block;outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;}';
     }
 
     function hasClass(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
@@ -492,7 +495,24 @@
             if (n && window.CodexplusSheet) {
                 e.preventDefault();
                 window.CodexplusSheet.open(editor, n);
+                return;
             }
+            // Q1: quadro (planta ou topologia) — duplo clique abre o editor dele.
+            var b = e.target && editor.dom.getParent(e.target, 'span.cx-board');
+            if (b && window.CodexplusBoard) {
+                e.preventDefault();
+                window.CodexplusBoard.open(editor, b);
+            }
+        });
+        ['topologia', 'planta'].forEach(function (m) {
+            ui.addButton(m === 'planta' ? 'cxplant' : 'cxtopology', {
+                icon: m === 'planta' ? 'home' : 'code-sample',
+                text: m === 'planta' ? 'Planta' : 'Topologia',
+                tooltip: m === 'planta'
+                    ? 'Planta de execução: a planta do cliente com os equipamentos. Duplo clique num quadro edita.'
+                    : 'Topologia de rede: equipamentos, zonas e VLANs. Duplo clique num quadro edita.',
+                onAction: function () { if (window.CodexplusBoard) { window.CodexplusBoard.open(editor, null, m); } }
+            });
         });
 
         // E4-3: imagem só por arquivo (ou colar/arrastar), pelo mesmo envio das
@@ -561,7 +581,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table cxsheet link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {

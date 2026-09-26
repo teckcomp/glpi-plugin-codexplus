@@ -2048,3 +2048,57 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-sheet-foot { padding: 10px 16px; border-top: 1px solid var(--cx-border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .cx-sheet-spacer { flex: 1; }
 .cx-sheet-ok { background: var(--cx-accent); color: #fff; border-color: var(--cx-accent); }
+
+/* =========================================================================
+   23. QUADRO — PLANTA E TOPOLOGIA (bloco Q1) — public/js/codexplus-board.js
+   ========================================================================= */
+.codexplus-content .cx-board-bg, .codexplus-content .cx-board img:not(:last-of-type) { display: none !important; }
+.codexplus-content .cx-board img { max-width: 100%; height: auto; }
+html.cx-board-open { overflow: hidden; }
+.cx-board-modal { position: fixed; inset: 0; z-index: 2000; background: #f4f6f9; display: flex; flex-direction: column;
+    font-family: var(--cx-font-body, system-ui, sans-serif); }
+.cx-board-top { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--cx-border); flex-wrap: wrap; }
+.cx-board-title { font-family: var(--cx-font-display); font-size: 1.05rem; margin-right: 8px; }
+.cx-board-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.cx-board-top button { border: 1px solid var(--cx-border); background: #fff; border-radius: 6px; padding: 4px 10px; font-size: .88em; cursor: pointer; }
+.cx-board-top button:hover { background: var(--cx-surface-1); }
+.cx-board-top button:disabled { opacity: .45; cursor: default; }
+.cx-board-top button.is-on { border-color: var(--cx-accent); color: var(--cx-accent); background: #e6f1fb; }
+.cx-board-ok { background: var(--cx-accent) !important; color: #fff !important; border-color: var(--cx-accent) !important; }
+.cx-board-sep { width: 1px; height: 22px; background: var(--cx-border); margin: 0 4px; }
+.cx-board-spacer { flex: 1; }
+.cx-board-zoom { min-width: 42px; text-align: center; font-size: .85em; color: var(--cx-muted); }
+.cx-board-op { display: inline-flex; align-items: center; gap: 6px; font-size: .85em; color: var(--cx-muted); margin: 0 4px; }
+.cx-board-body { flex: 1; display: grid; grid-template-columns: 250px minmax(0, 1fr) 270px; min-height: 0; }
+.cx-board-pal, .cx-board-props { background: #fff; overflow: auto; padding: 10px; }
+.cx-board-pal { border-right: 1px solid var(--cx-border); }
+.cx-board-props { border-left: 1px solid var(--cx-border); font-size: .9em; }
+.cx-board-q { width: 100%; margin-bottom: 8px; padding: 6px 8px; border: 1px solid var(--cx-border); border-radius: 6px; }
+.cx-board-cat { font-size: .74em; text-transform: uppercase; letter-spacing: .04em; color: var(--cx-muted); margin: 10px 0 4px; font-weight: 600; }
+.cx-board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.cx-board-ic { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 2px; cursor: grab;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .7em; line-height: 1.15; color: var(--cx-text, #1d2330); touch-action: none; }
+.cx-board-ic:hover { border-color: var(--cx-border); background: var(--cx-surface-1); }
+.cx-board-ghost { position: fixed; z-index: 2100; pointer-events: none; opacity: .85; }
+.cx-board-stage { position: relative; overflow: hidden; }
+.cx-board-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; background:
+    radial-gradient(circle, #d3d9e0 1px, transparent 1px) 0 0 / 20px 20px; }
+.cx-board-paper { fill: #fff; stroke: #d3d9e0; }
+.cx-board-marq { fill: rgba(55, 138, 221, .08); stroke: #378ADD; stroke-dasharray: 4 3; }
+.cx-board-hint { position: absolute; left: 10px; bottom: 8px; font-size: .78em; color: var(--cx-muted); background: rgba(255,255,255,.85);
+    padding: 3px 8px; border-radius: 6px; pointer-events: none; }
+.cx-board-f { display: block; margin: 0 0 8px; }
+.cx-board-f span { display: block; font-size: .82em; color: var(--cx-muted); margin-bottom: 2px; }
+.cx-board-f input[type=text], .cx-board-f textarea, .cx-board-f select { width: 100%; border: 1px solid var(--cx-border); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.cx-board-f input[type=range] { width: 100%; }
+.cx-board-chk { display: flex; gap: 6px; align-items: center; font-size: .88em; margin: 0 0 8px; }
+.cx-board-sub { font-weight: 600; margin: 12px 0 6px; font-size: .88em; }
+.cx-board-none { color: var(--cx-muted); font-size: .85em; }
+.cx-board-sw { display: flex; gap: 6px; margin: 8px 0; }
+.cx-board-sw button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--cx-border); cursor: pointer; }
+.cx-board-sw button.is-on { box-shadow: 0 0 0 2px #1d2330; }
+.cx-board-rz { cursor: nwse-resize; }
+.cx-board-svg { cursor: grab; }
+.cx-board-svg.is-panning { cursor: grabbing; }
+.cx-board-svg [data-id] { cursor: move; }
+.cx-board-scale { font-size: .8em; color: var(--cx-muted); margin: 0 4px; }

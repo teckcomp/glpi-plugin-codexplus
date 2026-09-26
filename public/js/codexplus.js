@@ -162,7 +162,9 @@
                 // 0.5.8: linha de identificação montada aqui, não raspada da tela
                 doctype: '', owner: '', date_published: '', sector: '',
                 // R3b3-2: aviso de versão não vigente (rascunho, em validação)
-                draft: ''
+                draft: '',
+                // Q1: tipo sem revisão periódica — tira "rev. {revisao}" do texto
+                norev: 0
             }
         };
 
@@ -308,6 +310,9 @@
     function resolveMarkers(text, cfg, pageNumber, total) {
         if (!text) {
             return '';
+        }
+        if (cfg.document.norev) {
+            text = text.replace(/\s*[·•|\-–]?\s*rev(?:isão)?\.?\s*\{revisao\}/gi, '').replace(/\{revisao\}/g, '');
         }
         var map = {
             '{codigo}':  cfg.document.code || '',

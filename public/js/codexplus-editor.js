@@ -97,7 +97,11 @@
         var s = sizes();
         // E5: as cores vão junto (o PDF só chama sizeCss()).
         return '.cx-size-sm{font-size:' + s.sm + 'em;}'
-            + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss();
+            + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss()
+            // PL1: planilha — números à direita, total em destaque (PDF e tela).
+            + '.cx-sheet-num{text-align:right;white-space:nowrap;}'
+            + '.cx-sheet-total td{border-top:2px solid #5f6b7a;}'
+            + '.cx-sheet-alt td{background-color:#e6f1fb;-webkit-print-color-adjust:exact;print-color-adjust:exact;}';
     }
 
     /* CSS dentro do editor (iframe do TinyMCE, que não carrega o CSS do
@@ -114,7 +118,10 @@
             + '.cx-callout-note{background:#e6f1fb;border-color:#378add;}'
             // Tabela como na leitura e no PDF (E3): largura total e bordas.
             + 'table{border-collapse:collapse;width:100%;}'
-            + 'td,th{border:1px solid #d3d9e0;padding:6px 8px;}th{background:#f6f8fa;}';
+            + 'td,th{border:1px solid #d3d9e0;padding:6px 8px;}th{background:#f6f8fa;}'
+            // PL1: a planilha é um bloco só (duplo clique edita).
+            + '.cx-sheet{outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;margin:0 0 12px;}'
+            + '.cx-sheet table{margin:0;}';
     }
 
     function hasClass(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
@@ -468,6 +475,23 @@
             scope: 'node'
         });
 
+        // PL1: planilha no corpo (codexplus-sheet.js). Duplo clique edita.
+        ui.addButton('cxsheet', {
+            icon: 'table-insert-column-after',
+            text: 'Planilha',
+            tooltip: 'Inserir planilha (Qtd, item, valores e total). Duplo clique numa planilha edita.',
+            onAction: function () {
+                if (window.CodexplusSheet) { window.CodexplusSheet.open(editor, null); }
+            }
+        });
+        editor.on('dblclick', function (e) {
+            var n = e.target && editor.dom.getParent(e.target, 'div.cx-sheet');
+            if (n && window.CodexplusSheet) {
+                e.preventDefault();
+                window.CodexplusSheet.open(editor, n);
+            }
+        });
+
         // E4-3: imagem só por arquivo (ou colar/arrastar), pelo mesmo envio das
         // coladas. A janela nativa "Inserir/editar imagem" saiu: ela prendia o
         // Salvar (relato de Claudio, 24/09/2026) e aceitava endereço externo,
@@ -534,7 +558,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {

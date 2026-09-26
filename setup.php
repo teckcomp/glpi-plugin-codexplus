@@ -66,7 +66,7 @@ function plugin_init_codexplus(): void
     // Os estáticos ficam em public/ — no GLPI 11 o roteador só serve
     // arquivos não-PHP a partir dessa pasta.
     $PLUGIN_HOOKS[Hooks::ADD_CSS]['codexplus']        = 'css/codexplus.css';
-    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = ['js/codexplus.js', 'js/codexplus-org.js', 'js/codexplus-grid.js', 'js/codexplus-perm.js', 'js/codexplus-docform.js', 'js/codexplus-editor.js', 'js/codexplus-export.js', 'js/codexplus-annotate.js'];
+    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = ['js/codexplus.js', 'js/codexplus-org.js', 'js/codexplus-grid.js', 'js/codexplus-perm.js', 'js/codexplus-docform.js', 'js/codexplus-editor.js', 'js/codexplus-sheet.js', 'js/codexplus-export.js', 'js/codexplus-annotate.js'];
 }
 /**
  * Metadados do plugin.

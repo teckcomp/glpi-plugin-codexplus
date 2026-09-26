@@ -359,12 +359,19 @@
             Array.prototype.forEach.call(tr.cells, function (td) {
                 var th = td.nodeName === 'TH';
                 var inner = [];
-                self.children(td, { fmt: Object.assign(self.blockFmt(td, {}), th ? { bold: true } : {}), para: {} }, inner);
+                // PL1: números da planilha à direita, como na tela e no PDF.
+                var num = (' ' + (td.className || '') + ' ').indexOf(' cx-sheet-num ') !== -1;
+                self.children(td, { fmt: Object.assign(self.blockFmt(td, {}), th ? { bold: true } : {}),
+                    para: num ? { alignment: D.AlignmentType.RIGHT } : {} }, inner);
                 if (!inner.length) { inner.push(new D.Paragraph({ children: [] })); }
                 var o = { children: inner, margins: { top: 60, bottom: 60, left: 100, right: 100 } };
                 if (td.colSpan > 1) { o.columnSpan = td.colSpan; }
                 if (td.rowSpan > 1) { o.rowSpan = td.rowSpan; }
                 if (th) { o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'F3F4F6' }; }
+                // PL1: linhas alternadas da planilha com fundo azul claro.
+                if ((' ' + (tr.className || '') + ' ').indexOf(' cx-sheet-alt ') !== -1) {
+                    o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'E6F1FB' };
+                }
                 cells.push(new D.TableCell(o));
             });
             if (cells.length) { rows.push(new D.TableRow({ children: cells, tableHeader: tr.parentNode && tr.parentNode.nodeName === 'THEAD' })); }

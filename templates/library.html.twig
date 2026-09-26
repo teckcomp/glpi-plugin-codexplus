@@ -3,7 +3,12 @@
    Entrada de quem só lê (e do Self-Service); aba do Painel para quem produz.
    Busca e filtro por tipo no navegador (public/js/codexplus.js não é
    envolvido: o script abaixo só esconde linhas).
-   Variáveis: shelf (sectors, total, types), doctypes, client_types, producer, form_url.
+   R5 (Claudio, 26/09/2026): para quem produz, a mesma prateleira com
+   filtro de Situação (padrão Publicados), "Só os meus" (responsável) e a
+   Lixeira, com Restaurar. Substitui a antiga tela Documentos.
+   Variáveis: shelf (sectors, total, types, status), doctypes, client_types,
+   producer, can_templates, statuses, trash, me, q, situacao, self, csrf,
+   form_url.
    Estilos em public/css/codexplus.css, seção 21. #}
 <div class="codexplus-app cx-lib" data-cx-lib>
 
@@ -18,7 +23,6 @@
         {% endif %}
         <a href="library.php" class="is-active">{{ __('Biblioteca', 'codexplus') }}</a>
         {% if producer %}
-            <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
             {% if can_templates %}<a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>{% endif %}
         {% endif %}
     </nav>
@@ -26,9 +30,22 @@
     <div class="cx-lib-bar">
         <label class="cx-lib-search">
             <i class="ti ti-search"></i>
-            <input type="search" data-cx-lib-q placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
+            <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
                    aria-label="{{ __('Buscar por título ou código', 'codexplus') }}">
         </label>
+        {% if producer %}
+            <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por situação', 'codexplus') }}">
+                {% for k, label in statuses|merge({'todos': __('Todos', 'codexplus')}) %}
+                    <button type="button" class="cx-lib-type{{ situacao == k ? ' is-active' : '' }}" data-cx-lib-st="{{ k }}">
+                        {{ label }}{% if k != 'todos' %} <span>{{ shelf.status[k] ?? 0 }}</span>{% else %} <span>{{ shelf.total }}</span>{% endif %}
+                    </button>
+                {% endfor %}
+                <button type="button" class="cx-lib-type{{ situacao == 'lixeira' ? ' is-active' : '' }}" data-cx-lib-st="lixeira">
+                    <i class="ti ti-trash"></i> {{ __('Lixeira', 'codexplus') }} <span>{{ trash|length }}</span>
+                </button>
+            </div>
+            <label class="cx-lib-mine"><input type="checkbox" data-cx-lib-mine> {{ __('Só os meus (responsável)', 'codexplus') }}</label>
+        {% endif %}
         <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por tipo', 'codexplus') }}">
             <button type="button" class="cx-lib-type is-active" data-cx-lib-type="">{{ __('Todos', 'codexplus') }} <span>{{ shelf.total }}</span></button>
             {% for t, n in shelf.types %}
@@ -55,7 +72,8 @@
                     <h3><i class="ti ti-folder"></i> {{ c.name }}</h3>
                     <ul class="cx-lib-list">
                         {% for d in c.docs %}
-                            <li class="cx-lib-doc" data-type="{{ d.doctype }}"
+                            <li class="cx-lib-doc" data-type="{{ d.doctype }}" data-status="{{ d.status }}"
+                                data-mine="{{ d.owner_id == me ? '1' : '0' }}"
                                 data-text="{{ (d.code ~ ' ' ~ d.name)|lower }}">
                                 <span class="codexplus-code cx-code-chip cx-code-type-{{ d.doctype }}">{{ d.code }}</span>
                                 <a class="codexplus-doc-link" href="{{ form_url }}?id={{ d.id }}">{{ d.name }}</a>
@@ -63,6 +81,9 @@
                                     {{ doctypes[d.doctype] ?? d.doctype }}
                                     {% if d.client_name and d.doctype in client_types %} · {{ d.client_name }}{% endif %}
                                 </span>
+                                {% if producer and d.status != 'publicado' %}
+                                    <span class="cx-lib-tag">{{ statuses[d.status] ?? d.status }}</span>
+                                {% endif %}
                                 {% if d.in_revision %}
                                     <span class="cx-lib-tag">{{ __('em atualização', 'codexplus') }}</span>
                                 {% endif %}
@@ -77,6 +98,32 @@
         </details>
     {% endfor %}
 
+    {% if producer %}
+        <section class="cx-lib-sector cx-lib-trash" data-cx-lib-trash hidden>
+            <h3 class="cx-lib-trash-title"><i class="ti ti-trash"></i> {{ __('Lixeira', 'codexplus') }}</h3>
+            {% if trash is empty %}
+                <p class="cx-lib-none">{{ __('A lixeira está vazia.', 'codexplus') }}</p>
+            {% else %}
+                <ul class="cx-lib-list">
+                    {% for d in trash %}
+                        <li class="cx-lib-doc">
+                            <span class="codexplus-code cx-code-chip cx-code-type-{{ d.doctype }}">{{ d.code }}</span>
+                            <span>{{ d.name }}</span>
+                            <span class="cx-lib-meta">{{ __('excluído', 'codexplus') }} {{ d.date_mod|date('d/m/Y') }}</span>
+                            <form method="post" action="{{ self }}" style="margin-left:auto">
+                                <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                                <input type="hidden" name="id" value="{{ d.id }}">
+                                <button type="submit" name="restore" value="1" class="codexplus-btn">
+                                    <i class="ti ti-restore"></i> {{ __('Restaurar', 'codexplus') }}
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    {% endif %}
+
     <p class="cx-lib-none" data-cx-lib-none hidden>{{ __('Nada encontrado com esse filtro.', 'codexplus') }}</p>
 </div>
 
@@ -86,11 +133,21 @@
     if (!root) { return; }
     var q = root.querySelector('[data-cx-lib-q]');
     var tipo = '';
+    // R5: situação (só para quem produz; leitor não tem os botões e vê só publicados).
+    var stBtn = root.querySelector('[data-cx-lib-st].is-active');
+    var st = stBtn ? stBtn.getAttribute('data-cx-lib-st') : '';
+    var mine = root.querySelector('[data-cx-lib-mine]');
+    var lixo = root.querySelector('[data-cx-lib-trash]');
     function aplica() {
         var termo = (q.value || '').trim().toLowerCase();
         var algum = false;
-        root.querySelectorAll('.cx-lib-doc').forEach(function (li) {
-            var ok = (!tipo || li.getAttribute('data-type') === tipo)
+        var naLixeira = st === 'lixeira';
+        if (lixo) { lixo.hidden = !naLixeira; }
+        root.querySelectorAll('.cx-lib-sector:not(.cx-lib-trash) .cx-lib-doc').forEach(function (li) {
+            var ok = !naLixeira
+                && (!st || st === 'todos' || li.getAttribute('data-status') === st)
+                && (!mine || !mine.checked || li.getAttribute('data-mine') === '1')
+                && (!tipo || li.getAttribute('data-type') === tipo)
                 && (!termo || li.getAttribute('data-text').indexOf(termo) >= 0);
             li.hidden = !ok;
             algum = algum || ok;
@@ -98,14 +155,22 @@
         root.querySelectorAll('.cx-lib-category').forEach(function (sec) {
             sec.hidden = !sec.querySelector('.cx-lib-doc:not([hidden])');
         });
-        root.querySelectorAll('.cx-lib-sector').forEach(function (s) {
+        root.querySelectorAll('.cx-lib-sector:not(.cx-lib-trash)').forEach(function (s) {
             s.hidden = !s.querySelector('.cx-lib-doc:not([hidden])');
             if (termo || tipo) { s.open = true; }
         });
         var none = root.querySelector('[data-cx-lib-none]');
-        if (none) { none.hidden = algum || !root.querySelector('.cx-lib-doc'); }
+        if (none) { none.hidden = naLixeira || algum || !root.querySelector('.cx-lib-sector:not(.cx-lib-trash) .cx-lib-doc'); }
     }
     q.addEventListener('input', aplica);
+    if (mine) { mine.addEventListener('change', aplica); }
+    root.querySelectorAll('[data-cx-lib-st]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            st = b.getAttribute('data-cx-lib-st');
+            root.querySelectorAll('[data-cx-lib-st]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+            aplica();
+        });
+    });
     root.querySelectorAll('[data-cx-lib-type]').forEach(function (b) {
         b.addEventListener('click', function () {
             tipo = b.getAttribute('data-cx-lib-type');
@@ -113,5 +178,6 @@
             aplica();
         });
     });
+    aplica();
 })();
 </script>

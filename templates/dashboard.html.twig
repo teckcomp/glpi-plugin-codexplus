@@ -21,18 +21,29 @@
         {% if not reader_only %}
         {# S1: no Self-Service só o Painel (lê o modelo novo); a tela
            Documentos ainda é a da Base de Conhecimento até a R5. #}
-        <a href="wiki.php">{{ __('Documentos', 'codexplus') }}</a>
         {% if can_templates %}<a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>{% endif %}
         {% endif %}
     </nav>
 
+    {% if legacy_count > 0 %}
+        {# R4: documentos ainda no modelo antigo (Base de Conhecimento). #}
+        <div class="cx-notice cx-notice--warn" style="margin:12px 0">
+            <i class="ti ti-transfer"></i>
+            <div>
+                <strong>{{ __('%d documento(s) ainda no modelo antigo', 'codexplus')|format(legacy_count) }}</strong>
+                <div class="cx-notice-text">{{ __('Eles não aparecem na Biblioteca nem no Painel até serem migrados.', 'codexplus') }}</div>
+                <div class="cx-notice-actions"><a class="codexplus-btn" href="migrate.php"><i class="ti ti-transfer"></i> {{ __('Ver e migrar', 'codexplus') }}</a></div>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="cx-dash-actionbar">
         {% if not reader_only %}
         {# S1: a busca ainda é a da tela Documentos (modelo antigo) até a R5. #}
-        <form method="get" action="wiki.php" class="cx-dash-search">
+        <form method="get" action="library.php" class="cx-dash-search">
             <i class="ti ti-search"></i>
             <input type="text" name="q"
-                   placeholder="{{ __('Buscar por título, código ou conteúdo…', 'codexplus') }}">
+                   placeholder="{{ __('Buscar por título ou código…', 'codexplus') }}">
         </form>
         {% endif %}
         {% if can_create %}

@@ -8,7 +8,6 @@
  * documento controlado, modelos de POP).
  */
 use Glpi\Plugin\Hooks;
-use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\ProfileTab;
 use GlpiPlugin\Codexplus\Wiki;
 define('PLUGIN_CODEXPLUS_VERSION', '0.6.9-alpha');
@@ -51,12 +50,6 @@ function plugin_init_codexplus(): void
             'tools' => Wiki::class,
         ];
     }
-    // Aba "Codex+" na ficha nativa do artigo (Etapa 2a): edita tipo, status,
-    // responsável, validade e revisão, e mostra o código derivado. Não altera
-    // nada da tabela nativa — grava só na satélite glpi_plugin_codexplus_documents.
-    Plugin::registerClass(DocumentMeta::class, [
-        'addtabon' => 'KnowbaseItem',
-    ]);
 
     // Aba "Codex+" em Administração > Perfis (Etapa R1): matriz de direitos
     // do plugin, gravada pelo formulário nativo de Perfil.

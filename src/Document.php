@@ -112,7 +112,7 @@ class Document extends CommonDBTM
     {
         return [
             self::STATUS_DRAFT      => __('Rascunho', 'codexplus'),
-            self::STATUS_APPROVAL   => __('Aguardando gestor', 'codexplus'),
+            self::STATUS_APPROVAL   => __('Aguardando responsável', 'codexplus'),
             self::STATUS_VALIDATION => __('Aguardando auditor', 'codexplus'),
             self::STATUS_PUBLISHED  => __('Publicado', 'codexplus'),
             self::STATUS_OBSOLETE   => __('Obsoleto', 'codexplus'),
@@ -345,7 +345,8 @@ class Document extends CommonDBTM
         if (!$this->checkEntity(true)) {
             return false;
         }
-        if (self::hasViewAll() || $this->hasRole()) {
+        // R5: o Super-Admin lê tudo pela regra, não só pelo bit Ver todos.
+        if (self::hasViewAll() || Rights::isSuperAdmin() || $this->hasRole()) {
             return true;
         }
         // R6-a: durante a revisão o leitor continua lendo — a versão
@@ -706,7 +707,7 @@ class Document extends CommonDBTM
         // checkEntity(true) de canViewItem().
         $where = [getEntitiesRestrictCriteria($doc, '', '', true)];
 
-        if (self::hasViewAll()) {
+        if (self::hasViewAll() || Rights::isSuperAdmin()) { // R5: espelho de canViewItem
             return ['LEFT JOIN' => $join, 'WHERE' => $where];
         }
 

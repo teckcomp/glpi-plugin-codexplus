@@ -1,7 +1,6 @@
 <?php
 namespace GlpiPlugin\Codexplus;
 
-use KnowbaseItem;
 
 /**
  * Painel do Codex+ — Etapas 6b/6c.
@@ -31,117 +30,6 @@ class Dashboard
 
     /** A partir de quantos dias sem alteração um rascunho conta como parado. */
     public const STALE_DRAFT_DAYS = 30;
-
-    /**
-     * Todos os documentos visíveis com metadados, já com o vencimento
-     * calculado. Base de tudo que o Painel mostra.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public static function loadAll(): array
-    {
-        /** @var \DBmysql $DB */
-        global $DB;
-
-        $meta = DocumentMeta::getTable();
-        $vis  = KnowbaseItem::getVisibilityCriteria();
-
-        $join = $vis['LEFT JOIN'];
-        $join[$meta] = [
-            'ON' => [
-                $meta                => 'knowbaseitems_id',
-                'glpi_knowbaseitems' => 'id',
-            ],
-        ];
-
-        $criteria = [
-            'SELECT' => [
-                'glpi_knowbaseitems.id',
-                'glpi_knowbaseitems.name',
-                'glpi_knowbaseitems.date_mod',
-                $meta . '.doctype',
-                $meta . '.sequence',
-                $meta . '.revision',
-                $meta . '.status',
-                $meta . '.users_id_owner',
-                $meta . '.validity_months',
-                $meta . '.client_name',
-                $meta . '.date_published',
-            ],
-            'DISTINCT'  => true,
-            'FROM'      => 'glpi_knowbaseitems',
-            'LEFT JOIN' => $join,
-            'WHERE'     => $vis['WHERE'],
-            'ORDER'     => 'glpi_knowbaseitems.date_mod DESC',
-        ];
-
-        $docs = [];
-        $ids  = [];
-
-        foreach ($DB->request($criteria) as $r) {
-            $id    = (int) $r['id'];
-            $ids[] = $id;
-
-            $doctype = (string) ($r['doctype'] ?? '');
-            $seq     = (int) ($r['sequence'] ?? 0);
-
-            $code = ($doctype !== '' && $seq > 0)
-                ? sprintf('%s%04d:%02d', $doctype, $seq, (int) $r['revision'])
-                : '';
-
-            $expiry = self::expiry(
-                $r['date_published'] ?? null,
-                (int) ($r['validity_months'] ?? 0),
-                (string) ($r['status'] ?? '')
-            );
-
-            $docs[$id] = [
-                'id'           => $id,
-                'name'         => (string) $r['name'],
-                'date_mod'     => $r['date_mod'],
-                'date_mod_ts'  => $r['date_mod'] ? (strtotime($r['date_mod']) ?: 0) : 0,
-                'doctype'      => $doctype,
-                'status'       => (string) ($r['status'] ?? ''),
-                'code'         => $code,
-                'client_name'  => (string) ($r['client_name'] ?? ''),
-                'category'     => '',
-                'has_category' => false,
-                'expiry'       => $expiry['state'],
-                'due_ts'       => $expiry['due'],
-            ];
-        }
-
-        // Categoria (relação N:N) em uma query em lote.
-        if ($ids) {
-            foreach ($DB->request([
-                'SELECT' => [
-                    'glpi_knowbaseitems_knowbaseitemcategories.knowbaseitems_id AS kbid',
-                    'glpi_knowbaseitemcategories.completename AS catname',
-                ],
-                'FROM'      => 'glpi_knowbaseitems_knowbaseitemcategories',
-                'LEFT JOIN' => [
-                    'glpi_knowbaseitemcategories' => [
-                        'ON' => [
-                            'glpi_knowbaseitemcategories'               => 'id',
-                            'glpi_knowbaseitems_knowbaseitemcategories' => 'knowbaseitemcategories_id',
-                        ],
-                    ],
-                ],
-                'WHERE' => ['glpi_knowbaseitems_knowbaseitemcategories.knowbaseitems_id' => $ids],
-                'ORDER' => 'glpi_knowbaseitemcategories.completename',
-            ]) as $c) {
-                $kbid = (int) $c['kbid'];
-                if (isset($docs[$kbid])) {
-                    $docs[$kbid]['has_category'] = true;
-                    if ($docs[$kbid]['category'] === '') {
-                        $docs[$kbid]['category'] = (string) $c['catname'];
-                    }
-                }
-            }
-        }
-
-        return array_values($docs);
-    }
 
     /**
      * Delega para DocumentMeta::expiryState(), que é a fonte única da regra

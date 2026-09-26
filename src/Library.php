@@ -19,14 +19,16 @@ final class Library
     /**
      * @return array{sectors: array<int, array{name: string, total: int, categories: array<int, array{name: string, docs: array<int, array<string, mixed>>}>}>, total: int, types: array<string, int>}
      */
-    public static function shelf(): array
+    public static function shelf(bool $allStatuses = false): array
     {
         /** @var \DBmysql $DB */
         global $DB;
 
+        // R5: quem produz vê todas as situações que a visibilidade libera
+        // (a tela filtra; padrão = publicados). Quem só lê, só publicados.
         $docs = array_filter(
             Dashboard::loadAllNew(),
-            static fn ($d) => $d['status'] === Document::STATUS_PUBLISHED
+            static fn ($d) => $allStatuses || $d['status'] === Document::STATUS_PUBLISHED
         );
 
         // Pares (setor, categoria) de cada documento; sem categoria vai para
@@ -79,6 +81,43 @@ final class Library
             $out[] = $bloco;
         }
         ksort($types);
-        return ['sectors' => $out, 'total' => count($docs), 'types' => $types];
+        $status = [];
+        foreach ($docs as $d) {
+            $status[$d['status']] = ($status[$d['status']] ?? 0) + 1;
+        }
+        return ['sectors' => $out, 'total' => count($docs), 'types' => $types, 'status' => $status];
+    }
+
+    /**
+     * Lixeira (R5): documentos excluídos que a pessoa pode restaurar
+     * (Document::canDeleteItem: bit Excluir + gerir o documento).
+     *
+     * @return array<int, array{id:int, code:string, name:string, doctype:string, date_mod:string}>
+     */
+    public static function trash(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $out = [];
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => Document::getTable(),
+            'WHERE'  => ['knowbaseitems_id' => 0, 'is_deleted' => 1],
+            'ORDER'  => ['date_mod DESC'],
+        ]) as $r) {
+            $d = new Document();
+            if (!$d->getFromDB((int) $r['id']) || !$d->canDeleteItem()) {
+                continue;
+            }
+            $out[] = [
+                'id'       => (int) $d->fields['id'],
+                'code'     => $d->getCode(),
+                'name'     => (string) $d->fields['name'],
+                'doctype'  => (string) $d->fields['doctype'],
+                'date_mod' => (string) $d->fields['date_mod'],
+            ];
+        }
+        return $out;
     }
 }

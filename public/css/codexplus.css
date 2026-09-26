@@ -2010,3 +2010,6 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-lib-empty { text-align: center; color: var(--cx-muted); padding: 40px 10px; }
 .cx-lib-empty .ti { font-size: 2.2rem; }
 .cx-lib-none { color: var(--cx-muted); text-align: center; padding: 20px; }
+/* R5: filtros de quem produz e lixeira na Biblioteca (seção 21). */
+.cx-lib-mine { display: inline-flex; align-items: center; gap: 6px; font-size: .88em; color: var(--cx-muted); margin: 0; }
+.cx-lib-trash-title { font-family: var(--cx-font-display); font-size: 1.05rem; margin: 12px 0 8px; display: flex; gap: 8px; align-items: center; }

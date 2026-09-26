@@ -266,6 +266,22 @@ if ($id > 0 && isset($_POST['duplicate'])) {
 }
 
 // -------------------------------------------------------------------------
+// POST — excluir (R5): vai para a lixeira (is_deleted); restaurar é na
+// Biblioteca, filtro Lixeira. Quem pode: Document::canDeleteItem.
+// -------------------------------------------------------------------------
+if ($id > 0 && isset($_POST['delete_doc'])) {
+    if (!$doc->canDeleteItem()) {
+        Session::addMessageAfterRedirect(__('Sem direito de excluir este documento.', 'codexplus'), false, ERROR);
+        Html::redirect($self . '?id=' . $id);
+    }
+    $codigo = $doc->getCode();
+    if ($doc->delete(['id' => $id])) {
+        Session::addMessageAfterRedirect(sprintf(__('%s foi para a lixeira. Dá para restaurar na Biblioteca, filtro Lixeira.', 'codexplus'), $codigo));
+    }
+    Html::redirect($CFG_GLPI['root_doc'] . '/plugins/codexplus/front/library.php');
+}
+
+// -------------------------------------------------------------------------
 // POST — salvar como modelo (M1, Claudio 26/09/2026): o corpo GRAVADO vira um
 // modelo novo do mesmo tipo, para quem tem "Gerenciar modelos". Imagens não
 // vão (Template::stripImages): são arquivos deste documento.
@@ -830,6 +846,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
     // Duplicar = poder criar (P1).
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
+    // R5: excluir (lixeira).
+    'can_delete'   => !$isNew && !$version['on'] && !$preview && $doc->canDeleteItem() && empty($doc->fields['is_deleted']),
     // M1: salvar o corpo gravado como modelo.
     'can_save_template' => !$isNew && !$version['on'] && !$isDiagram && Session::haveRight(Rights::NAME, Rights::TEMPLATES),
     // R3b3-1: anexos (fora as imagens coladas no corpo mostrado).

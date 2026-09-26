@@ -1,0 +1,67 @@
+{# Codex+ — R4: prévia e confirmação da migração do modelo antigo.
+   Variáveis: rows, self, form_url, csrf. #}
+<div class="codexplus-app">
+    {% include '@codexplus/parts/brand.html.twig' with {
+        title: __('Codex+', 'codexplus'),
+        subtitle: __('Migrar documentos da Base de Conhecimento', 'codexplus'),
+    } only %}
+
+    <nav class="codexplus-nav">
+        <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
+        <a href="library.php">{{ __('Biblioteca', 'codexplus') }}</a>
+        <a href="migrate.php" class="is-active">{{ __('Migração', 'codexplus') }}</a>
+    </nav>
+
+    {% if rows is empty %}
+        <div class="cx-notice cx-notice--info" style="margin-top:16px">
+            <i class="ti ti-circle-check"></i>
+            <div>{{ __('Nada a migrar: todos os documentos já estão no modelo novo.', 'codexplus') }}</div>
+        </div>
+    {% else %}
+        <p class="codexplus-form-hint" style="margin:16px 0">
+            {{ __('Cada documento mantém o código, a situação, o responsável e as datas; título, corpo, categorias, leitores e arquivos vêm do artigo. O artigo da Base de Conhecimento fica intocado. Categorias que não existem no Codex+ são criadas com o mesmo nome, sem setor: depois é só ligar o setor em Configurar > Listas suspensas > Codex+.', 'codexplus') }}
+        </p>
+        <form method="post" action="{{ self }}">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+            <table class="codexplus-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>{{ __('Código', 'codexplus') }}</th>
+                        <th>{{ __('Título', 'codexplus') }}</th>
+                        <th>{{ __('Situação', 'codexplus') }}</th>
+                        <th>{{ __('Categorias', 'codexplus') }}</th>
+                        <th>{{ __('Leitores', 'codexplus') }}</th>
+                        <th>{{ __('Arquivos', 'codexplus') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                        <tr>
+                            <td><input type="checkbox" name="ids[]" value="{{ r.id }}" {{ r.kb_exists ? 'checked' : 'disabled' }}></td>
+                            <td><span class="codexplus-code cx-code-chip cx-code-type-{{ r.doctype }}">{{ r.code }}</span></td>
+                            <td>{{ r.kb_exists ? r.name : __('(artigo não existe mais)', 'codexplus') }}</td>
+                            <td>{{ r.status }}</td>
+                            <td>{{ r.categories ? r.categories|join(', ') : '—' }}</td>
+                            <td>
+                                {{ r.readers.profiles }} {{ __('perfil(is)', 'codexplus') }},
+                                {{ r.readers.groups }} {{ __('grupo(s)', 'codexplus') }},
+                                {{ r.readers.users }} {{ __('usuário(s)', 'codexplus') }}
+                                {% if r.readers.entities > 0 %}
+                                    <br><span class="codexplus-muted">{{ r.readers.entities }} {{ __('por entidade (não migra)', 'codexplus') }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ r.files }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="margin-top:14px">
+                <button type="submit" name="migrate" value="1" class="codexplus-btn codexplus-btn-primary"
+                        onclick="return confirm('{{ __('Migrar os documentos marcados para o modelo novo? Isso não tem desfazer pela tela.', 'codexplus')|e('js') }}');">
+                    <i class="ti ti-transfer"></i> {{ __('Migrar marcados', 'codexplus') }}
+                </button>
+            </div>
+        </form>
+    {% endif %}
+</div>

@@ -5,7 +5,6 @@ use CommonDBTM;
 use CommonGLPI;
 use Dropdown;
 use Html;
-use KnowbaseItem;
 use Session;
 use User;
 
@@ -209,22 +208,6 @@ class DocumentMeta extends CommonDBTM
     }
 
     /**
-     * Carrega (ou instancia vazio) o metadado de um artigo.
-     */
-    public static function getForKnowbaseItem(int $kbId): self
-    {
-        $meta = new self();
-        if (!$meta->getFromDBByCrit(['knowbaseitems_id' => $kbId])) {
-            $meta->getEmpty();
-            $meta->fields['knowbaseitems_id'] = $kbId;
-            $meta->fields['status']           = 'rascunho';
-            $meta->fields['revision']         = 0;
-            $meta->fields['validity_months']  = self::DEFAULT_VALIDITY_MONTHS;
-        }
-        return $meta;
-    }
-
-    /**
      * Estado de vencimento + data de vencimento em timestamp.
      *
      * Regras (do documento de contexto):
@@ -391,148 +374,5 @@ class DocumentMeta extends CommonDBTM
         }
 
         return $input;
-    }
-
-    // ---------------------------------------------------------------------
-    // Aba na ficha nativa do KnowbaseItem
-    // ---------------------------------------------------------------------
-
-    public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
-    {
-        if ($item instanceof KnowbaseItem && !$item->isNewItem()) {
-            return self::getTypeName();
-        }
-        return '';
-    }
-
-    public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
-    {
-        if ($item instanceof KnowbaseItem) {
-            self::showForKnowbaseItem($item);
-        }
-        return true;
-    }
-
-    /**
-     * Formulário dos metadados dentro da aba. Usa os helpers nativos
-     * (Dropdown / User::dropdown) para combinar com o visual da ficha.
-     */
-    public static function showForKnowbaseItem(KnowbaseItem $kb): void
-    {
-        /** @var array $CFG_GLPI */
-        global $CFG_GLPI;
-
-        $meta    = self::getForKnowbaseItem($kb->getID());
-        $canedit = $kb->canUpdateItem();
-        $code    = $meta->getCode();
-
-        echo "<div class='codexplus-meta-tab'>";
-
-        // Faixa do código derivado.
-        echo "<div class='codexplus-meta-code'>";
-        echo "<span class='codexplus-meta-code-label'>"
-            . __('Código do documento', 'codexplus') . "</span>";
-        if ($code !== '') {
-            echo "<span class='codexplus-meta-code-value'>"
-                . htmlescape($code) . "</span>";
-        } else {
-            echo "<span class='codexplus-meta-code-empty'>"
-                . __('será gerado ao salvar com um tipo', 'codexplus') . "</span>";
-        }
-        echo "</div>";
-
-        echo "<form method='post' action='"
-            . htmlescape($CFG_GLPI['root_doc'] . '/plugins/codexplus/front/documentmeta.form.php') . "'>";
-        echo Html::hidden('knowbaseitems_id', ['value' => $kb->getID()]);
-
-        echo "<table class='tab_cadre_fixe'>";
-
-        // Tipo
-        echo "<tr class='tab_bg_1'><td width='32%'>" . __('Tipo', 'codexplus') . "</td><td>";
-        if ($canedit) {
-            Dropdown::showFromArray('doctype', self::getDoctypes(), [
-                'value'               => $meta->fields['doctype'] ?? '',
-                'display_emptychoice' => true,
-            ]);
-        } else {
-            echo htmlescape($meta->fields['doctype'] ?: '—');
-        }
-        echo "</td></tr>";
-
-        // Status
-        echo "<tr class='tab_bg_1'><td>" . __('Status', 'codexplus') . "</td><td>";
-        if ($canedit) {
-            Dropdown::showFromArray('status', self::getStatuses(), [
-                'value' => $meta->fields['status'] ?: 'rascunho',
-            ]);
-        } else {
-            echo htmlescape($meta->fields['status'] ?: '—');
-        }
-        echo "</td></tr>";
-
-        // Responsável
-        echo "<tr class='tab_bg_1'><td>" . __('Responsável', 'codexplus') . "</td><td>";
-        if ($canedit) {
-            User::dropdown([
-                'name'   => 'users_id_owner',
-                'value'  => $meta->fields['users_id_owner'] ?? 0,
-                'right'  => 'all',
-                'entity' => $_SESSION['glpiactive_entity'] ?? 0,
-            ]);
-        } else {
-            $owner = (int) ($meta->fields['users_id_owner'] ?? 0);
-            echo htmlescape($owner ? getUserName($owner) : '—');
-        }
-        echo "</td></tr>";
-
-        // Validade
-        echo "<tr class='tab_bg_1'><td>"
-            . __('Validade (meses — 0 = não vence, caso das propostas)', 'codexplus')
-            . "</td><td>";
-        $validity = (int) ($meta->fields['validity_months'] ?? self::DEFAULT_VALIDITY_MONTHS);
-        if ($canedit) {
-            echo "<input type='number' min='0' name='validity_months' value='" . $validity
-                . "' class='form-control'>";
-        } else {
-            echo $validity;
-        }
-        echo "</td></tr>";
-
-        // Revisão
-        echo "<tr class='tab_bg_1'><td>" . __('Revisão', 'codexplus') . "</td><td>";
-        $revision = (int) ($meta->fields['revision'] ?? 0);
-        if ($canedit) {
-            echo "<input type='number' min='0' name='revision' value='" . $revision
-                . "' class='form-control'>";
-            echo "<div class='codexplus-meta-hint'>"
-                . __('Suba a revisão só ao publicar uma versão de propósito — o histórico nativo já registra cada alteração.', 'codexplus')
-                . "</div>";
-        } else {
-            echo $revision;
-        }
-        echo "</td></tr>";
-
-        // Cliente (relevante só para Proposta)
-        echo "<tr class='tab_bg_1'><td>" . __('Cliente (somente Proposta)', 'codexplus') . "</td><td>";
-        if ($canedit) {
-            echo "<input type='text' name='client_name' value='"
-                . htmlescape($meta->fields['client_name'] ?? '')
-                . "' class='form-control'>";
-        } else {
-            echo htmlescape(($meta->fields['client_name'] ?? '') !== '' ? $meta->fields['client_name'] : '—');
-        }
-        echo "</td></tr>";
-
-        if ($canedit) {
-            echo "<tr class='tab_bg_2'><td colspan='2' class='center'>";
-            echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
-            echo "<button type='submit' name='save' class='btn btn-primary'>"
-                . __('Salvar', 'codexplus') . "</button>";
-            echo "</td></tr>";
-        }
-
-        echo "</table>";
-        echo "</form>";
-        echo "</div>";
     }
 }

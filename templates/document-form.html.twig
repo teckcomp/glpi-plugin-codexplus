@@ -30,6 +30,17 @@
                         </button>
                     </form>
                 {% endif %}
+                {% if can_delete %}
+                    {# R5: vai para a lixeira; restaurar na Biblioteca. #}
+                    <form method="post" action="{{ self }}" class="cx-docform-dup">
+                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="id" value="{{ id }}">
+                        <button type="submit" name="delete_doc" value="1" class="codexplus-btn cx-btn-danger-outline"
+                                onclick="return confirm('{{ __('Mandar este documento para a lixeira? Dá para restaurar depois, na Biblioteca.', 'codexplus')|e('js') }}');">
+                            <i class="ti ti-trash"></i> {{ __('Excluir', 'codexplus') }}
+                        </button>
+                    </form>
+                {% endif %}
                 {% if can_save_template %}
                     {# M1: o corpo gravado vira modelo do mesmo tipo. #}
                     <form method="post" action="{{ self }}" class="cx-docform-dup">

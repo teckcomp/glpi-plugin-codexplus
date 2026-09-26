@@ -45,6 +45,9 @@ TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
     'form_url'   => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php',
     'reader_only' => Session::getCurrentInterface() === 'helpdesk',
     'can_templates' => Session::haveRight(Rights::NAME, Rights::TEMPLATES),
+    // R4: aviso ao Super-Admin enquanto houver documento no modelo antigo.
+    'legacy_count'  => \GlpiPlugin\Codexplus\LegacyMigration::canRun()
+        ? count(\GlpiPlugin\Codexplus\LegacyMigration::candidates()) : 0,
 ]);
 
 Wiki::pageFooter();

@@ -3,7 +3,6 @@ namespace GlpiPlugin\Codexplus\Console;
 
 use Glpi\Console\AbstractCommand;
 use GlpiPlugin\Codexplus\Document;
-use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\Document_Group;
 use GlpiPlugin\Codexplus\Document_Profile;
 use GlpiPlugin\Codexplus\Document_User;
@@ -42,8 +41,6 @@ class DocumentCreateCommand extends AbstractCommand
         $this->addOption('target-profile', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: perfil (nome), repetível');
         $this->addOption('user', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Alvo: usuário (login), repetível');
         $this->addOption('category', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Categoria (nome ou ID), repetível — obrigatória');
-        $this->addOption('editor', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Editor: usuário (login), repetível');
-        $this->addOption('editor-group', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Editor: grupo (nome), repetível');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -63,7 +60,7 @@ class DocumentCreateCommand extends AbstractCommand
 
         $doc = new Document();
         if (!$doc->can(-1, CREATE, $data)) {
-            $output->writeln('<error>SEM DIREITO de criar documento: precisa do bit Criar E ser gestor do setor de cada categoria (ou Ver todos).</error>');
+            $output->writeln('<error>SEM DIREITO de criar documento: precisa do bit Criar.</error>');
             return Command::FAILURE;
         }
         $id = $doc->add($data);
@@ -91,18 +88,11 @@ class DocumentCreateCommand extends AbstractCommand
         foreach ((array) $input->getOption('user') as $n) {
             $links[] = [new Document_User(), ['users_id' => self::userId($n)], "usuário $n"];
         }
-        foreach ((array) $input->getOption('editor') as $n) {
-            $links[] = [new DocumentEditor(), ['users_id' => self::userId($n)], "editor $n"];
-        }
-        foreach ((array) $input->getOption('editor-group') as $n) {
-            $links[] = [new DocumentEditor(), ['groups_id' => self::groupId($n)], "editor grupo $n"];
-        }
-
         $ok = true;
         foreach ($links as [$rel, $row, $label]) {
             $row['plugin_codexplus_documents_id'] = $id;
             if (!$rel->can(-1, CREATE, $row)) {
-                $output->writeln("<error>Não ligou $label: SEM DIREITO (gerir o documento exige Atualizar + gestor do setor).</error>");
+                $output->writeln("<error>Não ligou $label: SEM DIREITO (gerir o documento: responsável, ou autor em rascunho).</error>");
                 $ok = false;
                 continue;
             }

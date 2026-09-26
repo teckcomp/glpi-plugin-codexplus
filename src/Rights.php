@@ -2,45 +2,29 @@
 namespace GlpiPlugin\Codexplus;
 
 /**
- * Direitos do Codex+ (Etapa R1).
+ * Direitos do Codex+ (Etapa R1; papéis refeitos no bloco P1, Claudio,
+ * 26/09/2026).
  *
- * Uma matriz só, ajustada na aba "Codex+" de Administração > Perfis.
+ * Uma matriz só, na aba "Codex+" de Administração > Perfis. O PERFIL diz o
+ * que a pessoa pode ser num documento; o DOCUMENTO diz quem ela é nele
+ * (responsável, auditor, revisor, autor) — sem papel de setor nem lista de
+ * editores:
+ *   - Ler: alvos de leitura (coluna Permissões), só a versão publicada;
+ *   - Criar: cria em qualquer categoria (o setor é só organização);
+ *   - Revisar e editar (bit 2): pode ser escolhido como REVISOR;
+ *   - Aprovar: pode ser escolhido como RESPONSÁVEL (gestor do documento),
+ *     que aprova a 1ª etapa;
+ *   - Auditar: pode ser escolhido como AUDITOR, que aprova ou devolve a 2ª
+ *     etapa e não edita nada.
+ * Editam o rascunho: responsável, revisor e autor.
  *
- * DUAS CAMADAS (decisão de Claudio, 20/09/2026 — Etapa R3c):
- *   - o PERFIL (estes bits) diz O QUE a pessoa pode fazer no Codex+;
- *   - o PLUGIN diz EM QUAIS documentos: gestores por setor (SectorMember),
- *     editores por documento (DocumentEditor), alvos de leitura por
- *     documento (Document_Profile/Group/User).
+ * SUPER-ADMIN (A2): perfil com Configurar > Atualizar (isSuperAdmin()). Pode
+ * tudo no fluxo, sem bit nenhum; não aparece na lista de auditores. "Ver
+ * todos" é só leitura.
  *
- * AUDITOR PELO PERFIL (bloco A1, Claudio, 25/09/2026): o bit 8192, antes
- * rotulado "Validar", passa a se chamar "Auditor". Quem tem um perfil com ele
- * na entidade do documento pode ser escolhido como auditor responsável, em
- * qualquer setor (auditorUsers()). O papel "auditor" do setor saiu de uso.
- * O bit é o mesmo: perfis que já o tinham continuam valendo.
- *
- * SUPER-ADMIN (bloco A2, Claudio, 25/09/2026): é o perfil com Configurar >
- * Atualizar (isSuperAdmin(), o mesmo critério do Install) e pode tudo no
- * fluxo, sem regra nenhuma — valida qualquer documento sem o bit Auditor e
- * não aparece na lista de auditores. O Install não lhe dá mais o bit Auditor.
- * "Ver todos" voltou a ser só leitura e papéis: não dispensa as regras da
- * validação.
- * A ação só vale quando as duas concordam. "Ver todos" dispensa os papéis
- * do plugin, mas só dentro do que os outros bits do perfil permitem. O
- * Super-Admin nasce com todos os bits (Install::installR3c).
- *
- * A chave gravada em glpi_profilerights continua sendo
- * `plugin_codexplus_wiki` (nome histórico da Etapa 0). Renomear exigiria
- * migrar as linhas de todos os perfis sem ganho funcional: o que o usuário
- * vê é o rótulo, não a chave.
- *
- * Bits: os quatro padrão do GLPI (1, 2, 4, 8) e quatro próprios a partir de
- * 1024, faixa que o núcleo também usa para direitos extras (a matriz de
- * Profile::displayRightsChoiceMatrix ordena >= 1024 depois dos padrão).
- * PURGE (16) não é usado: "Excluir" cobre a exclusão.
- *
- * Em R1 estes bits só são GRAVADOS. As telas atuais continuam checando os
- * direitos da base nativa; a troca acontece na R3 (criar/editar) e na R5
- * (listagens e painel).
+ * A chave gravada continua `plugin_codexplus_wiki` (nome histórico).
+ * Bits próprios a partir de 1024 (a matriz do núcleo os põe depois dos
+ * padrão). PURGE (16) não é usado.
  */
 final class Rights
 {
@@ -54,11 +38,12 @@ final class Rights
     public const VIEWALL   = 1024;  // ignora os alvos de leitura
     public const ANONYMOUS = 2048;  // gerar/revogar link de acesso anônimo (R7)
     public const TEMPLATES = 4096;  // gerenciar modelos, setores e categorias (R2)
-    public const VALIDATE  = 8192;  // auditor: 2ª etapa da validação (R3c; rótulo "Auditor" desde a A1)
+    public const VALIDATE  = 8192;  // Auditar: 2ª etapa da validação
+    public const APPROVE   = 16384; // Aprovar: pode ser o responsável, 1ª etapa (P1)
 
     /** Soma de todos os bits da matriz. */
     public const ALL = self::READ | self::UPDATE | self::CREATE | self::DELETE
-        | self::VIEWALL | self::ANONYMOUS | self::TEMPLATES | self::VALIDATE;
+        | self::VIEWALL | self::ANONYMOUS | self::TEMPLATES | self::VALIDATE | self::APPROVE;
 
     /**
      * Colunas da matriz, no formato que Profile::displayRightsChoiceMatrix
@@ -70,10 +55,11 @@ final class Rights
     {
         return [
             self::READ      => __('Ler', 'codexplus'),
-            self::UPDATE    => __('Atualizar', 'codexplus'),
             self::CREATE    => __('Criar', 'codexplus'),
+            self::UPDATE    => __('Revisar e editar', 'codexplus'),
+            self::APPROVE   => __('Aprovar', 'codexplus'),
+            self::VALIDATE  => __('Auditar', 'codexplus'),
             self::DELETE    => __('Excluir', 'codexplus'),
-            self::VALIDATE  => __('Auditor', 'codexplus'),
             self::VIEWALL   => __('Ver todos', 'codexplus'),
             self::ANONYMOUS => __('Publicar para acesso anônimo', 'codexplus'),
             self::TEMPLATES => __('Gerenciar modelos, setores e categorias', 'codexplus'),
@@ -89,25 +75,48 @@ final class Rights
         return (bool) \Session::haveRight('config', UPDATE);
     }
 
+    /** Quem pode ser auditor: bit Auditar; o Super-Admin fica fora (A2). */
+    public static function auditorUsers(int $entityId): array
+    {
+        return self::usersWithBit(self::VALIDATE, $entityId, false);
+    }
+
+    /** Quem pode ser responsável (P1): bit Aprovar, ou Super-Admin. */
+    public static function approverUsers(int $entityId): array
+    {
+        return self::usersWithBit(self::APPROVE, $entityId, true);
+    }
+
+    /** Quem pode ser revisor (P1): bit Revisar e editar, ou Super-Admin. */
+    public static function reviewerUsers(int $entityId): array
+    {
+        return self::usersWithBit(self::UPDATE, $entityId, true);
+    }
+
     /**
-     * Usuários que podem ser auditor responsável de um documento da entidade
-     * (bloco A1): ativos, não excluídos, com um perfil da interface padrão
-     * que tenha o bit Auditor, atribuído na própria entidade ou numa entidade
-     * acima com "recursivo". Perfil Self-Service fica fora: o GLPI tira dele
-     * todo direito de plugin na sessão (achado 27) e ele nunca validaria.
-     * Perfil Super-Admin (Configurar > Atualizar) também fica fora (A2): ele
-     * valida qualquer documento sem precisar ser escolhido.
-     *
-     * Na hora de validar vale o perfil ATIVO (Document::canValidate): quem
-     * tem mais de um perfil precisa estar no que tem o bit.
+     * Usuários ativos, não excluídos, com um perfil da interface padrão que
+     * tenha o bit, atribuído na entidade ou numa acima com recursivo.
+     * Self-Service fica fora (achado 27). $superAdmin: true = perfis com
+     * Configurar > Atualizar entram mesmo sem o bit; false = ficam fora.
      *
      * @return int[] ids em ordem de nome
      */
-    public static function auditorUsers(int $entityId): array
+    public static function usersWithBit(int $bit, int $entityId, bool $superAdmin): array
     {
         /** @var \DBmysql $DB */
         global $DB;
 
+        // Super-Admin = perfil com Configurar > Atualizar (critério de isSuperAdmin).
+        $supers = [];
+        foreach ($DB->request([
+            'SELECT' => ['profiles_id', 'rights'],
+            'FROM'   => 'glpi_profilerights',
+            'WHERE'  => ['name' => 'config'],
+        ]) as $row) {
+            if (((int) $row['rights'] & UPDATE) === UPDATE) {
+                $supers[] = (int) $row['profiles_id'];
+            }
+        }
         $profiles = [];
         foreach ($DB->request([
             'SELECT'     => ['glpi_profilerights.profiles_id', 'glpi_profilerights.rights'],
@@ -120,19 +129,11 @@ final class Rights
                 'glpi_profiles.interface' => 'central',
             ],
         ]) as $row) {
-            if (((int) $row['rights'] & self::VALIDATE) === self::VALIDATE) {
-                $profiles[] = (int) $row['profiles_id'];
-            }
-        }
-        if ($profiles !== []) {
-            foreach ($DB->request([
-                'SELECT' => ['profiles_id', 'rights'],
-                'FROM'   => 'glpi_profilerights',
-                'WHERE'  => ['name' => 'config', 'profiles_id' => $profiles],
-            ]) as $row) {
-                if (((int) $row['rights'] & UPDATE) === UPDATE) {
-                    $profiles = array_values(array_diff($profiles, [(int) $row['profiles_id']]));
-                }
+            $pid   = (int) $row['profiles_id'];
+            $super = in_array($pid, $supers, true);
+            if ($superAdmin ? ($super || ((int) $row['rights'] & $bit) === $bit)
+                            : (!$super && ((int) $row['rights'] & $bit) === $bit)) {
+                $profiles[] = $pid;
             }
         }
         if ($profiles === []) {

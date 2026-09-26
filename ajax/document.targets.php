@@ -1,18 +1,17 @@
 <?php
 
 /**
- * Codex+ — alvos de leitura (R3b2-a) e editores (R3b2-b) pela tela.
+ * Codex+ — alvos de leitura (R3b2-a) pela tela. Editores saíram na P1
+ * (Claudio, 26/09/2026): editam o responsável, o revisor e o autor.
  *
- * Adiciona ou tira um leitor (grupo, perfil ou usuário) ou um editor
- * (usuário ou grupo) sem recarregar a
+ * Adiciona ou tira um leitor (grupo, perfil ou usuário) sem recarregar a
  * página: a coluna "Permissões" vale também para documento publicado, fora
  * do formulário de edição, e recarregar no meio de uma edição perderia o que
  * não foi salvo.
  *
  * Nenhuma regra nova aqui. Quem pode é decidido pelas classes de ligação
- * (trait TargetRelation e DocumentEditor: gerir o documento = Atualizar +
- * gestor do setor, ou
- * Ver todos, em qualquer status — decisão de Claudio, 20/09/2026). Sem
+ * (trait TargetRelation: gerir o documento = Document::canManage, em
+ * qualquer status). Sem
  * entidade informada, perfil e grupo entram "sem restrição de entidade"
  * (TargetRelation::prepareInputForAdd, achado 34).
  *
@@ -85,7 +84,7 @@ if ($acao === 'add') {
     if (
         $lig <= 0
         || !$rel->getFromDB($lig)
-        || (int) $rel->fields[$classe === \GlpiPlugin\Codexplus\DocumentEditor::class ? $classe::$items_id : $classe::$items_id_1] !== $id
+        || (int) $rel->fields[$classe::$items_id_1] !== $id
     ) {
         return $responder(['erro' => 'nao_encontrado'], 404);
     }
@@ -99,4 +98,4 @@ if ($acao === 'add') {
     return $responder(['erro' => 'acao_invalida'], 422);
 }
 
-return $responder(['ok' => true, 'alvos' => Document::listTargets($id), 'editores' => Document::listEditors($id)]);
+return $responder(['ok' => true, 'alvos' => Document::listTargets($id)]);

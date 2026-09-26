@@ -41,12 +41,8 @@ class Document_Category extends CommonDBRelation
         if ($doc === null || !$doc->canManage() || $doc->fields['status'] !== Document::STATUS_DRAFT) {
             return false;
         }
-        $cid = (int) ($this->fields[static::$items_id_2] ?? $this->input[static::$items_id_2] ?? 0);
-        if (Session::haveRight(Rights::NAME, Rights::VIEWALL)) {
-            return $cid > 0;
-        }
-        $sector = Category::getSectorOf($cid);
-        return $sector > 0 && in_array($sector, SectorMember::mySectors(SectorMember::ROLE_MANAGER), true);
+        // P1 (Claudio, 26/09/2026): qualquer categoria; o setor é organização.
+        return (int) ($this->fields[static::$items_id_2] ?? $this->input[static::$items_id_2] ?? 0) > 0;
     }
 
     public function canPurgeItem(): bool

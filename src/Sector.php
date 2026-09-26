@@ -86,10 +86,4 @@ class Sector extends CommonDropdown
         }
         return $out;
     }
-
-    /** Papéis do setor (R3c) saem junto com o setor. */
-    public function cleanDBonPurge()
-    {
-        $this->deleteChildrenAndRelationsFromDb([SectorMember::class]);
-    }
 }

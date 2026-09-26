@@ -179,20 +179,8 @@ class Dashboard
         $t  = Document::getTable();
         $or = [[$t . '.users_id_auditor' => $me, $t . '.status' => Document::STATUS_VALIDATION]];
 
-        $sectors = SectorMember::mySectors(SectorMember::ROLE_MANAGER);
-        if ($sectors) {
-            $dc  = Document_Category::getTable();
-            $cat = Category::getTable();
-            $or[] = [
-                $t . '.status' => Document::STATUS_APPROVAL,
-                $t . '.id'     => new \Glpi\DBAL\QuerySubQuery([
-                    'SELECT'     => $dc . '.' . Document_Category::$items_id_1,
-                    'FROM'       => $dc,
-                    'INNER JOIN' => [$cat => ['ON' => [$dc => Document_Category::$items_id_2, $cat => 'id']]],
-                    'WHERE'      => [$cat . '.' . Category::SECTOR_FIELD => $sectors],
-                ]),
-            ];
-        }
+        // P1: 1ª etapa espera pelo responsável.
+        $or[] = [$t . '.users_id_owner' => $me, $t . '.status' => Document::STATUS_APPROVAL];
 
         $out = [];
         foreach ($DB->request([
@@ -206,7 +194,7 @@ class Dashboard
                 continue;
             }
             $etapa1 = $doc->fields['status'] === Document::STATUS_APPROVAL;
-            $dono   = $etapa1 ? $doc->isManager() : $doc->isAuditor();
+            $dono   = $etapa1 ? $doc->isOwner() : $doc->isAuditor();
             if (!$dono) {
                 continue;
             }
@@ -214,10 +202,9 @@ class Dashboard
             $bloqueio = '';
             if (!$pode) {
                 if ($etapa1) {
-                    $bloqueio = __('seu perfil não tem o direito Atualizar do Codex+', 'codexplus');
+                    $bloqueio = __('seu perfil atual não tem o direito Aprovar do Codex+', 'codexplus');
                 } else {
                     $bloqueio = match ($doc->validationBlocker()) {
-                        'alterou' => __('você alterou o documento: outro auditor precisa validar (você pode devolver)', 'codexplus'),
                         'aprovou' => __('você aprovou a 1ª etapa: outro auditor precisa validar (você pode devolver)', 'codexplus'),
                         default   => __('seu perfil atual não tem o direito Auditor do Codex+ (se outro perfil seu tem, troque para ele)', 'codexplus'),
                     };
@@ -233,7 +220,7 @@ class Dashboard
                 'name'    => (string) $doc->fields['name'],
                 'acao'    => $pode ? ($etapa1 ? __('Aprovar', 'codexplus') : __('Validar', 'codexplus')) : '',
                 'bloqueio' => $bloqueio,
-                'etapa'   => $etapa1 ? __('1ª etapa: gestor', 'codexplus') : __('2ª etapa: auditor', 'codexplus'),
+                'etapa'   => $etapa1 ? __('1ª etapa: responsável', 'codexplus') : __('2ª etapa: auditor', 'codexplus'),
                 'quem'    => $quem > 0
                     ? ($etapa1 ? __('enviado por', 'codexplus') : __('aprovado por', 'codexplus')) . ' ' . getUserName($quem)
                     : '',

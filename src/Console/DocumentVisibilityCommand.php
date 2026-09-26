@@ -74,11 +74,10 @@ class DocumentVisibilityCommand extends AbstractCommand
             $val  = $doc->canValidate();
             $apr  = $doc->canApprove();
             $roles = array_filter([
-                $doc->isManager() ? 'G' : '',
+                $doc->isOwner() ? 'RESP' : '',
                 $doc->isAuditor() ? 'AR' : '',
                 $doc->isReviewer() ? 'R' : '',
                 $doc->isEditor() ? 'E' : '',
-                $doc->isContributor() ? 'alterou' : '',
             ]);
             if ($item !== $sql) {
                 $diverge++;

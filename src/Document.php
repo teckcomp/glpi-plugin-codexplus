@@ -79,7 +79,7 @@ class Document extends CommonDBTM
     public const PENDING_STATUSES = [self::STATUS_APPROVAL, self::STATUS_VALIDATION];
 
     /** Campos que só quem gere o documento escolhe (R3d). */
-    private const MANAGED_FIELDS = ['users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'];
+    private const MANAGED_FIELDS = ['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'];
     /** Status que o leitor comum (alvo) enxerga. */
     public const READER_STATUSES = [self::STATUS_PUBLISHED, self::STATUS_OBSOLETE];
 
@@ -190,14 +190,27 @@ class Document extends CommonDBTM
         return array_values($out);
     }
 
-    public function isManager(): bool
+    /** É o responsável (gestor do documento, P1)? Aprova a 1ª etapa. */
+    public function isOwner(): bool
     {
-        return (bool) array_intersect($this->getSectorIds(), SectorMember::mySectors(SectorMember::ROLE_MANAGER));
+        $me = (int) Session::getLoginUserID();
+        return $me > 0 && (int) ($this->fields['users_id_owner'] ?? 0) === $me;
     }
 
+    /** É o autor (quem criou)? */
+    public function isAuthor(): bool
+    {
+        $me = (int) Session::getLoginUserID();
+        return $me > 0 && (int) ($this->fields['users_id'] ?? 0) === $me;
+    }
+
+    /**
+     * Edita o rascunho (P1, Claudio 26/09/2026): responsável, revisor e
+     * autor. O auditor não edita: só aprova ou devolve.
+     */
     public function isEditor(): bool
     {
-        return DocumentEditor::isMine((int) ($this->fields['id'] ?? 0));
+        return $this->isOwner() || $this->isReviewer() || $this->isAuthor();
     }
 
     /** Autor ou responsável do documento carregado. */
@@ -238,8 +251,8 @@ class Document extends CommonDBTM
 
     /**
      * Por que o auditor responsável não consegue validar (A2), para os avisos
-     * da página e do Painel: 'perfil' (perfil ativo sem o bit Auditor),
-     * 'alterou' (mexeu nesta revisão), 'aprovou' (aprovou a 1ª etapa). Vazio
+     * da página e do Painel: 'perfil' (perfil ativo sem o bit Auditar),
+     * 'aprovou' (aprovou a 1ª etapa). Vazio
      * se ele pode validar ou se não é o auditor desta etapa.
      */
     public function validationBlocker(): string
@@ -249,9 +262,6 @@ class Document extends CommonDBTM
         }
         if (!self::bit(Rights::VALIDATE)) {
             return 'perfil';
-        }
-        if ($this->isContributor()) {
-            return 'alterou';
         }
         if ($this->isApprover() && !$this->isAuditSectorOnly()) {
             return 'aprovou';
@@ -269,12 +279,11 @@ class Document extends CommonDBTM
     /** Tem algum papel no documento (vê em qualquer status). */
     public function hasRole(): bool
     {
-        return $this->isAuthorOrOwner() || $this->isEditor() || $this->isManager()
-            || $this->isAuditor() || $this->isReviewer();
+        return $this->isEditor() || $this->isAuditor();
     }
 
     /**
-     * Quem responde pela etapa em que o documento está: gestores do setor
+     * Quem responde pela etapa em que o documento está: o responsável
      * (aprovacao) ou o auditor responsável (validacao). Para o aviso
      * "aguardando …" da página. Vazio fora das duas etapas.
      *
@@ -283,7 +292,8 @@ class Document extends CommonDBTM
     public function pendingWith(): array
     {
         if ($this->status() === self::STATUS_APPROVAL) {
-            return SectorMember::usersOfRole($this->getSectorIds(), SectorMember::ROLE_MANAGER);
+            $o = (int) ($this->fields['users_id_owner'] ?? 0);
+            return $o > 0 ? [$o] : [];
         }
         if ($this->status() === self::STATUS_VALIDATION) {
             $a = (int) ($this->fields['users_id_auditor'] ?? 0);
@@ -349,12 +359,12 @@ class Document extends CommonDBTM
         return $hoje >= substr($ini, 0, 10) && $hoje <= substr($fim, 0, 10);
     }
 
-    /** Abrir revisão: publicado + (gestor, ou revisor dentro da janela, com Atualizar). */
+    /** Abrir revisão: publicado + (responsável, ou revisor dentro da janela). */
     public function canOpenRevision(): bool
     {
         return $this->status() === self::STATUS_PUBLISHED
             && $this->checkEntity()
-            && ($this->canManage() || (self::canUpdate() && $this->reviewerInWindow()));
+            && ($this->canManage() || $this->reviewerInWindow());
     }
 
     /** "Revisado sem alteração": as mesmas pessoas de abrir revisão. */
@@ -363,83 +373,68 @@ class Document extends CommonDBTM
         return $this->canOpenRevision();
     }
 
-    /** Cancelar revisão: só quem gere o documento, com a revisão em andamento. */
+    /** Cancelar revisão: o responsável, com a revisão em andamento. */
     public function canCancelRevision(): bool
     {
-        return $this->isInRevision() && $this->canManage();
+        return $this->isInRevision() && $this->checkEntity() && (Rights::isSuperAdmin() || $this->isOwner());
     }
 
-    /**
-     * Criar: Criar + gestor do setor de TODAS as categorias informadas
-     * (`_categories`). Sem categoria com setor, só com Ver todos.
-     */
+    /** Criar (P1): o bit Criar basta, em qualquer categoria. */
     public function canCreateItem(): bool
     {
-        if (!$this->checkEntity()) {
-            return false;
-        }
-        return self::canCreateIn(array_map('intval', (array) ($this->input['_categories'] ?? [])));
+        return $this->checkEntity() && self::canCreate();
     }
 
     /**
+     * Mantido para quem chama com categorias (Duplicar): desde a P1 a
+     * categoria não restringe a criação.
+     *
      * @param int[] $categoryIds
      */
     public static function canCreateIn(array $categoryIds): bool
     {
-        if (!self::canCreate()) {
-            return false;
-        }
-        if (self::hasViewAll()) {
-            return true;
-        }
-        if ($categoryIds === []) {
-            return false;
-        }
-        $mine = SectorMember::mySectors(SectorMember::ROLE_MANAGER);
-        foreach ($categoryIds as $cid) {
-            $s = Category::getSectorOf($cid);
-            if ($s <= 0 || !in_array($s, $mine, true)) {
-                return false;
-            }
-        }
-        return true;
+        return self::canCreate();
     }
 
-    /** Editar conteúdo/metadados: só em rascunho. */
+    /** Editar (P1): só em rascunho, por responsável, revisor ou autor. */
     public function canUpdateItem(): bool
     {
         return $this->checkEntity()
             && $this->status() === self::STATUS_DRAFT
-            && (self::hasViewAll() || $this->isEditor() || $this->isManager()
-                // R6-a: o revisor edita a revisão em andamento.
-                || ($this->isReviewer() && (int) ($this->fields['revision'] ?? 0) > 0));
+            && (Rights::isSuperAdmin() || $this->isEditor());
     }
 
     /**
-     * Gerir o documento: editores, alvos de leitura, categorias,
-     * responsável, obsoleto. Atualizar + gestor do setor (ou Ver todos).
+     * Gerir o documento (responsável, auditor, revisor, janela, categorias,
+     * leitores, obsoleto): o responsável; em rascunho, também o autor.
      */
     public function canManage(): bool
     {
-        return self::canUpdate()
-            && $this->checkEntity()
-            && (self::hasViewAll() || $this->isManager());
+        if (!$this->checkEntity()) {
+            return false;
+        }
+        return Rights::isSuperAdmin()
+            || $this->isOwner()
+            || ($this->isAuthor() && $this->status() === self::STATUS_DRAFT);
     }
 
     public function canDeleteItem(): bool
     {
-        return $this->checkEntity() && (self::hasViewAll() || $this->isManager());
+        return self::canDelete() && $this->canManage();
     }
 
     public function canSubmit(): bool
     {
-        return self::canUpdate() && $this->canUpdateItem();
+        return $this->canUpdateItem();
     }
 
-    /** 1ª etapa (R3d): o gestor do setor aprova, mesmo tendo editado. */
+    /** 1ª etapa (P1): o responsável, com o bit Aprovar, aprova. */
     public function canApprove(): bool
     {
-        return $this->status() === self::STATUS_APPROVAL && $this->canManage();
+        if ($this->status() !== self::STATUS_APPROVAL || !$this->checkEntity()) {
+            return false;
+        }
+        return Rights::isSuperAdmin() || (self::bit(Rights::APPROVE) && $this->isOwner());
     }
 
     /**
@@ -460,7 +455,6 @@ class Document extends CommonDBTM
         }
         return self::bit(Rights::VALIDATE)
             && $this->isAuditor()
-            && !$this->isContributor()
             && (!$this->isApprover() || $this->isAuditSectorOnly());
     }
 
@@ -485,6 +479,7 @@ class Document extends CommonDBTM
     {
         return $this->status() === self::STATUS_PUBLISHED && $this->canManage();
     }
+
 
     /**
      * O usuário da sessão é alvo de leitura? Espelho de
@@ -586,13 +581,10 @@ class Document extends CommonDBTM
         'group'        => [Document_Group::class, 'groups_id'],
         'profile'      => [Document_Profile::class, 'profiles_id'],
         'user'         => [Document_User::class, 'users_id'],
-        'editor_user'  => [DocumentEditor::class, 'users_id'],
-        'editor_group' => [DocumentEditor::class, 'groups_id'],
     ];
 
     /**
      * Linha de ligação para gravar um alvo da coluna "Permissões".
-     * Editor é usuário OU grupo: o outro lado vai zerado (DocumentEditor).
      *
      * @return array<string, int>|null null = tipo desconhecido
      */
@@ -602,43 +594,7 @@ class Document extends CommonDBTM
             return null;
         }
         [$classe, $chave] = self::PERM_TYPES[$tipo];
-        if ($classe === DocumentEditor::class) {
-            return [
-                DocumentEditor::$items_id => $documentId,
-                'users_id'                => $chave === 'users_id' ? $alvo : 0,
-                'groups_id'               => $chave === 'groups_id' ? $alvo : 0,
-            ];
-        }
         return [$classe::$items_id_1 => $documentId, $chave => $alvo];
-    }
-
-    /**
-     * Editores do documento, para a coluna "Permissões" (R3b2-b): grupos,
-     * depois usuários, cada bloco por nome. Mesmo formato de listTargets().
-     *
-     * @return array<int, array{tipo: string, ligacao: int, nome: string}>
-     */
-    public static function listEditors(int $documentId): array
-    {
-        /** @var \DBmysql $DB */
-        global $DB;
-
-        $grupos = $usuarios = [];
-        foreach ($DB->request([
-            'FROM'  => DocumentEditor::getTable(),
-            'WHERE' => [DocumentEditor::$items_id => $documentId],
-        ]) as $row) {
-            if ((int) $row['users_id'] > 0) {
-                $usuarios[] = ['tipo' => 'editor_user', 'ligacao' => (int) $row['id'], 'nome' => (string) getUserName((int) $row['users_id'])];
-            } elseif ((int) $row['groups_id'] > 0) {
-                $grupos[] = ['tipo' => 'editor_group', 'ligacao' => (int) $row['id'],
-                    'nome' => (string) \Dropdown::getDropdownName('glpi_groups', (int) $row['groups_id'])];
-            }
-        }
-        $ordem = static fn ($a, $b) => strcasecmp($a['nome'], $b['nome']);
-        usort($grupos, $ordem);
-        usort($usuarios, $ordem);
-        return array_merge($grupos, $usuarios);
     }
 
     /**
@@ -728,7 +684,7 @@ class Document extends CommonDBTM
 
         $groups = array_values($_SESSION['glpigroups'] ?? []);
 
-        // Papéis: autor, responsável, auditor, revisor, editor, gestor do setor.
+        // Papéis (P1): autor, responsável, auditor, revisor.
         $ors = [
             [$doc . '.users_id' => $me],
             [$doc . '.users_id_owner' => $me],
@@ -736,30 +692,6 @@ class Document extends CommonDBTM
             [$doc . '.users_id_auditor' => $me],
             [$doc . '.users_id_reviewer' => $me],
         ];
-
-        $edOr = [['users_id' => $me]];
-        if ($groups) {
-            $edOr[] = ['groups_id' => $groups];
-        }
-        $ors[] = [$doc . '.id' => new QuerySubQuery([
-            'SELECT' => DocumentEditor::$items_id,
-            'FROM'   => DocumentEditor::getTable(),
-            'WHERE'  => ['OR' => $edOr],
-        ])];
-
-        $sectors = SectorMember::mySectors(SectorMember::ROLE_MANAGER);
-        if ($sectors) {
-            $dc  = Document_Category::getTable();
-            $cat = Category::getTable();
-            $ors[] = [$doc . '.id' => new QuerySubQuery([
-                'SELECT'     => $dc . '.' . Document_Category::$items_id_1,
-                'FROM'       => $dc,
-                'INNER JOIN' => [
-                    $cat => ['ON' => [$dc => Document_Category::$items_id_2, $cat => 'id']],
-                ],
-                'WHERE'      => [$cat . '.' . Category::SECTOR_FIELD => $sectors],
-            ])];
-        }
 
         // Leitor: Ler + alvo, só publicado/obsoleto. (canView() garante que,
         // sem Ver todos, o bit Ler está presente.)
@@ -804,11 +736,15 @@ class Document extends CommonDBTM
         if (!$this->canSubmit()) {
             return $this->deny(__('Sem direito de enviar este documento para validação.', 'codexplus'));
         }
-        // Sem setor não há validador de setor; só quem tem Ver todos (e
-        // Validar) conseguiria validar — e só quem tem Ver todos cria
-        // documento fora de setor. Para os demais, exige categoria com setor.
-        if ($this->getSectorIds() === [] && !self::hasViewAll()) {
-            return $this->deny(__('Sem categoria com setor: não há quem valide. Ligue o documento a uma categoria.', 'codexplus'));
+        // 1ª etapa precisa do responsável com o bit Aprovar (P1).
+        if (!Rights::isSuperAdmin()) {
+            $owner = (int) ($this->fields['users_id_owner'] ?? 0);
+            if ($owner <= 0) {
+                return $this->deny(__('Escolha o responsável antes de enviar: é ele quem aprova a 1ª etapa.', 'codexplus'));
+            }
+            if (!in_array($owner, Rights::approverUsers((int) $this->fields['entities_id']), true)) {
+                return $this->deny(__('O responsável escolhido não tem o direito Aprovar no perfil. Escolha outro.', 'codexplus'));
+            }
         }
         // 2ª etapa precisa de alguém: o auditor responsável, que ainda tenha
         // um perfil com o bit Auditor na entidade (A1). Só o Super-Admin
@@ -820,6 +756,9 @@ class Document extends CommonDBTM
             }
             if (!in_array($auditor, Rights::auditorUsers((int) $this->fields['entities_id']), true)) {
                 return $this->deny(__('O auditor escolhido não tem mais um perfil de auditor. Escolha outro.', 'codexplus'));
+            }
+            if ($auditor === (int) ($this->fields['users_id_owner'] ?? 0) && !$this->isAuditSectorOnly()) {
+                return $this->deny(__('Responsável e auditor não podem ser a mesma pessoa (quem aprova não audita).', 'codexplus'));
             }
         }
         $extra = [];
@@ -840,16 +779,21 @@ class Document extends CommonDBTM
         ]);
     }
 
-    /** 1ª etapa: o gestor do setor aprova e o documento vai ao auditor. */
-    public function managerApprove(): bool
+    /**
+     * 1ª etapa: o responsável aprova e o documento vai ao auditor. A
+     * observação (opcional) fica em validation_comment, visível na página.
+     */
+    public function managerApprove(string $comment = ''): bool
     {
         if (!$this->canApprove()) {
-            return $this->deny(__('Sem direito de aprovar este documento (é preciso ser gestor do setor).', 'codexplus'));
+            return $this->deny(__('Sem direito de aprovar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
         }
+        $comment = trim($comment);
         return $this->transition([
-            'status'            => self::STATUS_VALIDATION,
-            'users_id_approver' => (int) Session::getLoginUserID(),
-            'date_approved'     => $_SESSION['glpi_currenttime'],
+            'status'             => self::STATUS_VALIDATION,
+            'users_id_approver'  => (int) Session::getLoginUserID(),
+            'date_approved'      => $_SESSION['glpi_currenttime'],
+            'validation_comment' => $comment === '' ? null : $comment,
         ]);
     }
 
@@ -857,17 +801,14 @@ class Document extends CommonDBTM
      * 2ª etapa: o auditor valida e o documento é publicado. Janela de
      * revisão vazia é calculada aqui pela regra do tipo.
      */
-    public function approve(): bool
+    public function approve(string $comment = ''): bool
     {
         if (!$this->canValidate()) {
-            if ($this->validationBlocker() === 'alterou') {
-                return $this->deny(__('Você alterou este documento nesta revisão: outra pessoa precisa validar.', 'codexplus'));
-            }
             if ($this->validationBlocker() === 'aprovou') {
                 return $this->deny(__('Você aprovou a 1ª etapa deste documento: outro auditor precisa validar. Você ainda pode devolvê-lo.', 'codexplus'));
             }
             if ($this->status() === self::STATUS_APPROVAL) {
-                return $this->deny(__('Ainda na 1ª etapa: falta a aprovação do gestor do setor.', 'codexplus'));
+                return $this->deny(__('Ainda na 1ª etapa: falta a aprovação do responsável.', 'codexplus'));
             }
             if ($this->status() === self::STATUS_VALIDATION && !$this->isAuditor()) {
                 return $this->deny(__('Só o auditor responsável valida este documento.', 'codexplus'));
@@ -878,7 +819,7 @@ class Document extends CommonDBTM
             'status'             => self::STATUS_PUBLISHED,
             'users_id_validator' => (int) Session::getLoginUserID(),
             'date_validated'     => $_SESSION['glpi_currenttime'],
-            'validation_comment' => null,
+            'validation_comment' => trim($comment) === '' ? null : trim($comment),
         ], $this->fields['date_published'] ?? null);
         // R6-a: publicar uma revisão é uma publicação nova — data de hoje e
         // janela recalculada a partir dela.
@@ -911,7 +852,7 @@ class Document extends CommonDBTM
     public function openRevision(): bool
     {
         if (!$this->canOpenRevision()) {
-            return $this->deny(__('Sem direito de abrir revisão (é preciso ser gestor do setor, ou o revisor dentro da janela).', 'codexplus'));
+            return $this->deny(__('Sem direito de abrir revisão (é preciso ser o responsável, ou o revisor dentro da janela).', 'codexplus'));
         }
         // Documento publicado antes da R6 ainda não tem a cópia: faz agora.
         if (DocumentVersion::get((int) $this->fields['id'], (int) $this->fields['revision']) === null) {
@@ -1094,14 +1035,11 @@ class Document extends CommonDBTM
             return false;
         }
 
-        // Categorias: obrigatórias e todas em setor do gestor (ou Ver todos).
-        // Checado aqui também — não só no can() — para valer em qualquer
-        // caminho de criação.
-        $cats = array_values(array_unique(array_map('intval', (array) ($input['_categories'] ?? []))));
-        if (!self::canCreateIn($cats)) {
-            return $this->deny(__('Sem direito de criar documento nestas categorias (é preciso ser gestor do setor de cada uma).', 'codexplus'));
+        // Categorias (P1): opcionais, qualquer uma; o setor é organização.
+        if (!self::canCreate()) {
+            return $this->deny(__('Sem direito de criar documentos.', 'codexplus'));
         }
-        $input['_categories'] = $cats;
+        $input['_categories'] = array_values(array_filter(array_unique(array_map('intval', (array) ($input['_categories'] ?? [])))));
 
         // Documento nasce rascunho: publicar é sempre pela validação.
         $input['status']           = self::STATUS_DRAFT;
@@ -1116,8 +1054,7 @@ class Document extends CommonDBTM
             $input['users_id_submitter'], $input['date_submitted'], $input['validation_comment'],
             $input['users_id_approver'], $input['date_approved']);
 
-        // Auditor, revisor e janela já na criação (R3d). Quem cria é gestor
-        // de todos os setores das categorias (ou Ver todos): pode escolher.
+        // Responsável, auditor, revisor e janela já na criação: quem cria escolhe.
         $ent = (int) ($input['entities_id'] ?? Session::getActiveEntity());
         return $this->checkManagedFields($input, $ent, true);
     }
@@ -1252,7 +1189,16 @@ class Document extends CommonDBTM
             return $input;
         }
         if (!$novo && !$this->canManage()) {
-            return $this->deny(__('Só quem gere o documento escolhe auditor, revisor e janela de revisão.', 'codexplus'));
+            return $this->deny(__('Só quem gere o documento escolhe responsável, auditor, revisor e janela de revisão.', 'codexplus'));
+        }
+        // P1: cada papel vem do bit no perfil.
+        if (isset($mudou['users_id_owner']) && (int) $input['users_id_owner'] > 0
+            && !in_array((int) $input['users_id_owner'], Rights::approverUsers($entityId), true)) {
+            return $this->deny(__('O responsável tem que ter o direito Aprovar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+        }
+        if (isset($mudou['users_id_reviewer']) && (int) $input['users_id_reviewer'] > 0
+            && !in_array((int) $input['users_id_reviewer'], Rights::reviewerUsers($entityId), true)) {
+            return $this->deny(__('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
         }
         if (isset($mudou['users_id_auditor'])) {
             if (!$novo && $this->status() !== self::STATUS_DRAFT) {
@@ -1260,7 +1206,7 @@ class Document extends CommonDBTM
             }
             $a = (int) $input['users_id_auditor'];
             if ($a > 0 && !in_array($a, Rights::auditorUsers($entityId), true)) {
-                return $this->deny(__('O auditor responsável tem que ter um perfil de auditor (Administração → Perfis → aba Codex+, coluna Auditor).', 'codexplus'));
+                return $this->deny(__('O auditor responsável tem que ter o direito Auditar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
             }
         }
         $ini = array_key_exists('review_start', $input) ? $input['review_start'] : $old('review_start', $atual);
@@ -1375,7 +1321,6 @@ class Document extends CommonDBTM
             Document_Profile::class,
             Document_Group::class,
             Document_User::class,
-            DocumentEditor::class,
         ]);
         DocumentContributor::purgeDocument((int) $this->fields['id']);
         Diagram::purgeDocument((int) $this->fields['id']);

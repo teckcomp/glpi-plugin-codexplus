@@ -96,7 +96,7 @@ class DocumentSetCommand extends AbstractCommand
             $allowed = $isOwnerOnly ? $doc->canManage() : $doc->can($id, UPDATE);
             if (!$allowed) {
                 $output->writeln(sprintf(
-                    '<error>SEM DIREITO de editar #%d (status: %s). Editar exige Atualizar + editor do documento ou gestor do setor, e só em rascunho.</error>',
+                    '<error>SEM DIREITO de editar #%d (status: %s). Editar: responsável, revisor ou autor, e só em rascunho.</error>',
                     $id,
                     $doc->fields['status']
                 ));

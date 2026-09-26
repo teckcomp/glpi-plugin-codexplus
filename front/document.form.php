@@ -31,11 +31,9 @@ use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\DocumentContributor;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
-use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\DocumentVersion;
 use GlpiPlugin\Codexplus\Rights;
-use GlpiPlugin\Codexplus\SectorMember;
 use GlpiPlugin\Codexplus\Wiki;
 
 include('../../../inc/includes.php');
@@ -50,10 +48,21 @@ $self = $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php';
 $id   = (int) ($_POST['id'] ?? $_GET['id'] ?? 0);
 $doc  = new Document();
 
-/** Categorias em que o usuário pode criar/ligar (null = todas: Ver todos). */
-$allowedSectors = Session::haveRight(Rights::NAME, Rights::VIEWALL)
-    ? null
-    : SectorMember::mySectors(SectorMember::ROLE_MANAGER);
+/**
+ * P1 (Claudio, 26/09/2026): cada papel do documento é escolhido entre quem
+ * tem o bit no perfil. Opções de lista: vazio + os usuários; o gravado que
+ * perdeu o bit continua visível, marcado.
+ */
+$roleOptions = static function (array $users, int $atual, string $semBit): array {
+    $opcoes = [0 => Dropdown::EMPTY_VALUE];
+    foreach ($users as $uid) {
+        $opcoes[$uid] = getUserName($uid);
+    }
+    if ($atual > 0 && !isset($opcoes[$atual])) {
+        $opcoes[$atual] = getUserName($atual) . ' ' . $semBit;
+    }
+    return $opcoes;
+};
 
 /**
  * R3b3-1: campos do upload nativo (imagem colada = _content, anexo =
@@ -107,9 +116,8 @@ if (isset($_POST['add'])) {
         $input['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
     $input += $postedClient($input['doctype']);
-    // R3b2-b: responsável, auditor, revisor e janela já na criação. Quem cria
-    // gere o documento (é gestor do setor de todas as categorias, ou Ver
-    // todos); Document::prepareInputForAdd confere auditor e janela.
+    // Responsável, auditor, revisor e janela já na criação; conferidos em
+    // Document::prepareInputForAdd (cada um com o bit dele no perfil).
     foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
             $input[$f] = (string) $_POST[$f];
@@ -117,7 +125,7 @@ if (isset($_POST['add'])) {
     }
     if (!$doc->can(-1, CREATE, $input)) {
         Session::addMessageAfterRedirect(
-            __('Sem direito de criar documento nestas categorias (é preciso ser gestor do setor de cada uma).', 'codexplus'),
+            __('Sem direito de criar documentos.', 'codexplus'),
             false,
             ERROR
         );
@@ -131,7 +139,7 @@ if (isset($_POST['add'])) {
     if ($newId) {
         Session::addMessageAfterRedirect(__('Documento criado como rascunho.', 'codexplus'));
 
-        // R3b2-b: leitores e editores escolhidos antes de o documento existir
+        // R3b2-b: leitores escolhidos antes de o documento existir
         // chegam como "tipo:id" (_cxn_perm[]) e são gravados agora, pelas
         // mesmas classes e checagens do endpoint da coluna Permissões. Se
         // algum falhar, o rascunho fica criado e a mensagem diz qual.
@@ -152,10 +160,8 @@ if (isset($_POST['add'])) {
             ) {
                 continue;
             }
-            $falhas[] = str_starts_with($tipo, 'editor_')
-                ? ($tipo === 'editor_user' ? getUserName((int) $alvo) : Dropdown::getDropdownName('glpi_groups', (int) $alvo))
-                : ($tipo === 'user' ? getUserName((int) $alvo)
-                    : Dropdown::getDropdownName($tipo === 'group' ? 'glpi_groups' : 'glpi_profiles', (int) $alvo));
+            $falhas[] = $tipo === 'user' ? getUserName((int) $alvo)
+                : Dropdown::getDropdownName($tipo === 'group' ? 'glpi_groups' : 'glpi_profiles', (int) $alvo);
         }
         if ($falhas) {
             Session::addMessageAfterRedirect(
@@ -195,7 +201,7 @@ if ($id > 0 && isset($_POST['duplicate'])) {
     $cats = Document_Category::getCategoryIds($id);
     if (!Document::canCreateIn($cats)) {
         Session::addMessageAfterRedirect(
-            __('Para duplicar, é preciso poder criar documento em todas as categorias deste (ser gestor do setor de cada uma).', 'codexplus'),
+            __('Sem direito de criar documentos.', 'codexplus'),
             false,
             ERROR
         );
@@ -205,7 +211,9 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         'name'           => sprintf(__('%s (cópia)', 'codexplus'), (string) $doc->fields['name']),
         'doctype'        => (string) $doc->fields['doctype'],
         'content'        => (string) ($doc->fields['content'] ?? ''),
-        'users_id_owner' => (int) Session::getLoginUserID(),
+        // Responsável = quem duplica, se tiver o direito Aprovar; senão vazio.
+        'users_id_owner' => in_array((int) Session::getLoginUserID(), Rights::approverUsers((int) $doc->fields['entities_id']), true)
+            ? (int) Session::getLoginUserID() : 0,
         '_categories'    => $cats,
     ];
     if ($copia['doctype'] === 'PRP') {
@@ -250,7 +258,7 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         Diagram::save((int) $newId, $d['data'] ?? Diagram::starter());
     }
     Session::addMessageAfterRedirect(sprintf(
-        __('Cópia criada como rascunho, com código novo (%s). Escolha auditor, revisor e permissões antes de enviar.', 'codexplus'),
+        __('Cópia criada como rascunho, com código novo (%s). Escolha responsável, auditor, revisor e leitores antes de enviar.', 'codexplus'),
         $novo->getCode()
     ));
     Html::redirect($self . '?id=' . $newId);
@@ -312,20 +320,13 @@ if ($id > 0 && isset($_POST['update'])) {
         // Categorias: diferença entre o que está gravado e o que veio.
         $current = Document_Category::getCategoryIds($id);
         $wanted  = $postedCategories();
-        if ($wanted === [] && $allowedSectors !== null) {
-            Session::addMessageAfterRedirect(
-                __('O documento precisa de ao menos uma categoria (é ela que define o setor e quem valida).', 'codexplus'),
-                false,
-                ERROR
-            );
-            $ok = false;
-        } else {
+        {
             foreach (array_diff($wanted, $current) as $cid) {
                 $link = new Document_Category();
                 $row  = ['plugin_codexplus_documents_id' => $id, 'plugin_codexplus_categories_id' => $cid];
                 if (!$link->can(-1, CREATE, $row) || !$link->add($row)) {
                     Session::addMessageAfterRedirect(
-                        sprintf(__('Categoria "%s" não ligada: fora dos setores que você gere.', 'codexplus'), Dropdown::getDropdownName(Category::getTable(), $cid)),
+                        sprintf(__('Categoria "%s" não ligada.', 'codexplus'), Dropdown::getDropdownName(Category::getTable(), $cid)),
                         false,
                         ERROR
                     );
@@ -346,8 +347,8 @@ if ($id > 0 && isset($_POST['update'])) {
 
     // Etapa 9: o diagrama vem em _diagram (JSON), validado no servidor.
     // A permissão já foi conferida acima (can UPDATE = rascunho + editor ou
-    // gestor). Mudou o desenho: conta como alteração do documento (quem
-    // editou não valida) e atualiza a data.
+    // responsável/revisor/autor). Mudou o desenho: registra quem alterou e
+    // atualiza a data.
     if ($doc->fields['doctype'] === 'DIA' && isset($_POST['_diagram'])) {
         $diagram = Diagram::validate(json_decode((string) $_POST['_diagram'], true));
         if ($diagram === null) {
@@ -393,12 +394,12 @@ if ($id > 0) {
     $flow = null;
     if (isset($_POST['submit_validation'])) {
         $flow = static fn () => $doc->submit((string) ($_POST['revision_summary'] ?? ''));
-        $okMsg = __('Enviado: aguardando a aprovação do gestor do setor.', 'codexplus');
+        $okMsg = __('Enviado: aguardando a aprovação do responsável.', 'codexplus');
     } elseif (isset($_POST['manager_approve'])) {
-        $flow = static fn () => $doc->managerApprove();
-        $okMsg = __('Aprovado pelo gestor: aguardando o auditor responsável.', 'codexplus');
+        $flow = static fn () => $doc->managerApprove((string) ($_POST['approval_comment'] ?? ''));
+        $okMsg = __('Aprovado: aguardando o auditor responsável.', 'codexplus');
     } elseif (isset($_POST['approve'])) {
-        $flow = static fn () => $doc->approve();
+        $flow = static fn () => $doc->approve((string) ($_POST['approval_comment'] ?? ''));
         $okMsg = __('Documento validado e publicado.', 'codexplus');
     } elseif (isset($_POST['reject'])) {
         $flow = static fn () => $doc->reject((string) ($_POST['validation_comment'] ?? ''));
@@ -430,7 +431,7 @@ if ($id > 0) {
 // -------------------------------------------------------------------------
 $isNew = $id <= 0;
 
-if ($isNew && !(Document::canCreate() && ($allowedSectors === null || $allowedSectors !== []))) {
+if ($isNew && !Document::canCreate()) {
     Html::displayRightError();
 }
 
@@ -519,10 +520,6 @@ if ($canEdit) {
         'display'  => false,
         'width'    => '100%',
     ];
-    if ($allowedSectors !== null) {
-        // Só categorias de setores que o usuário gere (o servidor confere de novo).
-        $catParams['condition'] = [Category::SECTOR_FIELD => $allowedSectors ?: [-1]];
-    }
     if (!$catCanChange) {
         $catParams['readonly'] = true;
     }
@@ -537,11 +534,14 @@ if ($canEdit) {
         ]);
     }
     if ($canManage || $isNew) {
-        // Na criação, o responsável começa sendo quem cria (troca na hora).
-        $widgets['owner'] = User::dropdown([
-            'name'    => 'users_id_owner',
-            'value'   => $isNew ? (int) Session::getLoginUserID() : (int) ($doc->fields['users_id_owner'] ?? 0),
-            'right'   => 'all',
+        // P1: responsável = gestor do documento, entre quem tem Aprovar. Na
+        // criação começa com quem cria, se tiver o direito.
+        $ent     = $isNew ? (int) Session::getActiveEntity() : (int) $doc->fields['entities_id'];
+        $aprov   = Rights::approverUsers($ent);
+        $me      = (int) Session::getLoginUserID();
+        $ownerId = $isNew ? (in_array($me, $aprov, true) ? $me : 0) : (int) ($doc->fields['users_id_owner'] ?? 0);
+        $widgets['owner'] = Dropdown::showFromArray('users_id_owner', $roleOptions($aprov, $ownerId, __('(sem o direito Aprovar)', 'codexplus')), [
+            'value'   => $ownerId,
             'display' => false,
             'width'   => '100%',
         ]);
@@ -599,14 +599,6 @@ $sectorNames = $isNew ? [] : array_map(
     $doc->getSectorIds()
 );
 
-$editors = [];
-if (!$isNew) {
-    foreach ($DB->request(['FROM' => DocumentEditor::getTable(), 'WHERE' => [DocumentEditor::$items_id => $id]]) as $row) {
-        $e = new DocumentEditor();
-        $e->getFromDB((int) $row['id']);
-        $editors[] = $e->getMemberName();
-    }
-}
 
 // R3b2-a: coluna "Permissões" com os alvos de leitura. Quem gere o documento
 // muda (em qualquer status: é acesso, não conteúdo); quem tem papel nele ou
@@ -618,20 +610,15 @@ $perm = [
     'pending'    => false,
     'can_manage' => false,
     'targets'    => [],
-    'editors'    => [],
-    'widgets'    => ['group' => '', 'profile' => '', 'user' => '', 'editor_user' => '', 'editor_group' => ''],
+    'widgets'    => ['group' => '', 'profile' => '', 'user' => ''],
     'url'        => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.targets.php',
 ];
-// Na criação, gerir = Atualizar (quem cria já é gestor do setor de todas as
-// categorias, ou Ver todos: Document::canCreateIn). Sem Atualizar, a coluna
-// não aparece — as ligações seriam recusadas depois de criar.
-$manageNew = $isNew && Document::canUpdate();
+$manageNew = $isNew; // quem cria gere o rascunho (autor, P1)
 if ($manageNew || (!$isNew && ($canManage || $doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL)))) {
     $perm['show']       = true;
     $perm['pending']    = $isNew;
     $perm['can_manage'] = $manageNew || $canManage;
     $perm['targets']    = $isNew ? [] : Document::listTargets($id);
-    $perm['editors']    = $isNew ? [] : Document::listEditors($id);
     if ($perm['can_manage']) {
         // Nomes com "_cxt_": o Salvar do formulário não os lê. Os três vão
         // pelo endpoint, que confere de novo quem pode (TargetRelation).
@@ -651,17 +638,6 @@ if ($manageNew || (!$isNew && ($canManage || $doc->hasRole() || Session::haveRig
             'display' => false,
             'width'   => '100%',
         ]);
-        $perm['widgets']['editor_user'] = User::dropdown([
-            'name'    => '_cxt_editor_user',
-            'right'   => 'all',
-            'display' => false,
-            'width'   => '100%',
-        ]);
-        $perm['widgets']['editor_group'] = Group::dropdown([
-            'name'    => '_cxt_editor_group',
-            'display' => false,
-            'width'   => '100%',
-        ]);
     }
 }
 
@@ -673,18 +649,10 @@ $status = $isNew ? Document::STATUS_DRAFT : (string) $doc->fields['status'];
 // tem um perfil com o bit Auditor na entidade do documento, em qualquer setor
 // (Rights::auditorUsers) — a lista não depende mais das categorias.
 $fmtDate = static fn ($d) => empty($d) ? '' : substr((string) $d, 0, 10);
-$auditorOptions = static function (int $entityId, int $atual): array {
-    $opcoes = [0 => Dropdown::EMPTY_VALUE];
-    foreach (Rights::auditorUsers($entityId) as $uid) {
-        $opcoes[$uid] = getUserName($uid);
-    }
-    // Auditor gravado que perdeu o perfil continua visível, para não sumir
-    // em silêncio; o envio avisa que precisa trocar.
-    if ($atual > 0 && !isset($opcoes[$atual])) {
-        $opcoes[$atual] = getUserName($atual) . ' ' . __('(sem perfil de auditor)', 'codexplus');
-    }
-    return $opcoes;
-};
+$auditorOptions = static fn (int $entityId, int $atual): array
+    => $roleOptions(Rights::auditorUsers($entityId), $atual, __('(sem o direito Auditar)', 'codexplus'));
+$reviewerOptions = static fn (int $entityId, int $atual): array
+    => $roleOptions(Rights::reviewerUsers($entityId), $atual, __('(sem o direito Revisar e editar)', 'codexplus'));
 $review = [
     'show'             => true,
     'is_new'           => $isNew,
@@ -712,10 +680,8 @@ if ($isNew) {
         'display' => false,
         'width'   => '100%',
     ]);
-    $review['reviewer_widget'] = User::dropdown([
-        'name'    => 'users_id_reviewer',
+    $review['reviewer_widget'] = Dropdown::showFromArray('users_id_reviewer', $reviewerOptions((int) Session::getActiveEntity(), 0), [
         'value'   => 0,
-        'right'   => 'all',
         'display' => false,
         'width'   => '100%',
     ]);
@@ -741,10 +707,8 @@ if (!$isNew) {
         ]);
     }
     if ($review['can_review']) {
-        $review['reviewer_widget'] = User::dropdown([
-            'name'    => 'users_id_reviewer',
+        $review['reviewer_widget'] = Dropdown::showFromArray('users_id_reviewer', $reviewerOptions((int) $doc->fields['entities_id'], $reviewerId), [
             'value'   => $reviewerId,
-            'right'   => 'all',
             'display' => false,
             'width'   => '100%',
         ]);
@@ -754,17 +718,17 @@ if (!$isNew) {
     // porquê (antes o botão só não aparecia). Regra das duas camadas:
     // perfil (bit) + papel no plugin.
     $st0 = (string) $doc->fields['status'];
-    if ($st0 === Document::STATUS_APPROVAL && $doc->isManager() && !$doc->canApprove()) {
-        $missingRight = __('Você é gestor do setor deste documento, mas seu perfil não tem o direito Atualizar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+    if ($st0 === Document::STATUS_APPROVAL && $doc->isOwner() && !$doc->canApprove()) {
+        $missingRight = __('Você é o responsável deste documento, mas o perfil em uso não tem o direito Aprovar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
     } elseif ($doc->validationBlocker() === 'perfil') {
-        $missingRight = __('Você é o auditor responsável deste documento, mas o perfil em uso não tem o direito Auditor do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+        $missingRight = __('Você é o auditor responsável deste documento, mas o perfil em uso não tem o direito Auditar do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
     }
 
     // Aviso "aguardando …": quem responde pela etapa atual.
     $st = (string) $doc->fields['status'];
     if (in_array($st, Document::PENDING_STATUSES, true)) {
         $pending['label'] = $st === Document::STATUS_APPROVAL
-            ? __('Aguardando a aprovação do gestor do setor', 'codexplus')
+            ? __('Aguardando a aprovação do responsável', 'codexplus')
             : __('Aguardando a validação do auditor responsável', 'codexplus');
         $pending['names'] = array_map('getUserName', $doc->pendingWith());
     }
@@ -790,7 +754,6 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
     'category_names' => $categoryNames,
     'sector_names'   => $sectorNames,
-    'editors'        => $editors,
     'validation_comment' => $isNew ? '' : (string) ($doc->fields['validation_comment'] ?? ''),
     'validator_name'     => $version['on'] ? $version['validator']
         : ($isNew || (int) ($doc->fields['users_id_validator'] ?? 0) <= 0 ? '' : getUserName((int) $doc->fields['users_id_validator'])),
@@ -807,15 +770,13 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_validate' => !$isNew && $doc->canValidate(),
     'can_approve'  => !$isNew && $doc->canApprove(),
     'can_reject'   => !$isNew && $doc->canReject(),
-    // A2: auditor responsável impedido de validar (editou ou aprovou a 1ª
-    // etapa). O motivo 'perfil' vai em missing_right.
+    // A2: auditor responsável impedido de validar (aprovou a 1ª etapa). O motivo 'perfil' vai em missing_right.
     'validation_block' => $isNew || $version['on'] ? '' : match ($doc->validationBlocker()) {
-        'alterou' => __('Você alterou este documento nesta revisão: outra pessoa precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
         'aprovou' => __('Você aprovou a 1ª etapa deste documento: outro auditor precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
         default   => '',
     },
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
-    // R3b2-b parte 2: duplicar = poder criar em todas as categorias dele.
+    // Duplicar = poder criar (P1).
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
     // R3b3-1: anexos (fora as imagens coladas no corpo mostrado).
     'attachments'   => $isNew || $isDiagram ? [] : Document::listAttachments($id, (string) ($shown['content'] ?? $doc->fields['content'] ?? '')),

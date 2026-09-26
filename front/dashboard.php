@@ -8,7 +8,6 @@ use Glpi\Application\View\TemplateRenderer;
 use GlpiPlugin\Codexplus\Dashboard;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Rights;
-use GlpiPlugin\Codexplus\SectorMember;
 use GlpiPlugin\Codexplus\Wiki;
 
 include('../../../inc/includes.php');
@@ -30,8 +29,7 @@ Html::header(
 // provisório da R3b1 saiu; "Novo documento" cria direto no modelo novo.
 $docs = Dashboard::loadAllNew();
 
-$canCreate = Document::canCreate()
-    && (Session::haveRight(Rights::NAME, Rights::VIEWALL) || SectorMember::mySectors(SectorMember::ROLE_MANAGER) !== []);
+$canCreate = Document::canCreate();
 
 TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
     'counters'   => Dashboard::getCounters($docs),

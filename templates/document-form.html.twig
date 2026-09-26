@@ -1,5 +1,5 @@
 {# Codex+ — Etapa R3b1: página do documento no modelo novo.
-   Criar, editar (só rascunho, para editor/gestor) e mover no fluxo
+   Criar, editar (só rascunho: responsável, revisor, autor) e mover no fluxo
    (Enviar, Validar, Devolver, Obsoleto). Regras em src/Document.php;
    aqui só se mostra o que o controller liberou.
    Estilos: public/css/codexplus.css, seção 14. #}
@@ -107,6 +107,15 @@
                 <div class="cx-notice-text">{{ validation_comment }}</div>
             </div>
         </div>
+    {% elseif not is_new and not version.on and validation_comment %}
+        {# P1: observação deixada na aprovação (responsável) ou na auditoria. #}
+        <div class="cx-notice">
+            <i class="ti ti-message-circle"></i>
+            <div>
+                <strong>{{ status == 'validacao' ? __('Observação do responsável', 'codexplus') : __('Observação da auditoria', 'codexplus') }}</strong>
+                <div class="cx-notice-text">{{ validation_comment }}</div>
+            </div>
+        </div>
     {% endif %}
     {% if validation_block %}
         <div class="cx-notice">
@@ -164,7 +173,7 @@
                         <label>{{ __('Categorias', 'codexplus') }}</label>
                         {{ widgets.categories|raw }}
                         <div class="codexplus-form-hint">
-                            {{ __('A categoria define o setor — e o setor define quem valida. Só aparecem as categorias dos setores que você gere.', 'codexplus') }}
+                            {{ __('Organiza o documento na estante (a categoria define o setor).', 'codexplus') }}
                         </div>
                     </div>
 
@@ -172,7 +181,7 @@
                         <div class="cx-docform-field">
                             <label>{{ __('Responsável', 'codexplus') }}</label>
                             {{ widgets.owner|raw }}
-                            <div class="codexplus-form-hint">{{ __('Recebe o aviso de vencimento.', 'codexplus') }}</div>
+                            <div class="codexplus-form-hint">{{ __('Gestor do documento: aprova a 1ª etapa, edita e recebe o aviso de vencimento. Aparece quem tem o direito Aprovar.', 'codexplus') }}</div>
                         </div>
                     {% endif %}
 
@@ -272,10 +281,6 @@
                     <div class="codexplus-doc-edit-zone cx-docform-roles">
                         <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                         <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
-                        {# R3b2-b: com a coluna Permissões na tela, os editores estão nela. #}
-                        {% if not perm.show %}
-                            <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
-                        {% endif %}
                     </div>
                 {% endif %}
             </article>
@@ -314,17 +319,14 @@
                 {% if client.name %}
                     <span><strong>{{ __('Cliente', 'codexplus') }}:</strong> {{ client.name }}</span>
                 {% endif %}
-                {% if not perm.show or version.on or preview %}
-                    <span><strong>{{ __('Editores', 'codexplus') }}:</strong> {{ editors ? editors|join(', ') : '—' }}</span>
-                {% endif %}
                 {% if status == 'publicado' and validator_name %}
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
                 {% endif %}
                 {% if review.show and (not review.can_review or preview) %}
                     <span><strong>{{ __('Auditor responsável', 'codexplus') }}:</strong> {{ review.auditor_name ?: '—' }}</span>
                     <span><strong>{{ __('Revisor', 'codexplus') }}:</strong> {{ review.reviewer_name ?: '—' }}</span>
-                    <span><strong>{{ __('Revisão', 'codexplus') }}:</strong>
-                        {% if review.start and review.end %}{{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% else %}—{% endif %}</span>
+                    <span><strong>{{ __('Janela de revisão', 'codexplus') }}:</strong>
+                        {% if review.start and review.end %}{{ review.start|date('d/m/Y') }} {{ __('a', 'codexplus') }} {{ review.end|date('d/m/Y') }}{% else %}{{ __('calculada na publicação', 'codexplus') }}{% endif %}</span>
                 {% endif %}
             </div>
             {% if review.show and review.can_review and not version.on and not preview %}
@@ -406,7 +408,7 @@
                     <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}
                     </button>
-                    <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Vai primeiro ao gestor do setor e depois ao auditor responsável; nesse meio-tempo o documento fica travado.', 'codexplus') }}</span>
+                    <span class="codexplus-form-hint">{{ __('Salve antes de enviar. Vai primeiro ao responsável e depois ao auditor; nesse meio-tempo o documento fica travado.', 'codexplus') }}</span>
                 </form>
             {% endif %}
 
@@ -418,7 +420,7 @@
                             onclick="return confirm('{{ __('Abrir a revisão seguinte? O documento volta a rascunho; os leitores continuam vendo a versão publicada até a nova ser validada.', 'codexplus')|e('js') }}');">
                         <i class="ti ti-pencil-plus"></i> {{ __('Abrir revisão', 'codexplus') }}
                     </button>
-                    <span class="codexplus-form-hint">{{ __('Cria a próxima revisão para editar. A publicada segue no ar até a nova passar pelo gestor e pelo auditor.', 'codexplus') }}</span>
+                    <span class="codexplus-form-hint">{{ __('Cria a próxima revisão para editar. A publicada segue no ar até a nova passar pelo responsável e pelo auditor.', 'codexplus') }}</span>
                 </form>
             {% endif %}
 
@@ -450,11 +452,13 @@
                 <form method="post" action="{{ self }}" class="cx-flow-row">
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
+                    <textarea name="approval_comment" rows="2" class="form-control"
+                              placeholder="{{ __('Observação para o auditor (opcional)', 'codexplus') }}"></textarea>
                     <button type="submit" name="manager_approve" value="1" class="codexplus-btn codexplus-btn-primary"
                             onclick="return confirm('{{ __('Aprovar e enviar ao auditor responsável?', 'codexplus')|e('js') }}');">
                         <i class="ti ti-circle-check"></i> {{ __('Aprovar e enviar ao auditor', 'codexplus') }}
                     </button>
-                    <span class="codexplus-form-hint">{{ __('1ª etapa: aprovação do gestor do setor.', 'codexplus') }}</span>
+                    <span class="codexplus-form-hint">{{ __('1ª etapa: aprovação do responsável.', 'codexplus') }}</span>
                 </form>
             {% endif %}
 
@@ -462,6 +466,8 @@
                 <form method="post" action="{{ self }}" class="cx-flow-row">
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
+                    <textarea name="approval_comment" rows="2" class="form-control"
+                              placeholder="{{ __('Observação da auditoria (opcional)', 'codexplus') }}"></textarea>
                     <button type="submit" name="approve" value="1" class="codexplus-btn codexplus-btn-primary"
                             onclick="return confirm('{{ __('Validar e publicar este documento?', 'codexplus')|e('js') }}');">
                         <i class="ti ti-circle-check"></i> {{ __('Validar e publicar', 'codexplus') }}
@@ -475,7 +481,7 @@
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     <textarea name="validation_comment" rows="2" class="form-control" required
-                              placeholder="{{ __('Motivo da devolução (obrigatório)', 'codexplus') }}"></textarea>
+                              placeholder="{{ __('O que corrigir (obrigatório)', 'codexplus') }}"></textarea>
                     <button type="submit" name="reject" value="1" class="codexplus-btn">
                         <i class="ti ti-arrow-back-up"></i> {{ __('Devolver para rascunho', 'codexplus') }}
                     </button>

@@ -1,8 +1,8 @@
 {# Codex+ — coluna "Permissões" da página do documento.
    Layout decidido por Claudio em 20/09/2026: fica na própria página, à
    direita de Categorias e Responsável, e não em abas.
-   R3b2-a: LEITURA (grupo, perfil, usuário). R3b2-b: EDIÇÃO (usuário, grupo)
-   na mesma coluna, e a coluna já na criação.
+   R3b2-a: LEITURA (grupo, perfil, usuário), e a coluna já na criação.
+   A seção EDIÇÃO saiu na P1 (editam responsável, revisor e autor).
 
    Não é formulário: pode estar dentro do formulário de edição ou fora dele
    (documento publicado). Documento existente: tudo vai por
@@ -13,7 +13,7 @@
    A marcação dos itens da lista é repetida no JS (itemHtml): mudou uma,
    mude a outra.
 
-   Variáveis: perm (show, pending, can_manage, targets, editors, widgets, url),
+   Variáveis: perm (show, pending, can_manage, targets, widgets, url),
    id, csrf_token. #}
 {% set icone = {'group': 'ti-users', 'profile': 'ti-id-badge-2', 'user': 'ti-user', 'editor_user': 'ti-user', 'editor_group': 'ti-users'} %}
 {% set rotulo = {'group': __('Grupo', 'codexplus'), 'profile': __('Perfil', 'codexplus'), 'user': __('Usuário', 'codexplus'), 'editor_user': __('Usuário', 'codexplus'), 'editor_group': __('Grupo', 'codexplus')} %}
@@ -25,15 +25,7 @@
         'tipos': ['group', 'profile', 'user'],
         'vazio': __('Nenhum leitor. Só quem tem papel no documento o vê.', 'codexplus'),
         'dica': __('Leitores só veem a versão publicada. Grupo e perfil valem em todas as entidades.', 'codexplus'),
-    },
-    {
-        'chave': 'edicao',
-        'titulo': __('Edição', 'codexplus'),
-        'itens': perm.editors,
-        'tipos': ['editor_user', 'editor_group'],
-        'vazio': __('Nenhum editor. Só os gestores do setor editam.', 'codexplus'),
-        'dica': __('Editores mudam o conteúdo enquanto o documento está em rascunho. Quem editou não valida.', 'codexplus'),
-    },
+    }
 ] %}
 <aside class="cx-perm{{ perm.pending ? ' cx-perm--pending' : '' }}" data-cx-perm data-url="{{ perm.url }}" data-doc="{{ id }}"
        data-manage="{{ perm.can_manage ? '1' : '0' }}" data-pending="{{ perm.pending ? '1' : '0' }}"

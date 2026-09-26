@@ -1,6 +1,6 @@
 {# Codex+ — auditor responsável, revisor e janela de revisão (bloco R3d).
-   Decisão de Claudio, 21/09/2026: validação em duas etapas (1ª o gestor do
-   setor, 2ª o auditor responsável) e revisão periódica com um papel próprio
+   Decisão de Claudio, 21/09/2026: validação em duas etapas (1ª o
+   responsável, 2ª o auditor responsável; P1, 26/09/2026) e revisão periódica com um papel próprio
    (revisor) e uma janela no calendário, com início e fim.
    Entra dentro de um .cx-docform-grid: na criação e na edição (formulário
    do documento) e, fora de rascunho, no formulário "Salvar revisão
@@ -16,7 +16,7 @@
             {% if review.no_auditors %}
                 {{ __('Ninguém tem perfil de auditor nesta entidade. O auditor é quem tem a coluna Auditor marcada no perfil (Administração → Perfis → aba Codex+). Dá para escolher depois, antes de enviar para validação.', 'codexplus') }}
             {% else %}
-                {{ __('2ª etapa da validação: quem valida e publica, depois do gestor do setor. Aparece quem tem perfil de auditor.', 'codexplus') }}
+                {{ __('2ª etapa: aprova e publica, ou devolve com o que corrigir. Não edita. Aparece quem tem o direito Auditar.', 'codexplus') }}
             {% endif %}
         </div>
     {% else %}

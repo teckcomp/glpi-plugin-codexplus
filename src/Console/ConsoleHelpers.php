@@ -25,7 +25,6 @@ trait ConsoleHelpers
             throw new InvalidArgumentException('Informe --username=<login> (o usuário que executa).');
         }
         $this->loadUserSession($login);
-        \GlpiPlugin\Codexplus\SectorMember::resetCache();
 
         $profileName = (string) ($input->getOption('profile') ?? '');
         if ($profileName !== '') {
@@ -34,7 +33,6 @@ trait ConsoleHelpers
                 throw new InvalidArgumentException("O usuário $login não tem o perfil \"$profileName\".");
             }
             Session::changeProfile($pid);
-            \GlpiPlugin\Codexplus\SectorMember::resetCache();
         }
     }
 

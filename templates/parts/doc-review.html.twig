@@ -28,6 +28,21 @@
 </div>
 {% endif %}
 
+{# E6 (Claudio, 27/09/2026): Proposta e Laudo têm um Editor — quem monta o
+   documento para o responsável (o mesmo papel do revisor, sem janela).
+   Edita o rascunho; publicar continua só com o responsável. #}
+{% if review.show_editor %}
+<div class="cx-docform-field"{% if review.is_new %} data-cx-only-type="{{ review.editor_types }}"{% endif %}>
+    <label>{{ __('Editor', 'codexplus') }}</label>
+    {% if review.can_review %}
+        {{ review.editor_widget|raw }}
+        <div class="codexplus-form-hint">{{ __('Monta o documento junto com o responsável e o autor: edita o rascunho, mas não publica (quem publica é o responsável). Aparece quem tem o direito Revisar e editar.', 'codexplus') }}</div>
+    {% else %}
+        <div class="cx-docform-readonly">{{ review.reviewer_name ?: '—' }}</div>
+    {% endif %}
+</div>
+{% endif %}
+
 {% if review.show_reviewer %}
 <div class="cx-docform-field cx-docform-field--wide cx-review"{% if review.is_new %} data-cx-only-type="{{ review.reviewer_types }}"{% endif %}>
     <label>{{ __('Revisão periódica', 'codexplus') }}</label>

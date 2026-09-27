@@ -1143,7 +1143,16 @@ class Document extends CommonDBTM
         }
         if ($flow === DocumentMeta::FLOW_DIRECT) {
             unset($input['users_id_reviewer'], $input['review_start'], $input['review_end']);
+            // E6 (Claudio, 27/09/2026): Proposta e Laudo têm um EDITOR — quem
+            // monta o documento para o responsável. É o mesmo papel do revisor
+            // (edita o rascunho, bit Revisar e editar), sem revisão periódica.
+            // Vem num campo próprio (users_id_editor) porque, na criação, o
+            // campo "Revisor" dos outros tipos também está na página.
+            if (array_key_exists('users_id_editor', $input)) {
+                $input['users_id_reviewer'] = (int) $input['users_id_editor'];
+            }
         }
+        unset($input['users_id_editor']);
         return $input;
     }
 
@@ -1286,7 +1295,9 @@ class Document extends CommonDBTM
         }
         if (isset($mudou['users_id_reviewer']) && (int) $input['users_id_reviewer'] > 0
             && !in_array((int) $input['users_id_reviewer'], Rights::reviewerUsers($entityId), true)) {
-            return $this->deny(__('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+            return $this->deny(DocumentMeta::flowOf((string) ($input['doctype'] ?? $this->fields['doctype'] ?? '')) === DocumentMeta::FLOW_DIRECT
+                ? __('O editor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus')
+                : __('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
         }
         if (isset($mudou['users_id_auditor'])) {
             if (!$novo && $this->status() !== self::STATUS_DRAFT) {

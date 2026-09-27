@@ -118,7 +118,7 @@ if (isset($_POST['add'])) {
     $input += $postedClient($input['doctype']);
     // Responsável, auditor, revisor e janela já na criação; conferidos em
     // Document::prepareInputForAdd (cada um com o bit dele no perfil).
-    foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'] as $f) {
+    foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
             $input[$f] = (string) $_POST[$f];
         }
@@ -378,7 +378,7 @@ if ($id > 0 && isset($_POST['update'])) {
         }
         // R3d: auditor, revisor e janela. Conferidos em Document (auditor do
         // setor, só em rascunho; janela com as duas datas).
-        foreach (['users_id_auditor', 'users_id_reviewer', 'review_start', 'review_end'] as $f) {
+        foreach (['users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
             if (isset($_POST[$f])) {
                 $data[$f] = (string) $_POST[$f];
             }
@@ -443,7 +443,7 @@ if ($id > 0 && isset($_POST['update_review'])) {
         Html::redirect($self . '?id=' . $id);
     }
     $data = ['id' => $id];
-    foreach (['users_id_reviewer', 'review_start', 'review_end'] as $f) {
+    foreach (['users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
             $data[$f] = (string) $_POST[$f];
         }
@@ -750,6 +750,10 @@ $review = [
     'show_auditor'     => $isNew || $doc->flow() === DocumentMeta::FLOW_FULL,
     'show_reviewer'    => $isNew || $doc->flow() !== DocumentMeta::FLOW_DIRECT,
     'auditor_types'    => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_FULL]),
+    // E6: Proposta e Laudo (fluxo direto) têm Editor no lugar do revisor.
+    'show_editor'      => $isNew || $doc->flow() === DocumentMeta::FLOW_DIRECT,
+    'editor_types'     => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_DIRECT]),
+    'editor_widget'    => '',
     'reviewer_types'   => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_FULL, DocumentMeta::FLOW_ONE]),
 ];
 $pending = ['label' => '', 'names' => []];
@@ -766,6 +770,11 @@ if ($isNew) {
         'width'   => '100%',
     ]);
     $review['reviewer_widget'] = Dropdown::showFromArray('users_id_reviewer', $reviewerOptions((int) Session::getActiveEntity(), 0), [
+        'value'   => 0,
+        'display' => false,
+        'width'   => '100%',
+    ]);
+    $review['editor_widget'] = Dropdown::showFromArray('users_id_editor', $reviewerOptions((int) Session::getActiveEntity(), 0), [
         'value'   => 0,
         'display' => false,
         'width'   => '100%',
@@ -792,11 +801,16 @@ if (!$isNew) {
         ]);
     }
     if ($review['can_review']) {
-        $review['reviewer_widget'] = Dropdown::showFromArray('users_id_reviewer', $reviewerOptions((int) $doc->fields['entities_id'], $reviewerId), [
-            'value'   => $reviewerId,
-            'display' => false,
-            'width'   => '100%',
-        ]);
+        // E6: no fluxo direto o mesmo papel aparece como "Editor".
+        $review[$review['show_editor'] ? 'editor_widget' : 'reviewer_widget'] = Dropdown::showFromArray(
+            $review['show_editor'] ? 'users_id_editor' : 'users_id_reviewer',
+            $reviewerOptions((int) $doc->fields['entities_id'], $reviewerId),
+            [
+                'value'   => $reviewerId,
+                'display' => false,
+                'width'   => '100%',
+            ]
+        );
     }
 
     // R3d-1: quem responde pela etapa mas não consegue agir fica sabendo o

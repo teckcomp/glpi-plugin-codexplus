@@ -427,6 +427,9 @@
                     {% if review.show_auditor %}
                     <span><strong>{{ __('Auditor responsável', 'codexplus') }}:</strong> {{ review.auditor_name ?: '—' }}</span>
                     {% endif %}
+                    {% if review.show_editor and not review.is_new %}
+                    <span><strong>{{ __('Editor', 'codexplus') }}:</strong> {{ review.reviewer_name ?: '—' }}</span>
+                    {% endif %}
                     {% if review.show_reviewer %}
                     <span><strong>{{ __('Revisor', 'codexplus') }}:</strong> {{ review.reviewer_name ?: '—' }}</span>
                     <span><strong>{{ __('Janela de revisão', 'codexplus') }}:</strong>
@@ -444,7 +447,7 @@
                         {% include '@codexplus/parts/doc-review.html.twig' with {review: review} only %}
                     </div>
                     <button type="submit" name="update_review" value="1" class="codexplus-btn">
-                        <i class="ti ti-device-floppy"></i> {{ __('Salvar revisão periódica', 'codexplus') }}
+                        <i class="ti ti-device-floppy"></i> {{ review.show_reviewer ? __('Salvar revisão periódica', 'codexplus') : __('Salvar editor', 'codexplus') }}
                     </button>
                 </form>
             {% endif %}

@@ -18,7 +18,8 @@
    Itens: icon {x,y,size,icon,label,f:{modelo,ip,vlan,obs},cat,cone},
           zone {x,y,w,h,label,color}, text {x,y,text,color,size}.
           link {a:{id,side}, b:{id,side}, kind, route, wp:[{x,y}], ends,
-                label, cable, pa, pb, vel, vlan, poe, showId, fs}
+                label, cable, pa, pb, vel, vlan, poe, showId, fs,
+                len:{mode:'auto'|'manual', m, extra}, showM} (Q2d: metros)
                 (Q2a/Q2b; side = n/l/s/o, borda do ícone; cable = P-001…).
    Todos com id, lock (travado) e g (grupo). Ligação não tem x/y: a
    posição vem dos dois ícones, e ela acompanha quando eles se movem.
@@ -129,7 +130,14 @@
                 vel: String(it.vel || '').slice(0, 40), vlan: String(it.vlan || '').slice(0, 40),
                 poe: !!it.poe,
                 showId: it.showId === undefined ? true : !!it.showId,
-                fs: LINK_FS[it.fs] ? it.fs : 'm'
+                fs: LINK_FS[it.fs] ? it.fs : 'm',
+                // Metragem (Q2d): automática pelo traçado e pela escala, com sobra; ou manual.
+                len: {
+                    mode: it.len && it.len.mode === 'manual' ? 'manual' : 'auto',
+                    m: Math.max(0, Math.min(10000, Math.round((+(it.len || {}).m || 0) * 10) / 10)),
+                    extra: it.len && isFinite(+it.len.extra) && it.len.extra !== '' && it.len.extra !== null ? Math.max(0, Math.min(100, Math.round(+it.len.extra))) : 10
+                },
+                showM: it.showM === undefined ? true : !!it.showM
             });
         });
         return out;
@@ -166,11 +174,25 @@
         var n = 1; while (used[n]) { n++; }
         return 'P-' + (n < 10 ? '00' : n < 100 ? '0' : '') + n;
     }
-    // Texto que aparece no cabo: identificação, rótulo e PoE.
-    function linkText(L) {
+    // Comprimento desenhado, em metros, pela escala em uso (PXM).
+    function polyLen(o) {
+        var t = 0;
+        for (var i = 1; i < o.length; i++) { t += Math.sqrt(Math.pow(o[i].x - o[i - 1].x, 2) + Math.pow(o[i].y - o[i - 1].y, 2)); }
+        return t;
+    }
+    // {measured, total}: medido no desenho; total = medido + sobra, ou o manual.
+    function linkMeters(L, find) {
+        var r = routePts(L, find), med = r ? polyLen(r) / PXM : 0;
+        var len = L.len || { mode: 'auto', m: 0, extra: 10 };
+        var tot = len.mode === 'manual' ? (+len.m || 0) : med * (1 + (+len.extra || 0) / 100);
+        return { measured: Math.round(med * 10) / 10, total: Math.round(tot * 10) / 10 };
+    }
+    // Texto que aparece no cabo: identificação, rótulo, metros e PoE.
+    function linkText(L, find) {
         var parts = [];
         if (L.showId && L.cable) { parts.push(L.cable); }
         if (L.label) { parts.push(L.label); }
+        if (L.showM && find) { var mt = linkMeters(L, find).total; if (mt > 0) { parts.push(fmtM(mt)); } }
         if (L.poe) { parts.push('PoE'); }
         return parts.join(' · ');
     }
@@ -297,7 +319,7 @@
         var n = pts.length;
         if (L.ends === 'arrow' || L.ends === 'both') { h += arrowHead(pts[n - 1], pts[n - 2], k); }
         if (L.ends === 'both') { h += arrowHead(pts[0], pts[1], k); }
-        var txt = linkText(L);
+        var txt = linkText(L, find);
         if (txt) {
             // O nome do cabo acompanha os ícones das pontas, como o nome do
             // ícone (Claudio, 27/09/2026), com Pequeno/Médio/Grande no painel.
@@ -735,6 +757,20 @@
             });
             return h;
         }
+        // Bloco de metragem do painel da ligação (Q2d).
+        function metersPanel(it) {
+            if (!it.len) { it.len = { mode: 'auto', m: 0, extra: 10 }; }
+            var mt = linkMeters(it, get), manual = it.len.mode === 'manual';
+            return '<p class="cx-board-sub">Comprimento</p>'
+                + '<label class="cx-board-f"><select data-k="len.mode"><option value="auto"' + (manual ? '' : ' selected') + '>Automático, pelo desenho</option>'
+                + '<option value="manual"' + (manual ? ' selected' : '') + '>Manual</option></select></label>'
+                + (manual
+                    ? '<label class="cx-board-f"><span>Metros</span><input type="text" inputmode="decimal" data-k="len.m" value="' + (it.len.m ? String(it.len.m).replace('.', ',') : '') + '" placeholder="25"></label>'
+                    : '<div class="cx-board-row"><label class="cx-board-f"><span>Sobra (%)</span><input type="text" inputmode="numeric" data-k="len.extra" value="' + it.len.extra + '"></label>'
+                      + '<p class="cx-board-none cx-board-meters">Medido ' + fmtM(mt.measured) + '<br><strong>Total ' + fmtM(mt.total) + '</strong></p></div>'
+                      + (D.pxm ? '' : '<p class="cx-board-none">Sem escala: metros aproximados (1 m = ' + PXM_DEFAULT + ' px). Use "Escala" na barra para medir pela planta.</p>'))
+                + '<label class="cx-board-chk"><input type="checkbox" data-k="showM"' + (it.showM ? ' checked' : '') + '> Mostrar os metros no cabo</label>';
+        }
         // Em qual trecho (entre o ponto j e o j+1) caiu o duplo clique.
         function segPiece(L, P, j) {
             if (L.route === 'elbow') {
@@ -815,11 +851,12 @@
                     + '<div class="cx-board-row">' + field('Cabo', 'cable', it.cable, 'P-001') + field('Rótulo', 'label', it.label, 'Uplink') + '</div>'
                     + '<div class="cx-board-row">' + field('Porta origem', 'pa', it.pa, 'Gi0/1') + field('Porta destino', 'pb', it.pb, 'eth0') + '</div>'
                     + '<div class="cx-board-row">' + field('Velocidade', 'vel', it.vel, '1 Gbps') + field('VLAN', 'vlan', it.vlan, '20') + '</div>'
+                    + metersPanel(it)
                     + '<label class="cx-board-chk"><input type="checkbox" data-k="poe"' + (it.poe ? ' checked' : '') + '> PoE</label>'
                     + '<label class="cx-board-chk"><input type="checkbox" data-k="showId"' + (it.showId ? ' checked' : '') + '> Mostrar a identificação no cabo</label>'
                     + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + opts({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
                     + '<p><button type="button" class="cx-board-btn" data-la="straighten"' + (it.wp.length ? '' : ' disabled') + '>Endireitar (tirar as dobras)</button></p>'
-                    + '<p class="cx-board-none">Para desenhar a passagem: duplo clique no cabo cria uma dobra ali; arraste a dobra (quadrado azul) para mover, ela alinha com a vizinha (segure Alt para posição livre); Ctrl + duplo clique na dobra apaga. Arraste a bolinha da ponta para outra borda ou outro ícone. O nome acompanha o tamanho dos ícones. Metragem chega no próximo passo.</p>';
+                    + '<p class="cx-board-none">Para desenhar a passagem: duplo clique no cabo cria uma dobra ali; arraste a dobra (quadrado azul) para mover, ela alinha com a vizinha (segure Alt para posição livre); Ctrl + duplo clique na dobra apaga. Arraste a bolinha da ponta para outra borda ou outro ícone. O nome acompanha o tamanho dos ícones.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else {
@@ -841,6 +878,10 @@
             if (!props.__snap) { snap(); props.__snap = true; }
             var v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
             if (/^(size|rot|cone\.dir|cone\.fov|cone\.m)$/.test(k) && it.t === 'icon') { v = +v; }
+            if (it.t === 'link' && (k === 'len.m' || k === 'len.extra')) {
+                v = parseFloat(String(v).replace(',', '.')) || 0;
+                v = k === 'len.extra' ? Math.max(0, Math.min(100, Math.round(v))) : Math.max(0, Math.min(10000, Math.round(v * 10) / 10));
+            }
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
             if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
@@ -848,6 +889,10 @@
             drawSel();
             if (/^cone\.|^cat$|^size$|^rot$/.test(k) && e.type === 'change') { drawProps(); }
             if (it.t === 'link' && k === 'cable') { var tt = props.querySelector('strong'); if (tt) { tt.textContent = 'Ligação ' + v; } }
+            if (it.t === 'link' && k === 'len.extra') {
+                var mm = props.querySelector('.cx-board-meters'), lm = linkMeters(it, get);
+                if (mm) { mm.innerHTML = 'Medido ' + fmtM(lm.measured) + '<br><strong>Total ' + fmtM(lm.total) + '</strong>'; }
+            }
         });
         props.addEventListener('change', function (e) {
             props.__snap = false;
@@ -1120,7 +1165,8 @@
                     snap();
                     var L = { id: uid(), t: 'link', a: { id: drag.from, side: drag.side }, b: { id: tgt.id, side: nearestSide(tgt, toBoard(e)) },
                         kind: LINK_DEFAULT, route: 'elbow', wp: [], ends: 'none', label: '', cable: nextCable(D.items),
-                        pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm', lock: false, g: '' };
+                        pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm',
+                        len: { mode: 'auto', m: 0, extra: 10 }, showM: true, lock: false, g: '' };
                     D.items.push(L);
                     sel = [L.id];
                 }
@@ -1343,5 +1389,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _toPng: toPng, _starter: starter, _apply: apply };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply };
 })();

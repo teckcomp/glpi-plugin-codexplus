@@ -2205,3 +2205,6 @@ html.cx-board-open { overflow: hidden; }
 .cx-fbar-pop { display: grid; grid-template-columns: repeat(6, 22px); gap: 5px; padding: 6px 2px 2px; justify-content: center; }
 .cx-fbar-sw { display: inline-block; width: 22px; height: 22px; border-radius: 5px; border: 1.5px solid; padding: 0; cursor: pointer; box-sizing: border-box; }
 .cx-fbar-sw.is-on { outline: 2px solid #378ADD; outline-offset: 1px; }
+/* Q5d — barra da ligação de fluxo */
+.cx-fbar-sel { font-size: 12px; padding: 1px 2px; border: 1px solid #d3d1c7; border-radius: 6px; max-width: 110px; }
+.cx-fbar-lab { font-size: 11px; color: #5F5E5A; margin-left: 2px; }

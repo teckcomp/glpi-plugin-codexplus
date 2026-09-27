@@ -42,6 +42,12 @@
    texto em 12 tons fixos, negrito e tamanho da letra — e camadas (Frente/
    Trás; a moldura fica sempre no fundo). Forma: {…, w, h, fill, line, ink,
    b, fs}; o `color` e o `sz` do Q5b ainda são lidos.
+   Q5d (27/09/2026): ligação de fluxo completa — cor (lc), espessura (lw:
+   f/m/g), traço (dash), ponta no início e no fim (ea/eb: seta cheia, seta
+   aberta, losango, círculo ou nada), balão com cor (lbg) que desliza ao
+   longo da linha (lt, 0..1). Cotovelo com cantos arredondados, ponta
+   proporcional à espessura e linha que para antes da ponta (referência
+   de Claudio). Estilo na barra flutuante; espessura também no painel.
    ========================================================================= */
 (function () {
     'use strict';
@@ -112,6 +118,91 @@
     Object.keys(FLOW_COLORS).forEach(function (k) { [FLOW_COLORS[k].s, FLOW_COLORS[k].t].forEach(function (c) { if (PAL_HEX.indexOf(c) < 0) { PAL_HEX.push(c); } }); });
     function pal(k) { return FLOW_COLORS[k] || FLOW_COLORS.azul; }
     function shapeFs(it) { return it.fs || SHAPE_FS; }
+    // Q5d — ligação de fluxo.
+    var FLOW_W = { f: 1.6, m: 3, g: 5 };
+    var FLOW_W_LABEL = { f: 'Fina', m: 'Média', g: 'Grossa' };
+    var FLOW_DASH = { solid: 'Contínuo', dash: 'Tracejado', dot: 'Pontilhado' };
+    var FLOW_HEADS = { none: 'Nenhuma', arrow: 'Seta cheia', open: 'Seta aberta', diamond: 'Losango', circle: 'Círculo' };
+    function headLen(w) { return 7 + w * 2.6; }
+    // Ponta desenhada (sem <marker>, por causa do PNG): tip = bico, from = de onde vem.
+    function flowHead(type, tip, from, w, c) {
+        if (!type || type === 'none') { return ''; }
+        var ang = Math.atan2(tip.y - from.y, tip.x - from.x), ux = Math.cos(ang), uy = Math.sin(ang), px = -uy, py = ux;
+        var L = headLen(w), hw = 3.2 + w * 1.25, f = function (x, y) { return x.toFixed(1) + ' ' + y.toFixed(1); };
+        var bx = tip.x - ux * L, by = tip.y - uy * L;
+        if (type === 'arrow') {
+            return '<path d="M' + f(tip.x, tip.y) + 'L' + f(bx + px * hw, by + py * hw) + 'L' + f(bx - px * hw, by - py * hw) + 'Z" fill="' + c + '"/>';
+        }
+        if (type === 'open') {
+            return '<path d="M' + f(bx + px * hw, by + py * hw) + 'L' + f(tip.x, tip.y) + 'L' + f(bx - px * hw, by - py * hw) + '" fill="none" stroke="' + c
+                + '" stroke-width="' + Math.max(1.4, w) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+        }
+        if (type === 'diamond') {
+            var mx = tip.x - ux * L / 2, my = tip.y - uy * L / 2;
+            return '<path d="M' + f(tip.x, tip.y) + 'L' + f(mx + px * hw * 0.8, my + py * hw * 0.8) + 'L' + f(bx, by) + 'L' + f(mx - px * hw * 0.8, my - py * hw * 0.8) + 'Z" fill="#fff" stroke="' + c + '" stroke-width="' + Math.max(1.2, w * 0.7) + '"/>';
+        }
+        var r = L / 2 - 0.5;
+        return '<circle cx="' + (tip.x - ux * r).toFixed(1) + '" cy="' + (tip.y - uy * r).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="#fff" stroke="' + c + '" stroke-width="' + Math.max(1.2, w * 0.7) + '"/>';
+    }
+    // Recua a ponta da polilinha d unidades (a linha não fura a seta).
+    function trimEnd(pts, d) {
+        var o = pts.slice(), n = o.length, a = o[n - 2], b = o[n - 1];
+        var l = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+        if (l < 1) { return o; }
+        var k = Math.min(d, l - 0.5) / l;
+        o[n - 1] = { x: b.x - (b.x - a.x) * k, y: b.y - (b.y - a.y) * k };
+        return o;
+    }
+    // Cantos arredondados nas dobras do cotovelo.
+    function roundedD(pts, r) {
+        var f = function (q) { return q.x.toFixed(1) + ' ' + q.y.toFixed(1); }, d = 'M' + f(pts[0]);
+        for (var i = 1; i < pts.length - 1; i++) {
+            var a = pts[i - 1], b = pts[i], c = pts[i + 1];
+            var l1 = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2)), l2 = Math.sqrt(Math.pow(c.x - b.x, 2) + Math.pow(c.y - b.y, 2));
+            var rr = Math.min(r, l1 / 2, l2 / 2);
+            if (rr < 1) { d += 'L' + f(b); continue; }
+            var p1 = { x: b.x - (b.x - a.x) / l1 * rr, y: b.y - (b.y - a.y) / l1 * rr }, p2 = { x: b.x + (c.x - b.x) / l2 * rr, y: b.y + (c.y - b.y) / l2 * rr };
+            d += 'L' + f(p1) + 'Q' + f(b) + ' ' + f(p2);
+        }
+        return d + 'L' + f(pts[pts.length - 1]);
+    }
+    // Fração (0..1) do ponto da polilinha mais perto de p.
+    function nearestT(pts, p) {
+        var tot = 0, seg = [], i;
+        for (i = 1; i < pts.length; i++) { var l = Math.sqrt(Math.pow(pts[i].x - pts[i - 1].x, 2) + Math.pow(pts[i].y - pts[i - 1].y, 2)); seg.push(l); tot += l; }
+        if (!tot) { return 0.5; }
+        var best = Infinity, bt = 0.5, acc = 0;
+        for (i = 1; i < pts.length; i++) {
+            var a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+            var t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+            var x = a.x + t * dx - p.x, y = a.y + t * dy - p.y, dd = x * x + y * y;
+            if (dd < best) { best = dd; bt = (acc + t * seg[i - 1]) / tot; }
+            acc += seg[i - 1];
+        }
+        return bt;
+    }
+    function flowLinkSvg(L, find, forExport) {
+        var pts = routePts(L, find);
+        if (!pts || pts.length < 2) { return ''; }
+        var w = FLOW_W[L.lw] || FLOW_W.f, c = pal(L.lc || 'cinza').s, n = pts.length, h = '<g data-id="' + L.id + '">';
+        var line = pts;
+        if (L.eb && L.eb !== 'none') { line = trimEnd(line, headLen(w) * (L.eb === 'open' ? 0.15 : 0.85)); }
+        if (L.ea && L.ea !== 'none') { line = trimEnd(line.slice().reverse(), headLen(w) * (L.ea === 'open' ? 0.15 : 0.85)).reverse(); }
+        var d = L.route === 'elbow' ? roundedD(line, 10 + w * 2) : linkD(line);
+        if (!forExport) { h += '<path d="' + routeD(L, find) + '" fill="none" stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke"/>'; }
+        var dash = L.dash === 'dash' ? ' stroke-dasharray="' + (w * 4 + 2) + ' ' + (w * 2.5 + 2) + '"' : L.dash === 'dot' ? ' stroke-dasharray="0.1 ' + (w * 2.4 + 2) + '"' : '';
+        h += '<path class="cx-board-link" d="' + d + '" fill="none" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="' + (L.dash === 'dot' ? 'round' : 'butt') + '" stroke-linejoin="round"' + dash + '/>';
+        h += flowHead(L.eb, pts[n - 1], pts[n - 2], w, c) + flowHead(L.ea, pts[0], pts[1], w, c);
+        if (L.label) {
+            var b = pal(L.lbg || 'branco'), fs = 12 * (LINK_FS[L.fs] || 1), m = midPoint(pts, L.lt === undefined ? 0.5 : L.lt);
+            var bw = L.label.length * fs * 0.56 + fs, bh = fs + 8;
+            h += '<rect data-lbl="1" x="' + (m.x - bw / 2).toFixed(1) + '" y="' + (m.y - bh / 2).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + bh + '" rx="' + (bh / 3).toFixed(1)
+                + '" fill="' + b.f + '" stroke="' + b.s + '" stroke-width="0.9"' + (forExport ? '' : ' style="cursor:ew-resize"') + '/>'
+                + '<text data-lbl="1" x="' + m.x.toFixed(1) + '" y="' + (m.y + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="' + b.t + '"'
+                + (forExport ? '' : ' style="cursor:ew-resize"') + '>' + esc(L.label) + '</text>';
+        }
+        return h + '</g>';
+    }
     function shapeMinW(it) { return it.shape === 'conn' ? 24 : 40; }
     // Largura útil do texto dentro de cada forma.
     function shapeInner(it) {
@@ -376,7 +467,18 @@
                 showM: it.showM === undefined ? true : !!it.showM
             });
             // Q5b: ligação de fluxo não é cabo — sem número, sem metros.
-            if (flowMode) { var fl = out.items[out.items.length - 1]; fl.cable = ''; fl.showId = false; fl.showM = false; fl.poe = false; }
+            if (flowMode) {
+                var fl = out.items[out.items.length - 1]; fl.cable = ''; fl.showId = false; fl.showM = false; fl.poe = false;
+                // Q5d: estilo. `ends` do Q5b vira ponta no início/fim.
+                fl.lc = FLOW_COLORS[it.lc] ? it.lc : 'cinza';
+                fl.lw = FLOW_W[it.lw] ? it.lw : 'f';
+                fl.dash = FLOW_DASH[it.dash] ? it.dash : 'solid';
+                fl.eb = FLOW_HEADS[it.eb] ? it.eb : (fl.ends === 'none' ? 'none' : 'arrow');
+                fl.ea = FLOW_HEADS[it.ea] ? it.ea : (fl.ends === 'both' ? 'arrow' : 'none');
+                fl.lt = isFinite(+it.lt) && it.lt !== '' && it.lt !== null ? Math.max(0.05, Math.min(0.95, Math.round(+it.lt * 1000) / 1000)) : 0.5;
+                fl.lbg = FLOW_COLORS[it.lbg] ? it.lbg : 'branco';
+                fl.ends = fl.eb !== 'none' ? (fl.ea !== 'none' ? 'both' : 'arrow') : 'none';
+            }
         });
         return out;
     }
@@ -521,7 +623,14 @@
         if (!P) { return null; }
         var n = P.length;
         if (L.route === 'elbow') {
-            return orth([P[0], out(P[0], L.a.side, STUB)].concat(P.slice(1, n - 1), [out(P[n - 1], L.b.side, STUB), P[n - 1]]));
+            // Q5d: na ligação de fluxo o trecho reto junto da forma cabe a ponta.
+            var sa = STUB, sb = STUB;
+            if (L.kind === 'fluxo') {
+                var hl = headLen(FLOW_W[L.lw] || FLOW_W.f) + 8;
+                if (L.ea && L.ea !== 'none') { sa = Math.max(STUB, hl); }
+                if (L.eb && L.eb !== 'none') { sb = Math.max(STUB, hl); }
+            }
+            return orth([P[0], out(P[0], L.a.side, sa)].concat(P.slice(1, n - 1), [out(P[n - 1], L.b.side, sb), P[n - 1]]));
         }
         if (L.route === 'curve') {
             var o = [P[0]];
@@ -555,6 +664,7 @@
         return pts[0];
     }
     function linkSvg(L, find, forExport) {
+        if (L.kind === 'fluxo') { return flowLinkSvg(L, find, forExport); }
         var pts = routePts(L, find);
         if (!pts) { return ''; }
         var k = LINK_KINDS[L.kind] || LINK_KINDS[LINK_DEFAULT], d = routeD(L, find), h = '<g data-id="' + L.id + '">';
@@ -1665,10 +1775,10 @@
             } else if (it.t === 'link' && it.kind === 'fluxo') {
                 h += '<p><strong>Ligação</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
                     + field('Rótulo', 'label', it.label, 'Sim')
-                    + '<label class="cx-board-f"><span>Traçado</span><select data-k="route">' + optsOf({ straight: 'Reto', elbow: 'Cotovelo', curve: 'Curvo' }, it.route) + '</select></label>'
-                    + '<label class="cx-board-f"><span>Pontas</span><select data-k="ends">' + optsOf({ none: 'Sem seta', arrow: 'Seta no destino', both: 'Seta nas duas pontas' }, it.ends) + '</select></label>'
-                    + '<label class="cx-board-f"><span>Tamanho do rótulo</span><select data-k="fs">' + optsOf({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Espessura da linha</span><select data-k="lw">' + optsOf(FLOW_W_LABEL, it.lw) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Tamanho do texto do rótulo</span><select data-k="fs">' + optsOf({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
                     + '<p><button type="button" class="cx-board-btn" data-la="straighten"' + (it.wp.length ? '' : ' disabled') + '>Endireitar (tirar as dobras)</button></p>'
+                    + '<p class="cx-board-none">Cor, espessura, traço, pontas, traçado e cor do balão: na barra sobre a ligação. Arraste o balão do rótulo ao longo da linha.</p>'
                     + '<p class="cx-board-none">Duplo clique na ligação cria uma dobra; arraste a dobra para mover; Ctrl + duplo clique apaga. Arraste a bolinha da ponta para outra borda ou outra forma.</p>';
             } else if (it.t === 'icon') {
                 var ic = I.get(it.icon);
@@ -1875,8 +1985,44 @@
             Object.keys(FLOW_COLORS).forEach(function (k) { if (!found && FLOW_COLORS[k][what === 'line' ? 's' : 't'] === hex) { found = k; } });
             return found;
         }
+        function flowLinks() { return sel.map(get).filter(function (i) { return i && i.t === 'link' && i.kind === 'fluxo'; }); }
+        function drawLinkBar(ls) {
+            var first = ls[0], pop = fbar.__pop || '';
+            var sig = ['L', sel.join(','), pop, ls.map(function (l) { return [l.lc, l.lw, l.dash, l.ea, l.eb, l.route, l.lbg].join(':'); }).join(';')].join('|');
+            if (fbar.__sig !== sig) {
+                fbar.__sig = sig;
+                var sel2 = function (key, opts) { return '<select class="cx-fbar-sel" data-lk="' + key + '" title="' + esc({ lw: 'Espessura', dash: 'Traço', ea: 'Ponta no início', eb: 'Ponta no fim', route: 'Traçado' }[key]) + '">'
+                    + Object.keys(opts).map(function (k) { return '<option value="' + k + '"' + (first[key] === k ? ' selected' : '') + '>' + esc(opts[k]) + '</option>'; }).join('') + '</select>'; };
+                var chip = function (what, label, k) {
+                    return '<button type="button" class="cx-fbar-b' + (pop === what ? ' is-on' : '') + '" data-fpop="' + what + '" title="' + label + '"><span class="cx-fbar-sw" style="background:'
+                        + (what === 'lbg' ? pal(k).f : '#fff') + ';border-color:' + pal(k).s + (what === 'lc' ? ';border-width:3px' : '') + '"></span> ' + label + '</button>';
+                };
+                var h = '<div class="cx-fbar-row">' + chip('lc', 'Cor', first.lc)
+                    + sel2('lw', FLOW_W_LABEL) + sel2('dash', FLOW_DASH)
+                    + '<span class="cx-fbar-sep"></span><span class="cx-fbar-lab">Início</span>' + sel2('ea', FLOW_HEADS) + '<span class="cx-fbar-lab">Fim</span>' + sel2('eb', FLOW_HEADS)
+                    + '<span class="cx-fbar-sep"></span>' + sel2('route', { straight: 'Reto', elbow: 'Cotovelo', curve: 'Curvo' }) + chip('lbg', 'Balão', first.lbg) + '</div>';
+                if (pop) {
+                    h += '<div class="cx-fbar-pop">' + Object.keys(FLOW_COLORS).map(function (k) {
+                        var c = FLOW_COLORS[k], on = first[pop] === k;
+                        return '<button type="button" class="cx-fbar-sw' + (on ? ' is-on' : '') + '" data-lpal="' + k + '" data-what="' + pop + '" title="' + esc(c.label) + '" aria-label="' + esc(c.label)
+                            + '" style="background:' + (pop === 'lbg' ? c.f : c.s) + ';border-color:' + c.s + '"></button>';
+                    }).join('') + '</div>';
+                }
+                fbar.innerHTML = h;
+            }
+            var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+            ls.forEach(function (l) { (routePts(l, get) || []).forEach(function (q) { x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x); y2 = Math.max(y2, q.y); }); });
+            if (!isFinite(x1)) { fbar.hidden = true; return; }
+            var off = svgOff(), top = off.y + view.y + y1 * view.z - 16, below = top < 70;
+            fbar.style.left = (off.x + view.x + (x1 + x2) / 2 * view.z) + 'px';
+            fbar.style.top = (below ? off.y + view.y + y2 * view.z + 16 : top) + 'px';
+            fbar.classList.toggle('is-below', below);
+            fbar.hidden = false;
+        }
         function drawFbar() {
             if (!fbar) { return; }
+            var ls = flowLinks();
+            if (ls.length && ls.length === sel.length && !ed && (!drag || drag.k === 'lbl')) { drawLinkBar(ls); return; }
             var its = styled();
             if (!its.length || its.length !== sel.length || ed || (drag && drag.k !== 'rs' && drag.k !== 'move')) { fbar.hidden = true; return; }
             var hasShape = its.some(function (i) { return i.t === 'shape'; }), hasText = its.some(function (i) { return i.t !== 'zone'; });
@@ -1884,7 +2030,7 @@
             var first = its[0], pop = fbar.__pop || '';
             var fsNow = first.t === 'shape' ? shapeFs(first) : first.t === 'text' ? (first.px || TEXT_PX[first.size] || 15) : 0;
             var allB = its.filter(function (i) { return i.t !== 'zone'; }).every(function (i) { return i.b; });
-            var sig = [sel.join(','), pop, its.map(function (i) { return [i.fill, i.line, i.ink, i.color].join(':'); }).join(';'), allB, fsNow].join('|');
+            var sig = ['S', sel.join(','), pop, its.map(function (i) { return [i.fill, i.line, i.ink, i.color].join(':'); }).join(';'), allB, fsNow].join('|');
             if (fbar.__sig !== sig) {
                 fbar.__sig = sig;
                 var btn = function (what, label, show) {
@@ -1941,8 +2087,19 @@
                     return;
                 }
                 if (t.hasAttribute('data-flayer')) { act(t.getAttribute('data-flayer')); }
+                if (t.hasAttribute('data-lpal')) {
+                    var lw0 = t.getAttribute('data-what'), lk = t.getAttribute('data-lpal');
+                    snap(); flowLinks().forEach(function (l) { l[lw0] = lk; }); render();
+                }
             });
             fbar.addEventListener('change', function (e) {
+                if (e.target.matches('.cx-fbar-sel')) {
+                    var key = e.target.getAttribute('data-lk'), val = e.target.value;
+                    snap();
+                    flowLinks().forEach(function (l) { l[key] = val; l.ends = l.eb !== 'none' ? (l.ea !== 'none' ? 'both' : 'arrow') : 'none'; });
+                    render();
+                    return;
+                }
                 if (!e.target.matches('.cx-fbar-fs')) { return; }
                 var v = +e.target.value;
                 styleApply(function (i) { if (i.t === 'shape') { i.fs = v; shapeFit(i); } else if (i.t === 'text') { i.px = v; } });
@@ -2032,6 +2189,12 @@
                     drag = null; render(); return;
                 }
                 var hid = hit(e.target), hl = hid && get(hid);
+                // Q5d: duplo clique no balão edita o rótulo (não cria dobra).
+                if (hl && hl.t === 'link' && e.target.getAttribute && e.target.getAttribute('data-lbl')) {
+                    sel = [hl.id]; drag = null; render();
+                    var lf = props.querySelector('[data-k="label"]'); if (lf) { lf.focus(); lf.select(); }
+                    return;
+                }
                 if (hl && hl.t === 'link' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
                     addBend(hl, p); sel = [hl.id]; drag = null; render(); return;
                 }
@@ -2068,6 +2231,11 @@
                 drag = { k: 'dv', id: sel[0], j: +e.target.getAttribute('data-dv'), moved: false };
             } else if (e.target.getAttribute('data-lw') && sel.length === 1) {
                 drag = { k: 'wp', id: sel[0], j: +e.target.getAttribute('data-lw'), moved: false };
+            } else if (flow && e.target.getAttribute('data-lbl') && tool === 'select' && !space) {
+                // Q5d: o balão do rótulo desliza ao longo da linha.
+                var lid = hit(e.target), lL = lid && get(lid);
+                if (lL && lL.t === 'link' && !lL.lock) { sel = [lL.id]; snap(); drag = { k: 'lbl', id: lL.id, moved: false }; }
+                else if (lL) { sel = [lL.id]; }
             } else if (e.target.getAttribute('data-rs') && sel.length === 1) {
                 var ri = get(sel[0]), rb = bbox(ri);
                 snap();
@@ -2189,6 +2357,11 @@
                 return;
             }
             if (drag.k === 'rs') { resizeTo(drag, p, e); paint(); drawSel(); return; }
+            if (drag.k === 'lbl') {
+                var LL = get(drag.id), rp = routePts(LL, get);
+                if (rp) { LL.lt = Math.max(0.05, Math.min(0.95, Math.round(nearestT(rp, p) * 1000) / 1000)); drag.moved = true; paint(); drawSel(); }
+                return;
+            }
             if (drag.k === 'rzi') {
                 var ic = get(drag.id);
                 ic.size = Math.max(24, Math.min(160, Math.round(Math.max(p.x - ic.x, p.y - ic.y) / 4) * 4));
@@ -2266,6 +2439,7 @@
                         // da decisão nasce "Sim", a 2ª "Não" (dá para editar).
                         var orig = get(drag.from), saidas = D.items.filter(function (l) { return l.t === 'link' && l.a.id === drag.from; }).length;
                         L.kind = 'fluxo'; L.ends = 'arrow'; L.cable = ''; L.showId = false; L.showM = false;
+                        L.lc = 'cinza'; L.lw = 'f'; L.dash = 'solid'; L.ea = 'none'; L.eb = 'arrow'; L.lt = 0.5; L.lbg = 'branco';
                         L.label = orig && orig.shape === 'dec' ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
                     }
                     D.items.push(L);
@@ -2273,6 +2447,7 @@
                 }
             }
             if (drag && drag.k === 'zone') { tool = 'select'; }
+            if (drag && drag.k === 'lbl' && !drag.moved) { hist.pop(); }
             if (drag && drag.k === 'move' && !drag.moved) { /* só seleção */ }
             drag = null;
             marq.setAttribute('hidden', '');
@@ -2563,5 +2738,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

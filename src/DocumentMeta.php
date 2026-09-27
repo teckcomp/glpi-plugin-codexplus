@@ -109,6 +109,50 @@ class DocumentMeta extends CommonDBTM
         ));
     }
 
+    /**
+     * T3 — "Duplicar como…" (Claudio, 27/09/2026). O tipo não muda depois
+     * de criado (forma o código); para "converter", duplica-se com outro
+     * tipo: documento NOVO, código e fluxo do tipo novo, o original fica como
+     * está. DIA fica fora nos dois sentidos (o corpo é um diagrama).
+     *
+     * @return array<string, string> tipos oferecidos na cópia (vazio = só o mesmo)
+     */
+    public static function duplicateTargets(string $from): array
+    {
+        if ($from === 'DIA' || !in_array($from, self::DOCTYPE_KEYS, true)) {
+            return [];
+        }
+        return array_diff_key(self::getDoctypes(), ['DIA' => true]);
+    }
+
+    /** Tipo da cópia: o pedido, se permitido; senão o da origem. */
+    public static function duplicateType(string $from, string $asked): string
+    {
+        return isset(self::duplicateTargets($from)[$asked]) ? $asked : $from;
+    }
+
+    /**
+     * O cliente vai junto na cópia? 'text' (Proposta -> Proposta), 'link'
+     * (Laudo/Documentação Técnica entre si), 'name' (Laudo/Documentação
+     * Técnica -> Proposta: o nome vira texto livre) ou '' (não vai: o
+     * destino não tem cliente, ou é Proposta -> vínculo, que não dá para
+     * adivinhar).
+     */
+    public static function clientCarry(string $from, string $to): string
+    {
+        if (in_array($from, self::CLIENT_TEXT_TYPES, true) && in_array($to, self::CLIENT_TEXT_TYPES, true)) {
+            return 'text';
+        }
+        if (self::linksClient($from) && self::linksClient($to)) {
+            return 'link';
+        }
+        // Vínculo -> Proposta: o nome do cliente vira o texto livre.
+        if (self::linksClient($from) && in_array($to, self::CLIENT_TEXT_TYPES, true)) {
+            return 'name';
+        }
+        return '';
+    }
+
     /** Tipos oferecidos pelo fluxo antigo (artigo da Base de Conhecimento). */
     public static function getLegacyDoctypes(): array
     {

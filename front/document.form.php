@@ -208,22 +208,34 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         );
         Html::redirect($self . '?id=' . $id);
     }
+    // T3: "Duplicar como…" — o tipo da cópia pode ser outro (DIA fica fora).
+    $origem  = (string) $doc->fields['doctype'];
+    $destino = DocumentMeta::duplicateType($origem, (string) ($_POST['duplicate_type'] ?? $origem));
     $copia = [
-        'name'           => sprintf(__('%s (cópia)', 'codexplus'), (string) $doc->fields['name']),
-        'doctype'        => (string) $doc->fields['doctype'],
+        // Mesmo tipo: "(cópia)" no título. Outro tipo: é o documento
+        // "convertido", o título fica igual (o código já é outro).
+        'name'           => $destino === $origem
+            ? sprintf(__('%s (cópia)', 'codexplus'), (string) $doc->fields['name'])
+            : (string) $doc->fields['name'],
+        'doctype'        => $destino,
         'content'        => (string) ($doc->fields['content'] ?? ''),
         // Responsável = quem duplica, se tiver o direito Aprovar; senão vazio.
         'users_id_owner' => in_array((int) Session::getLoginUserID(), Rights::approverUsers((int) $doc->fields['entities_id']), true)
             ? (int) Session::getLoginUserID() : 0,
         '_categories'    => $cats,
     ];
-    if ($copia['doctype'] === 'PRP') {
+    $leva = DocumentMeta::clientCarry($origem, $destino);
+    if ($leva === 'text' || $leva === 'name') {
         $copia['client_name'] = (string) ($doc->fields['client_name'] ?? '');
     }
-    if (DocumentMeta::linksClient($copia['doctype'])) {
+    if ($leva === 'link') {
         $copia['client_itemtype'] = (string) ($doc->fields['client_itemtype'] ?? '');
         $copia['client_items_id'] = (int) ($doc->fields['client_items_id'] ?? 0);
     }
+    $clienteFicou = $leva === '' && (
+        trim((string) ($doc->fields['client_name'] ?? '')) !== ''
+        || (int) ($doc->fields['client_items_id'] ?? 0) > 0
+    );
     $novo  = new Document();
     $newId = $novo->add($copia);
     if (!$newId) {
@@ -258,10 +270,25 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         $d = Diagram::load($id);
         Diagram::save((int) $newId, $d['data'] ?? Diagram::starter());
     }
-    Session::addMessageAfterRedirect(sprintf(
-        __('Cópia criada como rascunho, com código novo (%s). Escolha responsável, auditor, revisor e leitores antes de enviar.', 'codexplus'),
-        $novo->getCode()
-    ));
+    if ($destino === $origem) {
+        Session::addMessageAfterRedirect(sprintf(
+            __('Cópia criada como rascunho, com código novo (%s). Escolha responsável, auditor, revisor e leitores antes de enviar.', 'codexplus'),
+            $novo->getCode()
+        ));
+    } else {
+        Session::addMessageAfterRedirect(sprintf(
+            __('%1$s criado como rascunho a partir de %2$s, com o fluxo e a validade do novo tipo. O original não mudou: mande-o para a lixeira se não for mais usar. Escolha responsável, auditor, revisor e leitores antes de enviar.', 'codexplus'),
+            $novo->getCode(),
+            $doc->getCode()
+        ));
+    }
+    if ($clienteFicou) {
+        Session::addMessageAfterRedirect(
+            __('O cliente não foi levado: o novo tipo não tem cliente, ou pede o vínculo com um usuário ou entidade do GLPI (escolha na página da cópia).', 'codexplus'),
+            false,
+            WARNING
+        );
+    }
     Html::redirect($self . '?id=' . $newId);
 }
 
@@ -849,6 +876,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),
     // Duplicar = poder criar (P1).
     'can_duplicate' => !$isNew && !$version['on'] && Document::canCreateIn($categoryIds),
+    // T3: tipos oferecidos no "Duplicar como…" (vazio em diagrama).
+    'dup_types'     => $isNew ? [] : DocumentMeta::duplicateTargets((string) $doc->fields['doctype']),
     // R5: excluir (lixeira).
     'can_delete'   => !$isNew && !$version['on'] && !$preview && $doc->canDeleteItem() && empty($doc->fields['is_deleted']),
     // M1: salvar o corpo gravado como modelo.

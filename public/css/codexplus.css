@@ -1307,6 +1307,13 @@
 .cx-docform-ident { display: flex; align-items: center; gap: 8px; }
 /* R3b2-b parte 2: Duplicar ao lado do código; ações dentro dos avisos. */
 .cx-docform-dup { margin: 0 0 0 6px; }
+/* T3: "Duplicar como" (menu dos outros tipos). */
+.cx-dup-as { position: relative; display: inline-block; margin: 0 0 0 6px; }
+.cx-dup-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 1050; min-width: 280px; margin: 0; padding: 6px; background: #fff; border: 1px solid #d0d7de; border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+.cx-dup-menu[hidden] { display: none; }
+.cx-dup-menu-hint { margin: 2px 8px 6px; font-size: .78rem; color: #6b7785; white-space: normal; }
+.cx-dup-item { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 6px; background: none; color: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
+.cx-dup-item:hover, .cx-dup-item:focus-visible { background: #eef3fb; outline: none; }
 .cx-att-del { display: inline; margin: 0 0 0 6px; }
 .cx-notice-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .cx-docform-title { font-size: 1.25rem; font-weight: 600; }

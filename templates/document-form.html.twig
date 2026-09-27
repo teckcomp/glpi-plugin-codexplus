@@ -29,6 +29,41 @@
                             <i class="ti ti-copy"></i> {{ __('Duplicar', 'codexplus') }}
                         </button>
                     </form>
+                    {% if dup_types is not empty %}
+                        {# T3 (Claudio, 27/09/2026): "Duplicar como" abre um menu
+                           com os outros tipos; cada item cria o documento novo
+                           naquele tipo. Diagrama não tem o botão. #}
+                        <div class="cx-dup-as">
+                            <button type="button" class="codexplus-btn" data-cx-dup-toggle aria-haspopup="true" aria-expanded="false"
+                                    title="{{ __('Cria um documento novo de outro tipo a partir deste; este não muda', 'codexplus') }}">
+                                <i class="ti ti-transform"></i> {{ __('Duplicar como', 'codexplus') }} <i class="ti ti-chevron-down"></i>
+                            </button>
+                            <form method="post" action="{{ self }}" class="cx-dup-menu" data-cx-dup-menu hidden>
+                                <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="id" value="{{ id }}">
+                                <input type="hidden" name="duplicate" value="1">
+                                <p class="cx-dup-menu-hint">{{ __('Documento novo, no tipo escolhido, com o código, o fluxo e a validade dele. Este não muda.', 'codexplus') }}</p>
+                                {% for key, label in dup_types %}
+                                    {% if key != doctype %}
+                                        <button type="submit" name="duplicate_type" value="{{ key }}" class="cx-dup-item"
+                                                onclick="return confirm('{{ __('Criar um documento NOVO como %s a partir deste? Ele leva título, categorias e conteúdo como estão gravados e nasce em rascunho sem auditor, revisor nem permissões. Este documento não muda.', 'codexplus')|format(label)|e('js') }}');">{{ label }}</button>
+                                    {% endif %}
+                                {% endfor %}
+                            </form>
+                        </div>
+                        <script>
+                        (function () {
+                            var box = document.currentScript && document.currentScript.previousElementSibling;
+                            if (!box || !box.classList.contains('cx-dup-as')) { return; }
+                            var btn = box.querySelector('[data-cx-dup-toggle]');
+                            var menu = box.querySelector('[data-cx-dup-menu]');
+                            var set = function (open) { menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+                            btn.addEventListener('click', function () { set(menu.hidden); });
+                            document.addEventListener('click', function (e) { if (!menu.hidden && !box.contains(e.target)) { set(false); } });
+                            document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { set(false); btn.focus(); } });
+                        })();
+                        </script>
+                    {% endif %}
                 {% endif %}
                 {% if can_delete %}
                     {# R5: vai para a lixeira; restaurar na Biblioteca. #}

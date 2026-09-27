@@ -422,6 +422,74 @@
     function labelPx(size) { return Math.max(8, Math.round(size / 4)); }
     function fmtM(m) { return String(m).replace('.', ',') + ' m'; }
 
+    /* Q3a — lista de materiais do quadro (Claudio, 27/09/2026). Só leitura.
+         Equipamentos: um por ícone, pelo nome do ícone (Equipamento genérico:
+           pelo rótulo); com Modelo preenchido, "Nome · Modelo".
+         Cabos: metragem que o cabo já mostra (automática com sobra, ou
+           manual), arredondada PARA CIMA em cada lance e somada por tipo.
+           Sem fio e Lógica/VPN não entram (não são cabo comprado).
+         Eletrocalha e canaleta: metros de cada trecho, para cima, sem sobra.
+         Áreas, zonas e textos não contam.
+       only (lista de ids): só a seleção; entra também a ligação entre dois
+       ícones selecionados, porque a seleção em área não pega cabo. */
+    var MAT_SKIP = ['semfio', 'logica'];
+    function materials(D, only) {
+        PXM = D.pxm || PXM_DEFAULT;
+        var I = Icons(), all = D.items || [], find = finder(all);
+        var has = function (id) { return !only || only.indexOf(id) >= 0; };
+        var eq = {}, cab = {}, duc = {}, eqN = 0;
+        all.forEach(function (it) {
+            if (it.t === 'icon' && has(it.id)) {
+                var ic = I.get(it.icon) || {}, base = ic.name || 'Ícone';
+                if (it.icon === 'generico' && String(it.label || '').trim()) { base = String(it.label).trim(); }
+                var mod = String((it.f && it.f.modelo) || '').trim(), nm = mod ? base + ' · ' + mod : base;
+                eq[nm] = (eq[nm] || 0) + 1; eqN++;
+            } else if (it.t === 'link' && (has(it.id) || (only && has(it.a.id) && has(it.b.id)))) {
+                var k = LINK_KINDS[it.kind] ? it.kind : LINK_DEFAULT;
+                if (MAT_SKIP.indexOf(k) >= 0) { return; }
+                var c = cab[k] || (cab[k] = { n: 0, m: 0 });
+                c.n++; c.m += Math.ceil(linkMeters(it, find).total);
+            } else if (it.t === 'duct' && has(it.id)) {
+                var dk = DUCT_KINDS[it.kind] ? it.kind : 'eletrocalha';
+                var d = duc[dk] || (duc[dk] = { n: 0, m: 0 });
+                d.n++; d.m += Math.ceil(ductMeters(it));
+            }
+        });
+        return {
+            eqN: eqN,
+            eq: Object.keys(eq).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); }).map(function (k) { return { name: k, n: eq[k] }; }),
+            cables: Object.keys(LINK_KINDS).filter(function (k) { return cab[k]; }).map(function (k) { return { kind: k, label: LINK_KINDS[k].label, color: LINK_KINDS[k].c, n: cab[k].n, m: cab[k].m }; }),
+            ducts: Object.keys(DUCT_KINDS).filter(function (k) { return duc[k]; }).map(function (k) { return { kind: k, label: DUCT_KINDS[k].label, n: duc[k].n, m: duc[k].m }; }),
+            approx: !D.pxm
+        };
+    }
+    function materialsHtml(M, title) {
+        var row = function (a, b) { return '<div class="cx-mat-row"><span>' + a + '</span><span>' + b + '</span></div>'; };
+        var h = '<div class="cx-mat"><p class="cx-mat-title">' + esc(title) + '</p>';
+        if (!M.eq.length && !M.cables.length && !M.ducts.length) {
+            return h + '<p class="cx-board-none">Nada para contar ainda: coloque ícones, cabos ou eletrocalha.</p></div>';
+        }
+        if (M.eq.length) {
+            h += '<p class="cx-mat-sec">Equipamentos · ' + M.eqN + '</p>'
+                + M.eq.map(function (e) { return row(esc(e.name), String(e.n)); }).join('');
+        }
+        if (M.cables.length) {
+            h += '<p class="cx-mat-sec">Cabos · metro inteiro por lance</p>'
+                + M.cables.map(function (c) {
+                    return row('<i class="cx-mat-sw" style="background:' + c.color + '"></i>' + esc(c.label)
+                        + ' <span class="cx-mat-n">· ' + c.n + (c.n === 1 ? ' lance' : ' lances') + '</span>', c.m + ' m');
+                }).join('');
+        }
+        if (M.ducts.length) {
+            h += '<p class="cx-mat-sec">Infraestrutura</p>'
+                + M.ducts.map(function (d) { return row(esc(d.label), d.m + ' m'); }).join('');
+        }
+        if (M.approx && (M.cables.length || M.ducts.length)) {
+            h += '<p class="cx-mat-warn">Sem escala: metros aproximados (1 m = ' + PXM_DEFAULT + ' px). Use "Escala" na barra para medir pela planta.</p>';
+        }
+        return h + '<p class="cx-board-none">Sem fio e Lógica/VPN não entram. Áreas e textos não contam.</p></div>';
+    }
+
     function bbox(it) {
         if (it.t === 'zone') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'duct') {
@@ -910,12 +978,14 @@
         }
         function drawProps() {
             if (!sel.length) {
-                props.innerHTML = '<p class="cx-board-none">Selecione um item para editar rótulo e dados.</p>'
+                props.innerHTML = materialsHtml(materials(D, null), 'Materiais deste quadro')
+                    + '<p class="cx-board-none">Selecione um item para editar rótulo e dados.</p>'
                     + '<p class="cx-board-none">Atalhos: Delete exclui · Ctrl+C / Ctrl+V · Ctrl+D duplica · Ctrl+G agrupa · setas movem.</p>';
                 return;
             }
             if (sel.length > 1) {
-                props.innerHTML = '<p><strong>' + sel.length + ' itens selecionados</strong></p><p class="cx-board-none">Use Agrupar para mover como um conjunto.</p>';
+                props.innerHTML = '<p><strong>' + sel.length + ' itens selecionados</strong></p><p class="cx-board-none">Use Agrupar para mover como um conjunto.</p>'
+                    + materialsHtml(materials(D, sel), 'Materiais da seleção');
                 return;
             }
             var it = get(sel[0]), h = '';
@@ -1578,5 +1648,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml };
 })();

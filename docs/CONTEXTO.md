@@ -2,7 +2,10 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.9-alpha` · atualizado em 26/09/2026 (P1 papéis pelo perfil,
+> Estado: `v0.6.9-alpha` · atualizado em 27/09/2026 (Q2a a Q2e: ligações,
+> cabos, traçado com dobras, metragem e eletrocalha no motor de quadro —
+> seção 3.5, subseção "Ligações e cabos"; commits `8e71046` a `cd8a64f`). Antes,
+> 26/09/2026 (P1 papéis pelo perfil,
 > P2 fluxo por tipo, D1 cronograma e RACI, S1 Self-Service, B1 Biblioteca,
 > R3b4 e M1 modelos, E5 cor e realce, R4 migração, R5 fim da Base de
 > Conhecimento, PL1 planilha, Q1 motor de quadro com Planta e Topologia —
@@ -920,6 +923,58 @@ Topologia) ficam disponíveis no editor dos dois tipos.
   (SVG simples, viewBox 48, traço 2, cores da tabela de categorias, nome
   `categoria-nome.svg`, `icones.csv` com nome, categoria, busca, cone).
 
+#### Ligações e cabos — Q2a a Q2e (27/09/2026)
+
+Tudo no JSON do quadro (`data-cx-board`), validado em `clean()`; sem schema.
+Arquivo `public/js/codexplus-board.js` e fim da seção 23 do CSS. Commits
+`8e71046` (Q2a), `87c94a7` (Q2b e Q2c juntos, achado 75), `290d92b` (Q2d) e
+`cd8a64f` (Q2e).
+
+- **Item `link`**: `{a:{id,side}, b:{id,side}, kind, route, wp, ends, label,
+  cable, pa, pb, vel, vlan, poe, showId, fs, len:{mode,m,extra}, showM}`.
+  `side` = n/l/s/o (borda do ícone; a borda sul fica **abaixo do nome e do
+  IP**). Sem x/y: a posição vem dos ícones e a ligação acompanha. Ligação sem
+  um dos ícones é descartada no `clean()` e sai junto ao excluir o ícone.
+  Camadas: zonas → eletrocalhas → ligações → ícones e textos.
+- **Criar:** ícone selecionado mostra 4 alças azuis fora das bordas; puxar até
+  outro ícone liga na borda mais próxima de onde soltou. Soltar no vazio não
+  cria nada (forma ligada é do Fluxograma, Q5). Nasce **UTP Cat6, cotovelo,
+  P-00n** (Claudio, 27/09/2026, no mockup).
+- **Tipos** (`LINK_KINDS`, tipo novo = uma linha): Cat5e, Cat6, Cat6A (azul,
+  engrossando), fibra (roxo), coaxial/vídeo (laranja), elétrica (vermelho),
+  sem fio (tracejado), lógica/VPN (pontilhado, nasce com seta), outros.
+  Pontas: sem seta, no destino, nas duas (triângulo desenhado, sem
+  `<marker>`, para o PNG).
+- **Nome do cabo:** identificação (P-001, próximo número livre; colar dá
+  número novo), rótulo, metros e PoE, em caixinha no meio do traçado. O
+  tamanho **acompanha o menor ícone das pontas**, como o nome do ícone, com
+  Pequeno/Médio/Grande (Claudio, 27/09/2026: com ícones reduzidos o nome do
+  cabo ficava grande demais).
+- **Traçado:** reto, cotovelo, curvo. **Dobra = duplo clique no cabo; Ctrl
+  (Cmd) + duplo clique na dobra apaga** — proposta de Claudio, 27/09/2026,
+  que substituiu o ponto no meio de cada trecho (criava dobra a cada
+  arraste). Dobra **livre, sem grade**, encaixa na linha/coluna da dobra ou
+  ponta vizinha a 6 px de tela (guia rosa); **Alt** solta. Endireitar tira
+  todas. O cotovelo vira sempre perpendicular ao trecho anterior e junta
+  trechos alinhados (sem ganchos). Mover os dois ícones leva as dobras;
+  mover um só não. **Religar:** bolinha branca na ponta arrasta para outra
+  borda ou outro ícone.
+- **Metragem:** automática = traçado desenhado ÷ escala (`pxm`) + sobra (10%,
+  ajustável); ou manual. Sem escala, 1 m = 20 px, com aviso no painel.
+- **Escala:** uma medida basta — a planta é gravada com a proporção
+  original. Duas medidas que dão escalas muito diferentes indicam metros
+  digitados errados: medir a maior cota escrita na planta, nas mesmas faces
+  que ela mede (cota de cômodo é interna); 1 pé = 0,3048 m (Claudio e
+  Claude, 27/09/2026).
+- **Eletrocalha e canaleta** (item `duct {pts, kind, label, showM, fs}`):
+  botão Eletrocalha (atalho E); cada clique é um ponto, duplo clique ou Enter
+  termina, Esc cancela sem fechar o quadro; pontos livres com o mesmo
+  encaixe das dobras. Duplo clique na faixa cria ponto, Ctrl + duplo clique
+  apaga (mínimo 2). Metragem própria, sem sobra. Nome a 1/4 do caminho, para
+  não colidir com o do cabo que passa por dentro.
+- **Faixa de clique** de cabo e eletrocalha com 14–16 px **na tela** em
+  qualquer zoom (achado 74).
+
 #### Leitura sem recolher (achado 65)
 
 `RichText::getEnhancedHtml(..., ['text_maxsize' => 0])` na página do
@@ -1477,6 +1532,24 @@ depender do comportamento errático de `position: fixed` na impressão.
     trecho de conversa perdido). Antes de empacotar: `git status` e
     `git diff` da cópia; nada entra no pacote sem ter sido pedido e
     explicado a Claudio.
+72. **O jsdom não simula a captura do ponteiro** (`setPointerCapture`). No
+    navegador, depois do `pointerdown` com captura, o `dblclick` chega no
+    quadro e não na dobra: o Q2c passou nos testes e falhou com Claudio.
+    Duplo clique agora é detectado no próprio `pointerdown` (tempo < 400 ms,
+    distância < 8 px). Interação de arraste ou duplo clique **sempre** leva
+    um passo no roteiro de teste, mesmo com testes verdes.
+73. **Grade atrapalha ajuste fino.** Com zoom alto, a grade de 10 px da
+    planta vira saltos de ~30 px na tela e o cabo não encostava na parede.
+    Dobras e pontos de eletrocalha ficam livres (0,1 px), com encaixe nos
+    vizinhos e Alt para soltar. A grade continua só para ícones, zonas e
+    textos.
+74. **Traço fino fica impossível de clicar com zoom baixo.** Faixa de
+    clique transparente com `vector-effect="non-scaling-stroke"`: largura
+    fixa na tela.
+75. **Pacote gerado sobre bloco sem commit leva os dois.** O Q2b estava
+    aplicado e aprovado, mas sem commit, quando o Q2c foi aplicado; o commit
+    `87c94a7` levou os dois. Commit do bloco aprovado **antes** de aplicar o
+    pacote seguinte; se não deu, o roteiro do pacote novo avisa.
 
 ## 6. Contrato de código — não quebrar
 
@@ -1584,7 +1657,7 @@ codexplus/
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1)
 │   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1)
-│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1)
+│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2)
 │   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1)
 │   ├── js/codexplus-export.js exportar Word (E3)
 │   ├── js/codexplus-annotate.js anotador de imagens (E4)

@@ -1,6 +1,10 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.9-alpha` · atualizado em 26/09/2026: P1, P2, D1, S1, B1,
+> Estado em `v0.6.9-alpha` · atualizado em 27/09/2026: **Q2 fechado** (Q2a a
+> Q2e: ligações e cabos, traçado com dobras, metragem, eletrocalha; commits
+> `8e71046` a `cd8a64f`; CONTEXTO, seção 3.5). Próximo: **Q3** (legenda e lista de
+> materiais). Decisão de Claudio, 27/09/2026: seguir o roadmap até o fim,
+> produção depois (sem corte antecipado). Antes, 26/09/2026: P1, P2, D1, S1, B1,
 > R3b4, M1, E5, R4, R5, PL1 e Q1 (commits `66f9b2b` a `6a1f8ee`; detalhes no
 > CONTEXTO, seção 3.5). A Etapa R está fechada, salvo R6-b e R7; o Codex+ não
 > depende mais da Base de Conhecimento. Próximo: **Q2** (ligações e cabos no
@@ -64,8 +68,8 @@ Vale sobre a lista acima quando houver conflito.
 5. ~~Anexos, imagens, leitura e PDF (R3b3)~~ ✅ 22/09
 6. ~~Editor de documentos~~ ✅ E1 a E4 (24/09) e **E5** (cor e realce, 26/09)
 7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
-   Planta, Topologia, Fluxograma e Organograma) — **Q1 ✅**; faltam Q2, Q3,
-   Q4, Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
+   Planta, Topologia, Fluxograma e Organograma) — **Q1 e Q2 ✅**; faltam
+   Q3, Q4, Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
    quadro" abaixo
 8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
    a **Planta** do motor de quadro (Q1), também na Documentação Técnica
@@ -364,6 +368,16 @@ os critérios abaixo estiverem cumpridos:
 | PL1 | Planilha no editor (Qtd, Item, Unitário, Total; fórmulas; total perto do valor; linhas alternadas) | `820236c`, `974fa23` |
 | Q1 | Motor de quadro: Planta e Topologia, 34 ícones próprios, cone em metros com escala, girar, tamanho; leitura sem recolher; PDF sem "rev." em PRP/LAU | `6a1f8ee` |
 
+## Sessão de 27/09/2026 — blocos entregues
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| Q2a | Item `link`: alças nas quatro bordas, a ligação acompanha os ícones, rótulo, PNG; `clean()` descarta ligação órfã | `8e71046` |
+| Q2b | 9 tipos de cabo com cor e traço, pontas, numeração P-001, painel (portas, velocidade, VLAN, PoE, tamanho do nome); nome pelo tamanho dos ícones; clique em qualquer zoom | `87c94a7` (junto do Q2c) |
+| Q2c | Traçado reto, cotovelo e curvo; dobra por duplo clique, livre e com encaixe (Alt solta), Ctrl + duplo clique apaga; cotovelo sem ganchos; religar pela ponta | `87c94a7` |
+| Q2d | Metragem pela escala e pelo traçado, sobra ajustável, ou manual; metros no nome | `290d92b` |
+| Q2e | Eletrocalha e canaleta: desenho por cliques com encaixe, pontos editáveis, metragem, abaixo dos cabos | `cd8a64f` |
+
 ## Motor de quadro (decidido em 26/09/2026)
 
 Um motor, no estilo Miro, com paletas. Detalhes e decisões no CONTEXTO,
@@ -372,8 +386,8 @@ seção 3.5.
 | Bloco | Entrega | Situação |
 |---|---|---|
 | Q1 | Quadro, ícones, Planta (fundo, transparência, girar, escala) e Topologia (zonas); agrupar, travar, tamanho, girar; cone em metros | ✅ `6a1f8ee` |
-| Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | **próximo** |
-| Q3 | Legenda automática; **lista de materiais** (ícones e metros de cabo, conectores) com "Levar para a planilha" | |
+| Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | ✅ 27/09 (Q2a a Q2e) |
+| Q3 | Legenda automática; **lista de materiais** (ícones e metros de cabo, conectores) com "Levar para a planilha" | **próximo** |
 | Q4 | **"+ Ícone" a partir de imagem** (PNG/JPG/SVG: recorte, fundo transparente, modo silhueta na cor da categoria; nome, categoria, busca; lista para renomear/excluir) | |
 | Q5 | **Fluxograma** sobre o motor (subtipo de DIA): formas básicas, de fluxograma e BPMN simples, raias, moldura, nota, tabela, ícones, imagem; alças, "+" rápido, trocar forma, alinhar e distribuir, minimapa, busca, link para documento do Codex+ | |
 | Q6 | **Organograma migrado para o motor**, conferindo item por item com o atual (chefia, Arrumar, matriz, busca, modelos, PDF); só então o motor antigo sai | |
@@ -382,6 +396,14 @@ Fora (Claudio, 26/09): caneta livre, marca-texto, reconhecimento de forma,
 colaboração em tempo real, comentários, votação, apresentação, IA.
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
+
+- Quadro: **régua** para conferir a escala (medir outra cota depois de
+  definir a escala) — sugestão de 27/09, depois do erro de medida na planta
+- Quadro: cabo encaixar no **contorno real** do ícone (hoje sai da borda da
+  caixa quadrada; em ícones baixos, como o switch, a borda norte fica
+  ~15 px acima do desenho)
+- Quadro: desvio automático de obstáculos no cotovelo (hoje se resolve com
+  dobra); só se fizer falta no uso real
 
 - Tabelas `sectormembers` e `documenteditors` sem uso: apagar
 - Textos de ajuda dos comandos de console (ainda citam gestor do setor)

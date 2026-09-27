@@ -600,6 +600,15 @@
         ready.then(function () { build(editor, node, D, bgUrl, bgChanged); });
     }
 
+    function pngName(mode, now) {
+        var t = document.querySelector('input[name="name"]');
+        var slug = String(t && t.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+        var d = now || new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+        return (mode === 'topologia' ? 'topologia' : 'planta') + (slug ? '-' + slug : '')
+            + '-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.png';
+    }
+
     function notify(editor, text, type) {
         if (editor && editor.notificationManager) {
             editor.notificationManager.open({ text: text, type: type || 'info', timeout: type === 'error' ? 0 : 4000 });
@@ -647,6 +656,7 @@
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
+            + '<button type="button" data-act="png" title="Baixar o quadro como imagem PNG (como está agora, mesmo sem salvar)">Baixar PNG</button>'
             + '<button type="button" data-act="cancel">Cancelar</button>'
             + '<button type="button" data-act="save" class="cx-board-ok">' + (node ? 'Salvar quadro' : 'Inserir no documento') + '</button>'
             + '</div>'
@@ -1439,6 +1449,7 @@
             else if (a === 'bg') { pickBg(); }
             else if (a === 'rot') { rotate(); }
             else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }
+            else if (a === 'png') { downloadPng(); }
             else if (a === 'cancel') { close(); }
             else if (a === 'save') { save(); }
         }
@@ -1522,6 +1533,32 @@
             });
         }
 
+        /* Q2f (Claudio, 27/09/2026): o PNG do quadro em arquivo, para mandar
+           por WhatsApp ou e-mail sem exportar o documento. Mesmo toPng() do
+           Salvar, com o estado atual (inclusive o que ainda não foi salvo).
+           Nome: planta|topologia-<título do documento>-AAAA-MM-DD.png. */
+        function downloadPng() {
+            var btn = root.querySelector('[data-act="png"]');
+            if (btn.disabled) { return; }
+            btn.disabled = true; btn.textContent = 'Gerando…';
+            var done = function () { btn.disabled = false; btn.textContent = 'Baixar PNG'; };
+            toPng(D, bgUrl || null).then(function (blob) {
+                var a = document.createElement('a');
+                var url = URL.createObjectURL(blob);
+                a.href = url;
+                a.download = pngName(D.mode);
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+                done();
+            }).catch(function () {
+                done();
+                notify(editor, 'Não foi possível gerar a imagem do quadro.', 'error');
+            });
+        }
+
         function close() {
             document.removeEventListener('keydown', onKey, true);
             document.removeEventListener('keyup', onKeyUp, true);
@@ -1541,5 +1578,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName };
 })();

@@ -70,7 +70,7 @@
     function Icons() { return window.CodexplusIcons; }
 
     function starter(mode) {
-        return { v: 1, mode: MODES[mode] ? mode : 'topologia', w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, items: [] };
+        return { v: 1, mode: MODES[mode] ? mode : 'topologia', w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: true, items: [] };
     }
 
     function clean(d, mode) {
@@ -80,6 +80,9 @@
         out.h = Math.max(300, Math.min(6000, +d.h || out.h));
         out.bgOpacity = Math.max(0.1, Math.min(1, +d.bgOpacity || out.bgOpacity));
         out.pxm = Math.max(0, Math.min(1000, +d.pxm || 0));
+        // Q3b: legenda abaixo do quadro. Quadro novo nasce com ela; quadro
+        // gravado antes do Q3b (sem o campo) fica sem, até marcar.
+        out.legend = !!d.legend;
         var pxm = out.pxm || PXM_DEFAULT;
         var src = Array.isArray(d.items) ? d.items : [];
         src.forEach(function (it) {
@@ -542,6 +545,10 @@
             + data.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, find, true); }).join('')
             + data.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i, true); }).join('')
             + '</svg>';
+        return rasterize(svg, W, H);
+    }
+
+    function rasterize(svg, W, H) {
         return new Promise(function (ok, fail) {
             var img = new Image();
             img.onload = function () {
@@ -553,6 +560,73 @@
             img.onerror = function () { fail(new Error('svg')); };
             img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         });
+    }
+
+    /* ---------------- legenda (Q3b, Claudio 27/09/2026) ----------------
+       Imagem própria, gravada logo abaixo do quadro (span.cx-board-legend,
+       arquivo cx-quadro-legenda-*.png). Um item por tipo USADO: cabos (Sem
+       fio e Lógica também: aparecem no desenho), eletrocalha/canaleta e
+       ícones com o desenho da paleta. Zonas e textos não entram. */
+    function legendEntries(D) {
+        var I = Icons(), items = D.items || [], out = [], seen = {};
+        Object.keys(LINK_KINDS).forEach(function (k) {
+            if (items.some(function (i) { return i.t === 'link' && (LINK_KINDS[i.kind] ? i.kind : LINK_DEFAULT) === k; })) {
+                out.push({ t: 'link', k: k, name: LINK_KINDS[k].label });
+            }
+        });
+        Object.keys(DUCT_KINDS).forEach(function (k) {
+            if (items.some(function (i) { return i.t === 'duct' && (DUCT_KINDS[i.kind] ? i.kind : 'eletrocalha') === k; })) {
+                out.push({ t: 'duct', k: k, name: DUCT_KINDS[k].label });
+            }
+        });
+        var cats = Object.keys(I.CATS), icons = [];
+        items.forEach(function (i) {
+            if (i.t !== 'icon') { return; }
+            var ic = I.get(i.icon) || I.get('generico') || { name: 'Ícone', cat: 'infra' };
+            var gen = i.icon === 'generico', cat = (gen && i.cat) || ic.cat;
+            var name = gen ? (String(i.label || '').trim() || ic.name + ' (' + ((I.CATS[cat] || {}).label || cat) + ')') : ic.name;
+            var key = gen ? 'generico|' + cat + '|' + name : i.icon;
+            if (seen[key]) { return; }
+            seen[key] = true;
+            icons.push({ t: 'icon', icon: i.icon, cat: gen ? cat : '', name: name, ord: cats.indexOf(cat) });
+        });
+        icons.sort(function (a, b) { return (a.ord - b.ord) || a.name.localeCompare(b.name, 'pt-BR'); });
+        return out.concat(icons);
+    }
+    function legendSvg(D) {
+        var E = legendEntries(D);
+        if (!E.length) { return null; }
+        var cols = E.length > 16 ? 3 : (E.length > 6 ? 2 : 1), rows = Math.ceil(E.length / cols);
+        var PAD = 12, CW = 250, RH = 28, TOP = 34;
+        var w = PAD * 2 + cols * CW, h = TOP + rows * RH + 8;
+        var cut = function (t) { t = String(t); return t.length > 32 ? t.slice(0, 31) + '…' : t; };
+        var body = E.map(function (e, n) {
+            var x = PAD + Math.floor(n / rows) * CW, y = TOP + (n % rows) * RH, cy = y + RH / 2, g = '';
+            if (e.t === 'link') {
+                var L = LINK_KINDS[e.k];
+                g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 32) + '" y2="' + cy + '" stroke="' + L.c + '" stroke-width="' + (L.w + 0.6) + '"'
+                    + (L.d ? ' stroke-dasharray="' + L.d + '"' : '') + ' stroke-linecap="round"/>';
+                if (L.arrow) { g += '<path d="M' + (x + 34) + ' ' + cy + ' l-7 -4 v8 z" fill="' + L.c + '"/>'; }
+            } else if (e.t === 'duct') {
+                var K = DUCT_KINDS[e.k];
+                g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 34) + '" y2="' + cy + '" stroke="' + K.c + '" stroke-opacity="' + K.o + '" stroke-width="' + K.w + '"/>';
+                if (K.mid) { g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 34) + '" y2="' + cy + '" stroke="' + K.mid + '" stroke-opacity="0.6" stroke-width="1" stroke-dasharray="6 4"/>'; }
+            } else {
+                g += '<svg x="' + (x + 6) + '" y="' + (y + 2) + '" width="24" height="24" viewBox="0 0 48 48">' + Icons().body(e.icon, e.cat || undefined) + '</svg>';
+            }
+            return g + '<text x="' + (x + 44) + '" y="' + (cy + 4.5) + '" font-family="Arial,sans-serif" font-size="13" fill="#1d2330">' + esc(cut(e.name)) + '</text>';
+        }).join('');
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + (w * 2) + '" height="' + (h * 2) + '" viewBox="0 0 ' + w + ' ' + h + '">'
+            + '<rect x="0.5" y="0.5" width="' + (w - 1) + '" height="' + (h - 1) + '" rx="4" fill="#ffffff" stroke="#c9d1db"/>'
+            + '<text x="' + PAD + '" y="22" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#1d2330">Legenda</text>'
+            + body + '</svg>';
+        return { svg: svg, W: w * 2, H: h * 2, n: E.length };
+    }
+    function legendPng(D) {
+        var L = legendSvg(D);
+        // PNG em 2x; no documento a imagem leva width/height de 1x (o GLPI
+        // mantém esses dois atributos ao trocar a tag, achado 56).
+        return L ? rasterize(L.svg, L.W, L.H).then(function (b) { return { blob: b, w: L.W / 2, h: L.H / 2 }; }) : Promise.resolve(null);
     }
 
     /* ---------------- imagem: carregar e converter ---------------- */
@@ -614,7 +688,31 @@
         return false;
     }
 
-    function apply(editor, node, data, png, bg) {
+    /* Legenda: bloco logo depois do quadro. No mesmo parágrafo (irmão do
+       invólucro) ou no parágrafo seguinte, que é onde apply() a cria. */
+    function blockOf(el, body) {
+        var n = el;
+        while (n && n.parentNode && n.parentNode !== body) { n = n.parentNode; }
+        return n && n.parentNode === body ? n : null;
+    }
+    function legendOf(wrap, body) {
+        var sib = wrap.nextElementSibling;
+        if (sib && sib.matches && sib.matches('span.cx-board-legend')) { return sib; }
+        var b = blockOf(wrap, body), nx = b && b !== wrap ? b.nextElementSibling : null;
+        var first = nx && nx.firstElementChild;
+        return first && first.matches('span.cx-board-legend') ? first : null;
+    }
+    function boardOfLegend(lg, body) {
+        var sib = lg.previousElementSibling;
+        if (sib && sib.matches && sib.matches('span.cx-board')) { return sib; }
+        var b = blockOf(lg, body), pv = b && b !== lg ? b.previousElementSibling : null;
+        if (!pv) { return null; }
+        if (pv.matches('span.cx-board')) { return pv; }
+        var all = pv.querySelectorAll('span.cx-board');
+        return all.length ? all[all.length - 1] : null;
+    }
+
+    function apply(editor, node, data, png, bg, legend) {
         var dom = editor.dom, ok = true, stamp = Date.now();
         editor.undoManager.transact(function () {
             var wrap = node;
@@ -640,6 +738,32 @@
                 bgEl.parentNode.removeChild(bgEl);
             }
             ok = uploadImg(editor, main, png, 'cx-quadro-' + stamp + '.png') && ok;
+            // Q3b: legenda abaixo do quadro (cria, troca a imagem ou tira).
+            var body = editor.getBody(), lg = legendOf(wrap, body);
+            if (legend) {
+                if (!lg) {
+                    lg = dom.create('span', { 'class': 'cx-board-legend', contenteditable: 'false' });
+                    var b = blockOf(wrap, body);
+                    if (b && b !== wrap) {
+                        var p = dom.create('p');
+                        p.appendChild(lg);
+                        dom.insertAfter(p, b);
+                    } else {
+                        dom.insertAfter(lg, wrap);
+                    }
+                }
+                var li = lg.querySelector('img');
+                if (!li) { li = dom.create('img', { alt: 'Legenda' }); lg.appendChild(li); }
+                li.setAttribute('style', 'max-width:100%;height:auto;');
+                ok = uploadImg(editor, li, legend.blob, 'cx-quadro-legenda-' + stamp + '.png') && ok;
+                dom.setAttribs(li, { width: legend.w, height: legend.h });
+            } else if (lg) {
+                var pp = lg.parentNode;
+                pp.removeChild(lg);
+                if (pp !== body && pp.nodeName === 'P' && !pp.querySelector('img,span.cx-board') && !(pp.textContent || '').replace(/[\s\u200b\u00a0]/g, '')) {
+                    pp.parentNode.removeChild(pp);
+                }
+            }
         });
         editor.nodeChanged();
         editor.setDirty(true);
@@ -724,6 +848,7 @@
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
+            + '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>'
             + '<button type="button" data-act="png" title="Baixar o quadro como imagem PNG (como está agora, mesmo sem salvar)">Baixar PNG</button>'
             + '<button type="button" data-act="cancel">Cancelar</button>'
             + '<button type="button" data-act="save" class="cx-board-ok">' + (node ? 'Salvar quadro' : 'Inserir no documento') + '</button>'
@@ -1531,6 +1656,8 @@
         });
         var op = root.querySelector('[data-act="op"]');
         if (op) { op.addEventListener('input', function () { D.bgOpacity = +op.value / 100; render(); }); }
+        var lgChk = root.querySelector('[data-act="legend"]');
+        lgChk.addEventListener('change', function () { D.legend = lgChk.checked; });
 
         /* Gira a planta 90° no sentido horário, com os itens junto. */
         function rotate() {
@@ -1594,7 +1721,10 @@
             var btn = root.querySelector('[data-act="save"]');
             btn.disabled = true; btn.textContent = 'Gerando…';
             toPng(D, bgUrl || null).then(function (png) {
-                var ok = apply(editor, node, D, png, bgUrl ? { url: bgUrl, changed: bgChanged } : null);
+                return (D.legend ? legendPng(D) : Promise.resolve(null)).then(function (lp) { return [png, lp]; });
+            }).then(function (r) {
+                var png = r[0];
+                var ok = apply(editor, node, D, png, bgUrl ? { url: bgUrl, changed: bgChanged } : null, r[1]);
                 if (!ok) { notify(editor, 'Área de envio de arquivos não encontrada: o quadro não será gravado.', 'error'); }
                 close();
             }).catch(function () {
@@ -1648,5 +1778,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend };
 })();

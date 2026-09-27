@@ -2061,6 +2061,9 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
    ========================================================================= */
 .codexplus-content .cx-board-bg, .codexplus-content .cx-board img:not(:last-of-type) { display: none !important; }
 .codexplus-content .cx-board img { max-width: 100%; height: auto; }
+/* Q3b: legenda do quadro (imagem própria logo abaixo). */
+.codexplus-content .cx-board-legend { display: block; margin: 6px 0 12px; }
+.codexplus-content .cx-board-legend img { max-width: 100%; height: auto; }
 html.cx-board-open { overflow: hidden; }
 .cx-board-modal { position: fixed; inset: 0; z-index: 2000; background: #f4f6f9; display: flex; flex-direction: column;
     font-family: var(--cx-font-body, system-ui, sans-serif); }

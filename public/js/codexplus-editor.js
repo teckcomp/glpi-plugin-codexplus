@@ -176,7 +176,9 @@
             + '.cx-sheet-total td{border-top:2px solid #5f6b7a;}'
             + '.cx-sheet-alt td{background-color:#e6f1fb;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
             // Q1: a planta de fundo guardada junto do quadro não aparece (só o PNG).
-            + '.cx-board-bg,.cx-board img:not(:last-of-type){display:none!important;}.cx-board img{max-width:100%;height:auto;}';
+            + '.cx-board-bg,.cx-board img:not(:last-of-type){display:none!important;}.cx-board img{max-width:100%;height:auto;}'
+            // Q3b: legenda do quadro, imagem própria logo abaixo dele.
+            + '.cx-board-legend{display:block;margin:6px 0 12px;}.cx-board-legend img{max-width:100%;height:auto;}';
     }
 
     /* CSS dentro do editor (iframe do TinyMCE, que não carrega o CSS do
@@ -197,7 +199,8 @@
             // PL1: a planilha é um bloco só (duplo clique edita).
             + '.cx-sheet{outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;margin:0 0 12px;}'
             + '.cx-sheet table{margin:0;}'
-            + '.cx-board{display:inline-block;outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;}';
+            + '.cx-board{display:inline-block;outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;}'
+            + '.cx-board-legend{display:inline-block;outline:1px dotted #b4c7dc;outline-offset:3px;cursor:pointer;}';
     }
 
     function hasClass(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
@@ -460,6 +463,22 @@
         // T2: esconde Planilha / Planta / Topologia conforme o tipo.
         watchType(editor);
 
+        // Q3b: legenda sem quadro antes dela (quadro apagado ou movido) não
+        // vai para o gravado. O PreProcess recebe uma CÓPIA do corpo: o que
+        // está na tela não muda; some ao salvar e reabrir.
+        editor.on('PreProcess', function (e) {
+            if (!e.node || !e.node.querySelectorAll || !window.CodexplusBoard) { return; }
+            var root = e.node.nodeName === 'BODY' ? e.node : e.node.ownerDocument.body;
+            Array.prototype.slice.call(e.node.querySelectorAll('span.cx-board-legend')).forEach(function (lg) {
+                if (window.CodexplusBoard._boardOfLegend(lg, root)) { return; }
+                var p = lg.parentNode;
+                p.removeChild(lg);
+                if (p.nodeName === 'P' && !p.querySelector('img,span') && !(p.textContent || '').replace(/[\s\u200b\u00a0]/g, '') && p.parentNode) {
+                    p.parentNode.removeChild(p);
+                }
+            });
+        });
+
         editor.on('PreInit', function () {
             editor.formatter.register('cxsize_sm', { inline: 'span', classes: 'cx-size-sm' });
             editor.formatter.register('cxsize_lg', { inline: 'span', classes: 'cx-size-lg' });
@@ -573,6 +592,9 @@
             }
             // Q1: quadro (planta ou topologia) — duplo clique abre o editor dele.
             var b = e.target && editor.dom.getParent(e.target, 'span.cx-board');
+            // Q3b: duplo clique na legenda abre o quadro dela.
+            var lg = !b && e.target && editor.dom.getParent(e.target, 'span.cx-board-legend');
+            if (lg && window.CodexplusBoard) { b = window.CodexplusBoard._boardOfLegend(lg, editor.getBody()); }
             if (b && window.CodexplusBoard) {
                 e.preventDefault();
                 window.CodexplusBoard.open(editor, b);

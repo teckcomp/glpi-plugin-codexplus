@@ -20,6 +20,8 @@
           link {a:{id,side}, b:{id,side}, kind, route, wp:[{x,y}], ends,
                 label, cable, pa, pb, vel, vlan, poe, showId, fs,
                 len:{mode:'auto'|'manual', m, extra}, showM} (Q2d: metros)
+          duct {pts:[{x,y}], kind:'eletrocalha'|'canaleta', label, showM, fs}
+                (Q2e: polilinha desenhada por cliques, com metragem própria).
                 (Q2a/Q2b; side = n/l/s/o, borda do ícone; cable = P-001…).
    Todos com id, lock (travado) e g (grupo). Ligação não tem x/y: a
    posição vem dos dois ícones, e ela acompanha quando eles se movem.
@@ -51,6 +53,11 @@
         outro:  { label: 'Outros',           c: '#888780', w: 2,   d: '' }
     };
     var LINK_FS = { p: 0.8, m: 1, g: 1.3 };   // tamanho do nome do cabo
+    // Eletrocalha e canaleta (Q2e): faixa larga e translúcida, embaixo dos cabos.
+    var DUCT_KINDS = {
+        eletrocalha: { label: 'Eletrocalha', c: '#888780', w: 12, o: 0.35, mid: '#5F5E5A' },
+        canaleta:    { label: 'Canaleta',    c: '#B4B2A9', w: 7,  o: 0.6,  mid: '' }
+    };
     var LINK_DEFAULT = 'cat6';
 
     function esc(t) {
@@ -76,6 +83,15 @@
         var pxm = out.pxm || PXM_DEFAULT;
         var src = Array.isArray(d.items) ? d.items : [];
         src.forEach(function (it) {
+            if (it && it.t === 'duct') {
+                var pts = (Array.isArray(it.pts) ? it.pts : []).slice(0, 200).filter(function (q) { return q && isFinite(+q.x) && isFinite(+q.y); })
+                    .map(function (q) { return { x: Math.round(+q.x * 10) / 10, y: Math.round(+q.y * 10) / 10 }; });
+                if (pts.length < 2) { return; }
+                out.items.push({ id: String(it.id || uid()), t: 'duct', pts: pts, kind: DUCT_KINDS[it.kind] ? it.kind : 'eletrocalha',
+                    label: String(it.label || '').slice(0, 80), showM: it.showM === undefined ? true : !!it.showM,
+                    fs: LINK_FS[it.fs] ? it.fs : 'm', lock: !!it.lock, g: it.g ? String(it.g) : '' });
+                return;
+            }
             if (!it || ['icon', 'zone', 'text'].indexOf(it.t) < 0) { return; }
             var n = { id: String(it.id || uid()), t: it.t, x: +it.x || 0, y: +it.y || 0, lock: !!it.lock, g: it.g ? String(it.g) : '' };
             if (it.t === 'icon') {
@@ -292,11 +308,11 @@
         var r = routePts(L, find);
         return r ? linkD(r) : '';
     }
-    // Meio do traçado pelo comprimento (onde fica o rótulo).
-    function midPoint(pts) {
+    // Ponto a uma fração do traçado (0,5 = meio, onde fica o nome do cabo).
+    function midPoint(pts, frac) {
         var tot = 0, i, seg = [];
         for (i = 1; i < pts.length; i++) { var l = Math.sqrt(Math.pow(pts[i].x - pts[i - 1].x, 2) + Math.pow(pts[i].y - pts[i - 1].y, 2)); seg.push(l); tot += l; }
-        var half = tot / 2;
+        var half = tot * (frac === undefined ? 0.5 : frac);
         for (i = 0; i < seg.length; i++) {
             if (half <= seg[i] || i === seg.length - 1) {
                 var k = seg[i] ? half / seg[i] : 0;
@@ -330,6 +346,26 @@
                 + '" fill="#ffffff" stroke="' + k.c + '" stroke-width="0.8"/>'
                 + '<text x="' + m.x.toFixed(1) + '" y="' + (m.y + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="#1d2330">' + esc(txt) + '</text>';
         }
+        return h + '</g>';
+    }
+    function ductMeters(d) { return Math.round(polyLen(d.pts) / PXM * 10) / 10; }
+    function ductSvg(d, items, forExport) {
+        var k = DUCT_KINDS[d.kind] || DUCT_KINDS.eletrocalha, pts = d.pts, dd = linkD(pts), h = '<g data-id="' + d.id + '">';
+        if (!forExport) { h += '<path d="' + dd + '" fill="none" stroke="transparent" stroke-width="16" vector-effect="non-scaling-stroke"/>'; }
+        h += '<path class="cx-board-duct" d="' + dd + '" fill="none" stroke="' + k.c + '" stroke-opacity="' + k.o + '" stroke-width="' + k.w + '" stroke-linejoin="miter" stroke-linecap="square"/>';
+        if (k.mid) { h += '<path d="' + dd + '" fill="none" stroke="' + k.mid + '" stroke-opacity="0.6" stroke-width="1" stroke-dasharray="6 4"/>'; }
+        var parts = [k.label];
+        if (d.label) { parts.push(d.label); }
+        if (d.showM) { parts.push(fmtM(ductMeters(d))); }
+        var txt = parts.join(' · ');
+        // Mesmo tamanho do nome dos cabos: segue o menor ícone do quadro.
+        var sz = 48; (items || []).forEach(function (i) { if (i.t === 'icon') { sz = Math.min(sz, i.size); } });
+        var fs = Math.max(7, Math.round(labelPx(sz) * (LINK_FS[d.fs] || 1) * 2) / 2);
+        // A 1/4 do caminho: o cabo que passa por dentro põe o nome no meio.
+        var m = midPoint(pts, 0.25), w = txt.length * fs * 0.56 + fs, bh = fs + 6, oy = k.w / 2 + bh / 2 + 2;
+        h += '<rect x="' + (m.x - w / 2).toFixed(1) + '" y="' + (m.y - oy - bh / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + bh + '" rx="' + (bh / 4).toFixed(1)
+            + '" fill="#ffffff" fill-opacity="0.9" stroke="#5F5E5A" stroke-width="0.6"/>'
+            + '<text x="' + m.x.toFixed(1) + '" y="' + (m.y - oy + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="#444441">' + esc(txt) + '</text>';
         return h + '</g>';
     }
     function finder(items) {
@@ -388,6 +424,11 @@
 
     function bbox(it) {
         if (it.t === 'zone') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
+        if (it.t === 'duct') {
+            var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }), pd = (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w / 2 + 2;
+            var bx = Math.min.apply(null, xs) - pd, by = Math.min.apply(null, ys) - pd;
+            return { x: bx, y: by, w: Math.max.apply(null, xs) + pd - bx, h: Math.max.apply(null, ys) + pd - by };
+        }
         if (it.t === 'text') {
             var fs = TEXT_PX[it.size] || 15, lines = String(it.text || 'Texto').split('\n');
             var w = Math.max.apply(null, lines.map(function (l) { return l.length; })) * fs * 0.55;
@@ -429,8 +470,9 @@
             + '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w + '" height="' + box.h + '" fill="#ffffff"/>'
             + (bgImg ? '<image href="' + bgImg + '" x="0" y="0" width="' + data.w + '" height="' + data.h + '" opacity="' + data.bgOpacity + '"/>' : '')
             + data.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i, true); }).join('')
+            + data.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, data.items, true); }).join('')
             + data.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, find, true); }).join('')
-            + data.items.filter(function (i) { return i.t !== 'zone' && i.t !== 'link'; }).map(function (i) { return itemSvg(i, true); }).join('')
+            + data.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i, true); }).join('')
             + '</svg>';
         return new Promise(function (ok, fail) {
             var img = new Image();
@@ -578,6 +620,7 @@
             + '<button type="button" data-tool="select" title="Selecionar e mover (V)">Selecionar</button>'
             + '<button type="button" data-tool="zone" title="Desenhar zona / área (Z)">' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</button>'
             + '<button type="button" data-tool="text" title="Texto (T)">Texto</button>'
+            + '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>'
             + '<button type="button" data-tool="scale" title="Escala: clique em dois pontos da planta e informe a distância real">Escala</button>'
             + '<span class="cx-board-scale"></span>'
             + '<span class="cx-board-sep"></span>'
@@ -611,7 +654,7 @@
             + '<aside class="cx-board-pal"><input type="search" class="cx-board-q" placeholder="Buscar ícone"><div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
-            + '<g class="cx-board-zones"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
+            + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
             + '<div class="cx-board-hint">Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.</div></div>'
             + '<aside class="cx-board-props"></aside>'
@@ -622,7 +665,8 @@
         var svg = root.querySelector('.cx-board-svg'), vp = root.querySelector('.vp');
         var paper = root.querySelector('.cx-board-paper'), bgImgEl = root.querySelector('.cx-board-bgimg');
         var gZones = root.querySelector('.cx-board-zones'), gItems = root.querySelector('.cx-board-items');
-        var gLinks = root.querySelector('.cx-board-links');
+        var gLinks = root.querySelector('.cx-board-links'), gDucts = root.querySelector('.cx-board-ducts');
+        var ductDraft = null;   // pontos da eletrocalha em desenho
         var gSel = root.querySelector('.cx-board-sel'), gGuides = root.querySelector('.cx-board-guides');
         var marq = root.querySelector('.cx-board-marq'), props = root.querySelector('.cx-board-props');
 
@@ -685,8 +729,9 @@
         // Zonas embaixo, ligações no meio, ícones e textos por cima.
         function paint() {
             gZones.innerHTML = D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
+            gDucts.innerHTML = D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
-            gItems.innerHTML = D.items.filter(function (i) { return i.t !== 'zone' && i.t !== 'link'; }).map(function (i) { return itemSvg(i); }).join('');
+            gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
         }
         function render() {
             PXM = D.pxm || PXM_DEFAULT;
@@ -712,6 +757,18 @@
         function drawSel() {
             gSel.innerHTML = sel.map(function (id) {
                 var it = get(id); if (!it) { return ''; }
+                if (it.t === 'duct') {
+                    var dh = '<path d="' + linkD(it.pts) + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + ((DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w + 6 / view.z)
+                        + '" stroke-linejoin="miter" pointer-events="none"/>';
+                    if (sel.length === 1 && !it.lock) {
+                        var r0 = 5 / view.z;
+                        it.pts.forEach(function (q, i) {
+                            dh += '<rect class="cx-board-dv" data-dv="' + i + '" x="' + (q.x - r0) + '" y="' + (q.y - r0) + '" width="' + (2 * r0) + '" height="' + (2 * r0)
+                                + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"><title>Arraste para mover; Ctrl + duplo clique apaga o ponto</title></rect>';
+                        });
+                    }
+                    return dh;
+                }
                 if (it.t === 'link') {
                     var ld = routeD(it, get);
                     return ld ? '<path d="' + ld + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + (9 / view.z)
@@ -795,6 +852,37 @@
             // Ponto exato do clique, sem grade (Claudio, 27/09/2026: a grade não deixava encostar o cabo na parede).
             L.wp.splice(best, 0, { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 });
         }
+        // Encaixa na linha/coluna de pontos vizinhos (6 px na tela); Alt solta.
+        function alignTo(p, nb, alt) {
+            var tol = 6 / view.z, gx = null, gy = null;
+            if (!alt) {
+                nb.forEach(function (q) {
+                    if (!q) { return; }
+                    if (gx === null && Math.abs(q.x - p.x) < tol) { gx = q.x; }
+                    if (gy === null && Math.abs(q.y - p.y) < tol) { gy = q.y; }
+                });
+            }
+            gGuides.innerHTML = (gx !== null ? '<line x1="' + gx + '" y1="-5000" x2="' + gx + '" y2="5000" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '')
+                + (gy !== null ? '<line x1="-5000" y1="' + gy + '" x2="5000" y2="' + gy + '" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '');
+            return { x: Math.round((gx !== null ? gx : p.x) * 10) / 10, y: Math.round((gy !== null ? gy : p.y) * 10) / 10 };
+        }
+        function draftPreview(cur) {
+            if (!ductDraft) { return; }
+            var pts = ductDraft.concat(cur ? [cur] : []);
+            gGuides.innerHTML += '<path d="' + linkD(pts) + '" fill="none" stroke="#888780" stroke-opacity="0.45" stroke-width="12" stroke-linejoin="miter" pointer-events="none"/>'
+                + '<text x="' + (pts[pts.length - 1].x + 10 / view.z) + '" y="' + (pts[pts.length - 1].y - 10 / view.z) + '" font-family="Arial,sans-serif" font-size="' + (12 / view.z) + '" fill="#444441">'
+                + fmtM(Math.round(polyLen(pts) / PXM * 10) / 10) + '</text>';
+        }
+        function finishDuct() {
+            var pts = ductDraft || [];
+            ductDraft = null; gGuides.innerHTML = '';
+            if (pts.length >= 2) {
+                snap();
+                var dct = { id: uid(), t: 'duct', pts: pts, kind: 'eletrocalha', label: '', showM: true, fs: 'm', lock: false, g: '' };
+                D.items.push(dct); sel = [dct.id];
+            }
+            tool = 'select'; render();
+        }
         function iconAt(p) {
             for (var i = D.items.length - 1; i >= 0; i--) {
                 var it = D.items[i];
@@ -857,6 +945,16 @@
                     + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + opts({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
                     + '<p><button type="button" class="cx-board-btn" data-la="straighten"' + (it.wp.length ? '' : ' disabled') + '>Endireitar (tirar as dobras)</button></p>'
                     + '<p class="cx-board-none">Para desenhar a passagem: duplo clique no cabo cria uma dobra ali; arraste a dobra (quadrado azul) para mover, ela alinha com a vizinha (segure Alt para posição livre); Ctrl + duplo clique na dobra apaga. Arraste a bolinha da ponta para outra borda ou outro ícone. O nome acompanha o tamanho dos ícones.</p>';
+            } else if (it.t === 'duct') {
+                var dk = {}; Object.keys(DUCT_KINDS).forEach(function (k) { dk[k] = DUCT_KINDS[k].label; });
+                var dopt = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
+                h += '<p><strong>' + esc(DUCT_KINDS[it.kind].label) + '</strong></p>'
+                    + '<label class="cx-board-f"><span>Tipo</span><select data-k="kind">' + dopt(dk, it.kind) + '</select></label>'
+                    + field('Rótulo', 'label', it.label, '100 × 50 mm')
+                    + '<p class="cx-board-none cx-board-meters">Comprimento <strong>' + fmtM(ductMeters(it)) + '</strong>' + (D.pxm ? '' : ' (aproximado: sem escala)') + '</p>'
+                    + '<label class="cx-board-chk"><input type="checkbox" data-k="showM"' + (it.showM ? ' checked' : '') + '> Mostrar os metros</label>'
+                    + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + dopt({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
+                    + '<p class="cx-board-none">Arraste o quadrado branco para mover um ponto (alinha com o vizinho; Alt solta). Duplo clique na faixa cria um ponto; Ctrl + duplo clique no ponto apaga. Arraste a faixa para mover tudo.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else {
@@ -866,7 +964,7 @@
             }
             if (it.t !== 'icon' || true) {
                 h += '<div class="cx-board-sw">' + COLORS.map(function (c) {
-                    return it.t === 'icon' || it.t === 'link' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
+                    return it.t === 'icon' || it.t === 'link' || it.t === 'duct' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
                 }).join('') + '</div>';
             }
             h += '<p class="cx-board-none">' + (it.lock ? 'Travado: destrave para mover.' : '') + (it.g ? ' Em grupo.' : '') + '</p>';
@@ -976,9 +1074,21 @@
                 if (lwAttr !== null && lwAttr !== undefined && (e.ctrlKey || e.metaKey) && sel.length === 1) {
                     var lk0 = get(sel[0]); snap(); lk0.wp.splice(+lwAttr, 1); drag = null; render(); return;
                 }
+                var dvAttr = e.target.getAttribute && e.target.getAttribute('data-dv');
+                if (dvAttr !== null && dvAttr !== undefined && (e.ctrlKey || e.metaKey) && sel.length === 1) {
+                    var dd0 = get(sel[0]);
+                    if (dd0.pts.length > 2) { snap(); dd0.pts.splice(+dvAttr, 1); }
+                    drag = null; render(); return;
+                }
                 var hid = hit(e.target), hl = hid && get(hid);
                 if (hl && hl.t === 'link' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
                     addBend(hl, p); sel = [hl.id]; drag = null; render(); return;
+                }
+                if (hl && hl.t === 'duct' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
+                    var bj = 0, bdd = Infinity;
+                    for (var sj = 0; sj < hl.pts.length - 1; sj++) { var dq = distPoly(p, [hl.pts[sj], hl.pts[sj + 1]]); if (dq < bdd) { bdd = dq; bj = sj; } }
+                    snap(); hl.pts.splice(bj + 1, 0, { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 });
+                    sel = [hl.id]; drag = null; render(); return;
                 }
             }
             // Escala: o segundo clique fecha a medida.
@@ -996,6 +1106,15 @@
                 drag = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
             } else if (e.target.getAttribute('data-le') && sel.length === 1) {
                 drag = { k: 'end', id: sel[0], end: e.target.getAttribute('data-le') };
+            } else if (tool === 'duct') {
+                // Eletrocalha: cada clique é um ponto; duplo clique termina.
+                if (dbl && ductDraft) { finishDuct(); return; }
+                var dq0 = alignTo(p, [ductDraft && ductDraft[ductDraft.length - 1]], e.altKey);
+                if (!ductDraft) { ductDraft = [dq0]; } else { ductDraft.push(dq0); }
+                gGuides.innerHTML = ''; draftPreview(null);
+                return;
+            } else if (e.target.getAttribute('data-dv') && sel.length === 1) {
+                drag = { k: 'dv', id: sel[0], j: +e.target.getAttribute('data-dv'), moved: false };
             } else if (e.target.getAttribute('data-lw') && sel.length === 1) {
                 drag = { k: 'wp', id: sel[0], j: +e.target.getAttribute('data-lw'), moved: false };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
@@ -1035,7 +1154,11 @@
                         sel = grp;
                     }
                     var movable = sel.filter(function (s) { var it = get(s); return it && !it.lock && it.t !== 'link'; });
-                    drag = { k: 'move', p: p, start: movable.map(function (s) { var it = get(s); return { id: s, x: it.x, y: it.y }; }), moved: false,
+                    drag = { k: 'move', p: p, start: movable.map(function (s) {
+                            var it = get(s);
+                            if (it.t === 'duct') { var bb = bbox(it); return { id: s, x: bb.x, y: bb.y, pts: clone(it.pts) }; }
+                            return { id: s, x: it.x, y: it.y };
+                        }), moved: false,
                         // Ligação com os dois ícones no conjunto: as dobras andam junto.
                         lw: D.items.filter(function (l) { return l.t === 'link' && l.wp.length && movable.indexOf(l.a.id) >= 0 && movable.indexOf(l.b.id) >= 0; })
                             .map(function (l) { return { id: l.id, wp: clone(l.wp) }; }) };
@@ -1052,8 +1175,19 @@
             render();
         });
         svg.addEventListener('pointermove', function (e) {
+            if (tool === 'duct' && ductDraft && !drag) {
+                var pc = toBoard(e), qc = alignTo(pc, [ductDraft[ductDraft.length - 1]], e.altKey);
+                draftPreview(qc);
+                return;
+            }
             if (!drag) { return; }
             var p = toBoard(e);
+            if (drag.k === 'dv') {
+                if (!drag.moved) { snap(); drag.moved = true; }
+                var dv = get(drag.id);
+                dv.pts[drag.j] = alignTo(p, [dv.pts[drag.j - 1], dv.pts[drag.j + 1]], e.altKey);
+                paint(); drawSel(); return;
+            }
             if (drag.k === 'pan') {
                 view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return;
             }
@@ -1133,14 +1267,18 @@
                 var cx = drag.start[0].x + dx + b0.w / 2, cy = drag.start[0].y + dy + b0.h / 2;
                 var gx = null, gy = null;
                 D.items.forEach(function (o) {
-                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link') { return; }
+                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || o.t === 'duct') { return; }
                     var b = bbox(o), ox = b.x + b.w / 2, oy = b.y + b.h / 2;
                     if (gx === null && Math.abs(ox - cx) < SNAP / view.z) { gx = ox; }
                     if (gy === null && Math.abs(oy - cy) < SNAP / view.z) { gy = oy; }
                 });
                 var ddx = gx !== null ? dx + (gx - cx) : Math.round((drag.start[0].x + dx) / GRID) * GRID - drag.start[0].x;
                 var ddy = gy !== null ? dy + (gy - cy) : Math.round((drag.start[0].y + dy) / GRID) * GRID - drag.start[0].y;
-                drag.start.forEach(function (s) { var it = get(s.id); it.x = s.x + ddx; it.y = s.y + ddy; });
+                drag.start.forEach(function (s) {
+                    var it = get(s.id);
+                    if (s.pts) { it.pts = s.pts.map(function (q) { return { x: Math.round((q.x + ddx) * 10) / 10, y: Math.round((q.y + ddy) * 10) / 10 }; }); return; }
+                    it.x = s.x + ddx; it.y = s.y + ddy;
+                });
                 (drag.lw || []).forEach(function (s) { get(s.id).wp = s.wp.map(function (q) { return { x: q.x + ddx, y: q.y + ddy }; }); });
                 gGuides.innerHTML = (gx !== null ? '<line x1="' + gx + '" y1="-5000" x2="' + gx + '" y2="5000" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '')
                     + (gy !== null ? '<line x1="-5000" y1="' + gy + '" x2="5000" y2="' + gy + '" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '');
@@ -1186,7 +1324,7 @@
             drawSel();
         }, { passive: false });
         svg.addEventListener('dblclick', function (e) {
-            var id = hit(e.target); if (!id || (get(id) || {}).t === 'link') { return; }
+            var id = hit(e.target); if (!id || ['link', 'duct'].indexOf((get(id) || {}).t) >= 0) { return; }
             sel = [id]; render();
             var f = props.querySelector('[data-k="label"],[data-k="text"]'); if (f) { f.focus(); f.select(); }
         });
@@ -1196,6 +1334,10 @@
         function onKey(e) {
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
+            if (tool === 'duct') {
+                if (e.key === 'Enter') { e.preventDefault(); finishDuct(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); ductDraft = null; gGuides.innerHTML = ''; tool = 'select'; render(); return; }
+            }
             var ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
             if (k === 'escape') { if (sel.length) { sel = []; render(); } else { close(); } e.preventDefault(); return; }
             if (ctrl && k === 'z') { e.preventDefault(); if (e.shiftKey) { redoIt(); } else { undo(); } return; }
@@ -1209,7 +1351,8 @@
                 snap();
                 var mapa = {}, ids = {}, novos = [];
                 src.filter(function (o) { return o.t !== 'link'; }).forEach(function (o) {
-                    var n = clone(o); n.id = uid(); ids[o.id] = n.id; n.x += 20; n.y += 20;
+                    var n = clone(o); n.id = uid(); ids[o.id] = n.id;
+                    if (n.t === 'duct') { n.pts.forEach(function (q) { q.x += 20; q.y += 20; }); } else { n.x += 20; n.y += 20; }
                     if (n.g) { mapa[n.g] = mapa[n.g] || uid(); n.g = mapa[n.g]; }
                     D.items.push(n); novos.push(n.id);
                 });
@@ -1229,12 +1372,17 @@
             if (k === 'v') { tool = 'select'; render(); return; }
             if (k === 'z') { tool = 'zone'; render(); return; }
             if (k === 't') { tool = 'text'; render(); return; }
+            if (k === 'e') { tool = 'duct'; ductDraft = null; render(); return; }
             if (k === 'r') { act('rotate'); return; }
             var mv = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }[k];
             if (mv && sel.length) {
                 e.preventDefault(); snap();
                 var step = e.shiftKey ? GRID : 1;
-                sel.forEach(function (id) { var it = get(id); if (!it.lock && it.t !== 'link') { it.x += mv[0] * step; it.y += mv[1] * step; } });
+                sel.forEach(function (id) {
+                    var it = get(id); if (it.lock || it.t === 'link') { return; }
+                    if (it.t === 'duct') { it.pts.forEach(function (q) { q.x += mv[0] * step; q.y += mv[1] * step; }); return; }
+                    it.x += mv[0] * step; it.y += mv[1] * step;
+                });
                 render();
             }
         }
@@ -1296,7 +1444,7 @@
         }
         root.querySelector('.cx-board-top').addEventListener('click', function (e) {
             var t = e.target.closest('[data-tool]');
-            if (t) { tool = t.getAttribute('data-tool'); render(); return; }
+            if (t) { tool = t.getAttribute('data-tool'); ductDraft = null; gGuides.innerHTML = ''; render(); return; }
             var b = e.target.closest('button[data-act]');
             if (b) { act(b.getAttribute('data-act')); }
         });
@@ -1316,6 +1464,10 @@
                 var H = D.h;
                 var ROT = { n: 'l', l: 's', s: 'o', o: 'n' };
                 D.items.forEach(function (it) {
+                    if (it.t === 'duct') {
+                        it.pts = it.pts.map(function (q) { return { x: H - q.y, y: q.x }; });
+                        return;
+                    }
                     if (it.t === 'link') {
                         it.a.side = ROT[it.a.side]; it.b.side = ROT[it.b.side];
                         it.wp = (it.wp || []).map(function (q) { return { x: H - q.y, y: q.x }; });
@@ -1389,5 +1541,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply };
 })();

@@ -2116,3 +2116,6 @@ html.cx-board-open { overflow: hidden; }
 /* Q2d — metragem no painel da ligação */
 .cx-board-meters { margin: 18px 0 0; line-height: 1.35; }
 .cx-board-meters strong { color: #1d2330; }
+/* Q2e — eletrocalha / canaleta */
+.cx-board-svg .cx-board-dv { cursor: move; }
+.cx-board-svg .cx-board-ducts [data-id] { cursor: move; }

@@ -2176,3 +2176,15 @@ html.cx-board-open { overflow: hidden; }
 /* Q2e — eletrocalha / canaleta */
 .cx-board-svg .cx-board-dv { cursor: move; }
 .cx-board-svg .cx-board-ducts [data-id] { cursor: move; }
+
+/* =========================================================================
+   24. FLUXOGRAMA NO DOCUMENTO DIA (bloco Q5a) — public/js/codexplus-flow.js
+   A página mostra o SVG do quadro (o mesmo do PNG), encolhido para caber.
+   Editar abre o motor da seção 23 em tela cheia.
+   ========================================================================= */
+.cx-flow-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.cx-flow-state { font-size: .85em; color: var(--cx-muted); }
+.cx-flow-state.is-erro { color: #a32d2d; }
+.cx-flow-view { border: 1px solid #e3e6ec; border-radius: 8px; background: #fff; padding: 12px; overflow-x: auto; text-align: center; }
+.cx-flow-view svg { max-width: 100%; height: auto; }
+.cx-flow-empty { margin: 24px 0; color: var(--cx-muted); }

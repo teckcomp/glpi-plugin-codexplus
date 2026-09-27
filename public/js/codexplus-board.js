@@ -27,6 +27,10 @@
    posição vem dos dois ícones, e ela acompanha quando eles se movem.
    Q2b tipos e painel; Q2c traçado, dobras e religar a ponta; Q2d metragem
    e eletrocalha. Q3 legenda e lista de materiais; Q4 "+ Ícone".
+   Q5a (27/09/2026): paleta FLUXOGRAMA, aberta fora do editor de texto por
+   um documento DIA (codexplus-flow.js). Nesse caso open() recebe um `host`
+   {data, title, save(D)}: o quadro vai para a tabela de diagramas, sem PNG
+   no corpo e sem legenda.
    ========================================================================= */
 (function () {
     'use strict';
@@ -35,7 +39,7 @@
     var GRID = 10;
     var SNAP = 6;
     var COLORS = ['#185FA5', '#1D9E75', '#D85A30', '#534AB7', '#A32D2D', '#5F5E5A'];
-    var MODES = { topologia: 'Topologia', planta: 'Planta de execução' };
+    var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma' };
     var PXM_DEFAULT = 20;   // sem escala definida: 1 m = 20 px (aproximado)
     var PXM = PXM_DEFAULT;  // escala do quadro em uso (render e PNG)
     var SIDES = ['n', 'l', 's', 'o'];   // bordas do ícone: norte, leste, sul, oeste
@@ -595,7 +599,9 @@
     }
 
     /* ---------------- PNG do quadro ---------------- */
-    function toPng(data, bgImg) {
+    /* Q5a: o SVG do quadro inteiro (o mesmo do PNG), para a leitura do
+       fluxograma desenhar vetorial na página. kMax limita a ampliação. */
+    function boardSvg(data, bgImg, kMax) {
         PXM = data.pxm || PXM_DEFAULT;
         var box;
         if (bgImg) {
@@ -619,7 +625,7 @@
             box = { x: x1 - 24, y: y1 - 24, w: x2 - x1 + 48, h: y2 - y1 + 48 };
         }
         var find = finder(data.items);
-        var k = Math.min(2, 2400 / Math.max(box.w, box.h));
+        var k = Math.min(kMax || 2, 2400 / Math.max(box.w, box.h));
         var W = Math.round(box.w * k), H = Math.round(box.h * k);
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="' + box.x + ' ' + box.y + ' ' + box.w + ' ' + box.h + '">'
             + '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w + '" height="' + box.h + '" fill="#ffffff"/>'
@@ -629,7 +635,11 @@
             + data.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, find, true); }).join('')
             + data.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i, true); }).join('')
             + '</svg>';
-        return rasterize(svg, W, H);
+        return { svg: svg, w: W, h: H };
+    }
+    function toPng(data, bgImg) {
+        var r = boardSvg(data, bgImg);
+        return rasterize(r.svg, r.w, r.h);
     }
 
     function rasterize(svg, W, H) {
@@ -857,9 +867,13 @@
     /* ======================================================================
        Janela do quadro
        ====================================================================== */
-    function open(editor, node, mode) {
+    function open(editor, node, mode, host) {
         var raw = null, bgUrl = '', bgChanged = false;
-        if (node) {
+        if (host) {
+            // Q5a: quadro de um documento DIA (sem editor, sem planta de fundo).
+            raw = host.data || null;
+            node = null;
+        } else if (node) {
             try { raw = JSON.parse(node.getAttribute('data-cx-board') || 'null'); } catch (e) { raw = null; }
             var bgEl = bgOf(node);
             bgUrl = bgEl ? (bgEl.getAttribute('src') || '') : '';
@@ -872,25 +886,32 @@
             }
             ready = ready.then(function () { return urlToDataUrl(bgUrl); }).then(function (u) { bgUrl = u; }).catch(function () { bgUrl = ''; });
         }
-        ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged); });
+        ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged, host || null); });
     }
 
-    function pngName(mode, now) {
+    function pngName(mode, now, title) {
         var t = document.querySelector('input[name="name"]');
-        var slug = String(t && t.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        var slug = String(title || (t && t.value) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
         var d = now || new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
-        return (mode === 'topologia' ? 'topologia' : 'planta') + (slug ? '-' + slug : '')
+        return (MODES[mode] && mode !== 'planta' ? mode : 'planta') + (slug ? '-' + slug : '')
             + '-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.png';
     }
 
     function notify(editor, text, type) {
         if (editor && editor.notificationManager) {
             editor.notificationManager.open({ text: text, type: type || 'info', timeout: type === 'error' ? 0 : 4000 });
+        } else if (type === 'error' && typeof window.glpi_toast_error === 'function') {
+            window.glpi_toast_error(text);
+        } else if (type !== 'error' && typeof window.glpi_toast_info === 'function') {
+            window.glpi_toast_info(text);
         } else { window.alert(text); }
     }
 
-    function build(editor, node, D, bgUrl, bgChanged) {
+    function build(editor, node, D, bgUrl, bgChanged, host) {
+        var flow = D.mode === 'fluxograma';
+        if (flow) { D.legend = false; D.pxm = 0; }
+        var saveLabel = host ? 'Salvar ' + MODES[D.mode].toLowerCase() : (node ? 'Salvar quadro' : 'Inserir no documento');
         var hist = [], redo = [], sel = [], tool = 'select', clip = null;
         var view = { z: 1, x: 40, y: 40 };
         var I = Icons();
@@ -902,11 +923,11 @@
             + '<strong class="cx-board-title">' + esc(MODES[D.mode]) + '</strong>'
             + '<div class="cx-board-tools">'
             + '<button type="button" data-tool="select" title="Selecionar e mover (V)">Selecionar</button>'
-            + '<button type="button" data-tool="zone" title="Desenhar zona / área (Z)">' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</button>'
+            + '<button type="button" data-tool="zone" title="Desenhar ' + (flow ? 'moldura' : 'zona / área') + ' (Z)">' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</button>'
             + '<button type="button" data-tool="text" title="Texto (T)">Texto</button>'
-            + '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>'
+            + (flow ? '' : '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>'
             + '<button type="button" data-tool="scale" title="Escala: clique em dois pontos da planta e informe a distância real">Escala</button>'
-            + '<span class="cx-board-scale"></span>'
+            + '<span class="cx-board-scale"></span>')
             + '<span class="cx-board-sep"></span>'
             + '<button type="button" data-act="group" title="Agrupar (Ctrl+G)">Agrupar</button>'
             + '<button type="button" data-act="ungroup" title="Desagrupar (Ctrl+Shift+G)">Desagrupar</button>'
@@ -931,10 +952,10 @@
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
-            + '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>'
+            + (flow ? '' : '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>')
             + '<button type="button" data-act="png" title="Baixar o quadro como imagem PNG (como está agora, mesmo sem salvar)">Baixar PNG</button>'
             + '<button type="button" data-act="cancel">Cancelar</button>'
-            + '<button type="button" data-act="save" class="cx-board-ok">' + (node ? 'Salvar quadro' : 'Inserir no documento') + '</button>'
+            + '<button type="button" data-act="save" class="cx-board-ok">' + saveLabel + '</button>'
             + '</div>'
             + '<div class="cx-board-body">'
             + '<aside class="cx-board-pal"><div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
@@ -944,7 +965,9 @@
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
             + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
-            + '<div class="cx-board-hint">Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.</div></div>'
+            + '<div class="cx-board-hint">' + (flow
+                ? 'Arraste um ícone da paleta para o quadro; Texto e Moldura estão na barra. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área.'
+                : 'Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.') + '</div></div>'
             + '<aside class="cx-board-props"></aside>'
             + '</div>';
         document.body.appendChild(root);
@@ -1443,14 +1466,15 @@
         }
         function drawProps() {
             if (!sel.length) {
-                props.innerHTML = materialsHtml(materials(D, null), 'Materiais deste quadro')
-                    + '<p class="cx-board-none">Selecione um item para editar rótulo e dados.</p>'
+                // Q5a-2: fluxograma não tem lista de materiais (cabos, metros).
+                props.innerHTML = (flow ? '' : materialsHtml(materials(D, null), 'Materiais deste quadro'))
+                    + '<p class="cx-board-none">Selecione um item para editar ' + (flow ? 'o texto.' : 'rótulo e dados.') + '</p>'
                     + '<p class="cx-board-none">Atalhos: Delete exclui · Ctrl+C / Ctrl+V · Ctrl+D duplica · Ctrl+G agrupa · setas movem.</p>';
                 return;
             }
             if (sel.length > 1) {
                 props.innerHTML = '<p><strong>' + sel.length + ' itens selecionados</strong></p><p class="cx-board-none">Use Agrupar para mover como um conjunto.</p>'
-                    + materialsHtml(materials(D, sel), 'Materiais da seleção');
+                    + (flow ? '' : materialsHtml(materials(D, sel), 'Materiais da seleção'));
                 return;
             }
             var it = get(sel[0]), h = '';
@@ -1918,7 +1942,7 @@
             if (k === 'v') { tool = 'select'; render(); return; }
             if (k === 'z') { tool = 'zone'; render(); return; }
             if (k === 't') { tool = 'text'; render(); return; }
-            if (k === 'e') { tool = 'duct'; ductDraft = null; render(); return; }
+            if (k === 'e' && !flow) { tool = 'duct'; ductDraft = null; render(); return; }
             if (k === 'r') { act('rotate'); return; }
             var mv = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }[k];
             if (mv && sel.length) {
@@ -1998,7 +2022,7 @@
         var op = root.querySelector('[data-act="op"]');
         if (op) { op.addEventListener('input', function () { D.bgOpacity = +op.value / 100; render(); }); }
         var lgChk = root.querySelector('[data-act="legend"]');
-        lgChk.addEventListener('change', function () { D.legend = lgChk.checked; });
+        if (lgChk) { lgChk.addEventListener('change', function () { D.legend = lgChk.checked; }); }
 
         /* Gira a planta 90° no sentido horário, com os itens junto. */
         function rotate() {
@@ -2060,8 +2084,16 @@
 
         function save() {
             var btn = root.querySelector('[data-act="save"]');
-            btn.disabled = true; btn.textContent = 'Gerando…';
+            btn.disabled = true; btn.textContent = host ? 'Salvando…' : 'Gerando…';
             D.lib = libOf(D.items);
+            if (host) {
+                // Q5a: quem grava é o documento DIA (ajax/diagram.save.php).
+                Promise.resolve().then(function () { return host.save(clone(D)); }).then(close).catch(function (err) {
+                    btn.disabled = false; btn.textContent = saveLabel;
+                    notify(editor, 'Não foi possível salvar o ' + MODES[D.mode].toLowerCase() + (err && err.message ? ' (' + err.message + ')' : '') + '. O quadro continua aberto: tente de novo.', 'error');
+                });
+                return;
+            }
             toPng(D, bgUrl || null).then(function (png) {
                 return (D.legend ? legendPng(D) : Promise.resolve(null)).then(function (lp) { return [png, lp]; });
             }).then(function (r) {
@@ -2070,7 +2102,7 @@
                 if (!ok) { notify(editor, 'Área de envio de arquivos não encontrada: o quadro não será gravado.', 'error'); }
                 close();
             }).catch(function () {
-                btn.disabled = false; btn.textContent = node ? 'Salvar quadro' : 'Inserir no documento';
+                btn.disabled = false; btn.textContent = saveLabel;
                 notify(editor, 'Não foi possível gerar a imagem do quadro.', 'error');
             });
         }
@@ -2088,7 +2120,7 @@
                 var a = document.createElement('a');
                 var url = URL.createObjectURL(blob);
                 a.href = url;
-                a.download = pngName(D.mode);
+                a.download = pngName(D.mode, null, host && host.title);
                 a.style.display = 'none';
                 document.body.appendChild(a);
                 a.click();
@@ -2120,5 +2152,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

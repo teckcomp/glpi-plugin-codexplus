@@ -71,6 +71,22 @@ class Diagram
     public const SCHEDULE_VALUES  = ['', 'b', 'm']; // vazio, barra, marco
     public const SCHEDULE_UNITS   = ['S', 'M', 'T', 'A'];
 
+    /**
+     * Fluxograma (bloco Q5a, Claudio, 27/09/2026): subtipo de DIA sobre o
+     * motor de quadro (public/js/codexplus-board.js), o mesmo da Planta e da
+     * Topologia. Gravado como { "kind": "fluxograma", "board": {…JSON do
+     * quadro…} }. Quem confere o SIGNIFICADO de cada item é o clean() do
+     * motor, ao abrir; aqui se confere a FORMA (tipos de item, chaves,
+     * profundidade, tamanhos) para nada estranho ir ao banco.
+     */
+    public const SUBTYPE_FLOW      = 'fluxograma';
+    public const BOARD_ITEM_TYPES  = ['icon', 'zone', 'text', 'link', 'duct', 'shape', 'lane'];
+    public const MAX_BOARD_ITEMS   = 3000;
+    public const MAX_BOARD_TEXT    = 2000;
+    public const MAX_BOARD_DEPTH   = 4;
+    /** Ícone criado na instalação (Q4) copiado no quadro: PNG de 256 px. */
+    public const MAX_LIB_IMAGE     = 400000;
+
     /** @return array<string, string> subtipo => rótulo */
     public static function getSubtypes(): array
     {
@@ -78,18 +94,28 @@ class Diagram
             self::SUBTYPE_ORG      => __('Organograma', 'codexplus'),
             self::SUBTYPE_SCHEDULE => __('Cronograma', 'codexplus'),
             self::SUBTYPE_RACI     => __('Matriz RACI', 'codexplus'),
+            self::SUBTYPE_FLOW     => __('Fluxograma', 'codexplus'),
         ];
     }
 
     public static function subtypeOf(array $data): string
     {
         $k = (string) ($data['kind'] ?? '');
+        if ($k === self::SUBTYPE_FLOW) {
+            return $k;
+        }
         return in_array($k, self::GRID_SUBTYPES, true) ? $k : self::SUBTYPE_ORG;
     }
 
     /** @return array<string, mixed> */
     public static function starter(string $subtype = self::SUBTYPE_ORG): array
     {
+        if ($subtype === self::SUBTYPE_FLOW) {
+            return [
+                'kind'  => self::SUBTYPE_FLOW,
+                'board' => ['v' => 1, 'mode' => self::SUBTYPE_FLOW, 'w' => 1400, 'h' => 900, 'items' => []],
+            ];
+        }
         if ($subtype === self::SUBTYPE_SCHEDULE) {
             return [
                 'kind'    => self::SUBTYPE_SCHEDULE,
@@ -212,6 +238,9 @@ class Diagram
         }
         if (in_array($data['kind'] ?? '', self::GRID_SUBTYPES, true)) {
             return self::validateGrid($data);
+        }
+        if (($data['kind'] ?? '') === self::SUBTYPE_FLOW) {
+            return self::validateBoard($data);
         }
 
         $levels = [];
@@ -421,6 +450,106 @@ class Diagram
             // D1-2: unidade dos períodos (Semanas, Meses, Trimestres, Anos).
             $out['unit'] = in_array($data['unit'] ?? '', self::SCHEDULE_UNITS, true) ? $data['unit'] : 'S';
         }
+        return $out;
+    }
+
+    /**
+     * Fluxograma (Q5a): quadro do motor. Itens de tipo desconhecido saem;
+     * cada item passa por plain() (só escalares, listas e objetos rasos, com
+     * chave segura). Ícones da instalação guardados no quadro (`lib`, Q4a)
+     * só com PNG em data:, como o motor aceita.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function validateBoard(array $data): ?array
+    {
+        $b = $data['board'] ?? null;
+        if (!is_array($b)) {
+            return null;
+        }
+        $items = [];
+        foreach (array_slice(array_values((array) ($b['items'] ?? [])), 0, self::MAX_BOARD_ITEMS) as $it) {
+            if (!is_array($it) || !in_array($it['t'] ?? '', self::BOARD_ITEM_TYPES, true)) {
+                continue;
+            }
+            $clean = self::plain($it, 1);
+            if (is_array($clean) && self::key($clean['id'] ?? '') !== '') {
+                $items[] = $clean;
+            }
+        }
+        $board = [
+            'v'     => 1,
+            'mode'  => self::SUBTYPE_FLOW,
+            'w'     => max(400, min(6000, (int) ($b['w'] ?? 1400))),
+            'h'     => max(300, min(6000, (int) ($b['h'] ?? 900))),
+            'items' => $items,
+        ];
+        $lib = [];
+        foreach (array_slice((array) ($b['lib'] ?? []), 0, 200, true) as $k => $ic) {
+            $key = self::key($k);
+            $img = is_array($ic) ? (string) ($ic['image'] ?? '') : '';
+            if ($key !== (string) $k || !preg_match('/^u\d+$/', $key) || strlen($img) > self::MAX_LIB_IMAGE
+                || !preg_match('#^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$#', $img)) {
+                continue;
+            }
+            $lib[$key] = [
+                'name'   => self::text($ic['name'] ?? '', 80),
+                'cat'    => self::key($ic['cat'] ?? ''),
+                'search' => self::text($ic['search'] ?? '', 200),
+                'mode'   => ($ic['mode'] ?? '') === 'mask' ? 'mask' : 'color',
+                'image'  => $img,
+            ];
+        }
+        if ($lib) {
+            $board['lib'] = $lib;
+        }
+        $out = ['kind' => self::SUBTYPE_FLOW, 'board' => $board];
+        if (strlen((string) json_encode($out)) > self::MAX_BYTES) {
+            return null;
+        }
+        return $out;
+    }
+
+    /**
+     * Cópia "só dados" de um item do quadro: texto com teto, número finito,
+     * booleano; listas e objetos até MAX_BOARD_DEPTH níveis; chave com
+     * caractere estranho sai. null = valor descartado.
+     *
+     * @param mixed $v
+     * @return mixed
+     */
+    private static function plain($v, int $depth)
+    {
+        if (is_bool($v) || is_int($v)) {
+            return $v;
+        }
+        if (is_float($v)) {
+            return is_finite($v) ? $v : null;
+        }
+        if (is_string($v)) {
+            return self::text($v, self::MAX_BOARD_TEXT);
+        }
+        if (!is_array($v) || $depth > self::MAX_BOARD_DEPTH) {
+            return null;
+        }
+        $isList = array_is_list($v);
+        $out    = [];
+        foreach (array_slice($v, 0, 200, true) as $k => $x) {
+            if (!$isList && self::key($k) !== (string) $k) {
+                continue;
+            }
+            $c = self::plain($x, $depth + 1);
+            if ($c === null) {
+                continue;
+            }
+            if ($isList) {
+                $out[] = $c;
+            } else {
+                $out[(string) $k] = $c;
+            }
+        }
+        // Objeto vazio chega aqui como lista vazia (json_decode associativo)
+        // e sai "[]": o motor lê as duas formas do mesmo jeito.
         return $out;
     }
 

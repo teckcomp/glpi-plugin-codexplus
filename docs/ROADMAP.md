@@ -1,9 +1,11 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.9-alpha` · atualizado em 27/09/2026: **Q2 fechado** (Q2a a
+> Estado em `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão: **Q3 e
+> Q4 fechados**, mais T2, Q2f, T3 e E6 (commits `5396fe9` a `a76b16c`;
+> CONTEXTO, seção 3.6). Q3c cancelado. Próximo: **Q5 — Fluxograma** (mockup
+> antes). Antes, no mesmo dia: **Q2 fechado** (Q2a a
 > Q2e: ligações e cabos, traçado com dobras, metragem, eletrocalha; commits
-> `8e71046` a `cd8a64f`; CONTEXTO, seção 3.5). Próximo: **Q3** (legenda e lista de
-> materiais). Decisão de Claudio, 27/09/2026: seguir o roadmap até o fim,
+> `8e71046` a `cd8a64f`; CONTEXTO, seção 3.5). Decisão de Claudio, 27/09/2026: seguir o roadmap até o fim,
 > produção depois (sem corte antecipado). Antes, 26/09/2026: P1, P2, D1, S1, B1,
 > R3b4, M1, E5, R4, R5, PL1 e Q1 (commits `66f9b2b` a `6a1f8ee`; detalhes no
 > CONTEXTO, seção 3.5). A Etapa R está fechada, salvo R6-b e R7; o Codex+ não
@@ -68,8 +70,8 @@ Vale sobre a lista acima quando houver conflito.
 5. ~~Anexos, imagens, leitura e PDF (R3b3)~~ ✅ 22/09
 6. ~~Editor de documentos~~ ✅ E1 a E4 (24/09) e **E5** (cor e realce, 26/09)
 7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
-   Planta, Topologia, Fluxograma e Organograma) — **Q1 e Q2 ✅**; faltam
-   Q3, Q4, Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
+   Planta, Topologia, Fluxograma e Organograma) — **Q1 a Q4 ✅**; faltam
+   Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
    quadro" abaixo
 8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
    a **Planta** do motor de quadro (Q1), também na Documentação Técnica
@@ -377,6 +379,16 @@ os critérios abaixo estiverem cumpridos:
 | Q2c | Traçado reto, cotovelo e curvo; dobra por duplo clique, livre e com encaixe (Alt solta), Ctrl + duplo clique apaga; cotovelo sem ganchos; religar pela ponta | `87c94a7` |
 | Q2d | Metragem pela escala e pelo traçado, sobra ajustável, ou manual; metros no nome | `290d92b` |
 | Q2e | Eletrocalha e canaleta: desenho por cliques com encaixe, pontos editáveis, metragem, abaixo dos cabos | `cd8a64f` |
+| T2 | Ferramentas do editor por tipo: POP/PSG/MAN texto e imagens; PRP + Planilha e Planta; LAU/DTC + Planta e Topologia; DIV tudo | `5396fe9` |
+| Q2f | Baixar PNG do quadro (Planta e Topologia), estado atual, sem fechar | `5abf41a` |
+| T3 | Duplicar como outro tipo (documento novo, código e fluxo do tipo novo; DIA fora; regras do cliente) | `5149252` |
+| Q3a | Lista de materiais no painel do quadro (sem seleção: o quadro; com seleção: a seleção) | `4328f38` |
+| Q3b | Legenda do quadro no documento, como imagem logo abaixo; liga/desliga; duplo clique abre o quadro | `a3266a8` |
+| Q3c | "Levar para a planilha" — **cancelado** por Claudio | — |
+| E6 | Editor na Proposta e no Laudo (edita o rascunho, não publica; mesmo papel do revisor) | `254c576` |
+| Q4a | "+ Ícone" do Super-Admin: tabela nova, recorte, nome, categoria, busca; cópia do ícone no quadro (`0.6.10-alpha`, reinstalar) | `bed0707` |
+| Q4b | Tirar o fundo (cantos, tolerância, borda suave) e silhueta na cor da categoria; ícone em 256 px | `c4cdd5e` |
+| Q4c | Gerenciar ícones criados: editar (silhueta repintada) e excluir (quadros mantêm a cópia) | `a76b16c` |
 
 ## Motor de quadro (decidido em 26/09/2026)
 
@@ -387,9 +399,9 @@ seção 3.5.
 |---|---|---|
 | Q1 | Quadro, ícones, Planta (fundo, transparência, girar, escala) e Topologia (zonas); agrupar, travar, tamanho, girar; cone em metros | ✅ `6a1f8ee` |
 | Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | ✅ 27/09 (Q2a a Q2e) |
-| Q3 | Legenda automática; **lista de materiais** (ícones e metros de cabo, conectores) com "Levar para a planilha" | **próximo** |
-| Q4 | **"+ Ícone" a partir de imagem** (PNG/JPG/SVG: recorte, fundo transparente, modo silhueta na cor da categoria; nome, categoria, busca; lista para renomear/excluir) | |
-| Q5 | **Fluxograma** sobre o motor (subtipo de DIA): formas básicas, de fluxograma e BPMN simples, raias, moldura, nota, tabela, ícones, imagem; alças, "+" rápido, trocar forma, alinhar e distribuir, minimapa, busca, link para documento do Codex+ | |
+| Q3 | Legenda automática no documento (imagem); **lista de materiais** no painel. "Levar para a planilha" cancelado | ✅ 27/09 (Q3a, Q3b) |
+| Q4 | **"+ Ícone" a partir de imagem**, só o Super-Admin: recorte, tirar fundo, silhueta, 256 px; gerenciar (editar, excluir) | ✅ 27/09 (Q4a a Q4c) |
+| Q5 | **Fluxograma** (**próximo**) sobre o motor (subtipo de DIA): formas básicas, de fluxograma e BPMN simples, raias, moldura, nota, tabela, ícones, imagem; alças, "+" rápido, trocar forma, alinhar e distribuir, minimapa, busca, link para documento do Codex+ | |
 | Q6 | **Organograma migrado para o motor**, conferindo item por item com o atual (chefia, Arrumar, matriz, busca, modelos, PDF); só então o motor antigo sai | |
 
 Fora (Claudio, 26/09): caneta livre, marca-texto, reconhecimento de forma,
@@ -397,6 +409,8 @@ colaboração em tempo real, comentários, votação, apresentação, IA.
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
 
+- Quadro: PNG com planta de fundo usa a área inteira do quadro (sobra
+  branco em volta da planta); recortar só a área útil (observação no Q2f)
 - Quadro: **régua** para conferir a escala (medir outra cota depois de
   definir a escala) — sugestão de 27/09, depois do erro de medida na planta
 - Quadro: cabo encaixar no **contorno real** do ícone (hoje sai da borda da

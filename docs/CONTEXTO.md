@@ -2,7 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.9-alpha` · atualizado em 27/09/2026 (Q2a a Q2e: ligações,
+> Estado: `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão (T2
+> ferramentas por tipo, Q2f baixar PNG, T3 duplicar como, Q3a materiais, Q3b
+> legenda, E6 editor na Proposta e no Laudo, Q4a a Q4c ícones criados pelo
+> Super-Admin — seção 3.6; commits `5396fe9` a `a76b16c`; Q3c cancelado).
+> Antes, no mesmo dia: Q2a a Q2e (ligações,
 > cabos, traçado com dobras, metragem e eletrocalha no motor de quadro —
 > seção 3.5, subseção "Ligações e cabos"; commits `8e71046` a `cd8a64f`). Antes,
 > 26/09/2026 (P1 papéis pelo perfil,
@@ -144,6 +148,11 @@ desta tabela sem alinhar antes.**
 
 `glpi_plugin_codexplus_templates` — modelos por tipo: `id`, `name`,
 `doctype`, `content` (LONGTEXT com o HTML das seções), `is_default`, datas.
+
+`glpi_plugin_codexplus_icons` (Q4a, `0.6.10-alpha`) — ícones do quadro
+criados pelo Super-Admin: `id`, `name`, `cat`, `search`, `mode`
+(`color`/`mask`), `image` (MEDIUMTEXT, PNG em data URL, até 256 px e 250 KB),
+`users_id`, datas. Seção 3.6.
 
 ### Convenção de código
 
@@ -981,6 +990,113 @@ Arquivo `public/js/codexplus-board.js` e fim da seção 23 do CSS. Commits
 documento: o GLPI recolhia corpo acima de ~4000 caracteres ("..." com
 degradê) e o PDF saía em branco. Vale para todos os tipos.
 
+### 3.6 Sessão de 27/09/2026 (tarde) — ferramentas por tipo, quadro e ícones
+
+> Decisões de Claudio, 27/09/2026. Commits `5396fe9` a `a76b16c`
+> (`0.6.10-alpha` desde o Q4a, que criou a tabela de ícones). Tudo foi
+> entregue em pacotes pequenos com mockup antes (achado 75 respeitado:
+> commit de cada bloco antes do seguinte).
+
+#### Ferramentas do editor por tipo (bloco T2, `5396fe9`)
+
+Matriz em `TOOLS_BY_TYPE` (`codexplus-editor.js`), decidida por Claudio:
+
+| Tipo | Texto e imagens | Planilha | Planta | Topologia |
+|---|---|---|---|---|
+| POP, PSG, MAN | ✓ | | | |
+| PRP | ✓ | ✓ | ✓ | |
+| LAU, DTC | ✓ | | ✓ | ✓ |
+| DIV | ✓ | ✓ | ✓ | ✓ |
+| DIA | editor próprio por subtipo (regra à parte) | | | |
+
+- O tipo vem do `select[name=doctype]` (documento novo e tela Modelos, onde
+  muda na hora) ou do `data-cx-doctype` na zona do corpo (documento criado).
+  Tipo desconhecido ou vazio mostra tudo.
+- Esconde pelo CSS em `html[data-cx-hide~=…] [data-mce-name=…]` (achado 76),
+  com guarda no clique. **Esconder não bloqueia o que já está no texto:**
+  planilha e quadro existentes abrem com duplo clique em qualquer tipo.
+
+#### Quadro: baixar PNG (bloco Q2f, `5abf41a`)
+
+Botão **Baixar PNG** na barra do quadro (Planta e Topologia): o mesmo
+`toPng()` do Salvar, com o estado atual (mesmo sem salvar), sem fechar o
+quadro. Nome `planta|topologia-<título-sem-acento>-AAAA-MM-DD.png`.
+
+#### Duplicar como (bloco T3, `5149252`)
+
+O tipo **não muda** depois de criado (forma o código). Para "converter"
+(ex.: um DIV que virou POP): **Duplicar como ▾**, ao lado do Duplicar, com os
+outros tipos pelo nome completo (Claudio preferiu dois botões a um select).
+Nasce documento novo, em rascunho, com o código, o fluxo e a validade do tipo
+novo; título igual (sem "(cópia)"); o original não muda. DIA fica fora nos
+dois sentidos. Cliente: Proposta→Proposta leva o texto; LAU↔DTC leva o
+vínculo; LAU/DTC→Proposta leva o nome como texto; os demais casos não levam
+e avisam (`DocumentMeta::duplicateTargets`, `duplicateType`, `clientCarry`).
+
+#### Lista de materiais e legenda (blocos Q3a `4328f38` e Q3b `a3266a8`)
+
+- **Q3a — materiais no painel do quadro** (`materials()`): sem seleção, o
+  painel da direita mostra "Materiais deste quadro"; com vários itens,
+  "Materiais da seleção" (entra também o cabo entre dois ícones
+  selecionados). Equipamentos pelo nome do ícone, com "· modelo" quando o
+  Modelo está preenchido (genérico: pelo rótulo); cabos por tipo, **metro
+  inteiro para cima em cada lance**, somados (Sem fio e Lógica/VPN fora);
+  eletrocalha e canaleta por trecho, para cima, sem sobra; aviso de metros
+  aproximados sem escala. Só leitura.
+- **Q3b — legenda no documento, como imagem** (Claudio escolheu imagem a
+  tabela de texto: só a imagem mostra o símbolo; leitura, PDF e Word já
+  funcionam). Caixa "Legenda abaixo do quadro" (campo `legend` do JSON;
+  quadro novo nasce marcado, quadro gravado antes do Q3b fica sem até
+  marcar). Ao salvar, gera `cx-quadro-legenda-*.png` (1, 2 ou 3 colunas; um
+  item por tipo usado: cabos, inclusive sem fio e lógica, eletrocalha,
+  canaleta e ícones) num `span.cx-board-legend[contenteditable=false]` no
+  parágrafo logo abaixo do quadro. PNG em 2x com `width`/`height` de 1x
+  (achado 78). Duplo clique na legenda abre o quadro. Legenda sem quadro
+  antes dela sai do gravado pelo `PreProcess` (achado 77).
+- **Q3c ("Levar para a planilha") — cancelado por Claudio** (27/09/2026):
+  não é necessário. Não voltar como pendência.
+
+#### Editor na Proposta e no Laudo (bloco E6, `254c576`)
+
+> **Ajusta o P1** (que tirou a lista de editores): no fluxo direto há um
+> papel para quem monta o documento para o responsável.
+
+Campo **Editor** na Proposta e no Laudo (espaço que ficava vazio sem auditor
+e revisão periódica). É o **mesmo papel do revisor** (`users_id_reviewer`,
+bit Revisar e editar): edita o rascunho e vê o documento; **não publica** —
+o `canPublishDirect()` continua só com o responsável (Claudio: "para publicar
+necessita autorização do Responsável"). Vem num campo próprio
+(`users_id_editor`) porque, na criação, o "Revisor" dos outros tipos também
+está na página; `Document::dropUnusedRoles()` converte no fluxo direto e
+descarta nos outros. Linha de papéis mostra "Editor"; fora de rascunho o
+botão é "Salvar editor". A tabela `documenteditors` continua sem uso.
+
+#### Ícones criados pelo Super-Admin (blocos Q4a `bed0707`, Q4b `c4cdd5e`, Q4c `a76b16c`)
+
+- **Só o Super-Admin** (`Rights::isSuperAdmin()`) cria, edita e exclui
+  (Claudio, 27/09/2026); todos veem e usam. `src/IconLibrary.php`,
+  `ajax/icons.php` (GET lista + `can_create`; POST `add`, `update`,
+  `delete`, token novo em toda resposta, inclusive de erro).
+- **Imagem:** o navegador gera um **PNG de 256 px** do recorte quadrado
+  (Q4b-2: 96 px pixelava com zoom, ícone grande e PNG em 2x — achado 79). SVG
+  enviado também vira PNG (script não passa). O servidor confere assinatura,
+  tamanho (até 256 px) e peso (até 250 KB, com mensagem própria).
+- **Janela "+ Ícone"** (paleta): escolher imagem (PNG, JPG, WebP, SVG, até
+  2 MB), recorte arrastável com tamanho, nome (sugerido pelo arquivo),
+  categoria, busca, prévia em 3 tamanhos. **Tirar o fundo** (cor mais comum
+  dos 4 cantos, só o que está ligado à borda — o branco de dentro fica —,
+  tolerância, borda suave; imagem com canto transparente não é mexida).
+  **Silhueta na cor da categoria** (gravada já pintada; o quase branco fica
+  branco; trocar a categoria no Gerenciar repinta). Esc fecha só a janela.
+- **Paleta:** ícone criado entra na categoria escolhida, com ponto azul;
+  chave `u<id>`. "Gerenciar ícones criados (N)" no fim da paleta: editar
+  (nome, categoria, busca) e excluir.
+- **Cópia no quadro:** ao salvar, o JSON guarda os ícones criados que usa
+  (campo `lib`). Excluir da biblioteca não estraga quadro: a cópia desenha o
+  ícone mas **não o devolve à paleta** (`addCustom(…, onlyMissing)`).
+  Quadro aberto espera a biblioteca antes do `clean()` (ícone desconhecido
+  vira genérico).
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -1550,6 +1666,27 @@ depender do comportamento errático de `position: fixed` na impressão.
     aplicado e aprovado, mas sem commit, quando o Q2c foi aplicado; o commit
     `87c94a7` levou os dois. Commit do bloco aprovado **antes** de aplicar o
     pacote seguinte; se não deu, o roteiro do pacote novo avisa.
+76. **TinyMCE 7 marca cada botão da barra com `data-mce-name`** (inclusive
+    dentro da gaveta "…" do modo floating, que fica **fora** do contêiner do
+    editor). Para esconder botão por regra (T2): marca no `<html>` e CSS
+    `html[data-cx-hide~="x"] [data-mce-name="x"]`. A barra não se remonta
+    depois do `init`.
+77. **O `PreProcess` do TinyMCE recebe uma CÓPIA do corpo** (clone num
+    documento novo; `e.node` é o `body` desse documento). Dá para limpar o
+    que vai para o gravado (legenda órfã, Q3b) sem mexer no que está na tela.
+78. **Imagem nítida no documento:** o GLPI mantém `width`/`height` da `<img>`
+    ao trocar a tag (achado 56). Gerar o PNG em 2x e gravar `width`/`height`
+    de 1x (legenda do Q3b).
+79. **Ícone em imagem precisa de resolução de sobra.** Ícone vetorial não
+    pixela; o criado a partir de imagem, sim: zoom do quadro, ícone grande
+    (até 160 px) e PNG do documento em 2x. 256 px e
+    `imageSmoothingQuality = 'high'` na redução. Imagem de origem pequena não
+    tem conserto.
+80. **Validação local de Twig e PHP:** `php8.3-cli` + `php8.3-mbstring` pelo
+    apt e o Twig 3 (tarball do GitHub) renderizam parciais em modo estrito
+    (`strict_variables`), sem o GLPI. Pega variável faltando antes do teste
+    de Claudio. O `insertContent` do TinyMCE **não roda no jsdom** (caminho
+    de quadro novo só se confere no navegador).
 
 ## 6. Contrato de código — não quebrar
 
@@ -1639,9 +1776,11 @@ codexplus/
 │   ├── DocumentContributor.php quem alterou cada revisão (histórico)
 │   ├── DocumentVersion.php    versões publicadas (R6-a)
 │   ├── Diagram.php            diagrama DIA: organograma, cronograma, RACI (D1)
+│   ├── IconLibrary.php        ícones do quadro criados pelo Super-Admin (Q4)
 │   └── Console/               comandos de teste (plugins:codexplus:…)
 ├── ajax/
 │   ├── diagram.save.php       grava só o diagrama, sem recarregar
+│   ├── icons.php              ícones criados: lista, criar, editar, excluir (Q4)
 │   └── document.targets.php   leitores pela coluna Permissões
 ├── front/                     controllers (rodam em escopo de função!)
 │   ├── dashboard.php          Painel (quem produz)
@@ -1655,10 +1794,10 @@ codexplus/
 │   ├── js/codexplus.js        PDF (paginação manual)
 │   ├── js/codexplus-org.js    motor do organograma (grafo)
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1)
-│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5)
+│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1)
-│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2)
-│   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1)
+│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4)
+│   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1) e os criados na instalação (Q4)
 │   ├── js/codexplus-export.js exportar Word (E3)
 │   ├── js/codexplus-annotate.js anotador de imagens (E4)
 │   └── lib/                   mammoth, marked, docx (licença e versão em cada pasta)

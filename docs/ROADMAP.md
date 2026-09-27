@@ -1,6 +1,9 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão: **Q3 e
+> Estado em `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da
+> noite: **Fluxograma Q5a a Q5f** (commits `6ef31e5` a `e694ddd`; CONTEXTO,
+> seção 3.7). Próximo: **Q5g — raias verticais** (mockup antes). Antes, na
+> tarde: **Q3 e
 > Q4 fechados**, mais T2, Q2f, T3 e E6 (commits `5396fe9` a `a76b16c`;
 > CONTEXTO, seção 3.6). Q3c cancelado. Próximo: **Q5 — Fluxograma** (mockup
 > antes). Antes, no mesmo dia: **Q2 fechado** (Q2a a
@@ -70,9 +73,9 @@ Vale sobre a lista acima quando houver conflito.
 5. ~~Anexos, imagens, leitura e PDF (R3b3)~~ ✅ 22/09
 6. ~~Editor de documentos~~ ✅ E1 a E4 (24/09) e **E5** (cor e realce, 26/09)
 7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
-   Planta, Topologia, Fluxograma e Organograma) — **Q1 a Q4 ✅**; faltam
-   Q5 (Fluxograma) e Q6 (Organograma no motor) — tabela "Motor de
-   quadro" abaixo
+   Planta, Topologia, Fluxograma e Organograma) — **Q1 a Q4 ✅**, **Q5a a
+   Q5f ✅**; faltam Q5g a Q5i e Q6 (Organograma no motor) — tabelas
+   "Motor de quadro" e "Q5 — Fluxograma" abaixo
 8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
    a **Planta** do motor de quadro (Q1), também na Documentação Técnica
 9. ~~Migração dos 5 documentos (R4)~~ ✅ 26/09 (os 5 migrados)
@@ -401,11 +404,29 @@ seção 3.5.
 | Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | ✅ 27/09 (Q2a a Q2e) |
 | Q3 | Legenda automática no documento (imagem); **lista de materiais** no painel. "Levar para a planilha" cancelado | ✅ 27/09 (Q3a, Q3b) |
 | Q4 | **"+ Ícone" a partir de imagem**, só o Super-Admin: recorte, tirar fundo, silhueta, 256 px; gerenciar (editar, excluir) | ✅ 27/09 (Q4a a Q4c) |
-| Q5 | **Fluxograma** (**próximo**) sobre o motor (subtipo de DIA): formas básicas, de fluxograma e BPMN simples, raias, moldura, nota, tabela, ícones, imagem; alças, "+" rápido, trocar forma, alinhar e distribuir, minimapa, busca, link para documento do Codex+ | |
+| Q5 | **Fluxograma** sobre o motor (subtipo de DIA) — Q5a a Q5f ✅; faltam Q5g a Q5i (tabela abaixo) | em andamento |
 | Q6 | **Organograma migrado para o motor**, conferindo item por item com o atual (chefia, Arrumar, matriz, busca, modelos, PDF); só então o motor antigo sai | |
 
 Fora (Claudio, 26/09): caneta livre, marca-texto, reconhecimento de forma,
 colaboração em tempo real, comentários, votação, apresentação, IA.
+Fora do fluxograma (Claudio, 27/09): **ícones de rede** — cada paleta com os
+seus elementos (CONTEXTO, seção 3.7).
+
+### Q5 — Fluxograma (27/09/2026, com mockup de Claudio antes de cada escolha)
+
+| Bloco | Entrega | Situação |
+|---|---|---|
+| Q5a | Subtipo `fluxograma` de DIA; motor aberto pelo documento (`codexplus-flow.js`); leitura em SVG; PNG e PDF | ✅ `6ef31e5` |
+| Q5b | Formas com texto dentro; ligação de fluxo com Sim/Não; **elementos separados por paleta** | ✅ `ca747d2` |
+| Q5c | 8 alças (altura mínima pelo texto), barra flutuante (12 tons, negrito, letra), camadas | ✅ `086544f` |
+| Q5d | Ligação: cor, espessura, traço, pontas, cantos arredondados, balão colorido e deslizante | ✅ `a12638a` |
+| Q5e-1 | 9 formas de fluxograma clássico; paleta em seções recolhíveis | ✅ `6541123` |
+| Q5e-2 | BPMN: eventos (com tipos), tarefa (com tipos), subprocesso, gateways X/+/O, objeto de dados, anotação, grupo | ✅ `4ceb8d4` |
+| Q5f | "+" rápido, mini-paleta ao soltar no vazio, alinhar e distribuir | ✅ `e694ddd` |
+| Q5g | **Raias verticais** (decisão do mockup do Q5); arrastar a raia leva as formas | **próximo** (mockup antes) |
+| Q5h | Trocar forma sem perder ligações; minimapa; busca; link da forma para documento do Codex+ | |
+| Q5i | Importar e exportar `.bpmn` (BPMN 2.0 XML — Bizagi, Camunda, Signavio) | |
+
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
 
@@ -418,6 +439,9 @@ colaboração em tempo real, comentários, votação, apresentação, IA.
   ~15 px acima do desenho)
 - Quadro: desvio automático de obstáculos no cotovelo (hoje se resolve com
   dobra); só se fizer falta no uso real
+- Fluxograma: texto solto com largura e quebra de linha (hoje as alças do
+  texto mudam a letra)
+- Fluxograma: mini-paleta com "mais formas" (hoje as 9 mais usadas)
 
 - Tabelas `sectormembers` e `documenteditors` sem uso: apagar
 - Textos de ajuda dos comandos de console (ainda citam gestor do setor)
@@ -435,6 +459,8 @@ colaboração em tempo real, comentários, votação, apresentação, IA.
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
 - [x] **Self-Service vê o Codex+?** Sim, só leitura, condicionado à coluna
       Leitura do documento — Claudio, 26/09/2026 (S1)
+- [ ] **Tabela e imagem dentro do fluxograma** (estavam no escopo original
+      do Q5): fazer num bloco próprio ou cortar? Decidir antes do Q5h
 
 **Decididas:**
 
@@ -450,6 +476,13 @@ colaboração em tempo real, comentários, votação, apresentação, IA.
       Claudio, 26/09/2026
 - [x] **Ícone que falta**: genérico na hora, "+ Ícone" a partir de imagem,
       e o conjunto oficial pela especificação — Claudio, 26/09/2026
+- [x] **Elementos por paleta**: mesmo motor e interações; Planta/Topologia
+      com ícones, diagramas com elementos próprios — Claudio, 27/09/2026
+- [x] **Fluxograma**: DIA próprio, cor por tipo, cotovelo com seta, Sim/Não,
+      raias verticais, "+" e puxar para o vazio (mockup do Q5); barra
+      flutuante, 12 tons, 8 alças (Q5c); estilo da ligação na barra, seta
+      cheia (Q5d); 21 elementos extras, BPMN pelo Bizagi (Q5e) — Claudio,
+      27/09/2026
 
 - [x] **Auditor pelo perfil**, não pelo setor (bit Auditor na aba Codex+ de
       Perfis) — Claudio, 25/09/2026 (A1)

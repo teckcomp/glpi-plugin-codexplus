@@ -23,6 +23,8 @@ manuais e propostas, com exportação em PDF com a marca da empresa.
 - **Edição dentro do Codex+**, com o editor nativo do GLPI
 - **Configuração de marca:** logo, cabeçalho estruturado (título e logo) e
   rodapé com marcadores, com rodapé próprio por documento
+- **Diagramas (DIA):** organograma, cronograma, matriz RACI e **fluxograma**
+  (formas de fluxograma e BPMN, estilo, ligações, "+" rápido, PDF e PNG)
 
 ## Tipos de documento
 

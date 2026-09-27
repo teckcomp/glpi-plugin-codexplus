@@ -2,7 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão (T2
+> Estado: `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da noite:
+> **Fluxograma, Q5a a Q5f** — subtipo de DIA sobre o motor de quadro, formas
+> de fluxograma e BPMN, estilo, ligações completas, "+" rápido e alinhar
+> (seção 3.7; commits `6ef31e5` a `e694ddd`; achados 81 a 86). Antes, no
+> mesmo dia, sessão da tarde (T2
 > ferramentas por tipo, Q2f baixar PNG, T3 duplicar como, Q3a materiais, Q3b
 > legenda, E6 editor na Proposta e no Laudo, Q4a a Q4c ícones criados pelo
 > Super-Admin — seção 3.6; commits `5396fe9` a `a76b16c`; Q3c cancelado).
@@ -110,6 +114,9 @@ desta tabela sem alinhar antes.**
 > interação (conectar pelas bordas, puxar a seta para o vazio e criar a forma
 > ligada, trocar a forma sem perder ligações, rótulo na seta). Não é
 > referência de escopo: o preço acima continua valendo.
+> **Referência de BPMN (Claudio, 27/09/2026): Bizagi Modeler** — só a
+> notação, com desenho próprio (seção 3.7). Importar e exportar `.bpmn`
+> (BPMN 2.0 XML, que o Bizagi exporta) está no roadmap (Q5i).
 
 ---
 
@@ -1097,6 +1104,99 @@ botão é "Salvar editor". A tabela `documenteditors` continua sem uso.
   Quadro aberto espera a biblioteca antes do `clean()` (ícone desconhecido
   vira genérico).
 
+### 3.7 Sessão de 27/09/2026 (noite) — Fluxograma (Q5a a Q5f)
+
+> Decisões de Claudio, 27/09/2026, sempre com mockup antes. Commits
+> `6ef31e5` (Q5a) a `e694ddd` (Q5f), um por bloco (achado 75 respeitado).
+> Sem schema novo: continua `0.6.10-alpha`.
+
+#### Princípio: um motor, elementos por paleta
+
+**Decisão de Claudio (27/09/2026):** o motor de quadro e as interações são os
+mesmos (selecionar, arrastar, alças, ligar, dobras, desfazer, agrupar,
+travar, zoom, PNG), mas **cada paleta tem os seus elementos**. Planta e
+Topologia: ícones, cabos, eletrocalha. Fluxograma (e, no Q6, o Organograma):
+formas próprias e ligação de fluxo, **sem ícones de rede**. O `clean()` do
+motor aplica isso ao abrir qualquer quadro (achado 84).
+
+#### Fluxograma no DIA (bloco Q5a, `6ef31e5`)
+
+- **Subtipo `fluxograma` de `DIA`** (documento próprio, com código,
+  validade e ciclo), gravado em `glpi_plugin_codexplus_diagrams.data` como
+  `{ "kind": "fluxograma", "board": {…JSON do quadro…} }`.
+- `src/Diagram.php`: `SUBTYPE_FLOW`, `starter()`, `subtypeOf()` e
+  **`validateBoard()`** — confere a FORMA (tipos de item `icon zone text link
+  duct shape lane`, chaves seguras, profundidade 4, texto até 2000, até 3000
+  itens, 1 MB; `lib` só PNG em `data:` com chave `uN`). O SIGNIFICADO de
+  cada item é conferido pelo `clean()` do motor. Validação idempotente
+  (Salvar do formulário com diagrama igual não conta como alteração).
+- `public/js/codexplus-flow.js` (novo): monta `[data-cx-flow]` — leitura em
+  **SVG vetorial** (o mesmo do PNG), "Abrir o fluxograma" (motor em tela
+  cheia via `open(null, null, 'fluxograma', host)`), gravação por
+  `ajax/diagram.save.php`, hidden `_diagram` sincronizado, **Baixar PNG** e
+  **Exportar PDF** (iframe fora da tela, A4 com orientação pelo formato do
+  desenho, título e código no topo; o "Exportar PDF" do topo da leitura o
+  aciona). Q5a-2 tirou "Materiais" do painel; Q5a-3 antecipou o PDF.
+- Motor: `open()` aceita `host {data, title, save(D)}`; `boardSvg()` saiu de
+  dentro do `toPng()`; aviso pelo `glpi_toast_*` quando não há editor.
+
+#### Formas e ligação de fluxo (bloco Q5b, `ca747d2`)
+
+- Item `shape {x, y, w, h, shape, text, fill, line, ink, b, fs, mk}`; texto
+  **dentro da forma** (quebra por palavra; duplo clique ou começar a digitar;
+  Enter termina, Shift+Enter quebra a linha, Esc cancela).
+- Ligação `kind: 'fluxo'` (sem número de cabo e sem metros), cotovelo com
+  seta; a **1ª saída da Decisão (e do Gateway X) nasce "Sim", a 2ª "Não"**.
+
+#### Tamanho, estilo e camadas (blocos Q5c e Q5c-2, `086544f`)
+
+- **Oito alças** (Shift mantém a proporção, Alt solta da grade); **a altura
+  nunca fica menor que o texto**; formas redondas continuam redondas. Texto
+  solto: 4 alças de canto que mudam a letra.
+- **Barra flutuante sobre a seleção** (Claudio): Fundo, Borda e Texto em **12
+  tons fixos** (`FLOW_COLORS`, cada tom com fundo, borda e texto), negrito,
+  tamanho da letra, Frente/Trás (a moldura fica sempre no fundo). Letra
+  também no painel. Q5c-2 corrigiu a posição da barra (achado 81).
+
+#### Ligação completa (bloco Q5d, `a12638a`)
+
+- Na barra da ligação: cor (12 tons), **espessura Fina/Média/Grossa** (também
+  no painel — o antigo "P/M/G" era o texto do rótulo, achado 85), traço
+  contínuo/tracejado/pontilhado, ponta no início e no fim (seta cheia,
+  aberta, losango, círculo, nada), traçado, **cor do balão**.
+- **Balão desliza ao longo da linha** (arrastar; `lt` 0,05 a 0,95); duplo
+  clique no balão vai ao campo Rótulo.
+- Referência visual de Claudio: **cantos arredondados** no cotovelo, ponta
+  proporcional à espessura, linha que para antes da ponta, trecho reto
+  final que cabe a ponta.
+
+#### Elementos (blocos Q5e-1 `6541123` e Q5e-2 `4ceb8d4`)
+
+- Paleta em **seções recolhíveis**: *Fluxograma* (15: início/fim, processo,
+  decisão, documento, dados, conector, subprocesso, banco de dados, entrada
+  e operação manual, preparação, atraso, vários documentos, conector de
+  página, nota adesiva) e *BPMN* (eventos de início, intermediário e fim
+  com tipo simples/mensagem/temporizador, tarefa com tipo
+  usuário/serviço/manual, subprocesso [+], gateways X/+/O, objeto de dados,
+  anotação, grupo).
+- **Bizagi Modeler como referência de BPMN** (Claudio): só a notação (padrão
+  aberto da OMG), com desenho próprio — nada de arte de terceiros no
+  repositório público.
+- BPMN como no Bizagi: eventos e objeto de dados com o **nome embaixo**;
+  gateways com o nome **acima e à esquerda** (longe das 4 pontas); alças,
+  guias e alinhamento pela forma, não pelo nome (`coreBox`). Grupo sem
+  fundo, nasce atrás; anotação e grupo sem "Fundo" na barra.
+
+#### "+" rápido, mini-paleta, alinhar (bloco Q5f, `e694ddd`)
+
+- A bolinha azul da forma tem "+": **clique** cria a próxima forma ligada
+  naquela direção (90 de espaço, centrada, anda um passo se o lugar estiver
+  ocupado; processo repete, início/decisão/dados levam a processo, BPMN leva
+  a tarefa); **arrastar até outra forma** liga; **arrastar para o vazio**
+  abre a mini-paleta (9 formas) e a escolhida nasce ligada no ponto solto.
+- **Alinhar** (6) com 2 ou mais selecionados e **Distribuir** (2) com 3 ou
+  mais, na barra flutuante.
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -1687,6 +1787,33 @@ depender do comportamento errático de `position: fixed` na impressão.
     (`strict_variables`), sem o GLPI. Pega variável faltando antes do teste
     de Claudio. O `insertContent` do TinyMCE **não roda no jsdom** (caminho
     de quadro novo só se confere no navegador).
+81. **`<svg>` não tem `offsetLeft`/`offsetTop`** (só elemento HTML tem): a
+    conta dava `NaN`, o navegador ignorava a posição e a barra flutuante caía
+    cortada no canto do palco (Q5c-1). Posição de coisa HTML sobre o SVG =
+    `svg.getBoundingClientRect()` menos o do palco. O jsdom também não tem
+    essas propriedades, e o teste só pegou depois de simular retângulos
+    reais de tela — teste de posição precisa de `getBoundingClientRect`
+    falso com números de verdade.
+82. **jsdom e o tempo:** o duplo clique do motor é detectado por intervalo
+    (400 ms); testes seguidos rápido demais viram duplo clique sem querer —
+    esperar entre eles. O `setTimeout(fit)` da abertura nem sempre roda
+    antes do teste: chamar `act('fit')` logo depois de abrir.
+83. **Desenho se confere rasterizando.** `_boardSvg()` + `cairosvg` (SVG
+    serializado com `XMLSerializer`, não `outerHTML`) mostrou o que nenhum
+    teste de DOM pegou: metros aparecendo na ligação de fluxo, ponta grossa
+    encavalando no cotovelo, nome do gateway sobre a saída "Não", espaço de
+    60 apertado para o balão. Bloco visual só sai depois de ver a imagem.
+84. **Elementos por paleta se garantem no `clean()`**, ao abrir: fluxograma
+    descarta ícone e eletrocalha e força ligação `fluxo`; Planta e Topologia
+    descartam forma. Dado antigo abre sem o que não pertence à paleta.
+85. **Nome de campo pelo que ele muda.** "Pequeno/Médio/Grande" sem dizer do
+    quê levou Claudio a achar que era a espessura da linha (era o texto do
+    rótulo). Rótulos explícitos: "Espessura da linha", "Tamanho do texto do
+    rótulo", "Tamanho da letra".
+86. **Forma sem fundo precisa de área de clique.** Anotação: retângulo com
+    `fill-opacity="0"` (conta como pintado, recebe o clique); Grupo: sem
+    fundo de propósito (o que está dentro continua clicável) e borda
+    transparente larga só na tela.
 
 ## 6. Contrato de código — não quebrar
 
@@ -1775,7 +1902,7 @@ codexplus/
 │   ├── TargetRelation.php     comum aos três alvos de leitura (R3a)
 │   ├── DocumentContributor.php quem alterou cada revisão (histórico)
 │   ├── DocumentVersion.php    versões publicadas (R6-a)
-│   ├── Diagram.php            diagrama DIA: organograma, cronograma, RACI (D1)
+│   ├── Diagram.php            diagrama DIA: organograma, cronograma, RACI (D1), fluxograma (Q5a)
 │   ├── IconLibrary.php        ícones do quadro criados pelo Super-Admin (Q4)
 │   └── Console/               comandos de teste (plugins:codexplus:…)
 ├── ajax/
@@ -1796,7 +1923,8 @@ codexplus/
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1)
 │   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1)
-│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4)
+│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f)
+│   ├── js/codexplus-flow.js   fluxograma no documento DIA: leitura em SVG, abrir o motor, gravar, PNG e PDF (Q5a)
 │   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1) e os criados na instalação (Q4)
 │   ├── js/codexplus-export.js exportar Word (E3)
 │   ├── js/codexplus-annotate.js anotador de imagens (E4)

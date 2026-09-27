@@ -58,6 +58,11 @@
    objeto de dados, anotação e grupo. Notação padrão (a mesma do Bizagi),
    desenho próprio. Eventos, gateways e objeto de dados levam o nome
    EMBAIXO da forma, como no BPMN; os demais, dentro.
+   Q5f (27/09/2026): criar a próxima forma já ligada — a bolinha azul da
+   forma ganha um "+": CLIQUE cria a próxima forma naquela direção (com
+   espaço e alinhada); ARRASTAR até outra forma liga; ARRASTAR para o
+   vazio abre a mini-paleta e a forma escolhida nasce ligada ali. Alinhar
+   e distribuir na barra flutuante com 2 ou mais elementos selecionados.
    ========================================================================= */
 (function () {
     'use strict';
@@ -136,6 +141,16 @@
     // Atalhos da paleta: mesma forma com o tipo já escolhido.
     var PRESETS = { 'evmid:msg': 'Mensagem', 'evmid:timer': 'Temporizador' };
     function below(it) { return LABEL_BELOW.indexOf(it.shape) >= 0; }
+    // Q5f: formas da mini-paleta (soltar a ligação no vazio).
+    var MINI = ['proc', 'dec', 'term', 'doc', 'data', 'sub', 'task', 'gwx', 'evend'];
+    var BPMN_SET = ['evstart', 'evmid', 'evend', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'];
+    // "+" rápido: a próxima forma repete a origem, menos quando a origem é
+    // ponto de partida/chegada, decisão ou marcador — aí vem o passo comum.
+    function nextShapeOf(k) {
+        if (BPMN_SET.indexOf(k) >= 0) { return ['task', 'bsub'].indexOf(k) >= 0 ? k : 'task'; }
+        return ['term', 'dec', 'conn', 'offpage', 'note', 'data', 'db'].indexOf(k) >= 0 ? 'proc' : k;
+    }
+    var OPP = { n: 's', s: 'n', l: 'o', o: 'l' };
     function labelW(it) { return Math.max(it.w * 2.4, 110); }
     // Paleta em seções (Q5e). Forma nova = uma linha em SHAPES e o nome aqui.
     var SHAPE_GROUPS = [
@@ -1886,12 +1901,16 @@
         }
         // Alças de ligação nas quatro bordas (um pouco para fora, longe da alça de tamanho).
         function handles(it) {
-            var o = (it.t === 'shape' ? 22 : 10) / view.z, r = 5 / view.z;
+            var plus = flow && it.t === 'shape';
+            var o = (it.t === 'shape' ? 24 : 10) / view.z, r = (plus ? 7 : 5) / view.z;
             return SIDES.map(function (sd) {
                 var a = anchor(it, sd);
                 var x = a.x + (sd === 'l' ? o : sd === 'o' ? -o : 0), y = a.y + (sd === 's' ? o : sd === 'n' ? -o : 0);
+                var tip = plus ? 'Clique: nova forma ligada nesta direção · Arraste até outra forma para ligar, ou para o vazio para escolher a forma' : 'Puxe até ' + (flow ? 'outra forma' : 'outro ícone') + ' para ligar';
                 return '<circle class="cx-board-lh" data-lh="' + sd + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r
-                    + '" fill="#378ADD" stroke="#fff" stroke-width="' + (1.5 / view.z) + '"><title>Puxe até ' + (flow ? 'outra forma' : 'outro ícone') + ' para ligar</title></circle>';
+                    + '" fill="#378ADD" stroke="#fff" stroke-width="' + (1.5 / view.z) + '"><title>' + tip + '</title></circle>'
+                    + (plus ? '<path d="M' + (x - r * 0.5).toFixed(1) + ' ' + y.toFixed(1) + 'H' + (x + r * 0.5).toFixed(1) + 'M' + x.toFixed(1) + ' ' + (y - r * 0.5).toFixed(1) + 'V' + (y + r * 0.5).toFixed(1)
+                        + '" stroke="#fff" stroke-width="' + (1.6 / view.z) + '" pointer-events="none"/>' : '');
             }).join('');
         }
         // Alças da ligação selecionada: pontas (religar) e dobras (mover).
@@ -2274,6 +2293,40 @@
             fbar.classList.toggle('is-below', below);
             fbar.hidden = false;
         }
+        /* Q5f: alinhar e distribuir (pela caixa da forma, sem o nome de baixo). */
+        var AL_ICON = {
+            left: 'M3 2V16M5 5H14M5 12H10', ch: 'M9 2V16M4 5H14M6 12H12', right: 'M15 2V16M4 5H13M8 12H13',
+            top: 'M2 3H16M5 5V14M12 5V10', cv: 'M2 9H16M5 4V14M12 6V12', bottom: 'M2 15H16M5 4V13M12 8V13',
+            dh: 'M2 3V15M16 3V15M7 6V12M11 6V12', dv: 'M3 2H15M3 16H15M6 7H12M6 11H12'
+        };
+        var AL_TIP = { left: 'Alinhar à esquerda', ch: 'Centralizar na horizontal', right: 'Alinhar à direita', top: 'Alinhar em cima', cv: 'Centralizar na vertical', bottom: 'Alinhar embaixo', dh: 'Distribuir na horizontal', dv: 'Distribuir na vertical' };
+        function alignBtns(n) {
+            return ['left', 'ch', 'right', 'top', 'cv', 'bottom'].concat(n >= 3 ? ['dh', 'dv'] : []).map(function (k) {
+                return '<button type="button" class="cx-fbar-b cx-fbar-al" data-align="' + k + '" title="' + AL_TIP[k] + '" aria-label="' + AL_TIP[k] + '"><svg viewBox="0 0 18 18" width="15" height="15"><path d="' + AL_ICON[k] + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>';
+            }).join('');
+        }
+        function alignSel(k) {
+            var its = styled().filter(function (i) { return !i.lock; });
+            if (its.length < 2) { return; }
+            snap();
+            var bs = its.map(function (i) { return { it: i, b: coreBox(i) }; });
+            var x1 = Math.min.apply(null, bs.map(function (o) { return o.b.x; })), x2 = Math.max.apply(null, bs.map(function (o) { return o.b.x + o.b.w; }));
+            var y1 = Math.min.apply(null, bs.map(function (o) { return o.b.y; })), y2 = Math.max.apply(null, bs.map(function (o) { return o.b.y + o.b.h; }));
+            var mv = function (o, nx, ny) { o.it.x += Math.round(nx - o.b.x); o.it.y += Math.round(ny - o.b.y); };
+            if (k === 'dh' || k === 'dv') {
+                var h = k === 'dh', sorted = bs.slice().sort(function (a, b) { return h ? a.b.x - b.b.x : a.b.y - b.b.y; });
+                var tot = sorted.reduce(function (s0, o) { return s0 + (h ? o.b.w : o.b.h); }, 0);
+                var gap = ((h ? x2 - x1 : y2 - y1) - tot) / (sorted.length - 1), at = h ? x1 : y1;
+                sorted.forEach(function (o) { if (h) { mv(o, at, o.b.y); at += o.b.w + gap; } else { mv(o, o.b.x, at); at += o.b.h + gap; } });
+            } else {
+                bs.forEach(function (o) {
+                    var b = o.b;
+                    if (k === 'left') { mv(o, x1, b.y); } else if (k === 'right') { mv(o, x2 - b.w, b.y); } else if (k === 'ch') { mv(o, (x1 + x2) / 2 - b.w / 2, b.y); }
+                    else if (k === 'top') { mv(o, b.x, y1); } else if (k === 'bottom') { mv(o, b.x, y2 - b.h); } else { mv(o, b.x, (y1 + y2) / 2 - b.h / 2); }
+                });
+            }
+            render();
+        }
         function drawFbar() {
             if (!fbar) { return; }
             var ls = flowLinks();
@@ -2299,6 +2352,7 @@
                         + '<select class="cx-fbar-fs" title="Tamanho da letra">' + FS_LIST.concat(FS_LIST.indexOf(fsNow) < 0 && fsNow ? [fsNow] : []).sort(function (a, b) { return a - b; })
                             .map(function (v) { return '<option value="' + v + '"' + (v === fsNow ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select>' : '')
                     + '<span class="cx-fbar-sep"></span>'
+                    + (its.length >= 2 ? alignBtns(its.length) + '<span class="cx-fbar-sep"></span>' : '')
                     + '<button type="button" class="cx-fbar-b" data-flayer="front" title="Trazer para frente">⬆ Frente</button>'
                     + '<button type="button" class="cx-fbar-b" data-flayer="back" title="Enviar para trás">⬇ Trás</button></div>';
                 if (pop) {
@@ -2342,6 +2396,7 @@
                     return;
                 }
                 if (t.hasAttribute('data-flayer')) { act(t.getAttribute('data-flayer')); }
+                if (t.hasAttribute('data-align')) { alignSel(t.getAttribute('data-align')); return; }
                 if (t.hasAttribute('data-lpal')) {
                     var lw0 = t.getAttribute('data-what'), lk = t.getAttribute('data-lpal');
                     snap(); flowLinks().forEach(function (l) { l[lw0] = lk; }); render();
@@ -2436,6 +2491,7 @@
         /* ---------- quadro: ponteiro ---------- */
         var space = false, drag = null, scaleA = null, lastDown = { t: 0, x: 0, y: 0 };
         svg.addEventListener('pointerdown', function (e) {
+            miniClose();
             var p = toBoard(e);
             // Duplo clique detectado aqui: com a captura do ponteiro, o dblclick
             // do navegador chega no quadro e não na dobra (achado do Q2c).
@@ -2506,7 +2562,7 @@
                 drag = { k: 'rs', id: ri.id, dir: e.target.getAttribute('data-rs'), p: p, s: { x: rb.x, y: rb.y, w: rb.w, h: rb.h, px: ri.px || TEXT_PX[ri.size] || 15 } };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
                 var from = get(sel[0]), sd = e.target.getAttribute('data-lh');
-                drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd) };
+                drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd), cx0: e.clientX, cy0: e.clientY };
             } else if (e.target.getAttribute('data-rzi')) {
                 snap();
                 drag = { k: 'rzi', id: e.target.getAttribute('data-rzi') };
@@ -2691,23 +2747,15 @@
             }
             if (drag && drag.k === 'link') {
                 // Soltar no vazio não cria nada (forma ligada é do Fluxograma, Q5).
-                var tgt = iconAt(toBoard(e));
-                if (tgt && tgt.id !== drag.from) {
+                var pUp = toBoard(e), tgt = iconAt(pUp);
+                var still = Math.abs(e.clientX - drag.cx0) + Math.abs(e.clientY - drag.cy0) < 5;   // clique, não arraste
+                if (tgt && tgt.id !== drag.from && !still) {
                     snap();
-                    var L = { id: uid(), t: 'link', a: { id: drag.from, side: drag.side }, b: { id: tgt.id, side: nearestSide(tgt, toBoard(e)) },
-                        kind: LINK_DEFAULT, route: 'elbow', wp: [], ends: 'none', label: '', cable: nextCable(D.items),
-                        pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm',
-                        len: { mode: 'auto', m: 0, extra: 10 }, showM: true, lock: false, g: '' };
-                    if (flow) {
-                        // Q5b: ligação de fluxo — cotovelo com seta; a 1ª saída
-                        // da decisão nasce "Sim", a 2ª "Não" (dá para editar).
-                        var orig = get(drag.from), saidas = D.items.filter(function (l) { return l.t === 'link' && l.a.id === drag.from; }).length;
-                        L.kind = 'fluxo'; L.ends = 'arrow'; L.cable = ''; L.showId = false; L.showM = false;
-                        L.lc = 'cinza'; L.lw = 'f'; L.dash = 'solid'; L.ea = 'none'; L.eb = 'arrow'; L.lt = 0.5; L.lbg = 'branco';
-                        L.label = orig && (orig.shape === 'dec' || orig.shape === 'gwx') ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
-                    }
-                    D.items.push(L);
-                    sel = [L.id];
+                    sel = [makeLink(drag.from, drag.side, tgt.id, nearestSide(tgt, pUp)).id];
+                } else if (flow && get(drag.from) && get(drag.from).t === 'shape') {
+                    // Q5f: clique na bolinha = "+" rápido; soltar no vazio = mini-paleta.
+                    if (still) { quickAdd(get(drag.from), drag.side); }
+                    else if (!tgt) { miniOpen(drag.from, drag.side, pUp); }
                 }
             }
             if (drag && drag.k === 'zone') { tool = 'select'; }
@@ -2718,6 +2766,94 @@
             gGuides.innerHTML = '';
             render();
         });
+        /* ---------- Q5f: ligação nova, "+" rápido e mini-paleta ---------- */
+        function makeLink(fromId, side, toId, toSide) {
+            var L = { id: uid(), t: 'link', a: { id: fromId, side: side }, b: { id: toId, side: toSide },
+                kind: LINK_DEFAULT, route: 'elbow', wp: [], ends: 'none', label: '', cable: nextCable(D.items),
+                pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm',
+                len: { mode: 'auto', m: 0, extra: 10 }, showM: true, lock: false, g: '' };
+            if (flow) {
+                // Q5b: ligação de fluxo — cotovelo com seta; a 1ª saída
+                // da decisão nasce "Sim", a 2ª "Não" (dá para editar).
+                var orig = get(fromId), saidas = D.items.filter(function (l) { return l.t === 'link' && l.a.id === fromId; }).length;
+                L.kind = 'fluxo'; L.ends = 'arrow'; L.cable = ''; L.showId = false; L.showM = false;
+                L.lc = 'cinza'; L.lw = 'f'; L.dash = 'solid'; L.ea = 'none'; L.eb = 'arrow'; L.lt = 0.5; L.lbg = 'branco';
+                L.label = orig && (orig.shape === 'dec' || orig.shape === 'gwx') ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
+            }
+            D.items.push(L);
+            return L;
+        }
+        // Forma nova com o lado `toSide` encostado no ponto p (grade de 10).
+        function shapeAt(k, mk, p, toSide) {
+            var ck = SHAPES[k].color;
+            var it = { id: uid(), t: 'shape', shape: k, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' };
+            if (MK_OPTS[k]) { it.mk = MK_OPTS[k][mk] ? mk : 'none'; }
+            shapeFit(it);
+            it.x = p.x - it.w / 2; it.y = p.y - it.h / 2;
+            if (toSide === 'o') { it.x = p.x; } else if (toSide === 'l') { it.x = p.x - it.w; }
+            else if (toSide === 'n') { it.y = p.y; } else if (toSide === 's') { it.y = p.y - it.h; }
+            it.x = Math.round(it.x / GRID) * GRID; it.y = Math.round(it.y / GRID) * GRID;
+            return it;
+        }
+        function overlaps(it) {
+            return D.items.some(function (o) {
+                if (o.id === it.id || o.t === 'link' || o.t === 'zone' || (o.t === 'shape' && o.shape === 'group')) { return false; }
+                var b = coreBox(o);
+                return it.x < b.x + b.w + 10 && it.x + it.w + 10 > b.x && it.y < b.y + b.h + 10 && it.y + it.h + 10 > b.y;
+            });
+        }
+        // "+" rápido: próxima forma na direção da bolinha, centrada na origem,
+        // 90 de espaço (cabe o balão Sim/Não com folga); se o lugar estiver
+        // ocupado, anda mais um passo.
+        var GAP = 90;
+        function quickAdd(from, side) {
+            snap();
+            var k = nextShapeOf(from.shape), a = anchor(from, side), cb = coreBox(from);
+            var dir = { n: [0, -1], s: [0, 1], l: [1, 0], o: [-1, 0] }[side];
+            var it = shapeAt(k, '', { x: 0, y: 0 }, OPP[side]);
+            var place = function (step) {
+                var d = GAP + step * (GAP + (dir[0] ? it.w : it.h));
+                if (dir[0]) { it.x = dir[0] > 0 ? cb.x + cb.w + d : cb.x - d - it.w; it.y = cb.y + cb.h / 2 - it.h / 2; }
+                else { it.y = dir[1] > 0 ? cb.y + cb.h + d : cb.y - d - it.h; it.x = cb.x + cb.w / 2 - it.w / 2; }
+                it.x = Math.round(it.x); it.y = Math.round(it.y);
+            };
+            var n = 0; place(0);
+            while (overlaps(it) && n < 8) { n++; place(n); }
+            D.items.push(it);
+            makeLink(from.id, side, it.id, OPP[side]);
+            sel = [it.id];
+            render();
+            return it;
+        }
+        var mini = null;
+        function miniClose() { if (mini) { mini.el.remove(); mini = null; } }
+        function miniOpen(fromId, side, p) {
+            miniClose();
+            var el = document.createElement('div'), off = svgOff();
+            el.className = 'cx-mini';
+            el.innerHTML = MINI.map(function (k) {
+                var ck = SHAPES[k].color, demo = shapeFit({ id: 'm', t: 'shape', shape: k, x: 2, y: 2, sz: SQUARE.indexOf(k) >= 0 ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: 'none' });
+                return '<button type="button" data-mshape="' + k + '" title="' + esc(SHAPES[k].label) + '"><svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="40" height="26">' + shapeSvg(demo, true) + '</svg></button>';
+            }).join('');
+            el.style.left = (off.x + view.x + p.x * view.z) + 'px';
+            el.style.top = (off.y + view.y + p.y * view.z) + 'px';
+            root.querySelector('.cx-board-stage').appendChild(el);
+            el.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+            el.addEventListener('click', function (ev) {
+                var b = ev.target.closest('[data-mshape]'); if (!b) { return; }
+                var from = get(fromId); miniClose(); if (!from) { return; }
+                snap();
+                // A forma nasce com o lado de frente para a origem no ponto solto.
+                var ts = Math.abs(p.x - anchor(from, side).x) > Math.abs(p.y - anchor(from, side).y) ? (p.x > anchor(from, side).x ? 'o' : 'l') : (p.y > anchor(from, side).y ? 'n' : 's');
+                var it = shapeAt(b.getAttribute('data-mshape'), '', p, ts);
+                D.items.push(it);
+                makeLink(fromId, side, it.id, ts);
+                sel = [it.id];
+                render();
+            });
+            mini = { el: el, from: fromId, side: side, p: p };
+        }
+
         svg.addEventListener('wheel', function (e) {
             e.preventDefault();
             var r = svg.getBoundingClientRect();
@@ -2737,6 +2873,7 @@
         function onKey(e) {
             if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
             if (ed) { return; }
+            if (mini && e.key === 'Escape') { e.preventDefault(); miniClose(); return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
             if (tool === 'duct') {
@@ -2998,9 +3135,9 @@
         setTimeout(fit, 0);
 
         // Exposto para os testes (jsdom).
-        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
+        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

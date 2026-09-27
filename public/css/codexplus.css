@@ -2211,3 +2211,9 @@ html.cx-board-open { overflow: hidden; }
 /* Q5e — seções recolhíveis da paleta do fluxograma */
 .cx-board-cat-t { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 2px 0; cursor: pointer; }
 .cx-board-cat-t:hover { color: #1d2330; }
+/* Q5f — mini-paleta (soltar a ligação no vazio) e botões de alinhar */
+.cx-mini { position: absolute; z-index: 7; display: grid; grid-template-columns: repeat(3, 46px); gap: 4px; padding: 6px; background: #fff;
+    border: 1px solid #d3d1c7; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.14); transform: translate(8px, 8px); }
+.cx-mini button { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px; cursor: pointer; }
+.cx-mini button:hover { border-color: #d3d1c7; background: #f1efe8; }
+.cx-fbar-al { padding: 3px 5px; }

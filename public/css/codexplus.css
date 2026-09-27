@@ -2102,3 +2102,6 @@ html.cx-board-open { overflow: hidden; }
 .cx-board-svg.is-panning { cursor: grabbing; }
 .cx-board-svg [data-id] { cursor: move; }
 .cx-board-scale { font-size: .8em; color: var(--cx-muted); margin: 0 4px; }
+/* Q2a — alças de ligação nas bordas do ícone */
+.cx-board-svg .cx-board-lh { cursor: crosshair; }
+.cx-board-svg .cx-board-links [data-id] { cursor: pointer; }

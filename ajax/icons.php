@@ -5,6 +5,8 @@
  *
  * GET  -> { icons: [...], can_create: bool }   (quem pode ver documentos)
  * POST action=add -> { ok, icon, csrf }         (só o Super-Admin)
+ * POST action=update (id, name, cat, search[, image]) / action=delete (id)
+ *      -> Q4c, também só o Super-Admin
  *
  * CSRF: o núcleo valida o POST sozinho e CONSOME o token (achado do
  * diagram.save.php); toda resposta de POST devolve um token novo, inclusive
@@ -48,6 +50,22 @@ if (($_POST['action'] ?? '') === 'add') {
         return $responder(['erro' => $erro, 'csrf' => $csrf], 422);
     }
     return $responder(['ok' => true, 'icon' => $icon, 'csrf' => $csrf]);
+}
+
+// Q4c: editar e excluir (também só o Super-Admin).
+if (($_POST['action'] ?? '') === 'update') {
+    [$icon, $erro] = IconLibrary::update((int) ($_POST['id'] ?? 0), $_POST);
+    if ($icon === null) {
+        return $responder(['erro' => $erro, 'csrf' => $csrf], 422);
+    }
+    return $responder(['ok' => true, 'icon' => $icon, 'csrf' => $csrf]);
+}
+
+if (($_POST['action'] ?? '') === 'delete') {
+    if (!IconLibrary::delete((int) ($_POST['id'] ?? 0))) {
+        return $responder(['erro' => __('Ícone não encontrado.', 'codexplus'), 'csrf' => $csrf], 404);
+    }
+    return $responder(['ok' => true, 'csrf' => $csrf]);
 }
 
 return $responder(['erro' => 'acao_invalida', 'csrf' => $csrf], 400);

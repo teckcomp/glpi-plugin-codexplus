@@ -973,7 +973,8 @@
                 });
                 h += '</div>';
             });
-            root.querySelector('.cx-board-icons').innerHTML = h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>';
+            root.querySelector('.cx-board-icons').innerHTML = (h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>')
+                + (LIB.canCreate && I.customs().length ? '<button type="button" class="cx-board-mgic">Gerenciar ícones criados (' + I.customs().length + ')</button>' : '');
         }
         root.querySelector('.cx-board-q').addEventListener('input', paleta);
 
@@ -1127,6 +1128,108 @@
         }
         var niBtn = root.querySelector('.cx-board-newic');
         if (niBtn) { niBtn.addEventListener('click', niOpen); }
+
+        /* ---------- Q4c: gerenciar ícones criados (Super-Admin) ----------
+           Lista com editar (nome, categoria, busca; a silhueta é repintada
+           na cor nova) e excluir. Excluir tira da paleta; quadros que usam
+           o ícone guardam uma cópia e continuam iguais. Mesma janela (ni). */
+        function post(fields) {
+            var tk = document.querySelector('[name="_glpi_csrf_token"]'), fd = new FormData();
+            Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
+            if (tk) { fd.append('_glpi_csrf_token', tk.value); }
+            return fetch(BASE + '/ajax/icons.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (res) {
+                    if (res.j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = res.j.csrf; }); }
+                    if (!res.ok || res.j.erro) { throw new Error(res.j.erro || 'Não foi possível gravar.'); }
+                    return res.j;
+                });
+        }
+        // Silhueta: repinta o PNG gravado na cor da categoria nova.
+        function recolor(img, hex) {
+            return new Promise(function (ok, fail) {
+                var im = new Image();
+                im.onload = function () {
+                    var c = document.createElement('canvas'), w = im.naturalWidth || NI_OUT, h = im.naturalHeight || NI_OUT;
+                    c.width = w; c.height = h;
+                    var g = c.getContext && c.getContext('2d');
+                    if (!g || typeof g.getImageData !== 'function') { ok(''); return; }
+                    g.drawImage(im, 0, 0, w, h);
+                    var px = g.getImageData(0, 0, w, h);
+                    tint(px.data, hex);
+                    g.putImageData(px, 0, 0);
+                    ok(c.toDataURL('image/png'));
+                };
+                im.onerror = function () { fail(new Error('img')); };
+                im.src = img;
+            });
+        }
+        function mgOpen() {
+            if (ni) { return; }
+            var el = document.createElement('div');
+            el.className = 'cx-ni-back';
+            el.innerHTML = '<div class="cx-ni cx-mg" role="dialog" aria-label="Ícones criados">'
+                + '<div class="cx-mg-head"><p class="cx-ni-title">Ícones criados na instalação</p>'
+                + '<p class="cx-board-none">Excluir tira da paleta. Quadros que já usam o ícone continuam com ele.</p></div>'
+                + '<div class="cx-mg-list"></div><p class="cx-ni-err" hidden></p>'
+                + '<div class="cx-ni-btns"><button type="button" data-mg="close">Fechar</button></div></div>';
+            root.appendChild(el);
+            ni = { el: el, mg: true };
+            var list = el.querySelector('.cx-mg-list'), err = el.querySelector('.cx-ni-err');
+            var fail = function (t) { err.textContent = t || ''; err.hidden = !t; };
+            var cats = function (v) { return Object.keys(I.CATS).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(I.CATS[k].label) + '</option>'; }).join(''); };
+            var draw = function (editing) {
+                var all = I.customs().slice().sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+                list.innerHTML = all.length ? all.map(function (ic) {
+                    var th = '<img src="' + ic.img + '" alt="" width="32" height="32">';
+                    if (editing === ic.id) {
+                        return '<div class="cx-mg-row is-edit" data-key="' + ic.id + '">' + th
+                            + '<input type="text" maxlength="60" data-mg="name" value="' + esc(ic.name) + '" aria-label="Nome">'
+                            + '<select data-mg="cat" aria-label="Categoria">' + cats(ic.cat) + '</select>'
+                            + '<input type="text" maxlength="200" data-mg="search" value="' + esc(ic.search) + '" placeholder="busca" aria-label="Busca">'
+                            + '<span class="cx-mg-act"><button type="button" data-mg="save">Salvar</button><button type="button" data-mg="back">Voltar</button></span></div>';
+                    }
+                    return '<div class="cx-mg-row" data-key="' + ic.id + '">' + th
+                        + '<span class="cx-mg-name">' + esc(ic.name) + (ic.mode === 'mask' ? ' <em>· silhueta</em>' : '') + '</span>'
+                        + '<span class="cx-mg-cat">' + esc((I.CATS[ic.cat] || {}).label || ic.cat) + '</span>'
+                        + '<span class="cx-mg-by">' + esc(ic.author || '') + '</span>'
+                        + '<span class="cx-mg-act"><button type="button" data-mg="edit">Editar</button><button type="button" data-mg="del" class="is-danger">Excluir</button></span></div>';
+                }).join('') : '<p class="cx-board-none">Nenhum ícone criado.</p>';
+            };
+            draw('');
+            el.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-mg]');
+                if (!b) { return; }
+                var a = b.getAttribute('data-mg'), row = b.closest('.cx-mg-row'), key = row ? row.getAttribute('data-key') : '';
+                var ic = key ? I.get(key) : null, id = key.replace(/^u/, '');
+                if (a === 'close') { niClose(); paleta(); return; }
+                if (a === 'edit') { fail(''); draw(key); var nm = list.querySelector('[data-mg="name"]'); if (nm) { nm.focus(); } return; }
+                if (a === 'back') { fail(''); draw(''); return; }
+                if (a === 'del') {
+                    var usado = D.items.some(function (i) { return i.t === 'icon' && i.icon === key; });
+                    if (!window.confirm('Excluir o ícone "' + ic.name + '" da paleta?' + (usado ? ' Este quadro usa o ícone: ele continua aqui (e nos outros quadros que já o usam).' : ''))) { return; }
+                    b.disabled = true; fail('');
+                    post({ action: 'delete', id: id }).then(function () {
+                        I.removeCustom(key); draw(''); paleta();
+                    }).catch(function (e2) { b.disabled = false; fail(e2.message); });
+                    return;
+                }
+                if (a === 'save') {
+                    var name = row.querySelector('[data-mg="name"]').value.trim(), cat = row.querySelector('[data-mg="cat"]').value;
+                    if (!name) { fail('Informe o nome do ícone.'); return; }
+                    b.disabled = true; fail('');
+                    var img = (ic.mode === 'mask' && cat !== ic.cat) ? recolor(ic.img, (I.CATS[cat] || I.CATS.infra).S) : Promise.resolve('');
+                    img.then(function (novo) {
+                        return post({ action: 'update', id: id, name: name, cat: cat, search: row.querySelector('[data-mg="search"]').value.trim(), image: novo || '' });
+                    }).then(function (j) {
+                        I.addCustom([j.icon]); draw(''); paleta(); render();
+                    }).catch(function (e2) { b.disabled = false; fail(e2.message); });
+                }
+            });
+        }
+        root.querySelector('.cx-board-icons').addEventListener('click', function (e) {
+            if (e.target.closest('.cx-board-mgic')) { mgOpen(); }
+        });
 
         /* ---------- histórico ---------- */
         function snap() { hist.push(JSON.stringify(D)); if (hist.length > 80) { hist.shift(); } redo = []; }
@@ -2014,7 +2117,7 @@
 
         // Exposto para os testes (jsdom).
         root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, setTool: function (t) { tool = t; },
-            setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, ni: function () { return ni; } };
+            setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
     window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };

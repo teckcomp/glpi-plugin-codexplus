@@ -51,7 +51,9 @@ class IconLibrary
 
     private static function row(array $r): array
     {
+        $uid = (int) ($r['users_id'] ?? 0);
         return [
+            'author' => $uid > 0 && function_exists('getUserName') ? (string) getUserName($uid) : '',
             'id'     => (int) $r['id'],
             'name'   => (string) $r['name'],
             'cat'    => (string) $r['cat'],
@@ -113,6 +115,52 @@ class IconLibrary
             && ($info[2] ?? 0) === IMAGETYPE_PNG
             && $info[0] >= 16 && $info[1] >= 16
             && $info[0] <= self::MAX_SIDE && $info[1] <= self::MAX_SIDE;
+    }
+
+    public static function get(int $id): ?array
+    {
+        global $DB;
+        foreach ($DB->request(['FROM' => self::table(), 'WHERE' => ['id' => $id], 'LIMIT' => 1]) as $r) {
+            return self::row($r);
+        }
+        return null;
+    }
+
+    /**
+     * Q4c: editar nome, categoria, busca e (silhueta repintada na cor nova)
+     * a imagem. Sem imagem no pedido, fica a que está gravada.
+     *
+     * @return array{0: ?array, 1: string} [ícone gravado, erro]
+     */
+    public static function update(int $id, array $in): array
+    {
+        global $DB;
+        $atual = self::get($id);
+        if ($atual === null) {
+            return [null, __('Ícone não encontrado.', 'codexplus')];
+        }
+        if ((string) ($in['image'] ?? '') === '') {
+            $in['image'] = $atual['image'];
+        }
+        $in['mode'] = $atual['mode'];   // o modo não muda depois de criado
+        [$data, $erro] = self::validate($in);
+        if ($data === null) {
+            return [null, $erro];
+        }
+        if (!$DB->update(self::table(), $data + ['date_mod' => date('Y-m-d H:i:s')], ['id' => $id])) {
+            return [null, __('Não foi possível gravar o ícone.', 'codexplus')];
+        }
+        return [['id' => $id, 'author' => $atual['author']] + $data, ''];
+    }
+
+    /**
+     * Q4c: tira da paleta. Quadros que usam o ícone guardam uma cópia dele
+     * (campo lib do JSON): continuam abrindo com o desenho certo.
+     */
+    public static function delete(int $id): bool
+    {
+        global $DB;
+        return self::get($id) !== null && (bool) $DB->delete(self::table(), ['id' => $id]);
     }
 
     /** @return array{0: ?array, 1: string} [ícone gravado, erro] */

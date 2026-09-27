@@ -167,14 +167,26 @@
             if (onlyMissing && BY_ID[key]) { return; }
             var e = { id: key, name: String(c.name || 'Ícone').slice(0, 80), cat: CATS[c.cat] ? c.cat : 'infra',
                 search: String(c.search || '').slice(0, 200), cone: false, body: '', custom: true, img: img,
-                mode: c.mode === 'mask' ? 'mask' : 'color' };
+                mode: c.mode === 'mask' ? 'mask' : 'color', author: String(c.author || '') };
             for (var i = LIST.length - 1; i >= 0; i--) { if (LIST[i][0] === key) { LIST.splice(i, 1); } }
             BY_ID[key] = e;
-            LIST.push([key, e.name, e.cat, e.search, false, '']);
+            // Q4c: a cópia guardada num quadro (onlyMissing) desenha o ícone,
+            // mas não volta para a paleta: ícone excluído não reaparece.
+            if (!onlyMissing) { LIST.push([key, e.name, e.cat, e.search, false, '']); }
             n++;
         });
         return n;
     }
 
-    window.CodexplusIcons = { CATS: CATS, LIST: LIST, get: function (id) { return BY_ID[id] || null; }, body: body, addCustom: addCustom };
+    /* Q4c: tira da paleta. O desenho continua conhecido nesta página, para
+       o quadro aberto que já o usa. */
+    function removeCustom(key) {
+        for (var i = LIST.length - 1; i >= 0; i--) { if (LIST[i][0] === key) { LIST.splice(i, 1); } }
+    }
+    function customs() {
+        return LIST.filter(function (r) { return BY_ID[r[0]] && BY_ID[r[0]].custom; }).map(function (r) { return BY_ID[r[0]]; });
+    }
+
+    window.CodexplusIcons = { CATS: CATS, LIST: LIST, get: function (id) { return BY_ID[id] || null; }, body: body, addCustom: addCustom,
+        removeCustom: removeCustom, customs: customs };
 })();

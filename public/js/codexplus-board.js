@@ -31,6 +31,12 @@
    um documento DIA (codexplus-flow.js). Nesse caso open() recebe um `host`
    {data, title, save(D)}: o quadro vai para a tabela de diagramas, sem PNG
    no corpo e sem legenda.
+   Q5b (27/09/2026): FORMAS do fluxograma — shape {x,y,w,h,shape,text,color,
+   sz} (w/h derivados: a forma cresce em altura com o texto) — e a ligação
+   de fluxo (kind 'fluxo': cotovelo, seta, rótulo; a 1ª saída da decisão
+   nasce "Sim", a 2ª "Não"). Elementos separados por paleta (Claudio,
+   27/09/2026): Planta e Topologia usam ícones, cabos e eletrocalha; o
+   fluxograma usa formas e ligação de fluxo. As interações são as mesmas.
    ========================================================================= */
 (function () {
     'use strict';
@@ -63,6 +69,80 @@
         canaleta:    { label: 'Canaleta',    c: '#B4B2A9', w: 7,  o: 0.6,  mid: '' }
     };
     var LINK_DEFAULT = 'cat6';
+    // Q5b: ligação de fluxo (só no fluxograma; flow tira da lista de cabos).
+    LINK_KINDS.fluxo = { label: 'Fluxo', c: '#5F5E5A', w: 1.6, d: '', arrow: true, flow: true };
+
+    /* Q5b — formas do fluxograma. Cor por tipo (Claudio, 27/09/2026), com
+       troca no painel. Tamanho P/M/G muda largura, altura base e letra. */
+    var SHAPES = {
+        term: { label: 'Início / fim', w: 140, h: 44, color: 'verde' },
+        proc: { label: 'Processo',     w: 150, h: 60, color: 'azul' },
+        dec:  { label: 'Decisão',      w: 150, h: 84, color: 'ambar' },
+        doc:  { label: 'Documento',    w: 150, h: 64, color: 'roxo' },
+        data: { label: 'Dados',        w: 150, h: 56, color: 'cinza' },
+        conn: { label: 'Conector',     w: 44,  h: 44, color: 'cinza' }
+    };
+    var FLOW_COLORS = {
+        verde: { label: 'Verde',  f: '#E1F5EE', s: '#0F6E56', t: '#085041' },
+        azul:  { label: 'Azul',   f: '#E6F1FB', s: '#185FA5', t: '#0C447C' },
+        ambar: { label: 'Âmbar',  f: '#FAEEDA', s: '#854F0B', t: '#633806' },
+        roxo:  { label: 'Roxo',   f: '#EEEDFE', s: '#534AB7', t: '#3C3489' },
+        coral: { label: 'Coral',  f: '#FAECE7', s: '#993C1D', t: '#712B13' },
+        cinza: { label: 'Cinza',  f: '#F1EFE8', s: '#5F5E5A', t: '#444441' }
+    };
+    var SHAPE_K = { p: 0.8, m: 1, g: 1.25 };
+    var SHAPE_FS = 13;
+    function shapeFs(it) { return Math.round(SHAPE_FS * (SHAPE_K[it.sz] || 1) * 2) / 2; }
+    // Largura útil do texto dentro de cada forma.
+    function shapeInner(it) {
+        var w = it.w;
+        return it.shape === 'dec' ? w * 0.56 : it.shape === 'data' ? w - 44 : it.shape === 'conn' ? w - 8 : it.shape === 'term' ? w - 26 : w - 18;
+    }
+    // Quebra por palavra pela largura aproximada da letra (Arial ~0,55 em).
+    function wrapText(text, maxW, fs) {
+        var max = Math.max(1, Math.floor(maxW / (fs * 0.55))), out = [];
+        String(text || '').split('\n').forEach(function (par) {
+            var line = '';
+            par.split(/\s+/).filter(Boolean).forEach(function (wd) {
+                while (wd.length > max) { if (line) { out.push(line); line = ''; } out.push(wd.slice(0, max)); wd = wd.slice(max); }
+                if (!line) { line = wd; } else if ((line + ' ' + wd).length <= max) { line += ' ' + wd; } else { out.push(line); line = wd; }
+            });
+            out.push(line);
+        });
+        while (out.length > 1 && out[out.length - 1] === '') { out.pop(); }
+        return out.slice(0, 30);
+    }
+    // w e h vêm do tipo, do tamanho e do texto (nunca do que chegou gravado).
+    function shapeFit(it) {
+        var b = SHAPES[it.shape] || SHAPES.proc, k = SHAPE_K[it.sz] || 1, fs = shapeFs(it);
+        it.w = Math.round(b.w * k);
+        var base = Math.round(b.h * k), lines = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs).length : 0;
+        var need = lines * fs * 1.25;
+        need = it.shape === 'dec' ? need / 0.5 + 12 : it.shape === 'doc' ? need + fs * 2 : need + fs * 1.4;
+        it.h = Math.max(base, Math.ceil(need / GRID) * GRID);
+        if (it.shape === 'conn') { it.w = it.h = Math.max(it.w, it.h); }
+        return it;
+    }
+    function shapeSvg(it) {
+        var c = FLOW_COLORS[it.color] || FLOW_COLORS.azul, x = it.x, y = it.y, w = it.w, h = it.h;
+        var st = ' fill="' + c.f + '" stroke="' + c.s + '" stroke-width="1.6"', g = '', wv = Math.min(9, h * 0.15);
+        if (it.shape === 'term') { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + Math.min(h, w) / 2 + '"' + st + '/>'; }
+        else if (it.shape === 'dec') { g = '<path d="M' + (x + w / 2) + ' ' + y + 'L' + (x + w) + ' ' + (y + h / 2) + 'L' + (x + w / 2) + ' ' + (y + h) + 'L' + x + ' ' + (y + h / 2) + 'Z"' + st + '/>'; }
+        else if (it.shape === 'doc') {
+            g = '<path d="M' + x + ' ' + y + 'H' + (x + w) + 'V' + (y + h - wv) + 'Q' + (x + w * 0.75) + ' ' + (y + h - wv * 2) + ' ' + (x + w / 2) + ' ' + (y + h - wv)
+                + 'T' + x + ' ' + (y + h - wv) + 'Z"' + st + '/>';
+        }
+        else if (it.shape === 'data') { var sk = Math.min(20, w * 0.15); g = '<path d="M' + (x + sk) + ' ' + y + 'H' + (x + w) + 'L' + (x + w - sk) + ' ' + (y + h) + 'H' + x + 'Z"' + st + '/>'; }
+        else if (it.shape === 'conn') { g = '<circle cx="' + (x + w / 2) + '" cy="' + (y + h / 2) + '" r="' + w / 2 + '"' + st + '/>'; }
+        else { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"' + st + '/>'; }
+        var fs = shapeFs(it), lh = fs * 1.25, txt = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs) : [];
+        if (txt.length) {
+            var cy = y + (it.shape === 'doc' ? (h - wv) / 2 : h / 2), y0 = cy - (txt.length - 1) * lh / 2 + fs * 0.35;
+            g += '<text x="' + (x + w / 2) + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="' + c.t + '">'
+                + txt.map(function (l, i) { return '<tspan x="' + (x + w / 2) + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
+        }
+        return '<g data-id="' + it.id + '">' + g + '</g>';
+    }
 
     function esc(t) {
         return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
@@ -173,7 +253,19 @@
         out.legend = !!d.legend;
         var pxm = out.pxm || PXM_DEFAULT;
         var src = Array.isArray(d.items) ? d.items : [];
+        // Q5b: cada paleta com os seus elementos. Fluxograma: formas, texto,
+        // moldura e ligação de fluxo. Planta/Topologia: sem formas.
+        var flowMode = out.mode === 'fluxograma';
         src.forEach(function (it) {
+            if (it && it.t === 'shape') {
+                if (!flowMode) { return; }
+                var sh = { id: String(it.id || uid()), t: 'shape', x: +it.x || 0, y: +it.y || 0, lock: !!it.lock, g: it.g ? String(it.g) : '',
+                    shape: SHAPES[it.shape] ? it.shape : 'proc', text: String(it.text || '').slice(0, 500), sz: SHAPE_K[it.sz] ? it.sz : 'm' };
+                sh.color = FLOW_COLORS[it.color] ? it.color : SHAPES[sh.shape].color;
+                out.items.push(shapeFit(sh));
+                return;
+            }
+            if (it && (it.t === 'icon' || it.t === 'duct') && flowMode) { return; }
             if (it && it.t === 'duct') {
                 var pts = (Array.isArray(it.pts) ? it.pts : []).slice(0, 200).filter(function (q) { return q && isFinite(+q.x) && isFinite(+q.y); })
                     .map(function (q) { return { x: Math.round(+q.x * 10) / 10, y: Math.round(+q.y * 10) / 10 }; });
@@ -210,9 +302,9 @@
             }
             out.items.push(n);
         });
-        // Ligações: só entre dois ícones que existem (ícone apagado leva a ligação junto).
+        // Ligações: só entre dois ícones (ou formas) que existem; apagar leva a ligação junto.
         var icons = {};
-        out.items.forEach(function (i) { if (i.t === 'icon') { icons[i.id] = true; } });
+        out.items.forEach(function (i) { if (i.t === 'icon' || i.t === 'shape') { icons[i.id] = true; } });
         var seen = {};
         out.items.forEach(function (i) { seen[i.id] = true; });
         src.forEach(function (it) {
@@ -226,11 +318,11 @@
                 id: id, t: 'link', lock: !!it.lock, g: it.g ? String(it.g) : '',
                 a: { id: a, side: SIDES.indexOf(it.a.side) >= 0 ? it.a.side : 'l' },
                 b: { id: b, side: SIDES.indexOf(it.b.side) >= 0 ? it.b.side : 'o' },
-                kind: LINK_KINDS[it.kind] ? it.kind : LINK_DEFAULT,
+                kind: flowMode ? 'fluxo' : (LINK_KINDS[it.kind] && !LINK_KINDS[it.kind].flow ? it.kind : LINK_DEFAULT),
                 route: ['straight', 'elbow', 'curve'].indexOf(it.route) >= 0 ? it.route : 'straight',
                 wp: (Array.isArray(it.wp) ? it.wp : []).slice(0, 50).filter(function (p) { return p && isFinite(+p.x) && isFinite(+p.y); })
                     .map(function (p) { return { x: Math.round(+p.x * 10) / 10, y: Math.round(+p.y * 10) / 10 }; }),
-                ends: ['none', 'arrow', 'both'].indexOf(it.ends) >= 0 ? it.ends : 'none',
+                ends: ['none', 'arrow', 'both'].indexOf(it.ends) >= 0 ? it.ends : (flowMode ? 'arrow' : 'none'),
                 label: String(it.label || '').slice(0, 80),
                 cable: String(it.cable || '').slice(0, 20),
                 pa: String(it.pa || '').slice(0, 40), pb: String(it.pb || '').slice(0, 40),
@@ -246,6 +338,8 @@
                 },
                 showM: it.showM === undefined ? true : !!it.showM
             });
+            // Q5b: ligação de fluxo não é cabo — sem número, sem metros.
+            if (flowMode) { var fl = out.items[out.items.length - 1]; fl.cable = ''; fl.showId = false; fl.showM = false; fl.poe = false; }
         });
         return out;
     }
@@ -254,12 +348,22 @@
     // Ponto de encaixe na borda do ícone. O sul fica abaixo do nome e do IP,
     // para o cabo não passar por cima do texto.
     function anchor(ic, side) {
+        if (ic.t === 'shape') {
+            // Bordas da forma; no paralelogramo, o meio dos lados inclinados.
+            var sk = ic.shape === 'data' ? Math.min(20, ic.w * 0.15) / 2 : 0, mx = ic.x + ic.w / 2, my = ic.y + ic.h / 2;
+            if (side === 'n') { return { x: mx, y: ic.y }; }
+            // Documento: o meio da borda de baixo é a crista da onda.
+            if (side === 's') { return { x: mx, y: ic.y + ic.h - (ic.shape === 'doc' ? Math.min(9, ic.h * 0.15) : 0) }; }
+            if (side === 'o') { return { x: ic.x + sk, y: my }; }
+            return { x: ic.x + ic.w - sk, y: my };
+        }
         var s = ic.size, cx = ic.x + s / 2, cy = ic.y + s / 2;
         if (side === 'n') { return { x: cx, y: ic.y }; }
         if (side === 's') { var b = bbox(ic); return { x: cx, y: b.y + b.h }; }
         if (side === 'o') { return { x: ic.x, y: cy }; }
         return { x: ic.x + s, y: cy };
     }
+    function isNode(i) { return !!i && (i.t === 'icon' || i.t === 'shape'); }
     function nearestSide(ic, p) {
         var best = 'n', bd = Infinity;
         SIDES.forEach(function (sd) {
@@ -271,7 +375,7 @@
     // Pontos do traçado: origem, dobras, destino (null se faltar um ícone).
     function linkPts(L, find) {
         var a = find(L.a.id), b = find(L.b.id);
-        if (!a || !b || a.t !== 'icon' || b.t !== 'icon') { return null; }
+        if (!a || !b || !isNode(a) || !isNode(b)) { return null; }
         return [anchor(a, L.a.side)].concat(L.wp || [], [anchor(b, L.b.side)]);
     }
     // Próximo número livre de cabo (P-001, P-002…); reaproveita buraco.
@@ -431,7 +535,8 @@
             // O nome do cabo acompanha os ícones das pontas, como o nome do
             // ícone (Claudio, 27/09/2026), com Pequeno/Médio/Grande no painel.
             var a = find(L.a.id), b = find(L.b.id);
-            var fs = Math.max(7, Math.round(labelPx(Math.min(a.size, b.size)) * (LINK_FS[L.fs] || 1) * 2) / 2);
+            var fs = L.kind === 'fluxo' ? 12 * (LINK_FS[L.fs] || 1)
+                : Math.max(7, Math.round(labelPx(Math.min(a.size, b.size)) * (LINK_FS[L.fs] || 1) * 2) / 2);
             var m = midPoint(pts), w = txt.length * fs * 0.56 + fs, bh = fs + 6;
             h += '<rect x="' + (m.x - w / 2).toFixed(1) + '" y="' + (m.y - bh / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + bh + '" rx="' + (bh / 4).toFixed(1)
                 + '" fill="#ffffff" stroke="' + k.c + '" stroke-width="0.8"/>'
@@ -469,6 +574,7 @@
 
     /* ---------------- desenho de um item (tela e PNG) ---------------- */
     function itemSvg(it, forExport) {
+        if (it.t === 'shape') { return shapeSvg(it); }
         if (it.t === 'zone') {
             return '<g data-id="' + it.id + '"><rect x="' + it.x + '" y="' + it.y + '" width="' + it.w + '" height="' + it.h
                 + '" rx="10" fill="' + it.color + '" fill-opacity="0.05" stroke="' + it.color + '" stroke-width="2" stroke-dasharray="8 5"/>'
@@ -582,6 +688,7 @@
     }
 
     function bbox(it) {
+        if (it.t === 'shape') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'zone') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'duct') {
             var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }), pd = (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w / 2 + 2;
@@ -934,10 +1041,10 @@
             + '<button type="button" data-act="lock" title="Travar / destravar">Travar</button>'
             + '<button type="button" data-act="del" title="Excluir (Delete)">Excluir</button>'
             + '<span class="cx-board-sep"></span>'
-            + '<button type="button" data-act="smaller" title="Diminuir ícones (os selecionados; sem seleção, todos)">Ícone −</button>'
+            + (flow ? '' : '<button type="button" data-act="smaller" title="Diminuir ícones (os selecionados; sem seleção, todos)">Ícone −</button>'
             + '<button type="button" data-act="bigger" title="Aumentar ícones (os selecionados; sem seleção, todos)">Ícone +</button>'
             + '<button type="button" data-act="rotate" title="Girar os ícones selecionados 90° (R)">Girar 90°</button>'
-            + '<span class="cx-board-sep"></span>'
+            + '<span class="cx-board-sep"></span>')
             + '<button type="button" data-act="undo" title="Desfazer (Ctrl+Z)">↶</button>'
             + '<button type="button" data-act="redo" title="Refazer (Ctrl+Y)">↷</button>'
             + '<span class="cx-board-sep"></span>'
@@ -958,15 +1065,15 @@
             + '<button type="button" data-act="save" class="cx-board-ok">' + saveLabel + '</button>'
             + '</div>'
             + '<div class="cx-board-body">'
-            + '<aside class="cx-board-pal"><div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
+            + '<aside class="cx-board-pal">' + (flow ? '' : '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
             + (LIB.canCreate ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
-            + '</div><div class="cx-board-icons"></div></aside>'
+            + '</div>') + '<div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
             + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
             + '<div class="cx-board-hint">' + (flow
-                ? 'Arraste um ícone da paleta para o quadro; Texto e Moldura estão na barra. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área.'
+                ? 'Arraste uma forma da paleta para o quadro. Duplo clique na forma (ou comece a digitar) escreve nela. Com a forma selecionada, puxe uma alça azul até outra forma para ligar: a 1ª saída da decisão nasce Sim, a 2ª Não. Arraste o fundo para mover a vista; roda do mouse dá zoom.'
                 : 'Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.') + '</div></div>'
             + '<aside class="cx-board-props"></aside>'
             + '</div>';
@@ -983,6 +1090,16 @@
 
         /* ---------- paleta ---------- */
         function paleta() {
+            if (flow) {
+                // Q5b: só formas (os ícones são da Planta e da Topologia).
+                root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Fluxograma</div><div class="cx-board-grid">'
+                    + Object.keys(SHAPES).map(function (k) {
+                        var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: k === 'conn' ? 'm' : 'p', text: '', color: SHAPES[k].color });
+                        return '<button type="button" class="cx-board-ic" data-shape="' + k + '" title="' + esc(SHAPES[k].label) + '">'
+                            + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo) + '</svg><span>' + esc(SHAPES[k].label) + '</span></button>';
+                    }).join('') + '</div>';
+                return;
+            }
             var q = (root.querySelector('.cx-board-q').value || '').trim().toLowerCase();
             var h = '';
             Object.keys(I.CATS).forEach(function (ck) {
@@ -999,7 +1116,7 @@
             root.querySelector('.cx-board-icons').innerHTML = (h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>')
                 + (LIB.canCreate && I.customs().length ? '<button type="button" class="cx-board-mgic">Gerenciar ícones criados (' + I.customs().length + ')</button>' : '');
         }
-        root.querySelector('.cx-board-q').addEventListener('input', paleta);
+        if (!flow) { root.querySelector('.cx-board-q').addEventListener('input', paleta); }
 
         /* ---------- Q4a: novo ícone a partir de imagem (Super-Admin) ----------
            Recorte quadrado arrastável sobre a imagem; sai um PNG de 256 px
@@ -1347,7 +1464,7 @@
                     + (it.lock ? '<text x="' + (b.x + b.w + 6) + '" y="' + (b.y + 4) + '" font-size="' + (12 / view.z) + '" fill="#378ADD">🔒</text>' : '')
                     + (it.t === 'icon' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rzi="' + it.id + '" x="' + (it.x + it.size - 4 / view.z) + '" y="' + (it.y + it.size - 4 / view.z)
                         + '" width="' + (9 / view.z) + '" height="' + (9 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '')
-                    + (it.t === 'icon' && sel.length === 1 ? handles(it) : '')
+                    + ((it.t === 'icon' || it.t === 'shape') && sel.length === 1 ? handles(it) : '')
                     + (it.t === 'zone' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rz="' + it.id + '" x="' + (b.x + b.w - 5 / view.z) + '" y="' + (b.y + b.h - 5 / view.z)
                         + '" width="' + (10 / view.z) + '" height="' + (10 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '');
             }).join('');
@@ -1360,7 +1477,7 @@
                 var a = anchor(it, sd);
                 var x = a.x + (sd === 'l' ? o : sd === 'o' ? -o : 0), y = a.y + (sd === 's' ? o : sd === 'n' ? -o : 0);
                 return '<circle class="cx-board-lh" data-lh="' + sd + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r
-                    + '" fill="#378ADD" stroke="#fff" stroke-width="' + (1.5 / view.z) + '"><title>Puxe até outro ícone para ligar</title></circle>';
+                    + '" fill="#378ADD" stroke="#fff" stroke-width="' + (1.5 / view.z) + '"><title>Puxe até ' + (flow ? 'outra forma' : 'outro ícone') + ' para ligar</title></circle>';
             }).join('');
         }
         // Alças da ligação selecionada: pontas (religar) e dobras (mover).
@@ -1452,13 +1569,16 @@
         function iconAt(p) {
             for (var i = D.items.length - 1; i >= 0; i--) {
                 var it = D.items[i];
-                if (it.t !== 'icon') { continue; }
+                if (!isNode(it)) { continue; }
                 var b = bbox(it);
                 if (p.x >= b.x - 4 && p.x <= b.x + b.w + 4 && p.y >= b.y - 4 && p.y <= b.y + b.h + 4) { return it; }
             }
             return null;
         }
-        function iconName(it) { return it ? (it.label || (I.get(it.icon) || {}).name || 'Ícone') : '?'; }
+        function iconName(it) {
+            if (it && it.t === 'shape') { return String(it.text || '').trim().split('\n')[0].slice(0, 40) || SHAPES[it.shape].label; }
+            return it ? (it.label || (I.get(it.icon) || {}).name || 'Ícone') : '?';
+        }
 
         /* ---------- painel de propriedades ---------- */
         function field(label, key, val, ph) {
@@ -1478,7 +1598,24 @@
                 return;
             }
             var it = get(sel[0]), h = '';
-            if (it.t === 'icon') {
+            var optsOf = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
+            if (it.t === 'shape') {
+                h += '<p><strong>' + esc(SHAPES[it.shape].label) + '</strong></p>'
+                    + '<label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
+                    + '<label class="cx-board-f"><span>Tamanho</span><select data-k="sz">' + optsOf({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.sz) + '</select></label>'
+                    + '<span class="cx-board-flab">Cor</span><div class="cx-board-sw">' + Object.keys(FLOW_COLORS).map(function (k) {
+                        return '<button type="button" data-fc="' + k + '" style="background:' + FLOW_COLORS[k].f + ';border-color:' + FLOW_COLORS[k].s + '" title="' + esc(FLOW_COLORS[k].label) + '" aria-label="' + esc(FLOW_COLORS[k].label) + '"' + (it.color === k ? ' class="is-on"' : '') + '></button>';
+                    }).join('') + '</div>'
+                    + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha. A forma cresce em altura com o texto.</p>';
+            } else if (it.t === 'link' && it.kind === 'fluxo') {
+                h += '<p><strong>Ligação</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
+                    + field('Rótulo', 'label', it.label, 'Sim')
+                    + '<label class="cx-board-f"><span>Traçado</span><select data-k="route">' + optsOf({ straight: 'Reto', elbow: 'Cotovelo', curve: 'Curvo' }, it.route) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Pontas</span><select data-k="ends">' + optsOf({ none: 'Sem seta', arrow: 'Seta no destino', both: 'Seta nas duas pontas' }, it.ends) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Tamanho do rótulo</span><select data-k="fs">' + optsOf({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
+                    + '<p><button type="button" class="cx-board-btn" data-la="straighten"' + (it.wp.length ? '' : ' disabled') + '>Endireitar (tirar as dobras)</button></p>'
+                    + '<p class="cx-board-none">Duplo clique na ligação cria uma dobra; arraste a dobra para mover; Ctrl + duplo clique apaga. Arraste a bolinha da ponta para outra borda ou outra forma.</p>';
+            } else if (it.t === 'icon') {
                 var ic = I.get(it.icon);
                 h += '<p><strong>' + esc(ic.name) + '</strong></p>' + field('Rótulo', 'label', it.label, 'CAM-01 Entrada');
                 if (it.icon === 'generico') {
@@ -1500,7 +1637,7 @@
                 }
             } else if (it.t === 'link') {
                 var opts = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
-                var kinds = {}; Object.keys(LINK_KINDS).forEach(function (k) { kinds[k] = LINK_KINDS[k].label; });
+                var kinds = {}; Object.keys(LINK_KINDS).forEach(function (k) { if (!LINK_KINDS[k].flow) { kinds[k] = LINK_KINDS[k].label; } });
                 h += '<p><strong>Ligação ' + esc(it.cable) + '</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
                     + '<label class="cx-board-f"><span>Tipo de cabo</span><select data-k="kind">' + opts(kinds, it.kind) + '</select></label>'
                     + '<label class="cx-board-f"><span>Traçado</span><select data-k="route">' + opts({ straight: 'Reto', elbow: 'Cotovelo', curve: 'Curvo' }, it.route) + '</select></label>'
@@ -1525,7 +1662,7 @@
                     + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + dopt({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
                     + '<p class="cx-board-none">Arraste o quadrado branco para mover um ponto (alinha com o vizinho; Alt solta). Duplo clique na faixa cria um ponto; Ctrl + duplo clique no ponto apaga. Arraste a faixa para mover tudo.</p>';
             } else if (it.t === 'zone') {
-                h += '<p><strong>' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
+                h += '<p><strong>' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else {
                 h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<label class="cx-board-f"><span>Tamanho</span><select data-k="size"><option value="p"' + (it.size === 'p' ? ' selected' : '') + '>Pequeno</option>'
@@ -1533,7 +1670,7 @@
             }
             if (it.t !== 'icon' || true) {
                 h += '<div class="cx-board-sw">' + COLORS.map(function (c) {
-                    return it.t === 'icon' || it.t === 'link' || it.t === 'duct' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
+                    return it.t === 'icon' || it.t === 'link' || it.t === 'duct' || it.t === 'shape' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
                 }).join('') + '</div>';
             }
             h += '<p class="cx-board-none">' + (it.lock ? 'Travado: destrave para mover.' : '') + (it.g ? ' Em grupo.' : '') + '</p>';
@@ -1551,6 +1688,7 @@
             }
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
+            if (it.t === 'shape' && (k === 'text' || k === 'sz')) { it.text = String(it.text).slice(0, 500); shapeFit(it); }
             if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
             paint();
             drawSel();
@@ -1571,6 +1709,8 @@
                 var lk = get(sel[0]); if (lk && lk.wp && lk.wp.length) { snap(); lk.wp = []; render(); }
                 return;
             }
+            var fc = e.target.closest('[data-fc]');
+            if (fc && sel.length === 1) { snap(); get(sel[0]).color = fc.getAttribute('data-fc'); render(); return; }
             var b = e.target.closest('[data-color]'); if (!b || sel.length !== 1) { return; }
             snap(); get(sel[0]).color = b.getAttribute('data-color'); render();
         });
@@ -1602,14 +1742,55 @@
             render();
         }
 
+        function addShape(shape, x, y) {
+            snap();
+            var it = shapeFit({ id: uid(), t: 'shape', shape: shape, text: '', color: SHAPES[shape].color, sz: 'm', x: 0, y: 0, lock: false, g: '' });
+            it.x = Math.round((x - it.w / 2) / GRID) * GRID; it.y = Math.round((y - it.h / 2) / GRID) * GRID;
+            D.items.push(it);
+            sel = [it.id];
+            render();
+            return it;
+        }
+
+        /* ---------- Q5b: texto no lugar (duplo clique ou começar a digitar) ---------- */
+        var ed = null;
+        function editEnd(keep) {
+            if (!ed) { return; }
+            var e0 = ed; ed = null;
+            var it = get(e0.id);
+            if (keep && it && it.text !== e0.ta.value) { snap(); it.text = e0.ta.value.slice(0, 500); shapeFit(it); }
+            e0.ta.remove();
+            render();
+        }
+        function editStart(it, first) {
+            if (ed || !it || it.t !== 'shape' || it.lock) { return; }
+            var stage = root.querySelector('.cx-board-stage'), ta = document.createElement('textarea');
+            ta.className = 'cx-board-inplace';
+            ta.value = first !== undefined ? first : (it.text || '');
+            var fs = shapeFs(it) * view.z;
+            ta.style.cssText = 'left:' + (svg.offsetLeft + view.x + it.x * view.z) + 'px;top:' + (svg.offsetTop + view.y + it.y * view.z) + 'px;width:' + (it.w * view.z)
+                + 'px;height:' + (it.h * view.z) + 'px;font-size:' + fs + 'px;color:' + (FLOW_COLORS[it.color] || FLOW_COLORS.azul).t;
+            stage.appendChild(ta);
+            ed = { id: it.id, ta: ta };
+            ta.addEventListener('keydown', function (ev) {
+                ev.stopPropagation();
+                if (ev.key === 'Escape') { ev.preventDefault(); editEnd(false); }
+                else if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); editEnd(true); }
+            });
+            ta.addEventListener('blur', function () { editEnd(true); });
+            ta.focus();
+            if (first === undefined) { ta.select(); } else { ta.setSelectionRange(ta.value.length, ta.value.length); }
+        }
+
         /* ---------- arraste da paleta ---------- */
         root.querySelector('.cx-board-icons').addEventListener('pointerdown', function (e) {
-            var b = e.target.closest('[data-icon]'); if (!b) { return; }
+            var b = e.target.closest('[data-icon],[data-shape]'); if (!b) { return; }
             e.preventDefault();
+            var shape = b.getAttribute('data-shape');
             var icon = b.getAttribute('data-icon'), moved = false, sx = e.clientX, sy = e.clientY;
             var ghost = document.createElement('div');
             ghost.className = 'cx-board-ghost';
-            ghost.innerHTML = '<svg viewBox="0 0 48 48" width="48" height="48">' + I.body(icon) + '</svg>';
+            ghost.innerHTML = shape ? b.querySelector('svg').outerHTML : '<svg viewBox="0 0 48 48" width="48" height="48">' + I.body(icon) + '</svg>';
             function mv(ev) {
                 if (!moved && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) { return; }
                 if (!moved) { moved = true; document.body.appendChild(ghost); }
@@ -1619,11 +1800,12 @@
                 document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
                 if (ghost.parentNode) { ghost.remove(); }
                 var r = svg.getBoundingClientRect();
+                var put = function (x, y) { if (shape) { addShape(shape, x, y); } else { addIcon(icon, x, y); } };
                 if (!moved) {
                     var c = toBoard({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
-                    addIcon(icon, c.x, c.y);
+                    put(c.x, c.y);
                 } else if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) {
-                    var p = toBoard(ev); addIcon(icon, p.x, p.y);
+                    var p = toBoard(ev); put(p.x, p.y);
                 }
             }
             document.addEventListener('pointermove', mv);
@@ -1703,7 +1885,7 @@
             } else if (tool === 'zone') {
                 snap();
                 var z = { id: uid(), t: 'zone', x: Math.round(p.x / GRID) * GRID, y: Math.round(p.y / GRID) * GRID, w: 20, h: 20,
-                    label: D.mode === 'planta' ? 'Área' : 'Zona', color: COLORS[D.items.filter(function (i) { return i.t === 'zone'; }).length % COLORS.length], lock: false, g: '' };
+                    label: flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona', color: COLORS[D.items.filter(function (i) { return i.t === 'zone'; }).length % COLORS.length], lock: false, g: '' };
                 D.items.push(z); sel = [z.id];
                 drag = { k: 'zone', id: z.id, ox: z.x, oy: z.y };
             } else if (tool === 'text') {
@@ -1874,6 +2056,13 @@
                         kind: LINK_DEFAULT, route: 'elbow', wp: [], ends: 'none', label: '', cable: nextCable(D.items),
                         pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm',
                         len: { mode: 'auto', m: 0, extra: 10 }, showM: true, lock: false, g: '' };
+                    if (flow) {
+                        // Q5b: ligação de fluxo — cotovelo com seta; a 1ª saída
+                        // da decisão nasce "Sim", a 2ª "Não" (dá para editar).
+                        var orig = get(drag.from), saidas = D.items.filter(function (l) { return l.t === 'link' && l.a.id === drag.from; }).length;
+                        L.kind = 'fluxo'; L.ends = 'arrow'; L.cable = ''; L.showId = false; L.showM = false;
+                        L.label = orig && orig.shape === 'dec' ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
+                    }
                     D.items.push(L);
                     sel = [L.id];
                 }
@@ -1894,6 +2083,7 @@
         }, { passive: false });
         svg.addEventListener('dblclick', function (e) {
             var id = hit(e.target); if (!id || ['link', 'duct'].indexOf((get(id) || {}).t) >= 0) { return; }
+            if (get(id).t === 'shape') { sel = [id]; render(); editStart(get(id)); return; }
             sel = [id]; render();
             var f = props.querySelector('[data-k="label"],[data-k="text"]'); if (f) { f.focus(); f.select(); }
         });
@@ -1902,6 +2092,7 @@
         function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && root.contains(a); }
         function onKey(e) {
             if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
+            if (ed) { return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
             if (tool === 'duct') {
@@ -1909,6 +2100,13 @@
                 if (e.key === 'Escape') { e.preventDefault(); ductDraft = null; gGuides.innerHTML = ''; tool = 'select'; render(); return; }
             }
             var ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+            // Q5b: forma selecionada + tecla de texto começa a escrever nela;
+            // Enter (ou F2) abre o texto que já existe.
+            var one = sel.length === 1 && get(sel[0]);
+            if (flow && one && one.t === 'shape' && !ctrl && !e.altKey) {
+                if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); editStart(one); return; }
+                if (e.key.length === 1 && e.key !== ' ') { e.preventDefault(); editStart(one, e.key); return; }
+            }
             if (k === 'escape') { if (sel.length) { sel = []; render(); } else { close(); } e.preventDefault(); return; }
             if (ctrl && k === 'z') { e.preventDefault(); if (e.shiftKey) { redoIt(); } else { undo(); } return; }
             if (ctrl && k === 'y') { e.preventDefault(); redoIt(); return; }
@@ -2141,16 +2339,16 @@
         }
 
         // Ligações feitas no Q2a nasceram sem número: numera ao abrir.
-        D.items.forEach(function (i) { if (i.t === 'link' && !i.cable) { i.cable = nextCable(D.items); } });
+        if (!flow) { D.items.forEach(function (i) { if (i.t === 'link' && !i.cable) { i.cable = nextCable(D.items); } }); }
 
         paleta();
         render();
         setTimeout(fit, 0);
 
         // Exposto para os testes (jsdom).
-        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, setTool: function (t) { tool = t; },
+        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

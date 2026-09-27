@@ -37,6 +37,11 @@
    nasce "Sim", a 2ª "Não"). Elementos separados por paleta (Claudio,
    27/09/2026): Planta e Topologia usam ícones, cabos e eletrocalha; o
    fluxograma usa formas e ligação de fluxo. As interações são as mesmas.
+   Q5c (27/09/2026): tamanho livre (8 alças; a altura nunca fica menor que
+   o texto), estilo na barra flutuante sobre a seleção — fundo, borda e
+   texto em 12 tons fixos, negrito e tamanho da letra — e camadas (Frente/
+   Trás; a moldura fica sempre no fundo). Forma: {…, w, h, fill, line, ink,
+   b, fs}; o `color` e o `sz` do Q5b ainda são lidos.
    ========================================================================= */
 (function () {
     'use strict';
@@ -82,17 +87,32 @@
         data: { label: 'Dados',        w: 150, h: 56, color: 'cinza' },
         conn: { label: 'Conector',     w: 44,  h: 44, color: 'cinza' }
     };
+    // Q5c: 12 tons fixos (Claudio, 27/09/2026). Cada tom tem fundo (f),
+    // borda (s) e texto (t): "Fundo", "Borda" e "Texto" escolhem o tom.
     var FLOW_COLORS = {
-        verde: { label: 'Verde',  f: '#E1F5EE', s: '#0F6E56', t: '#085041' },
-        azul:  { label: 'Azul',   f: '#E6F1FB', s: '#185FA5', t: '#0C447C' },
-        ambar: { label: 'Âmbar',  f: '#FAEEDA', s: '#854F0B', t: '#633806' },
-        roxo:  { label: 'Roxo',   f: '#EEEDFE', s: '#534AB7', t: '#3C3489' },
-        coral: { label: 'Coral',  f: '#FAECE7', s: '#993C1D', t: '#712B13' },
-        cinza: { label: 'Cinza',  f: '#F1EFE8', s: '#5F5E5A', t: '#444441' }
+        verde:    { label: 'Verde',        f: '#E1F5EE', s: '#0F6E56', t: '#085041' },
+        verde2:   { label: 'Verde forte',  f: '#9FE1CB', s: '#0F6E56', t: '#04342C' },
+        azul:     { label: 'Azul',         f: '#E6F1FB', s: '#185FA5', t: '#0C447C' },
+        azul2:    { label: 'Azul forte',   f: '#B5D4F4', s: '#185FA5', t: '#042C53' },
+        ambar:    { label: 'Âmbar',        f: '#FAEEDA', s: '#854F0B', t: '#633806' },
+        ambar2:   { label: 'Âmbar forte',  f: '#FAC775', s: '#854F0B', t: '#412402' },
+        roxo:     { label: 'Roxo',         f: '#EEEDFE', s: '#534AB7', t: '#3C3489' },
+        roxo2:    { label: 'Roxo forte',   f: '#CECBF6', s: '#534AB7', t: '#26215C' },
+        coral:    { label: 'Coral',        f: '#FAECE7', s: '#993C1D', t: '#712B13' },
+        vermelho: { label: 'Vermelho',     f: '#FCEBEB', s: '#A32D2D', t: '#791F1F' },
+        cinza:    { label: 'Cinza',        f: '#F1EFE8', s: '#5F5E5A', t: '#444441' },
+        branco:   { label: 'Branco / preto', f: '#ffffff', s: '#5F5E5A', t: '#1d2330' }
     };
-    var SHAPE_K = { p: 0.8, m: 1, g: 1.25 };
+    var SHAPE_K = { p: 0.8, m: 1, g: 1.25 };   // só para ler o `sz` do Q5b
     var SHAPE_FS = 13;
-    function shapeFs(it) { return Math.round(SHAPE_FS * (SHAPE_K[it.sz] || 1) * 2) / 2; }
+    var FS_LIST = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
+    var SHAPE_MAX = 1600;
+    // Cores aceitas em texto e moldura: as de sempre + as dos 12 tons.
+    var PAL_HEX = COLORS.concat(['#1d2330']);
+    Object.keys(FLOW_COLORS).forEach(function (k) { [FLOW_COLORS[k].s, FLOW_COLORS[k].t].forEach(function (c) { if (PAL_HEX.indexOf(c) < 0) { PAL_HEX.push(c); } }); });
+    function pal(k) { return FLOW_COLORS[k] || FLOW_COLORS.azul; }
+    function shapeFs(it) { return it.fs || SHAPE_FS; }
+    function shapeMinW(it) { return it.shape === 'conn' ? 24 : 40; }
     // Largura útil do texto dentro de cada forma.
     function shapeInner(it) {
         var w = it.w;
@@ -112,20 +132,28 @@
         while (out.length > 1 && out[out.length - 1] === '') { out.pop(); }
         return out.slice(0, 30);
     }
-    // w e h vêm do tipo, do tamanho e do texto (nunca do que chegou gravado).
-    function shapeFit(it) {
-        var b = SHAPES[it.shape] || SHAPES.proc, k = SHAPE_K[it.sz] || 1, fs = shapeFs(it);
-        it.w = Math.round(b.w * k);
-        var base = Math.round(b.h * k), lines = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs).length : 0;
+    // Altura que o texto precisa na largura atual.
+    function shapeNeed(it) {
+        var fs = shapeFs(it), lines = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs).length : 0;
         var need = lines * fs * 1.25;
-        need = it.shape === 'dec' ? need / 0.5 + 12 : it.shape === 'doc' ? need + fs * 2 : need + fs * 1.4;
-        it.h = Math.max(base, Math.ceil(need / GRID) * GRID);
+        return Math.ceil(it.shape === 'dec' ? need / 0.5 + 12 : it.shape === 'doc' ? need + fs * 2 : need + fs * 1.4);
+    }
+    // Q5c: w e h são os que a pessoa ajustou (sem eles, o tamanho do tipo);
+    // a altura nunca fica menor do que o texto precisa (Claudio, 27/09/2026).
+    function shapeFit(it) {
+        var b = SHAPES[it.shape] || SHAPES.proc, k = SHAPE_K[it.sz] || 1;
+        if (!(+it.fs > 0)) { it.fs = Math.round(SHAPE_FS * k * 2) / 2; }
+        it.fs = Math.max(8, Math.min(48, +it.fs));
+        it.w = Math.max(shapeMinW(it), Math.min(SHAPE_MAX, Math.round(+it.w > 0 ? +it.w : b.w * k)));
+        it.h = Math.max(shapeMinW(it), Math.min(SHAPE_MAX, Math.round(+it.h > 0 ? +it.h : b.h * k)));
+        it.h = Math.max(it.h, Math.min(SHAPE_MAX, shapeNeed(it)));
         if (it.shape === 'conn') { it.w = it.h = Math.max(it.w, it.h); }
+        delete it.sz;
         return it;
     }
     function shapeSvg(it) {
-        var c = FLOW_COLORS[it.color] || FLOW_COLORS.azul, x = it.x, y = it.y, w = it.w, h = it.h;
-        var st = ' fill="' + c.f + '" stroke="' + c.s + '" stroke-width="1.6"', g = '', wv = Math.min(9, h * 0.15);
+        var x = it.x, y = it.y, w = it.w, h = it.h, ink = pal(it.ink).t;
+        var st = ' fill="' + pal(it.fill).f + '" stroke="' + pal(it.line).s + '" stroke-width="1.6"', g = '', wv = Math.min(9, h * 0.15);
         if (it.shape === 'term') { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + Math.min(h, w) / 2 + '"' + st + '/>'; }
         else if (it.shape === 'dec') { g = '<path d="M' + (x + w / 2) + ' ' + y + 'L' + (x + w) + ' ' + (y + h / 2) + 'L' + (x + w / 2) + ' ' + (y + h) + 'L' + x + ' ' + (y + h / 2) + 'Z"' + st + '/>'; }
         else if (it.shape === 'doc') {
@@ -138,7 +166,7 @@
         var fs = shapeFs(it), lh = fs * 1.25, txt = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs) : [];
         if (txt.length) {
             var cy = y + (it.shape === 'doc' ? (h - wv) / 2 : h / 2), y0 = cy - (txt.length - 1) * lh / 2 + fs * 0.35;
-            g += '<text x="' + (x + w / 2) + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="' + c.t + '">'
+            g += '<text x="' + (x + w / 2) + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
                 + txt.map(function (l, i) { return '<tspan x="' + (x + w / 2) + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
         }
         return '<g data-id="' + it.id + '">' + g + '</g>';
@@ -260,8 +288,14 @@
             if (it && it.t === 'shape') {
                 if (!flowMode) { return; }
                 var sh = { id: String(it.id || uid()), t: 'shape', x: +it.x || 0, y: +it.y || 0, lock: !!it.lock, g: it.g ? String(it.g) : '',
-                    shape: SHAPES[it.shape] ? it.shape : 'proc', text: String(it.text || '').slice(0, 500), sz: SHAPE_K[it.sz] ? it.sz : 'm' };
-                sh.color = FLOW_COLORS[it.color] ? it.color : SHAPES[sh.shape].color;
+                    shape: SHAPES[it.shape] ? it.shape : 'proc', text: String(it.text || '').slice(0, 500),
+                    w: +it.w || 0, h: +it.h || 0, fs: +it.fs || 0, b: !!it.b };
+                // Q5b gravava `sz` (P/M/G) e w/h calculados: vale o w/h gravado.
+                if (!sh.w && SHAPE_K[it.sz]) { sh.sz = it.sz; }
+                var old = FLOW_COLORS[it.color] ? it.color : SHAPES[sh.shape].color;
+                sh.fill = FLOW_COLORS[it.fill] ? it.fill : old;
+                sh.line = FLOW_COLORS[it.line] ? it.line : old;
+                sh.ink = FLOW_COLORS[it.ink] ? it.ink : old;
                 out.items.push(shapeFit(sh));
                 return;
             }
@@ -294,11 +328,14 @@
             } else if (it.t === 'zone') {
                 n.w = Math.max(20, +it.w || 200); n.h = Math.max(20, +it.h || 120);
                 n.label = String(it.label || '').slice(0, 80);
-                n.color = COLORS.indexOf(it.color) >= 0 ? it.color : COLORS[1];
+                n.color = PAL_HEX.indexOf(it.color) >= 0 ? it.color : COLORS[1];
             } else {
                 n.text = String(it.text || '').slice(0, 300);
-                n.color = COLORS.indexOf(it.color) >= 0 ? it.color : '#1d2330';
+                n.color = PAL_HEX.indexOf(it.color) >= 0 ? it.color : '#1d2330';
                 n.size = ['p', 'm', 'g'].indexOf(it.size) >= 0 ? it.size : 'm';
+                // Q5c: letra em px (barra flutuante) e negrito.
+                if (+it.px > 0) { n.px = Math.max(8, Math.min(96, Math.round(+it.px))); }
+                if (it.b) { n.b = true; }
             }
             out.items.push(n);
         });
@@ -582,9 +619,9 @@
                 + esc(it.label) + '</text></g>';
         }
         if (it.t === 'text') {
-            var fs = TEXT_PX[it.size] || 15;
+            var fs = it.px || TEXT_PX[it.size] || 15;
             var lines = String(it.text || (forExport ? '' : 'Texto')).split('\n');
-            return '<g data-id="' + it.id + '"><text x="' + it.x + '" y="' + (it.y + fs) + '" font-family="Arial,sans-serif" font-size="' + fs + '" fill="' + it.color + '">'
+            return '<g data-id="' + it.id + '"><text x="' + it.x + '" y="' + (it.y + fs) + '" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + it.color + '">'
                 + lines.map(function (l, i) { return '<tspan x="' + it.x + '" dy="' + (i ? fs * 1.25 : 0) + '">' + esc(l) + '</tspan>'; }).join('')
                 + '</text></g>';
         }
@@ -696,7 +733,7 @@
             return { x: bx, y: by, w: Math.max.apply(null, xs) + pd - bx, h: Math.max.apply(null, ys) + pd - by };
         }
         if (it.t === 'text') {
-            var fs = TEXT_PX[it.size] || 15, lines = String(it.text || 'Texto').split('\n');
+            var fs = it.px || TEXT_PX[it.size] || 15, lines = String(it.text || 'Texto').split('\n');
             var w = Math.max.apply(null, lines.map(function (l) { return l.length; })) * fs * 0.55;
             return { x: it.x, y: it.y, w: Math.max(30, w), h: lines.length * fs * 1.25 + 4 };
         }
@@ -1094,7 +1131,7 @@
                 // Q5b: só formas (os ícones são da Planta e da Topologia).
                 root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Fluxograma</div><div class="cx-board-grid">'
                     + Object.keys(SHAPES).map(function (k) {
-                        var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: k === 'conn' ? 'm' : 'p', text: '', color: SHAPES[k].color });
+                        var ck = SHAPES[k].color, demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: k === 'conn' ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck });
                         return '<button type="button" class="cx-board-ic" data-shape="' + k + '" title="' + esc(SHAPES[k].label) + '">'
                             + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo) + '</svg><span>' + esc(SHAPES[k].label) + '</span></button>';
                     }).join('') + '</div>';
@@ -1381,6 +1418,7 @@
         /* ---------- vista ---------- */
         function applyView() {
             vp.setAttribute('transform', 'translate(' + view.x + ' ' + view.y + ') scale(' + view.z + ')');
+            if (typeof drawFbar === 'function' && fbar) { drawFbar(); }
             root.querySelector('.cx-board-zoom').textContent = Math.round(view.z * 100) + '%';
         }
         function toBoard(e) {
@@ -1438,6 +1476,10 @@
             root.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-tool') === tool); });
         }
         function drawSel() {
+            drawSelBody();
+            if (typeof drawFbar === 'function') { drawFbar(); }
+        }
+        function drawSelBody() {
             gSel.innerHTML = sel.map(function (id) {
                 var it = get(id); if (!it) { return ''; }
                 if (it.t === 'duct') {
@@ -1465,14 +1507,29 @@
                     + (it.t === 'icon' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rzi="' + it.id + '" x="' + (it.x + it.size - 4 / view.z) + '" y="' + (it.y + it.size - 4 / view.z)
                         + '" width="' + (9 / view.z) + '" height="' + (9 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '')
                     + ((it.t === 'icon' || it.t === 'shape') && sel.length === 1 ? handles(it) : '')
-                    + (it.t === 'zone' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rz="' + it.id + '" x="' + (b.x + b.w - 5 / view.z) + '" y="' + (b.y + b.h - 5 / view.z)
+                    + (flow && sel.length === 1 && !it.lock ? sizeHandles(it, b) : '')
+                    + (!flow && it.t === 'zone' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rz="' + it.id + '" x="' + (b.x + b.w - 5 / view.z) + '" y="' + (b.y + b.h - 5 / view.z)
                         + '" width="' + (10 / view.z) + '" height="' + (10 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '');
             }).join('');
         }
 
+        // Q5c: oito alças de tamanho (forma e moldura); no texto, os quatro
+        // cantos (mudam a letra). Na borda tracejada da seleção.
+        var RS_CUR = { nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew' };
+        function sizeHandles(it, b) {
+            if (['shape', 'zone', 'text'].indexOf(it.t) < 0) { return ''; }
+            var dirs = it.t === 'text' ? ['nw', 'ne', 'se', 'sw'] : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+            var x1 = b.x - 4, y1 = b.y - 4, x2 = b.x + b.w + 4, y2 = b.y + b.h + 4, r = 4 / view.z;
+            return dirs.map(function (d) {
+                var x = d.indexOf('w') >= 0 ? x1 : d.indexOf('e') >= 0 ? x2 : (x1 + x2) / 2;
+                var y = d.indexOf('n') >= 0 ? y1 : d.indexOf('s') >= 0 ? y2 : (y1 + y2) / 2;
+                return '<rect class="cx-board-rs" data-rs="' + d + '" x="' + (x - r) + '" y="' + (y - r) + '" width="' + (2 * r) + '" height="' + (2 * r)
+                    + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" style="cursor:' + RS_CUR[d] + '-resize"/>';
+            }).join('');
+        }
         // Alças de ligação nas quatro bordas (um pouco para fora, longe da alça de tamanho).
         function handles(it) {
-            var o = 10 / view.z, r = 5 / view.z;
+            var o = (it.t === 'shape' ? 22 : 10) / view.z, r = 5 / view.z;
             return SIDES.map(function (sd) {
                 var a = anchor(it, sd);
                 var x = a.x + (sd === 'l' ? o : sd === 'o' ? -o : 0), y = a.y + (sd === 's' ? o : sd === 'n' ? -o : 0);
@@ -1602,11 +1659,9 @@
             if (it.t === 'shape') {
                 h += '<p><strong>' + esc(SHAPES[it.shape].label) + '</strong></p>'
                     + '<label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
-                    + '<label class="cx-board-f"><span>Tamanho</span><select data-k="sz">' + optsOf({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.sz) + '</select></label>'
-                    + '<span class="cx-board-flab">Cor</span><div class="cx-board-sw">' + Object.keys(FLOW_COLORS).map(function (k) {
-                        return '<button type="button" data-fc="' + k + '" style="background:' + FLOW_COLORS[k].f + ';border-color:' + FLOW_COLORS[k].s + '" title="' + esc(FLOW_COLORS[k].label) + '" aria-label="' + esc(FLOW_COLORS[k].label) + '"' + (it.color === k ? ' class="is-on"' : '') + '></button>';
-                    }).join('') + '</div>'
-                    + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha. A forma cresce em altura com o texto.</p>';
+                    + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha.</p>'
+                    + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="fs">' + FS_LIST.map(function (v) { return '<option value="' + v + '"' + (v === shapeFs(it) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
+                    + '<p class="cx-board-none">Tamanho: puxe os quadradinhos brancos (Shift mantém a proporção; Alt solta da grade). A altura nunca fica menor que o texto. Cores, negrito, letra e camadas: na barra sobre a forma.</p>';
             } else if (it.t === 'link' && it.kind === 'fluxo') {
                 h += '<p><strong>Ligação</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
                     + field('Rótulo', 'label', it.label, 'Sim')
@@ -1663,12 +1718,16 @@
                     + '<p class="cx-board-none">Arraste o quadrado branco para mover um ponto (alinha com o vizinho; Alt solta). Duplo clique na faixa cria um ponto; Ctrl + duplo clique no ponto apaga. Arraste a faixa para mover tudo.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
+            } else if (flow) {
+                h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
+                    + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="px">' + FS_LIST.concat([36, 48]).map(function (v) { return '<option value="' + v + '"' + (v === (it.px || TEXT_PX[it.size] || 15) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
+                    + '<p class="cx-board-none">Cor, negrito, letra e camadas: na barra sobre o texto. Puxe um canto para aumentar a letra.</p>';
             } else {
                 h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<label class="cx-board-f"><span>Tamanho</span><select data-k="size"><option value="p"' + (it.size === 'p' ? ' selected' : '') + '>Pequeno</option>'
                     + '<option value="m"' + (it.size === 'm' ? ' selected' : '') + '>Médio</option><option value="g"' + (it.size === 'g' ? ' selected' : '') + '>Grande</option></select></label>';
             }
-            if (it.t !== 'icon' || true) {
+            if (!flow) {
                 h += '<div class="cx-board-sw">' + COLORS.map(function (c) {
                     return it.t === 'icon' || it.t === 'link' || it.t === 'duct' || it.t === 'shape' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
                 }).join('') + '</div>';
@@ -1688,7 +1747,8 @@
             }
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
-            if (it.t === 'shape' && (k === 'text' || k === 'sz')) { it.text = String(it.text).slice(0, 500); shapeFit(it); }
+            if (it.t === 'shape' && k === 'text') { it.text = String(it.text).slice(0, 500); shapeFit(it); }
+            if ((it.t === 'shape' && k === 'fs') || (it.t === 'text' && k === 'px')) { it[k] = +v; if (it.t === 'shape') { shapeFit(it); } }
             if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
             paint();
             drawSel();
@@ -1709,8 +1769,6 @@
                 var lk = get(sel[0]); if (lk && lk.wp && lk.wp.length) { snap(); lk.wp = []; render(); }
                 return;
             }
-            var fc = e.target.closest('[data-fc]');
-            if (fc && sel.length === 1) { snap(); get(sel[0]).color = fc.getAttribute('data-fc'); render(); return; }
             var b = e.target.closest('[data-color]'); if (!b || sel.length !== 1) { return; }
             snap(); get(sel[0]).color = b.getAttribute('data-color'); render();
         });
@@ -1744,12 +1802,151 @@
 
         function addShape(shape, x, y) {
             snap();
-            var it = shapeFit({ id: uid(), t: 'shape', shape: shape, text: '', color: SHAPES[shape].color, sz: 'm', x: 0, y: 0, lock: false, g: '' });
+            var ck = SHAPES[shape].color;
+            var it = shapeFit({ id: uid(), t: 'shape', shape: shape, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' });
             it.x = Math.round((x - it.w / 2) / GRID) * GRID; it.y = Math.round((y - it.h / 2) / GRID) * GRID;
             D.items.push(it);
             sel = [it.id];
             render();
             return it;
+        }
+
+        /* ---------- Q5c: redimensionar pelas alças ---------- */
+        function resizeTo(dr, p, e) {
+            var it = get(dr.id), s0 = dr.s, d = dr.dir, dx = p.x - dr.p.x, dy = p.y - dr.p.y;
+            var x1 = s0.x, y1 = s0.y, x2 = s0.x + s0.w, y2 = s0.y + s0.h;
+            var gr = function (v) { return e.altKey ? v : Math.round(v / GRID) * GRID; };
+            if (d.indexOf('w') >= 0) { x1 = gr(s0.x + dx); }
+            if (d.indexOf('e') >= 0) { x2 = gr(s0.x + s0.w + dx); }
+            if (d.indexOf('n') >= 0) { y1 = gr(s0.y + dy); }
+            if (d.indexOf('s') >= 0) { y2 = gr(s0.y + s0.h + dy); }
+            if (e.shiftKey && d.length === 2 && s0.h > 0) {
+                // Shift: mantém a proporção pela largura.
+                var nh = (x2 - x1) * s0.h / s0.w;
+                if (d.indexOf('n') >= 0) { y1 = y2 - nh; } else { y2 = y1 + nh; }
+            }
+            var mw = it.t === 'shape' ? shapeMinW(it) : 20;
+            if (x2 - x1 < mw) { if (d.indexOf('w') >= 0) { x1 = x2 - mw; } else { x2 = x1 + mw; } }
+            if (y2 - y1 < mw) { if (d.indexOf('n') >= 0) { y1 = y2 - mw; } else { y2 = y1 + mw; } }
+            if (it.t === 'text') {
+                it.px = Math.max(8, Math.min(96, Math.round(s0.px * (x2 - x1) / s0.w)));
+                var tb = bbox(it);
+                it.x = d.indexOf('w') >= 0 ? x2 - tb.w : x1;
+                it.y = d.indexOf('n') >= 0 ? y2 - tb.h : y1;
+                return;
+            }
+            it.x = x1; it.y = y1; it.w = x2 - x1; it.h = y2 - y1;
+            if (it.t === 'shape') {
+                shapeFit(it);
+                // Texto pediu mais altura (ou o conector ficou redondo): cresce
+                // para o lado oposto ao da alça puxada.
+                if (d.indexOf('n') >= 0) { it.y = y2 - it.h; }
+                if (d.indexOf('w') >= 0) { it.x = x2 - it.w; }
+            }
+        }
+
+        /* ---------- Q5c: barra flutuante de estilo ---------- */
+        var stageEl = root.querySelector('.cx-board-stage'), fbar = null;
+        if (flow) {
+            fbar = document.createElement('div');
+            fbar.className = 'cx-fbar';
+            fbar.hidden = true;
+            stageEl.appendChild(fbar);
+        }
+        // Q5c-2: onde o <svg> começa dentro do palco. SVG não tem offsetLeft/
+        // offsetTop (só elemento HTML tem): a conta dava NaN e a barra caía
+        // no canto de baixo, cortada.
+        function svgOff() {
+            var a = svg.getBoundingClientRect(), b = stageEl.getBoundingClientRect();
+            return { x: (a.left - b.left) || 0, y: (a.top - b.top) || 0 };
+        }
+        function styled() { return sel.map(get).filter(function (i) { return i && ['shape', 'zone', 'text'].indexOf(i.t) >= 0; }); }
+        function swatch(what, k, on) {
+            var c = FLOW_COLORS[k], bg = what === 'fill' ? c.f : what === 'line' ? '#fff' : c.t;
+            var bd = what === 'line' ? c.s : what === 'fill' ? c.s : c.t;
+            return '<button type="button" class="cx-fbar-sw' + (on ? ' is-on' : '') + '" data-what="' + what + '" data-pal="' + k + '" title="' + esc(c.label) + '" aria-label="' + esc(c.label)
+                + '" style="background:' + bg + ';border-color:' + bd + (what === 'line' ? ';border-width:3px' : '') + '"></button>';
+        }
+        // Fundo: só forma. Borda: forma e moldura. Texto: forma e texto.
+        function applies(i, what) { return i.t === 'shape' || (what === 'line' ? i.t === 'zone' : what === 'ink' && i.t === 'text'); }
+        function palKeyOf(it, what) {
+            if (it.t === 'shape') { return it[what]; }
+            var hex = it.color, found = null;
+            Object.keys(FLOW_COLORS).forEach(function (k) { if (!found && FLOW_COLORS[k][what === 'line' ? 's' : 't'] === hex) { found = k; } });
+            return found;
+        }
+        function drawFbar() {
+            if (!fbar) { return; }
+            var its = styled();
+            if (!its.length || its.length !== sel.length || ed || (drag && drag.k !== 'rs' && drag.k !== 'move')) { fbar.hidden = true; return; }
+            var hasShape = its.some(function (i) { return i.t === 'shape'; }), hasText = its.some(function (i) { return i.t !== 'zone'; });
+            var hasLine = its.some(function (i) { return i.t !== 'text'; });
+            var first = its[0], pop = fbar.__pop || '';
+            var fsNow = first.t === 'shape' ? shapeFs(first) : first.t === 'text' ? (first.px || TEXT_PX[first.size] || 15) : 0;
+            var allB = its.filter(function (i) { return i.t !== 'zone'; }).every(function (i) { return i.b; });
+            var sig = [sel.join(','), pop, its.map(function (i) { return [i.fill, i.line, i.ink, i.color].join(':'); }).join(';'), allB, fsNow].join('|');
+            if (fbar.__sig !== sig) {
+                fbar.__sig = sig;
+                var btn = function (what, label, show) {
+                    if (!show) { return ''; }
+                    var k = its.filter(function (i) { return applies(i, what); }).map(function (i) { return palKeyOf(i, what); }).filter(Boolean)[0] || 'branco';
+                    return '<button type="button" class="cx-fbar-b' + (pop === what ? ' is-on' : '') + '" data-fpop="' + what + '" title="' + label + '">' + swatch(what, k, false).replace('<button', '<span').replace('</button>', '</span>') + ' ' + label + '</button>';
+                };
+                var h = '<div class="cx-fbar-row">'
+                    + btn('fill', 'Fundo', hasShape) + btn('line', 'Borda', hasLine) + btn('ink', 'Texto', hasText)
+                    + (hasText ? '<button type="button" class="cx-fbar-b' + (allB ? ' is-on' : '') + '" data-fb="1" title="Negrito"><b>B</b></button>'
+                        + '<select class="cx-fbar-fs" title="Tamanho da letra">' + FS_LIST.concat(FS_LIST.indexOf(fsNow) < 0 && fsNow ? [fsNow] : []).sort(function (a, b) { return a - b; })
+                            .map(function (v) { return '<option value="' + v + '"' + (v === fsNow ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select>' : '')
+                    + '<span class="cx-fbar-sep"></span>'
+                    + '<button type="button" class="cx-fbar-b" data-flayer="front" title="Trazer para frente">⬆ Frente</button>'
+                    + '<button type="button" class="cx-fbar-b" data-flayer="back" title="Enviar para trás">⬇ Trás</button></div>';
+                if (pop) {
+                    var cur = (its.filter(function (i) { return applies(i, pop); }).map(function (i) { return palKeyOf(i, pop); })[0]) || '';
+                    h += '<div class="cx-fbar-pop">' + Object.keys(FLOW_COLORS).map(function (k) { return swatch(pop, k, k === cur); }).join('') + '</div>';
+                }
+                fbar.innerHTML = h;
+            }
+            // Posição: centrada acima da seleção; sem espaço em cima, embaixo.
+            var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+            its.forEach(function (i) { var b = bbox(i); x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h); });
+            var off = svgOff(), cx = off.x + view.x + (x1 + x2) / 2 * view.z, top = off.y + view.y + y1 * view.z - 14;
+            var below = top < 70;
+            fbar.style.left = cx + 'px';
+            fbar.style.top = (below ? off.y + view.y + y2 * view.z + 14 : top) + 'px';
+            fbar.classList.toggle('is-below', below);
+            fbar.hidden = false;
+        }
+        function styleApply(fn) {
+            snap();
+            styled().forEach(fn);
+            render();
+        }
+        if (fbar) {
+            fbar.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            fbar.addEventListener('click', function (e) {
+                var t = e.target.closest('button'); if (!t) { return; }
+                if (t.hasAttribute('data-fpop')) { var w0 = t.getAttribute('data-fpop'); fbar.__pop = fbar.__pop === w0 ? '' : w0; drawFbar(); return; }
+                if (t.hasAttribute('data-pal')) {
+                    var what = t.getAttribute('data-what'), k = t.getAttribute('data-pal');
+                    styleApply(function (i) {
+                        if (i.t === 'shape') { i[what] = k; }
+                        else if (i.t === 'zone' && what === 'line') { i.color = FLOW_COLORS[k].s; }
+                        else if (i.t === 'text' && what === 'ink') { i.color = FLOW_COLORS[k].t; }
+                    });
+                    return;
+                }
+                if (t.hasAttribute('data-fb')) {
+                    var all = styled().filter(function (i) { return i.t !== 'zone'; }).every(function (i) { return i.b; });
+                    styleApply(function (i) { if (i.t !== 'zone') { i.b = !all; if (i.t === 'shape') { shapeFit(i); } } });
+                    return;
+                }
+                if (t.hasAttribute('data-flayer')) { act(t.getAttribute('data-flayer')); }
+            });
+            fbar.addEventListener('change', function (e) {
+                if (!e.target.matches('.cx-fbar-fs')) { return; }
+                var v = +e.target.value;
+                styleApply(function (i) { if (i.t === 'shape') { i.fs = v; shapeFit(i); } else if (i.t === 'text') { i.px = v; } });
+            });
         }
 
         /* ---------- Q5b: texto no lugar (duplo clique ou começar a digitar) ---------- */
@@ -1761,6 +1958,7 @@
             if (keep && it && it.text !== e0.ta.value) { snap(); it.text = e0.ta.value.slice(0, 500); shapeFit(it); }
             e0.ta.remove();
             render();
+            drawFbar();
         }
         function editStart(it, first) {
             if (ed || !it || it.t !== 'shape' || it.lock) { return; }
@@ -1768,10 +1966,12 @@
             ta.className = 'cx-board-inplace';
             ta.value = first !== undefined ? first : (it.text || '');
             var fs = shapeFs(it) * view.z;
-            ta.style.cssText = 'left:' + (svg.offsetLeft + view.x + it.x * view.z) + 'px;top:' + (svg.offsetTop + view.y + it.y * view.z) + 'px;width:' + (it.w * view.z)
-                + 'px;height:' + (it.h * view.z) + 'px;font-size:' + fs + 'px;color:' + (FLOW_COLORS[it.color] || FLOW_COLORS.azul).t;
+            var off = svgOff();
+            ta.style.cssText = 'left:' + (off.x + view.x + it.x * view.z) + 'px;top:' + (off.y + view.y + it.y * view.z) + 'px;width:' + (it.w * view.z)
+                + 'px;height:' + (it.h * view.z) + 'px;font-size:' + fs + 'px;color:' + pal(it.ink).t + (it.b ? ';font-weight:bold' : '');
             stage.appendChild(ta);
             ed = { id: it.id, ta: ta };
+            drawFbar();
             ta.addEventListener('keydown', function (ev) {
                 ev.stopPropagation();
                 if (ev.key === 'Escape') { ev.preventDefault(); editEnd(false); }
@@ -1868,6 +2068,10 @@
                 drag = { k: 'dv', id: sel[0], j: +e.target.getAttribute('data-dv'), moved: false };
             } else if (e.target.getAttribute('data-lw') && sel.length === 1) {
                 drag = { k: 'wp', id: sel[0], j: +e.target.getAttribute('data-lw'), moved: false };
+            } else if (e.target.getAttribute('data-rs') && sel.length === 1) {
+                var ri = get(sel[0]), rb = bbox(ri);
+                snap();
+                drag = { k: 'rs', id: ri.id, dir: e.target.getAttribute('data-rs'), p: p, s: { x: rb.x, y: rb.y, w: rb.w, h: rb.h, px: ri.px || TEXT_PX[ri.size] || 15 } };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
                 var from = get(sel[0]), sd = e.target.getAttribute('data-lh');
                 drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd) };
@@ -1984,6 +2188,7 @@
                     + '" stroke="#378ADD" stroke-width="' + (2 / view.z) + '" stroke-dasharray="' + (6 / view.z) + ' ' + (4 / view.z) + '"/>';
                 return;
             }
+            if (drag.k === 'rs') { resizeTo(drag, p, e); paint(); drawSel(); return; }
             if (drag.k === 'rzi') {
                 var ic = get(drag.id);
                 ic.size = Math.max(24, Math.min(160, Math.round(Math.max(p.x - ic.x, p.y - ic.y) / 4) * 4));
@@ -2200,6 +2405,14 @@
                 D.items = D.items.filter(function (i) { return i.t !== 'link' || (get(i.a.id) && get(i.b.id)); });
                 sel = []; render();
             }
+            else if ((a === 'front' || a === 'back') && sel.length) {
+                // Q5c: ordem dentro da própria camada (moldura continua no
+                // fundo, ligações sob as formas: o desenho separa por tipo).
+                snap();
+                var mv = D.items.filter(function (i) { return sel.indexOf(i.id) >= 0; }), rest = D.items.filter(function (i) { return sel.indexOf(i.id) < 0; });
+                D.items = a === 'front' ? rest.concat(mv) : mv.concat(rest);
+                render();
+            }
             else if (a === 'undo') { undo(); }
             else if (a === 'redo') { redoIt(); }
             else if (a === 'zin' || a === 'zout') { var r = svg.getBoundingClientRect(); zoomAt(a === 'zin' ? 1.2 : 1 / 1.2, r.width / 2, r.height / 2); drawSel(); }
@@ -2350,5 +2563,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

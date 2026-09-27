@@ -2192,3 +2192,16 @@ html.cx-board-open { overflow: hidden; }
 .cx-board-inplace { position: absolute; z-index: 5; box-sizing: border-box; margin: 0; padding: 6px 10px; border: 2px solid #378ADD; border-radius: 6px;
     background: rgba(255,255,255,.92); font-family: Arial, sans-serif; line-height: 1.25; text-align: center; resize: none; outline: none; overflow: hidden; }
 .cx-board-flab { display: block; font-size: .85em; color: var(--cx-muted); margin-top: 6px; }
+/* Q5c — barra flutuante de estilo do fluxograma (sobre a seleção) */
+.cx-fbar { position: absolute; z-index: 6; transform: translate(-50%, -100%); background: #fff; border: 1px solid #d3d1c7; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12); padding: 4px 6px; font-size: 12px; white-space: nowrap; }
+.cx-fbar.is-below { transform: translate(-50%, 0); }
+.cx-fbar-row { display: flex; align-items: center; gap: 4px; }
+.cx-fbar-b { display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px 7px; cursor: pointer; color: #1d2330; }
+.cx-fbar-b:hover, .cx-fbar-b.is-on { border-color: #d3d1c7; background: #f1efe8; }
+.cx-fbar-b .cx-fbar-sw { width: 14px; height: 14px; cursor: inherit; }
+.cx-fbar-fs { font-size: 12px; padding: 1px 2px; border: 1px solid #d3d1c7; border-radius: 6px; }
+.cx-fbar-sep { width: 1px; height: 18px; background: #d3d1c7; margin: 0 2px; }
+.cx-fbar-pop { display: grid; grid-template-columns: repeat(6, 22px); gap: 5px; padding: 6px 2px 2px; justify-content: center; }
+.cx-fbar-sw { display: inline-block; width: 22px; height: 22px; border-radius: 5px; border: 1.5px solid; padding: 0; cursor: pointer; box-sizing: border-box; }
+.cx-fbar-sw.is-on { outline: 2px solid #378ADD; outline-offset: 1px; }

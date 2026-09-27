@@ -89,6 +89,54 @@
             .catch(function () {});
         return LIB.promise;
     }
+    /* Q4b — tratamento do PNG do ícone novo, sobre os pixels (RGBA) do
+       recorte de 256 px. Funções puras: testáveis sem canvas.
+       removeBg: a cor do fundo é a dos cantos (a que mais se repete entre os
+         quatro); some tudo o que, LIGADO À BORDA, estiver perto dessa cor —
+         o branco de dentro do desenho (uma porta, um visor) fica. tol 0..100.
+         A borda do desenho ganha transparência parcial (sem serrilhado).
+       tint: silhueta — todo pixel visível vira a cor da categoria, com a
+         mesma transparência; o que é quase branco fica branco. */
+    function fxDist(p, i, c) { var r = p[i] - c[0], g = p[i + 1] - c[1], b = p[i + 2] - c[2]; return Math.sqrt(r * r + g * g + b * b); }
+    function removeBg(p, w, h, tol) {
+        var corners = [0, w - 1, (h - 1) * w, h * w - 1].map(function (k) { return k * 4; });
+        // Imagem que já tem fundo transparente (um canto transparente basta): não mexe.
+        if (corners.some(function (i) { return p[i + 3] < 16; })) { return 0; }
+        var best = corners[0], bestN = -1;
+        corners.forEach(function (i) {
+            var n = corners.filter(function (j) { return fxDist(p, j, [p[i], p[i + 1], p[i + 2]]) < 24; }).length;
+            if (n > bestN) { bestN = n; best = i; }
+        });
+        var key = [p[best], p[best + 1], p[best + 2]], max = Math.max(1, tol * 2.2);
+        var seen = new Uint8Array(w * h), stack = [], gone = 0;
+        var push = function (x, y) { if (x >= 0 && y >= 0 && x < w && y < h && !seen[y * w + x]) { seen[y * w + x] = 1; stack.push(y * w + x); } };
+        for (var x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+        for (var y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+        var fringe = [];
+        while (stack.length) {
+            var k = stack.pop(), i = k * 4;
+            if (p[i + 3] >= 16 && fxDist(p, i, key) > max) { fringe.push(k); continue; }
+            p[i + 3] = 0; gone++;
+            var kx = k % w, ky = (k - kx) / w;
+            push(kx + 1, ky); push(kx - 1, ky); push(kx, ky + 1); push(kx, ky - 1);
+        }
+        fringe.forEach(function (k) {
+            var i = k * 4, d = fxDist(p, i, key);
+            if (d < max * 1.6) { p[i + 3] = Math.round(p[i + 3] * Math.min(1, (d - max) / (max * 0.6))); }
+        });
+        return gone;
+    }
+    function tint(p, hex) {
+        var c = [parseInt(hex.substr(1, 2), 16), parseInt(hex.substr(3, 2), 16), parseInt(hex.substr(5, 2), 16)];
+        for (var i = 0; i < p.length; i += 4) {
+            if (p[i + 3] === 0) { continue; }
+            // Branco de dentro do desenho (porta, visor) fica branco: o ícone
+            // lembra os da paleta (miolo claro, traço na cor da categoria).
+            if (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2] > 225) { p[i] = 255; p[i + 1] = 255; p[i + 2] = 255; continue; }
+            p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2];
+        }
+    }
+
     // Cópia, no quadro, dos ícones da instalação que ele usa (campo lib).
     function libOf(items) {
         var out = {};
@@ -930,10 +978,11 @@
         root.querySelector('.cx-board-q').addEventListener('input', paleta);
 
         /* ---------- Q4a: novo ícone a partir de imagem (Super-Admin) ----------
-           Recorte quadrado arrastável sobre a imagem; sai um PNG de 96 px
+           Recorte quadrado arrastável sobre a imagem; sai um PNG de 256 px
            (nada do arquivo original é guardado). Grava em ajax/icons.php. */
         var ni = null;   // janela aberta
-        var NI_BOX = 240, NI_OUT = 96, NI_MAX = 2 * 1024 * 1024;
+        // Q4b-2: 256 px (antes 96, pixelava com zoom, ícone grande e PNG em 2x).
+        var NI_BOX = 240, NI_OUT = 256, NI_MAX = 2 * 1024 * 1024;
         function niClose() { if (ni) { ni.el.remove(); ni = null; } }
         function niOpen() {
             if (ni) { return; }
@@ -946,6 +995,11 @@
                 + '<div class="cx-ni-stage"><canvas width="' + NI_BOX + '" height="' + NI_BOX + '"></canvas><div class="cx-ni-crop" hidden></div></div>'
                 + '<label class="cx-board-f"><span>Tamanho do recorte</span><input type="range" min="10" max="100" step="1" value="100" data-ni="size"></label>'
                 + '<p class="cx-board-none">Arraste o quadrado para escolher a parte da imagem. PNG, JPG, WebP ou SVG, até 2 MB.</p>'
+                + '<label class="cx-board-chk"><input type="checkbox" data-ni="bg" checked> Tirar o fundo <span class="cx-ni-muted">(cor dos cantos)</span></label>'
+                + '<label class="cx-board-f cx-ni-tol"><span>Tolerância</span><input type="range" min="0" max="100" step="1" value="30" data-ni="tol"></label>'
+                + '<div class="cx-ni-mode" role="group" aria-label="Cor do ícone">'
+                + '<button type="button" data-ni-mode="color" class="is-on">Cor original</button>'
+                + '<button type="button" data-ni-mode="mask">Silhueta na cor da categoria</button></div>'
                 + '</div><div class="cx-ni-side">'
                 + '<p class="cx-ni-title">Novo ícone</p>'
                 + '<label class="cx-board-f"><span>Nome</span><input type="text" maxlength="60" data-ni="name" placeholder="Guarita"></label>'
@@ -956,7 +1010,7 @@
                 + '<div class="cx-ni-btns"><button type="button" data-ni="cancel">Cancelar</button><button type="button" data-ni="save" class="cx-board-ok">Salvar ícone</button></div>'
                 + '</div></div>';
             root.appendChild(el);
-            ni = { el: el, img: null, s: 1, ox: 0, oy: 0, iw: 0, ih: 0, cx: 0, cy: 0, cs: 0, out: '' };
+            ni = { el: el, img: null, s: 1, ox: 0, oy: 0, iw: 0, ih: 0, cx: 0, cy: 0, cs: 0, out: '', mode: 'color' };
             var cv = el.querySelector('canvas'), crop = el.querySelector('.cx-ni-crop');
             var q = function (k) { return el.querySelector('[data-ni="' + k + '"]'); };
             var err = el.querySelector('.cx-ni-err');
@@ -973,7 +1027,16 @@
                 o.width = NI_OUT; o.height = NI_OUT;
                 var og = o.getContext && o.getContext('2d');
                 if (!og) { return; }
+                og.imageSmoothingEnabled = true;
+                og.imageSmoothingQuality = 'high';
                 og.drawImage(ni.img, (ni.cx - ni.ox) / ni.s, (ni.cy - ni.oy) / ni.s, ni.cs / ni.s, ni.cs / ni.s, 0, 0, NI_OUT, NI_OUT);
+                // Q4b: fundo e silhueta, sobre os pixels do recorte.
+                if (typeof og.getImageData === 'function' && (q('bg').checked || ni.mode === 'mask')) {
+                    var px = og.getImageData(0, 0, NI_OUT, NI_OUT);
+                    if (q('bg').checked) { removeBg(px.data, NI_OUT, NI_OUT, +q('tol').value); }
+                    if (ni.mode === 'mask') { tint(px.data, (I.CATS[q('cat').value] || I.CATS.infra).S); }
+                    og.putImageData(px, 0, 0);
+                }
                 ni.out = o.toDataURL('image/png');
                 el.querySelectorAll('.cx-ni-prev img').forEach(function (im) { im.src = ni.out; });
             };
@@ -1023,6 +1086,16 @@
                 document.addEventListener('pointermove', mv);
                 document.addEventListener('pointerup', up);
             });
+            q('bg').addEventListener('change', function () { el.querySelector('.cx-ni-tol').hidden = !q('bg').checked; draw(); });
+            q('tol').addEventListener('input', draw);
+            q('cat').addEventListener('change', function () { if (ni.mode === 'mask') { draw(); } });
+            el.querySelectorAll('[data-ni-mode]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    ni.mode = b.getAttribute('data-ni-mode');
+                    el.querySelectorAll('[data-ni-mode]').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+                    draw();
+                });
+            });
             q('cancel').addEventListener('click', niClose);
             q('save').addEventListener('click', function () {
                 var name = q('name').value.trim();
@@ -1032,7 +1105,7 @@
                 var tk = document.querySelector('[name="_glpi_csrf_token"]');
                 var fd = new FormData();
                 fd.append('action', 'add'); fd.append('name', name); fd.append('cat', q('cat').value);
-                fd.append('search', q('search').value.trim()); fd.append('mode', 'color'); fd.append('image', ni.out);
+                fd.append('search', q('search').value.trim()); fd.append('mode', ni.mode); fd.append('image', ni.out);
                 if (tk) { fd.append('_glpi_csrf_token', tk.value); }
                 var btn = q('save'); btn.disabled = true; btn.textContent = 'Salvando…';
                 fetch(BASE + '/ajax/icons.php', { method: 'POST', body: fd, credentials: 'same-origin' })
@@ -1944,5 +2017,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

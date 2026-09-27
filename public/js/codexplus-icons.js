@@ -163,7 +163,7 @@
             if (!c) { return; }
             var key = c.key || ('u' + (parseInt(c.id, 10) || 0));
             var img = String(c.image || '');
-            if (!KEY.test(key) || key === 'u0' || !IMG.test(img) || img.length > 300000) { return; }
+            if (!KEY.test(key) || key === 'u0' || !IMG.test(img) || img.length > 400000) { return; }
             if (onlyMissing && BY_ID[key]) { return; }
             var e = { id: key, name: String(c.name || 'Ícone').slice(0, 80), cat: CATS[c.cat] ? c.cat : 'infra',
                 search: String(c.search || '').slice(0, 200), cone: false, body: '', custom: true, img: img,

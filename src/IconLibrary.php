@@ -10,9 +10,9 @@ namespace GlpiPlugin\Codexplus;
  * de uma imagem: vão para a paleta de todo mundo, na categoria escolhida.
  *
  * A imagem é SEMPRE um PNG pequeno gerado no navegador (recorte quadrado,
- * 96 px). Nem SVG nem arquivo original ficam guardados: um SVG pode trazer
+ * 256 px). Nem SVG nem arquivo original ficam guardados: um SVG pode trazer
  * script, o PNG não. Aqui só se confere que o que chegou é mesmo um PNG
- * pequeno.
+ * pequeno (até 256 px desde o Q4b-2).
  *
  * Quem cria, edita e exclui: só o Super-Admin (Rights::isSuperAdmin),
  * decisão de Claudio. Quem usa: quem abre o quadro. O quadro guarda uma CÓPIA
@@ -26,7 +26,7 @@ class IconLibrary
     /** Categorias = as do codexplus-icons.js (cor do ícone). */
     public const CATS = ['rede', 'nucleo', 'seguranca', 'estacao', 'infra', 'protecao'];
     public const MODES = ['color', 'mask'];
-    public const MAX_BYTES = 150000;   // PNG decodificado
+    public const MAX_BYTES = 250000;   // PNG decodificado (Q4b-2: 256 px)
     public const MAX_SIDE = 256;
     public const PREFIX = 'data:image/png;base64,';
 
@@ -85,6 +85,10 @@ class IconLibrary
             $mode = 'color';
         }
         $img = (string) ($in['image'] ?? '');
+        // Base64 ocupa 4/3 do arquivo: passou do teto, avisa o motivo.
+        if (strlen($img) > (int) (self::MAX_BYTES * 4 / 3) + strlen(self::PREFIX) + 4) {
+            return [null, __('Imagem pesada demais para ícone (foto?). Use um desenho mais simples ou recorte uma parte menor.', 'codexplus')];
+        }
         if (!self::validPng($img)) {
             return [null, __('Imagem inválida: envie de novo.', 'codexplus')];
         }

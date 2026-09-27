@@ -79,6 +79,76 @@
     // Blocos que recebem estilo e tamanho. Célula de tabela e item de lista
     // só recebem tamanho (não viram título nem nota).
     var TEXT_BLOCKS = 'p,h1,h2,h3,h4,h5,h6,div,pre,blockquote';
+
+    /* T2 — ferramentas por tipo de documento (Claudio, 27/09/2026):
+         POP, PSG, MAN -> texto e imagens
+         PRP           -> + Planilha e Planta
+         LAU, DTC      -> + Planta e Topologia
+         DIV           -> tudo
+       (DIA tem editor próprio e não usa este corpo.) Tipo fora da tabela ou
+       ainda não escolhido mostra tudo. Esconder o botão não mexe no que já
+       está no texto: planilha e quadro existentes continuam abrindo com
+       duplo clique. O tipo vem do select[name=doctype] do formulário
+       (documento novo e tela Modelos, onde ele muda na hora) ou do
+       data-cx-doctype em volta do editor (documento já criado). */
+    var TOOLS_BY_TYPE = {
+        cxsheet:    ['PRP', 'DIV'],
+        cxplant:    ['PRP', 'LAU', 'DTC', 'DIV'],
+        cxtopology: ['LAU', 'DTC', 'DIV']
+    };
+    var KNOWN_TYPES = ['POP', 'PSG', 'MAN', 'PRP', 'LAU', 'DTC', 'DIV'];
+    function toolAllowed(btn, type) {
+        var list = TOOLS_BY_TYPE[btn];
+        if (!list || KNOWN_TYPES.indexOf(type) === -1) { return true; }
+        return list.indexOf(type) !== -1;
+    }
+    function hiddenTools(type) {
+        return Object.keys(TOOLS_BY_TYPE).filter(function (b) { return !toolAllowed(b, type); });
+    }
+    function typeSelect(editor) {
+        var el = editor && editor.getElement && editor.getElement();
+        var form = el ? (el.form || (el.closest && el.closest('form'))) : null;
+        return (form && form.querySelector('select[name="doctype"]'))
+            || document.querySelector('select[name="doctype"]');
+    }
+    function currentType(editor) {
+        var sel = typeSelect(editor);
+        if (sel) { return String(sel.value || ''); }
+        var el = editor && editor.getElement && editor.getElement();
+        var holder = (el && el.closest && el.closest('[data-cx-doctype]'))
+            || document.querySelector('[data-cx-doctype]');
+        return holder ? String(holder.getAttribute('data-cx-doctype') || '') : '';
+    }
+    /* A barra e a gaveta "mais" (modo floating) ficam fora do iframe e a
+       gaveta nem fica dentro do contêiner do editor: por isso a marca vai no
+       <html> e o CSS casa pelo data-mce-name que o TinyMCE 7 põe em cada
+       botão. */
+    function applyTools(type) {
+        var root = document.documentElement;
+        if (!root) { return; }
+        var h = hiddenTools(type);
+        if (h.length) { root.setAttribute('data-cx-hide', h.join(' ')); }
+        else { root.removeAttribute('data-cx-hide'); }
+    }
+    (function injectToolsCss() {
+        if (!document.head || document.getElementById('cx-tools-css')) { return; }
+        var st = document.createElement('style');
+        st.id = 'cx-tools-css';
+        st.textContent = Object.keys(TOOLS_BY_TYPE).map(function (b) {
+            return 'html[data-cx-hide~="' + b + '"] [data-mce-name="' + b + '"]{display:none!important;}';
+        }).join('');
+        document.head.appendChild(st);
+    })();
+    function watchType(editor) {
+        var upd = function () { applyTools(currentType(editor)); };
+        upd();
+        var sel = typeSelect(editor);
+        if (sel && !sel.__cxToolsWatch) {
+            sel.__cxToolsWatch = true;
+            sel.addEventListener('change', upd);
+            if (window.jQuery) { window.jQuery(sel).on('change', upd); }
+        }
+    }
     var SIZE_BLOCKS = 'p,li,td,th,div,blockquote';
 
     /* Medidas: fonte única nos tokens do CSS. Valor padrão só se o CSS não
@@ -387,6 +457,9 @@
 
         var ui = editor.ui.registry;
 
+        // T2: esconde Planilha / Planta / Topologia conforme o tipo.
+        watchType(editor);
+
         editor.on('PreInit', function () {
             editor.formatter.register('cxsize_sm', { inline: 'span', classes: 'cx-size-sm' });
             editor.formatter.register('cxsize_lg', { inline: 'span', classes: 'cx-size-lg' });
@@ -487,6 +560,7 @@
             text: 'Planilha',
             tooltip: 'Inserir planilha (Qtd, item, valores e total). Duplo clique numa planilha edita.',
             onAction: function () {
+                if (!toolAllowed('cxsheet', currentType(editor))) { return; }
                 if (window.CodexplusSheet) { window.CodexplusSheet.open(editor, null); }
             }
         });
@@ -511,7 +585,10 @@
                 tooltip: m === 'planta'
                     ? 'Planta de execução: a planta do cliente com os equipamentos. Duplo clique num quadro edita.'
                     : 'Topologia de rede: equipamentos, zonas e VLANs. Duplo clique num quadro edita.',
-                onAction: function () { if (window.CodexplusBoard) { window.CodexplusBoard.open(editor, null, m); } }
+                onAction: function () {
+                    if (!toolAllowed(m === 'planta' ? 'cxplant' : 'cxtopology', currentType(editor))) { return; }
+                    if (window.CodexplusBoard) { window.CodexplusBoard.open(editor, null, m); }
+                }
             });
         });
 
@@ -667,7 +744,11 @@
         _applyStyle: applyStyle,
         _applySize: applySize,
         _importFile: importFile,
-        _normalize: normalize
+        _normalize: normalize,
+        _toolAllowed: toolAllowed,
+        _hiddenTools: hiddenTools,
+        _currentType: currentType,
+        _applyTools: applyTools
     };
 
     prepare(EDITOR_ID);

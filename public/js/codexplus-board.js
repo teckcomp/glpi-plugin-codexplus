@@ -18,7 +18,8 @@
    Itens: icon {x,y,size,icon,label,f:{modelo,ip,vlan,obs},cat,cone},
           zone {x,y,w,h,label,color}, text {x,y,text,color,size}.
           link {a:{id,side}, b:{id,side}, kind, route, wp:[{x,y}], ends,
-                label, cable} (Q2a; side = n/l/s/o, borda do ícone).
+                label, cable, pa, pb, vel, vlan, poe, showId, fs}
+                (Q2a/Q2b; side = n/l/s/o, borda do ícone; cable = P-001…).
    Todos com id, lock (travado) e g (grupo). Ligação não tem x/y: a
    posição vem dos dois ícones, e ela acompanha quando eles se movem.
    Q2b tipos e painel; Q2c traçado, dobras e religar a ponta; Q2d metragem
@@ -35,8 +36,20 @@
     var PXM_DEFAULT = 20;   // sem escala definida: 1 m = 20 px (aproximado)
     var PXM = PXM_DEFAULT;  // escala do quadro em uso (render e PNG)
     var SIDES = ['n', 'l', 's', 'o'];   // bordas do ícone: norte, leste, sul, oeste
-    // Tipos de cabo: cor, espessura e traço. Q2a usa só o padrão; Q2b completa a lista.
-    var LINK_KINDS = { cat6: { label: 'UTP Cat6', c: '#378ADD', w: 2.5, d: '' } };
+    // Tipos de cabo (Q2b): cor, espessura e traço. Tipo novo = uma linha aqui.
+    // UTP em azul com a espessura crescendo; lógica/VPN nasce com seta.
+    var LINK_KINDS = {
+        cat5e:  { label: 'UTP Cat5e',        c: '#378ADD', w: 2,   d: '' },
+        cat6:   { label: 'UTP Cat6',         c: '#378ADD', w: 2.6, d: '' },
+        cat6a:  { label: 'UTP Cat6A',        c: '#185FA5', w: 3.4, d: '' },
+        fibra:  { label: 'Fibra óptica',     c: '#7F77DD', w: 2.6, d: '' },
+        coax:   { label: 'Coaxial / vídeo',  c: '#D85A30', w: 2.6, d: '' },
+        eletr:  { label: 'Elétrica',         c: '#E24B4A', w: 2.6, d: '' },
+        semfio: { label: 'Sem fio',          c: '#888780', w: 2,   d: '8 6' },
+        logica: { label: 'Lógica / VPN',     c: '#5F5E5A', w: 2,   d: '1 6', arrow: true },
+        outro:  { label: 'Outros',           c: '#888780', w: 2,   d: '' }
+    };
+    var LINK_FS = { p: 0.8, m: 1, g: 1.3 };   // tamanho do nome do cabo
     var LINK_DEFAULT = 'cat6';
 
     function esc(t) {
@@ -108,10 +121,15 @@
                 kind: LINK_KINDS[it.kind] ? it.kind : LINK_DEFAULT,
                 route: ['straight', 'elbow', 'curve'].indexOf(it.route) >= 0 ? it.route : 'straight',
                 wp: (Array.isArray(it.wp) ? it.wp : []).slice(0, 50).filter(function (p) { return p && isFinite(+p.x) && isFinite(+p.y); })
-                    .map(function (p) { return { x: Math.round(+p.x), y: Math.round(+p.y) }; }),
+                    .map(function (p) { return { x: Math.round(+p.x * 10) / 10, y: Math.round(+p.y * 10) / 10 }; }),
                 ends: ['none', 'arrow', 'both'].indexOf(it.ends) >= 0 ? it.ends : 'none',
                 label: String(it.label || '').slice(0, 80),
-                cable: String(it.cable || '').slice(0, 20)
+                cable: String(it.cable || '').slice(0, 20),
+                pa: String(it.pa || '').slice(0, 40), pb: String(it.pb || '').slice(0, 40),
+                vel: String(it.vel || '').slice(0, 40), vlan: String(it.vlan || '').slice(0, 40),
+                poe: !!it.poe,
+                showId: it.showId === undefined ? true : !!it.showId,
+                fs: LINK_FS[it.fs] ? it.fs : 'm'
             });
         });
         return out;
@@ -141,8 +159,116 @@
         if (!a || !b || a.t !== 'icon' || b.t !== 'icon') { return null; }
         return [anchor(a, L.a.side)].concat(L.wp || [], [anchor(b, L.b.side)]);
     }
+    // Próximo número livre de cabo (P-001, P-002…); reaproveita buraco.
+    function nextCable(items) {
+        var used = {};
+        items.forEach(function (i) { var m = i.t === 'link' && /^P-(\d+)$/.exec(i.cable || ''); if (m) { used[+m[1]] = true; } });
+        var n = 1; while (used[n]) { n++; }
+        return 'P-' + (n < 10 ? '00' : n < 100 ? '0' : '') + n;
+    }
+    // Texto que aparece no cabo: identificação, rótulo e PoE.
+    function linkText(L) {
+        var parts = [];
+        if (L.showId && L.cable) { parts.push(L.cable); }
+        if (L.label) { parts.push(L.label); }
+        if (L.poe) { parts.push('PoE'); }
+        return parts.join(' · ');
+    }
+    // Ponta de seta desenhada como triângulo (o PNG não depende de <marker>).
+    function arrowHead(tip, from, k) {
+        var ang = Math.atan2(tip.y - from.y, tip.x - from.x), len = 6 + k.w * 2.5, hw = 3 + k.w * 1.2;
+        var bx = tip.x - len * Math.cos(ang), by = tip.y - len * Math.sin(ang);
+        var px = -Math.sin(ang) * hw, py = Math.cos(ang) * hw;
+        return '<path d="M' + tip.x.toFixed(1) + ' ' + tip.y.toFixed(1) + 'L' + (bx + px).toFixed(1) + ' ' + (by + py).toFixed(1)
+            + 'L' + (bx - px).toFixed(1) + ' ' + (by - py).toFixed(1) + 'Z" fill="' + k.c + '"/>';
+    }
     function linkD(pts) {
         return 'M' + pts.map(function (q) { return (+q.x).toFixed(1) + ' ' + (+q.y).toFixed(1); }).join('L');
+    }
+
+    /* ---------------- traçado (Q2c): reto, cotovelo, curvo ---------------- */
+    var STUB = 14;   // o cotovelo sai reto da borda antes de dobrar
+    function out(p, side, d) {
+        return side === 'n' ? { x: p.x, y: p.y - d } : side === 's' ? { x: p.x, y: p.y + d } : side === 'o' ? { x: p.x - d, y: p.y } : { x: p.x + d, y: p.y };
+    }
+    // Liga os pontos só com trechos horizontais e verticais. A cada ponto,
+    // vira perpendicular ao trecho anterior (Claudio, 27/09/2026: o cotovelo
+    // fazia ganchos perto das pontas) e junta trechos alinhados.
+    function orth(q) {
+        var o = [q[0]], dir = '';
+        for (var i = 1; i < q.length; i++) {
+            var p = o[o.length - 1], c = q[i];
+            if (Math.abs(p.x - c.x) > 0.5 && Math.abs(p.y - c.y) > 0.5) {
+                o.push(dir === 'h' ? { x: p.x, y: c.y } : { x: c.x, y: p.y });
+            }
+            o.push(c);
+            var a = o[o.length - 2], b = o[o.length - 1];
+            if (Math.abs(a.x - b.x) > 0.5) { dir = 'h'; } else if (Math.abs(a.y - b.y) > 0.5) { dir = 'v'; }
+        }
+        return simplify(o);
+    }
+    function simplify(o) {
+        var r = [];
+        o.forEach(function (c) {
+            var p = r[r.length - 1];
+            if (p && Math.abs(p.x - c.x) < 0.5 && Math.abs(p.y - c.y) < 0.5) { return; }
+            var q = r[r.length - 2];
+            if (q && ((Math.abs(q.x - p.x) < 0.5 && Math.abs(p.x - c.x) < 0.5) || (Math.abs(q.y - p.y) < 0.5 && Math.abs(p.y - c.y) < 0.5))) { r[r.length - 1] = c; return; }
+            r.push(c);
+        });
+        return r;
+    }
+    // Distância de um ponto a uma polilinha.
+    function distPoly(pt, o) {
+        var best = Infinity;
+        for (var i = 1; i < o.length; i++) {
+            var a = o[i - 1], b = o[i], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+            var t = l2 ? Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / l2)) : 0;
+            var x = a.x + t * dx - pt.x, y = a.y + t * dy - pt.y;
+            best = Math.min(best, x * x + y * y);
+        }
+        return best;
+    }
+    // Curva suave pelas dobras; nas pontas, sai perpendicular à borda.
+    function curveSegs(L, P) {
+        var segs = [], n = P.length;
+        for (var i = 0; i < n - 1; i++) {
+            var a = P[i], b = P[i + 1], len = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2)) / 3;
+            var c1 = i === 0 ? out(a, L.a.side, Math.max(20, len)) : { x: a.x + (b.x - P[i - 1].x) / 6, y: a.y + (b.y - P[i - 1].y) / 6 };
+            var c2 = i === n - 2 ? out(b, L.b.side, Math.max(20, len)) : { x: b.x - (P[i + 2].x - a.x) / 6, y: b.y - (P[i + 2].y - a.y) / 6 };
+            segs.push([a, c1, c2, b]);
+        }
+        return segs;
+    }
+    function bez(s, t) {
+        var u = 1 - t;
+        return { x: u * u * u * s[0].x + 3 * u * u * t * s[1].x + 3 * u * t * t * s[2].x + t * t * t * s[3].x,
+                 y: u * u * u * s[0].y + 3 * u * u * t * s[1].y + 3 * u * t * t * s[2].y + t * t * t * s[3].y };
+    }
+    // Pontos do desenho (polilinha): serve para o rótulo, as setas e o PNG.
+    function routePts(L, find) {
+        var P = linkPts(L, find);
+        if (!P) { return null; }
+        var n = P.length;
+        if (L.route === 'elbow') {
+            return orth([P[0], out(P[0], L.a.side, STUB)].concat(P.slice(1, n - 1), [out(P[n - 1], L.b.side, STUB), P[n - 1]]));
+        }
+        if (L.route === 'curve') {
+            var o = [P[0]];
+            curveSegs(L, P).forEach(function (sg) { for (var k = 1; k <= 16; k++) { o.push(bez(sg, k / 16)); } });
+            return o;
+        }
+        return P;
+    }
+    function routeD(L, find) {
+        if (L.route === 'curve') {
+            var P = linkPts(L, find);
+            if (!P) { return ''; }
+            var f = function (q) { return q.x.toFixed(1) + ' ' + q.y.toFixed(1); };
+            return 'M' + f(P[0]) + curveSegs(L, P).map(function (sg) { return 'C' + f(sg[1]) + ' ' + f(sg[2]) + ' ' + f(sg[3]); }).join('');
+        }
+        var r = routePts(L, find);
+        return r ? linkD(r) : '';
     }
     // Meio do traçado pelo comprimento (onde fica o rótulo).
     function midPoint(pts) {
@@ -159,17 +285,28 @@
         return pts[0];
     }
     function linkSvg(L, find, forExport) {
-        var pts = linkPts(L, find);
+        var pts = routePts(L, find);
         if (!pts) { return ''; }
-        var k = LINK_KINDS[L.kind] || LINK_KINDS[LINK_DEFAULT], d = linkD(pts), h = '<g data-id="' + L.id + '">';
+        var k = LINK_KINDS[L.kind] || LINK_KINDS[LINK_DEFAULT], d = routeD(L, find), h = '<g data-id="' + L.id + '">';
         // Faixa larga e invisível: facilita clicar no cabo (não vai para o PNG).
-        if (!forExport) { h += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="12"/>'; }
+        // 14 px NA TELA em qualquer zoom (Claudio, 27/09/2026: com a planta
+        // inteira à vista o cabo ficava com 3 a 4 px clicáveis).
+        if (!forExport) { h += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke"/>'; }
         h += '<path class="cx-board-link" d="' + d + '" fill="none" stroke="' + k.c + '" stroke-width="' + k.w
             + '" stroke-linecap="round" stroke-linejoin="round"' + (k.d ? ' stroke-dasharray="' + k.d + '"' : '') + '/>';
-        if (L.label) {
-            var m = midPoint(pts), w = L.label.length * 6.2 + 12;
-            h += '<rect x="' + (m.x - w / 2).toFixed(1) + '" y="' + (m.y - 9).toFixed(1) + '" width="' + w.toFixed(1) + '" height="18" rx="4" fill="#ffffff" stroke="' + k.c + '" stroke-width="0.8"/>'
-                + '<text x="' + m.x.toFixed(1) + '" y="' + (m.y + 4).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#1d2330">' + esc(L.label) + '</text>';
+        var n = pts.length;
+        if (L.ends === 'arrow' || L.ends === 'both') { h += arrowHead(pts[n - 1], pts[n - 2], k); }
+        if (L.ends === 'both') { h += arrowHead(pts[0], pts[1], k); }
+        var txt = linkText(L);
+        if (txt) {
+            // O nome do cabo acompanha os ícones das pontas, como o nome do
+            // ícone (Claudio, 27/09/2026), com Pequeno/Médio/Grande no painel.
+            var a = find(L.a.id), b = find(L.b.id);
+            var fs = Math.max(7, Math.round(labelPx(Math.min(a.size, b.size)) * (LINK_FS[L.fs] || 1) * 2) / 2);
+            var m = midPoint(pts), w = txt.length * fs * 0.56 + fs, bh = fs + 6;
+            h += '<rect x="' + (m.x - w / 2).toFixed(1) + '" y="' + (m.y - bh / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + bh + '" rx="' + (bh / 4).toFixed(1)
+                + '" fill="#ffffff" stroke="' + k.c + '" stroke-width="0.8"/>'
+                + '<text x="' + m.x.toFixed(1) + '" y="' + (m.y + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="#1d2330">' + esc(txt) + '</text>';
         }
         return h + '</g>';
     }
@@ -247,8 +384,12 @@
             box = { x: 0, y: 0, w: data.w, h: data.h };
         } else {
             var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+            var fnd = finder(data.items);
             data.items.forEach(function (it) {
-                if (it.t === 'link') { return; }
+                if (it.t === 'link') {
+                    (routePts(it, fnd) || []).forEach(function (q) { x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x); y2 = Math.max(y2, q.y); });
+                    return;
+                }
                 var b = bbox(it);
                 if (it.cone && it.cone.on) {
                     var c = { x: it.x + it.size / 2, y: it.y + it.size / 2 }, r = it.cone.m * PXM + 30;
@@ -550,9 +691,10 @@
             gSel.innerHTML = sel.map(function (id) {
                 var it = get(id); if (!it) { return ''; }
                 if (it.t === 'link') {
-                    var lp = linkPts(it, get);
-                    return lp ? '<path d="' + linkD(lp) + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + (9 / view.z)
-                        + '" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>' : '';
+                    var ld = routeD(it, get);
+                    return ld ? '<path d="' + ld + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + (9 / view.z)
+                        + '" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>'
+                        + (sel.length === 1 && !it.lock ? linkHandles(it) : '') : '';
                 }
                 var b = bbox(it);
                 return '<rect x="' + (b.x - 4) + '" y="' + (b.y - 4) + '" width="' + (b.w + 8) + '" height="' + (b.h + 8)
@@ -575,6 +717,47 @@
                 return '<circle class="cx-board-lh" data-lh="' + sd + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r
                     + '" fill="#378ADD" stroke="#fff" stroke-width="' + (1.5 / view.z) + '"><title>Puxe até outro ícone para ligar</title></circle>';
             }).join('');
+        }
+        // Alças da ligação selecionada: pontas (religar) e dobras (mover).
+        // Dobra nasce com duplo clique no cabo e sai com Ctrl + duplo clique
+        // (Claudio, 27/09/2026: o ponto no meio de cada trecho criava dobras
+        // a cada arraste).
+        function linkHandles(L) {
+            var P = linkPts(L, get); if (!P) { return ''; }
+            var r = 5 / view.z, sw = 1.5 / view.z, h = '', n = P.length;
+            (L.wp || []).forEach(function (q, i) {
+                h += '<rect class="cx-board-lw" data-lw="' + i + '" x="' + (q.x - r) + '" y="' + (q.y - r) + '" width="' + (2 * r) + '" height="' + (2 * r)
+                    + '" fill="#378ADD" stroke="#fff" stroke-width="' + sw + '"><title>Arraste para mover; Ctrl + duplo clique apaga a dobra</title></rect>';
+            });
+            [['a', P[0]], ['b', P[n - 1]]].forEach(function (e) {
+                h += '<circle class="cx-board-le" data-le="' + e[0] + '" cx="' + e[1].x.toFixed(1) + '" cy="' + e[1].y.toFixed(1) + '" r="' + r
+                    + '" fill="#fff" stroke="#378ADD" stroke-width="' + (2 / view.z) + '"><title>Arraste para outra borda ou outro ícone</title></circle>';
+            });
+            return h;
+        }
+        // Em qual trecho (entre o ponto j e o j+1) caiu o duplo clique.
+        function segPiece(L, P, j) {
+            if (L.route === 'elbow') {
+                var n = P.length, q = [P[j]];
+                if (j === 0) { q.push(out(P[0], L.a.side, STUB)); }
+                if (j === n - 2) { q.push(out(P[n - 1], L.b.side, STUB)); }
+                q.push(P[j + 1]);
+                return orth(q);
+            }
+            if (L.route === 'curve') {
+                var sg = curveSegs(L, P)[j], o = [];
+                for (var k = 0; k <= 16; k++) { o.push(bez(sg, k / 16)); }
+                return o;
+            }
+            return [P[j], P[j + 1]];
+        }
+        function addBend(L, p) {
+            var P = linkPts(L, get); if (!P) { return; }
+            var best = 0, bd = Infinity;
+            for (var j = 0; j < P.length - 1; j++) { var d = distPoly(p, segPiece(L, P, j)); if (d < bd) { bd = d; best = j; } }
+            snap();
+            // Ponto exato do clique, sem grade (Claudio, 27/09/2026: a grade não deixava encostar o cabo na parede).
+            L.wp.splice(best, 0, { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 });
         }
         function iconAt(p) {
             for (var i = D.items.length - 1; i >= 0; i--) {
@@ -623,9 +806,20 @@
                         + '<p class="cx-board-none">' + (D.pxm ? 'Metros pela escala da planta.' : 'Escala aproximada (1 m = ' + PXM_DEFAULT + ' px): use "Escala" na barra para medir pela planta.') + '</p>';
                 }
             } else if (it.t === 'link') {
-                h += '<p><strong>Ligação</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
-                    + field('Rótulo', 'label', it.label, 'Uplink')
-                    + '<p class="cx-board-none">Tipo de cabo, traçado, dobras e metragem chegam nos próximos passos.</p>';
+                var opts = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
+                var kinds = {}; Object.keys(LINK_KINDS).forEach(function (k) { kinds[k] = LINK_KINDS[k].label; });
+                h += '<p><strong>Ligação ' + esc(it.cable) + '</strong></p><p class="cx-board-none">' + esc(iconName(get(it.a.id))) + ' → ' + esc(iconName(get(it.b.id))) + '</p>'
+                    + '<label class="cx-board-f"><span>Tipo de cabo</span><select data-k="kind">' + opts(kinds, it.kind) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Traçado</span><select data-k="route">' + opts({ straight: 'Reto', elbow: 'Cotovelo', curve: 'Curvo' }, it.route) + '</select></label>'
+                    + '<label class="cx-board-f"><span>Pontas</span><select data-k="ends">' + opts({ none: 'Sem seta', arrow: 'Seta no destino', both: 'Seta nas duas pontas' }, it.ends) + '</select></label>'
+                    + '<div class="cx-board-row">' + field('Cabo', 'cable', it.cable, 'P-001') + field('Rótulo', 'label', it.label, 'Uplink') + '</div>'
+                    + '<div class="cx-board-row">' + field('Porta origem', 'pa', it.pa, 'Gi0/1') + field('Porta destino', 'pb', it.pb, 'eth0') + '</div>'
+                    + '<div class="cx-board-row">' + field('Velocidade', 'vel', it.vel, '1 Gbps') + field('VLAN', 'vlan', it.vlan, '20') + '</div>'
+                    + '<label class="cx-board-chk"><input type="checkbox" data-k="poe"' + (it.poe ? ' checked' : '') + '> PoE</label>'
+                    + '<label class="cx-board-chk"><input type="checkbox" data-k="showId"' + (it.showId ? ' checked' : '') + '> Mostrar a identificação no cabo</label>'
+                    + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + opts({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
+                    + '<p><button type="button" class="cx-board-btn" data-la="straighten"' + (it.wp.length ? '' : ' disabled') + '>Endireitar (tirar as dobras)</button></p>'
+                    + '<p class="cx-board-none">Para desenhar a passagem: duplo clique no cabo cria uma dobra ali; arraste a dobra (quadrado azul) para mover, ela alinha com a vizinha (segure Alt para posição livre); Ctrl + duplo clique na dobra apaga. Arraste a bolinha da ponta para outra borda ou outro ícone. O nome acompanha o tamanho dos ícones. Metragem chega no próximo passo.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else {
@@ -649,15 +843,22 @@
             if (/^(size|rot|cone\.dir|cone\.fov|cone\.m)$/.test(k) && it.t === 'icon') { v = +v; }
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
+            if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
             paint();
             drawSel();
             if (/^cone\.|^cat$|^size$|^rot$/.test(k) && e.type === 'change') { drawProps(); }
+            if (it.t === 'link' && k === 'cable') { var tt = props.querySelector('strong'); if (tt) { tt.textContent = 'Ligação ' + v; } }
         });
         props.addEventListener('change', function (e) {
             props.__snap = false;
             if (e.target.matches('select,[type=checkbox],[type=range]')) { drawProps(); }
         });
         props.addEventListener('click', function (e) {
+            var la = e.target.closest('[data-la]');
+            if (la && sel.length === 1 && la.getAttribute('data-la') === 'straighten') {
+                var lk = get(sel[0]); if (lk && lk.wp && lk.wp.length) { snap(); lk.wp = []; render(); }
+                return;
+            }
             var b = e.target.closest('[data-color]'); if (!b || sel.length !== 1) { return; }
             snap(); get(sel[0]).color = b.getAttribute('data-color'); render();
         });
@@ -718,9 +919,23 @@
         });
 
         /* ---------- quadro: ponteiro ---------- */
-        var space = false, drag = null, scaleA = null;
+        var space = false, drag = null, scaleA = null, lastDown = { t: 0, x: 0, y: 0 };
         svg.addEventListener('pointerdown', function (e) {
             var p = toBoard(e);
+            // Duplo clique detectado aqui: com a captura do ponteiro, o dblclick
+            // do navegador chega no quadro e não na dobra (achado do Q2c).
+            var now = Date.now(), dbl = now - lastDown.t < 400 && Math.abs(e.clientX - lastDown.x) + Math.abs(e.clientY - lastDown.y) < 8;
+            lastDown = dbl ? { t: 0, x: 0, y: 0 } : { t: now, x: e.clientX, y: e.clientY };
+            if (dbl && tool === 'select') {
+                var lwAttr = e.target.getAttribute && e.target.getAttribute('data-lw');
+                if (lwAttr !== null && lwAttr !== undefined && (e.ctrlKey || e.metaKey) && sel.length === 1) {
+                    var lk0 = get(sel[0]); snap(); lk0.wp.splice(+lwAttr, 1); drag = null; render(); return;
+                }
+                var hid = hit(e.target), hl = hid && get(hid);
+                if (hl && hl.t === 'link' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
+                    addBend(hl, p); sel = [hl.id]; drag = null; render(); return;
+                }
+            }
             // Escala: o segundo clique fecha a medida.
             if (tool === 'scale' && scaleA) {
                 var dist = Math.sqrt(Math.pow(p.x - scaleA.x, 2) + Math.pow(p.y - scaleA.y, 2));
@@ -734,6 +949,10 @@
             }
             if (e.button === 1 || space) {
                 drag = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+            } else if (e.target.getAttribute('data-le') && sel.length === 1) {
+                drag = { k: 'end', id: sel[0], end: e.target.getAttribute('data-le') };
+            } else if (e.target.getAttribute('data-lw') && sel.length === 1) {
+                drag = { k: 'wp', id: sel[0], j: +e.target.getAttribute('data-lw'), moved: false };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
                 var from = get(sel[0]), sd = e.target.getAttribute('data-lh');
                 drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd) };
@@ -771,7 +990,10 @@
                         sel = grp;
                     }
                     var movable = sel.filter(function (s) { var it = get(s); return it && !it.lock && it.t !== 'link'; });
-                    drag = { k: 'move', p: p, start: movable.map(function (s) { var it = get(s); return { id: s, x: it.x, y: it.y }; }), moved: false };
+                    drag = { k: 'move', p: p, start: movable.map(function (s) { var it = get(s); return { id: s, x: it.x, y: it.y }; }), moved: false,
+                        // Ligação com os dois ícones no conjunto: as dobras andam junto.
+                        lw: D.items.filter(function (l) { return l.t === 'link' && l.wp.length && movable.indexOf(l.a.id) >= 0 && movable.indexOf(l.b.id) >= 0; })
+                            .map(function (l) { return { id: l.id, wp: clone(l.wp) }; }) };
                 } else if (e.shiftKey) {
                     drag = { k: 'marq', p: p, base: sel.slice() };
                 } else {
@@ -789,6 +1011,36 @@
             var p = toBoard(e);
             if (drag.k === 'pan') {
                 view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return;
+            }
+            if (drag.k === 'wp') {
+                if (!drag.moved) { snap(); drag.moved = true; }
+                // Livre, sem grade; gruda na mesma linha/coluna da dobra ou ponta
+                // vizinha (6 px na tela), com guia rosa. Alt desliga o encaixe.
+                var lw = get(drag.id), P = linkPts(lw, get), nb = [P[drag.j], P[drag.j + 2]], tol = 6 / view.z;
+                var wx = p.x, wy = p.y, gx = null, gy = null;
+                if (!e.altKey) {
+                    nb.forEach(function (q) {
+                        if (!q) { return; }
+                        if (gx === null && Math.abs(q.x - p.x) < tol) { gx = q.x; }
+                        if (gy === null && Math.abs(q.y - p.y) < tol) { gy = q.y; }
+                    });
+                }
+                if (gx !== null) { wx = gx; }
+                if (gy !== null) { wy = gy; }
+                lw.wp[drag.j] = { x: Math.round(wx * 10) / 10, y: Math.round(wy * 10) / 10 };
+                gGuides.innerHTML = (gx !== null ? '<line x1="' + gx + '" y1="-5000" x2="' + gx + '" y2="5000" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '')
+                    + (gy !== null ? '<line x1="-5000" y1="' + gy + '" x2="5000" y2="' + gy + '" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '');
+                paint(); drawSel(); return;
+            }
+            if (drag.k === 'end') {
+                var le = get(drag.id), other = le[drag.end === 'a' ? 'b' : 'a'].id, al = iconAt(p), gl = '';
+                if (al && al.id !== other) {
+                    var alb = bbox(al), aa = anchor(al, nearestSide(al, p));
+                    gl = '<rect x="' + (alb.x - 4) + '" y="' + (alb.y - 4) + '" width="' + (alb.w + 8) + '" height="' + (alb.h + 8) + '" fill="none" stroke="#378ADD" stroke-width="' + (2 / view.z) + '"/>'
+                        + '<circle cx="' + aa.x + '" cy="' + aa.y + '" r="' + (5 / view.z) + '" fill="#378ADD"/>';
+                }
+                gGuides.innerHTML = gl + '<circle cx="' + p.x + '" cy="' + p.y + '" r="' + (4 / view.z) + '" fill="none" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>';
+                return;
             }
             if (drag.k === 'link') {
                 var alvo = iconAt(p), gh = '';
@@ -844,6 +1096,7 @@
                 var ddx = gx !== null ? dx + (gx - cx) : Math.round((drag.start[0].x + dx) / GRID) * GRID - drag.start[0].x;
                 var ddy = gy !== null ? dy + (gy - cy) : Math.round((drag.start[0].y + dy) / GRID) * GRID - drag.start[0].y;
                 drag.start.forEach(function (s) { var it = get(s.id); it.x = s.x + ddx; it.y = s.y + ddy; });
+                (drag.lw || []).forEach(function (s) { get(s.id).wp = s.wp.map(function (q) { return { x: q.x + ddx, y: q.y + ddy }; }); });
                 gGuides.innerHTML = (gx !== null ? '<line x1="' + gx + '" y1="-5000" x2="' + gx + '" y2="5000" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '')
                     + (gy !== null ? '<line x1="-5000" y1="' + gy + '" x2="5000" y2="' + gy + '" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '');
                 paint();
@@ -852,13 +1105,22 @@
         });
         svg.addEventListener('pointerup', function (e) {
             svg.classList.remove('is-panning');
+            if (drag && drag.k === 'end') {
+                // Religar: outra borda do mesmo ícone ou outro ícone; no vazio, nada muda.
+                var pe = toBoard(e), Le = get(drag.id), oth = Le[drag.end === 'a' ? 'b' : 'a'].id, ti = iconAt(pe);
+                if (ti && ti.id !== oth) {
+                    var ns = nearestSide(ti, pe);
+                    if (ti.id !== Le[drag.end].id || ns !== Le[drag.end].side) { snap(); Le[drag.end] = { id: ti.id, side: ns }; }
+                }
+            }
             if (drag && drag.k === 'link') {
                 // Soltar no vazio não cria nada (forma ligada é do Fluxograma, Q5).
                 var tgt = iconAt(toBoard(e));
                 if (tgt && tgt.id !== drag.from) {
                     snap();
                     var L = { id: uid(), t: 'link', a: { id: drag.from, side: drag.side }, b: { id: tgt.id, side: nearestSide(tgt, toBoard(e)) },
-                        kind: LINK_DEFAULT, route: 'straight', wp: [], ends: 'none', label: '', cable: '', lock: false, g: '' };
+                        kind: LINK_DEFAULT, route: 'elbow', wp: [], ends: 'none', label: '', cable: nextCable(D.items),
+                        pa: '', pb: '', vel: '', vlan: '', poe: false, showId: true, fs: 'm', lock: false, g: '' };
                     D.items.push(L);
                     sel = [L.id];
                 }
@@ -878,7 +1140,7 @@
             drawSel();
         }, { passive: false });
         svg.addEventListener('dblclick', function (e) {
-            var id = hit(e.target); if (!id) { return; }
+            var id = hit(e.target); if (!id || (get(id) || {}).t === 'link') { return; }
             sel = [id]; render();
             var f = props.querySelector('[data-k="label"],[data-k="text"]'); if (f) { f.focus(); f.select(); }
         });
@@ -908,6 +1170,7 @@
                 // Ligação só vai junto se os dois ícones foram copiados.
                 src.filter(function (o) { return o.t === 'link' && ids[o.a.id] && ids[o.b.id]; }).forEach(function (o) {
                     var n = clone(o); n.id = uid(); n.a.id = ids[o.a.id]; n.b.id = ids[o.b.id];
+                    if (/^P-\d+$/.test(n.cable || '')) { n.cable = nextCable(D.items); }
                     n.wp = (n.wp || []).map(function (q) { return { x: q.x + 20, y: q.y + 20 }; });
                     if (n.g) { mapa[n.g] = mapa[n.g] || uid(); n.g = mapa[n.g]; }
                     D.items.push(n); novos.push(n.id);
@@ -1068,6 +1331,9 @@
             root.remove();
         }
 
+        // Ligações feitas no Q2a nasceram sem número: numera ao abrir.
+        D.items.forEach(function (i) { if (i.t === 'link' && !i.cable) { i.cable = nextCable(D.items); } });
+
         paleta();
         render();
         setTimeout(fit, 0);
@@ -1077,5 +1343,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _toPng: toPng, _starter: starter, _apply: apply };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _toPng: toPng, _starter: starter, _apply: apply };
 })();

@@ -2105,3 +2105,11 @@ html.cx-board-open { overflow: hidden; }
 /* Q2a — alças de ligação nas bordas do ícone */
 .cx-board-svg .cx-board-lh { cursor: crosshair; }
 .cx-board-svg .cx-board-links [data-id] { cursor: pointer; }
+/* Q2b — painel da ligação: dois campos por linha */
+.cx-board-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cx-board-row .cx-board-f { min-width: 0; }
+/* Q2c — alças do traçado */
+.cx-board-svg .cx-board-lw { cursor: move; }
+.cx-board-svg .cx-board-le { cursor: crosshair; }
+.cx-board-btn { border: 1px solid var(--cx-border); background: #fff; border-radius: 6px; padding: 4px 10px; font-size: .9em; cursor: pointer; }
+.cx-board-btn:disabled { opacity: .45; cursor: default; }

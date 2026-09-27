@@ -46,6 +46,9 @@ class Install
     // Etapa 9 (0.6.7) — diagrama institucional ligado ao documento DIA
     public const DIAGRAMS_TABLE       = 'glpi_plugin_codexplus_diagrams';
 
+    // Q4a (0.6.10) — ícones criados na instalação (IconLibrary)
+    public const ICONS_TABLE          = 'glpi_plugin_codexplus_icons';
+
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
      *
@@ -54,6 +57,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::ICONS_TABLE,
             self::DIAGRAMS_TABLE,
             self::DOC_CONTRIB_TABLE,
             self::DOC_EDITORS_TABLE,
@@ -540,6 +544,25 @@ class Install
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `plugin_codexplus_documents_id` (`plugin_codexplus_documents_id`)
             ) $opts", "Codex+ (9a): erro ao criar $t");
+        }
+
+        // Q4a (Claudio, 27/09/2026): ícones do quadro criados pelo
+        // Super-Admin. A imagem é um PNG pequeno em data URL (IconLibrary).
+        $t = self::ICONS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `name` varchar(80) NOT NULL DEFAULT '',
+                `cat` varchar(16) NOT NULL DEFAULT 'infra',
+                `search` varchar(255) NOT NULL DEFAULT '',
+                `mode` varchar(8) NOT NULL DEFAULT 'color',
+                `image` mediumtext NULL,
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `cat` (`cat`)
+            ) $opts", "Codex+ (Q4a): erro ao criar $t");
         }
 
         // Super-Admin herda tudo: perfis com Configurar > Atualizar. Menos o

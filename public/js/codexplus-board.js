@@ -69,6 +69,37 @@
     function clone(o) { return JSON.parse(JSON.stringify(o)); }
     function Icons() { return window.CodexplusIcons; }
 
+    /* Q4a — ícones criados na instalação. Carregados uma vez por página
+       (ajax/icons.php); a lista chega junto com "pode criar?" (só o
+       Super-Admin). Falha de rede não impede abrir o quadro. */
+    var BASE = (function () {
+        var sc = document.currentScript;
+        return sc && sc.src ? sc.src.replace(/\/js\/codexplus-board\.js.*$/, '') : '';
+    })();
+    var LIB = { canCreate: false, promise: null };
+    function loadLibrary() {
+        if (LIB.promise) { return LIB.promise; }
+        if (typeof fetch !== 'function' || !BASE) { LIB.promise = Promise.resolve(); return LIB.promise; }
+        LIB.promise = fetch(BASE + '/ajax/icons.php', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : {}; })
+            .then(function (j) {
+                if (j && Array.isArray(j.icons)) { Icons().addCustom(j.icons); }
+                LIB.canCreate = !!(j && j.can_create);
+            })
+            .catch(function () {});
+        return LIB.promise;
+    }
+    // Cópia, no quadro, dos ícones da instalação que ele usa (campo lib).
+    function libOf(items) {
+        var out = {};
+        (items || []).forEach(function (i) {
+            if (i.t !== 'icon' || !/^u\d+$/.test(i.icon) || out[i.icon]) { return; }
+            var ic = Icons().get(i.icon);
+            if (ic && ic.custom) { out[i.icon] = { name: ic.name, cat: ic.cat, search: ic.search, mode: ic.mode, image: ic.img }; }
+        });
+        return out;
+    }
+
     function starter(mode) {
         return { v: 1, mode: MODES[mode] ? mode : 'topologia', w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: true, items: [] };
     }
@@ -76,6 +107,11 @@
     function clean(d, mode) {
         var out = starter(d && d.mode || mode);
         if (!d || typeof d !== 'object') { return out; }
+        // Q4a: ícones da instalação guardados no quadro entram antes da
+        // conferência dos itens (ícone desconhecido vira genérico).
+        if (d.lib && typeof d.lib === 'object') {
+            Icons().addCustom(Object.keys(d.lib).map(function (k) { return Object.assign({ key: k }, d.lib[k]); }), true);
+        }
         out.w = Math.max(400, Math.min(6000, +d.w || out.w));
         out.h = Math.max(300, Math.min(6000, +d.h || out.h));
         out.bgOpacity = Math.max(0.1, Math.min(1, +d.bgOpacity || out.bgOpacity));
@@ -780,16 +816,15 @@
             var bgEl = bgOf(node);
             bgUrl = bgEl ? (bgEl.getAttribute('src') || '') : '';
         }
-        var D = clean(raw, mode);
-        var ready = Promise.resolve();
+        var ready = loadLibrary();
         if (bgUrl) {
             if (/^blob:|^data:/.test(bgUrl) && !/docid=/.test(bgUrl)) {
                 notify(editor, 'Salve o documento antes de editar este quadro de novo: a planta ainda está sendo enviada.', 'error');
                 return;
             }
-            ready = urlToDataUrl(bgUrl).then(function (u) { bgUrl = u; }).catch(function () { bgUrl = ''; });
+            ready = ready.then(function () { return urlToDataUrl(bgUrl); }).then(function (u) { bgUrl = u; }).catch(function () { bgUrl = ''; });
         }
-        ready.then(function () { build(editor, node, D, bgUrl, bgChanged); });
+        ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged); });
     }
 
     function pngName(mode, now) {
@@ -854,7 +889,9 @@
             + '<button type="button" data-act="save" class="cx-board-ok">' + (node ? 'Salvar quadro' : 'Inserir no documento') + '</button>'
             + '</div>'
             + '<div class="cx-board-body">'
-            + '<aside class="cx-board-pal"><input type="search" class="cx-board-q" placeholder="Buscar ícone"><div class="cx-board-icons"></div></aside>'
+            + '<aside class="cx-board-pal"><div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
+            + (LIB.canCreate ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
+            + '</div><div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
             + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
@@ -883,13 +920,140 @@
                 h += '<div class="cx-board-cat">' + esc(I.CATS[ck].label) + '</div><div class="cx-board-grid">';
                 ls.forEach(function (r) {
                     h += '<button type="button" class="cx-board-ic" data-icon="' + r[0] + '" title="' + esc(r[1]) + '">'
-                        + '<svg viewBox="0 0 48 48" width="34" height="34">' + I.body(r[0]) + '</svg><span>' + esc(r[1]) + '</span></button>';
+                        + '<svg viewBox="0 0 48 48" width="34" height="34">' + I.body(r[0]) + '</svg><span>' + esc(r[1]) + '</span>'
+                        + ((I.get(r[0]) || {}).custom ? '<i class="cx-board-own" title="Criado na instalação"></i>' : '') + '</button>';
                 });
                 h += '</div>';
             });
             root.querySelector('.cx-board-icons').innerHTML = h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>';
         }
         root.querySelector('.cx-board-q').addEventListener('input', paleta);
+
+        /* ---------- Q4a: novo ícone a partir de imagem (Super-Admin) ----------
+           Recorte quadrado arrastável sobre a imagem; sai um PNG de 96 px
+           (nada do arquivo original é guardado). Grava em ajax/icons.php. */
+        var ni = null;   // janela aberta
+        var NI_BOX = 240, NI_OUT = 96, NI_MAX = 2 * 1024 * 1024;
+        function niClose() { if (ni) { ni.el.remove(); ni = null; } }
+        function niOpen() {
+            if (ni) { return; }
+            var cats = Object.keys(I.CATS).map(function (k) { return '<option value="' + k + '">' + esc(I.CATS[k].label) + '</option>'; }).join('');
+            var el = document.createElement('div');
+            el.className = 'cx-ni-back';
+            el.innerHTML = '<div class="cx-ni" role="dialog" aria-label="Novo ícone">'
+                + '<div class="cx-ni-main">'
+                + '<label class="cx-ni-file"><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"> <span>Escolher imagem</span></label>'
+                + '<div class="cx-ni-stage"><canvas width="' + NI_BOX + '" height="' + NI_BOX + '"></canvas><div class="cx-ni-crop" hidden></div></div>'
+                + '<label class="cx-board-f"><span>Tamanho do recorte</span><input type="range" min="10" max="100" step="1" value="100" data-ni="size"></label>'
+                + '<p class="cx-board-none">Arraste o quadrado para escolher a parte da imagem. PNG, JPG, WebP ou SVG, até 2 MB.</p>'
+                + '</div><div class="cx-ni-side">'
+                + '<p class="cx-ni-title">Novo ícone</p>'
+                + '<label class="cx-board-f"><span>Nome</span><input type="text" maxlength="60" data-ni="name" placeholder="Guarita"></label>'
+                + '<label class="cx-board-f"><span>Categoria (cor)</span><select data-ni="cat">' + cats + '</select></label>'
+                + '<label class="cx-board-f"><span>Busca (palavras)</span><input type="text" maxlength="200" data-ni="search" placeholder="portaria cabine vigia"></label>'
+                + '<p class="cx-board-sub">Prévia</p><div class="cx-ni-prev"><img alt="" width="48" height="48"><img alt="" width="32" height="32"><img alt="" width="22" height="22"></div>'
+                + '<p class="cx-ni-err" hidden></p>'
+                + '<div class="cx-ni-btns"><button type="button" data-ni="cancel">Cancelar</button><button type="button" data-ni="save" class="cx-board-ok">Salvar ícone</button></div>'
+                + '</div></div>';
+            root.appendChild(el);
+            ni = { el: el, img: null, s: 1, ox: 0, oy: 0, iw: 0, ih: 0, cx: 0, cy: 0, cs: 0, out: '' };
+            var cv = el.querySelector('canvas'), crop = el.querySelector('.cx-ni-crop');
+            var q = function (k) { return el.querySelector('[data-ni="' + k + '"]'); };
+            var err = el.querySelector('.cx-ni-err');
+            var fail = function (t) { err.textContent = t; err.hidden = !t; };
+            var draw = function () {
+                var g = cv.getContext && cv.getContext('2d');
+                if (!g || !ni.img) { return; }
+                g.clearRect(0, 0, NI_BOX, NI_BOX);
+                g.drawImage(ni.img, ni.ox, ni.oy, ni.iw * ni.s, ni.ih * ni.s);
+                crop.hidden = false;
+                crop.style.left = ni.cx + 'px'; crop.style.top = ni.cy + 'px';
+                crop.style.width = ni.cs + 'px'; crop.style.height = ni.cs + 'px';
+                var o = document.createElement('canvas');
+                o.width = NI_OUT; o.height = NI_OUT;
+                var og = o.getContext && o.getContext('2d');
+                if (!og) { return; }
+                og.drawImage(ni.img, (ni.cx - ni.ox) / ni.s, (ni.cy - ni.oy) / ni.s, ni.cs / ni.s, ni.cs / ni.s, 0, 0, NI_OUT, NI_OUT);
+                ni.out = o.toDataURL('image/png');
+                el.querySelectorAll('.cx-ni-prev img').forEach(function (im) { im.src = ni.out; });
+            };
+            // Mantém o quadrado dentro da imagem desenhada.
+            var fitCrop = function () {
+                var dw = ni.iw * ni.s, dh = ni.ih * ni.s, full = Math.min(dw, dh);
+                ni.cs = Math.max(8, full * (+q('size').value || 100) / 100);
+                ni.cx = Math.min(Math.max(ni.cx, ni.ox), ni.ox + dw - ni.cs);
+                ni.cy = Math.min(Math.max(ni.cy, ni.oy), ni.oy + dh - ni.cs);
+            };
+            el.querySelector('input[type=file]').addEventListener('change', function (e) {
+                var f = e.target.files && e.target.files[0];
+                fail('');
+                if (!f) { return; }
+                if (f.size > NI_MAX) { fail('Arquivo maior que 2 MB.'); return; }
+                if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(f.type)) { fail('Use PNG, JPG, WebP ou SVG.'); return; }
+                var rd = new FileReader();
+                rd.onload = function () {
+                    var im = new Image();
+                    im.onload = function () {
+                        // SVG sem tamanho próprio: desenha no tamanho da caixa.
+                        var w = im.naturalWidth || NI_BOX, h = im.naturalHeight || NI_BOX;
+                        ni.img = im; ni.iw = w; ni.ih = h;
+                        ni.s = Math.min(NI_BOX / w, NI_BOX / h);
+                        ni.ox = (NI_BOX - w * ni.s) / 2; ni.oy = (NI_BOX - h * ni.s) / 2;
+                        q('size').value = 100; ni.cx = 0; ni.cy = 0;
+                        fitCrop();
+                        ni.cx = ni.ox + (w * ni.s - ni.cs) / 2; ni.cy = ni.oy + (h * ni.s - ni.cs) / 2;
+                        draw();
+                        if (!q('name').value) { q('name').value = f.name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').slice(0, 60); }
+                    };
+                    im.onerror = function () { fail('Não foi possível abrir essa imagem.'); };
+                    im.src = rd.result;
+                };
+                rd.readAsDataURL(f);
+            });
+            q('size').addEventListener('input', function () {
+                if (!ni.img) { return; }
+                var mx = ni.cx + ni.cs / 2, my = ni.cy + ni.cs / 2;   // redimensiona pelo centro
+                fitCrop(); ni.cx = mx - ni.cs / 2; ni.cy = my - ni.cs / 2; fitCrop(); draw();
+            });
+            crop.addEventListener('pointerdown', function (e) {
+                e.preventDefault();
+                var sx = e.clientX, sy = e.clientY, bx = ni.cx, by = ni.cy;
+                var mv = function (ev) { ni.cx = bx + ev.clientX - sx; ni.cy = by + ev.clientY - sy; fitCrop(); draw(); };
+                var up = function () { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); };
+                document.addEventListener('pointermove', mv);
+                document.addEventListener('pointerup', up);
+            });
+            q('cancel').addEventListener('click', niClose);
+            q('save').addEventListener('click', function () {
+                var name = q('name').value.trim();
+                if (!ni.out) { fail('Escolha uma imagem.'); return; }
+                if (!name) { fail('Informe o nome do ícone.'); q('name').focus(); return; }
+                fail('');
+                var tk = document.querySelector('[name="_glpi_csrf_token"]');
+                var fd = new FormData();
+                fd.append('action', 'add'); fd.append('name', name); fd.append('cat', q('cat').value);
+                fd.append('search', q('search').value.trim()); fd.append('mode', 'color'); fd.append('image', ni.out);
+                if (tk) { fd.append('_glpi_csrf_token', tk.value); }
+                var btn = q('save'); btn.disabled = true; btn.textContent = 'Salvando…';
+                fetch(BASE + '/ajax/icons.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+                    .then(function (res) {
+                        // O token é consumido a cada POST: o novo vai para todos os formulários.
+                        if (res.j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = res.j.csrf; }); }
+                        if (!res.ok || !res.j.icon) { throw new Error(res.j.erro || 'Não foi possível gravar o ícone.'); }
+                        I.addCustom([res.j.icon]);
+                        paleta();
+                        niClose();
+                        notify(editor, 'Ícone "' + res.j.icon.name + '" criado: já está na paleta.', 'success');
+                    })
+                    .catch(function (e2) {
+                        btn.disabled = false; btn.textContent = 'Salvar ícone';
+                        fail(e2 && e2.message && !/fetch|network/i.test(e2.message) ? e2.message : 'Não foi possível gravar o ícone.');
+                    });
+            });
+        }
+        var niBtn = root.querySelector('.cx-board-newic');
+        if (niBtn) { niBtn.addEventListener('click', niOpen); }
 
         /* ---------- histórico ---------- */
         function snap() { hist.push(JSON.stringify(D)); if (hist.length > 80) { hist.shift(); } redo = []; }
@@ -1537,6 +1701,7 @@
         /* ---------- teclado ---------- */
         function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && root.contains(a); }
         function onKey(e) {
+            if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
             if (tool === 'duct') {
@@ -1720,6 +1885,7 @@
         function save() {
             var btn = root.querySelector('[data-act="save"]');
             btn.disabled = true; btn.textContent = 'Gerando…';
+            D.lib = libOf(D.items);
             toPng(D, bgUrl || null).then(function (png) {
                 return (D.legend ? legendPng(D) : Promise.resolve(null)).then(function (lp) { return [png, lp]; });
             }).then(function (r) {
@@ -1775,8 +1941,8 @@
 
         // Exposto para os testes (jsdom).
         root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, setTool: function (t) { tool = t; },
-            setSel: function (ids) { sel = ids; render(); }, onKey: onKey };
+            setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend };
+    window.CodexplusBoard = { open: open, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary };
 })();

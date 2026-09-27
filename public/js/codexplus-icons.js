@@ -144,9 +144,37 @@
     /** Desenho do ícone (miolo de um <svg viewBox="0 0 48 48">) na cor da categoria. */
     function body(id, catOverride) {
         var ic = BY_ID[id] || BY_ID.generico;
+        // Q4a: ícone criado na instalação = PNG pronto (data URL conferida).
+        if (ic.custom) {
+            return '<image href="' + ic.img + '" x="2" y="2" width="44" height="44" preserveAspectRatio="xMidYMid meet"/>';
+        }
         var c = CATS[catOverride || ic.cat] || CATS.infra;
         return ic.body.replace(/\{F\}/g, c.F).replace(/\{S\}/g, c.S).replace(/\{G\}/g, '#1D9E75');
     }
 
-    window.CodexplusIcons = { CATS: CATS, LIST: LIST, get: function (id) { return BY_ID[id] || null; }, body: body };
+    /* Q4a — ícones criados na instalação (ajax/icons.php) e as cópias que
+       cada quadro guarda (campo lib). Chave "u<id>". Só entra PNG em data
+       URL; nada de SVG. onlyMissing: a cópia do quadro não passa por cima do
+       ícone da biblioteca (que pode ter sido renomeado). */
+    var KEY = /^u\d+$/, IMG = /^data:image\/png;base64,[A-Za-z0-9+\/]+={0,2}$/;
+    function addCustom(list, onlyMissing) {
+        var n = 0;
+        (list || []).forEach(function (c) {
+            if (!c) { return; }
+            var key = c.key || ('u' + (parseInt(c.id, 10) || 0));
+            var img = String(c.image || '');
+            if (!KEY.test(key) || key === 'u0' || !IMG.test(img) || img.length > 300000) { return; }
+            if (onlyMissing && BY_ID[key]) { return; }
+            var e = { id: key, name: String(c.name || 'Ícone').slice(0, 80), cat: CATS[c.cat] ? c.cat : 'infra',
+                search: String(c.search || '').slice(0, 200), cone: false, body: '', custom: true, img: img,
+                mode: c.mode === 'mask' ? 'mask' : 'color' };
+            for (var i = LIST.length - 1; i >= 0; i--) { if (LIST[i][0] === key) { LIST.splice(i, 1); } }
+            BY_ID[key] = e;
+            LIST.push([key, e.name, e.cat, e.search, false, '']);
+            n++;
+        });
+        return n;
+    }
+
+    window.CodexplusIcons = { CATS: CATS, LIST: LIST, get: function (id) { return BY_ID[id] || null; }, body: body, addCustom: addCustom };
 })();

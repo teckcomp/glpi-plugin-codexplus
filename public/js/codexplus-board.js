@@ -48,6 +48,10 @@
    longo da linha (lt, 0..1). Cotovelo com cantos arredondados, ponta
    proporcional à espessura e linha que para antes da ponta (referência
    de Claudio). Estilo na barra flutuante; espessura também no painel.
+   Q5e-1 (27/09/2026): mais 9 formas de fluxograma clássico (subprocesso,
+   banco de dados, entrada e operação manual, preparação, atraso, vários
+   documentos, conector de página, nota adesiva) e paleta em seções
+   recolhíveis (BPMN entra no Q5e-2).
    ========================================================================= */
 (function () {
     'use strict';
@@ -91,8 +95,26 @@
         dec:  { label: 'Decisão',      w: 150, h: 84, color: 'ambar' },
         doc:  { label: 'Documento',    w: 150, h: 64, color: 'roxo' },
         data: { label: 'Dados',        w: 150, h: 56, color: 'cinza' },
-        conn: { label: 'Conector',     w: 44,  h: 44, color: 'cinza' }
+        conn: { label: 'Conector',     w: 44,  h: 44, color: 'cinza' },
+        // Q5e-1 — fluxograma clássico
+        sub:     { label: 'Subprocesso',        w: 160, h: 64,  color: 'azul' },
+        db:      { label: 'Banco de dados',     w: 110, h: 84,  color: 'cinza' },
+        manin:   { label: 'Entrada manual',     w: 150, h: 64,  color: 'cinza' },
+        manop:   { label: 'Operação manual',    w: 150, h: 60,  color: 'cinza' },
+        prep:    { label: 'Preparação',         w: 150, h: 60,  color: 'cinza' },
+        delay:   { label: 'Atraso / espera',    w: 130, h: 60,  color: 'ambar' },
+        docs:    { label: 'Vários documentos',  w: 160, h: 76,  color: 'roxo' },
+        offpage: { label: 'Conector de página', w: 64,  h: 64,  color: 'cinza' },
+        note:    { label: 'Nota adesiva',       w: 150, h: 100, color: 'ambar2' }
     };
+    // Paleta em seções (Q5e). Forma nova = uma linha em SHAPES e o nome aqui.
+    var SHAPE_GROUPS = [
+        { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] }
+    ];
+    // Medidas internas de cada forma (desenho, texto e âncoras usam as mesmas).
+    function skewOf(it) { return Math.min(20, it.w * 0.15); }
+    function dbRy(it) { return Math.min(12, it.h * 0.16); }
+    function stackOf(it) { return Math.min(8, it.w * 0.05, it.h * 0.1); }
     // Q5c: 12 tons fixos (Claudio, 27/09/2026). Cada tom tem fundo (f),
     // borda (s) e texto (t): "Fundo", "Borda" e "Texto" escolhem o tom.
     var FLOW_COLORS = {
@@ -207,7 +229,20 @@
     // Largura útil do texto dentro de cada forma.
     function shapeInner(it) {
         var w = it.w;
-        return it.shape === 'dec' ? w * 0.56 : it.shape === 'data' ? w - 44 : it.shape === 'conn' ? w - 8 : it.shape === 'term' ? w - 26 : w - 18;
+        switch (it.shape) {
+            case 'dec': return w * 0.56;
+            case 'data': return w - 44;
+            case 'conn': return w - 8;
+            case 'term': return w - 26;
+            case 'sub': return w - 2 * Math.min(12, w * 0.08) - 12;
+            case 'manop': return w - 2 * skewOf(it) - 10;
+            case 'prep': return w - 2 * skewOf(it) - 8;
+            case 'delay': return w - Math.min(it.h, w) / 4 - 14;
+            case 'docs': return w - 2 * stackOf(it) - 18;
+            case 'offpage': return w - 12;
+            case 'note': return w - 22;
+        }
+        return w - 18;
     }
     // Quebra por palavra pela largura aproximada da letra (Arial ~0,55 em).
     function wrapText(text, maxW, fs) {
@@ -227,7 +262,16 @@
     function shapeNeed(it) {
         var fs = shapeFs(it), lines = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs).length : 0;
         var need = lines * fs * 1.25;
-        return Math.ceil(it.shape === 'dec' ? need / 0.5 + 12 : it.shape === 'doc' ? need + fs * 2 : need + fs * 1.4);
+        switch (it.shape) {
+            case 'dec': return Math.ceil(need / 0.5 + 12);
+            case 'doc': return Math.ceil(need + fs * 2);
+            case 'db': return Math.ceil(need + fs * 1.4 + dbRy(it) * 3);
+            case 'docs': return Math.ceil(need + fs * 2 + stackOf(it) * 2);
+            case 'manin': return Math.ceil((need + fs * 1.4) / 0.78);
+            case 'offpage': return Math.ceil((need + fs * 1.2) / 0.66);
+            case 'note': return Math.ceil(need + fs * 2);
+        }
+        return Math.ceil(need + fs * 1.4);
     }
     // Q5c: w e h são os que a pessoa ajustou (sem eles, o tamanho do tipo);
     // a altura nunca fica menor do que o texto precisa (Claudio, 27/09/2026).
@@ -242,6 +286,18 @@
         delete it.sz;
         return it;
     }
+    // Centro vertical do texto (fora das partes "decorativas" de cada forma).
+    function shapeTextCy(it) {
+        var y = it.y, h = it.h;
+        switch (it.shape) {
+            case 'doc': return y + (h - Math.min(9, h * 0.15)) / 2;
+            case 'db': return y + dbRy(it) * 2 + (h - dbRy(it) * 3) / 2;
+            case 'manin': return y + h * 0.22 + (h * 0.78) / 2;
+            case 'docs': var so = stackOf(it); return y + 2 * so + (h - 2 * so - Math.min(8, (h - 2 * so) * 0.15)) / 2;
+            case 'offpage': return y + h * 0.36;
+        }
+        return y + h / 2;
+    }
     function shapeSvg(it) {
         var x = it.x, y = it.y, w = it.w, h = it.h, ink = pal(it.ink).t;
         var st = ' fill="' + pal(it.fill).f + '" stroke="' + pal(it.line).s + '" stroke-width="1.6"', g = '', wv = Math.min(9, h * 0.15);
@@ -253,12 +309,48 @@
         }
         else if (it.shape === 'data') { var sk = Math.min(20, w * 0.15); g = '<path d="M' + (x + sk) + ' ' + y + 'H' + (x + w) + 'L' + (x + w - sk) + ' ' + (y + h) + 'H' + x + 'Z"' + st + '/>'; }
         else if (it.shape === 'conn') { g = '<circle cx="' + (x + w / 2) + '" cy="' + (y + h / 2) + '" r="' + w / 2 + '"' + st + '/>'; }
+        else if (it.shape === 'sub') {
+            var sb = Math.min(12, w * 0.08);
+            g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3"' + st + '/>'
+                + '<path d="M' + (x + sb) + ' ' + y + 'V' + (y + h) + 'M' + (x + w - sb) + ' ' + y + 'V' + (y + h) + '" stroke="' + pal(it.line).s + '" stroke-width="1.6" fill="none"/>';
+        }
+        else if (it.shape === 'db') {
+            var ry = dbRy(it), rx = w / 2;
+            g = '<path d="M' + x + ' ' + (y + ry) + 'V' + (y + h - ry) + 'A' + rx + ' ' + ry + ' 0 0 0 ' + (x + w) + ' ' + (y + h - ry) + 'V' + (y + ry) + 'Z"' + st + '/>'
+                + '<ellipse cx="' + (x + w / 2) + '" cy="' + (y + ry) + '" rx="' + rx + '" ry="' + ry + '"' + st + '/>';
+        }
+        else if (it.shape === 'manin') { g = '<path d="M' + x + ' ' + (y + h * 0.22) + 'L' + (x + w) + ' ' + y + 'V' + (y + h) + 'H' + x + 'Z"' + st + '/>'; }
+        else if (it.shape === 'manop') { var mk = skewOf(it); g = '<path d="M' + x + ' ' + y + 'H' + (x + w) + 'L' + (x + w - mk) + ' ' + (y + h) + 'H' + (x + mk) + 'Z"' + st + '/>'; }
+        else if (it.shape === 'prep') {
+            var pk = skewOf(it);
+            g = '<path d="M' + (x + pk) + ' ' + y + 'H' + (x + w - pk) + 'L' + (x + w) + ' ' + (y + h / 2) + 'L' + (x + w - pk) + ' ' + (y + h) + 'H' + (x + pk) + 'L' + x + ' ' + (y + h / 2) + 'Z"' + st + '/>';
+        }
+        else if (it.shape === 'delay') {
+            var dr = Math.min(h, w) / 2;
+            g = '<path d="M' + x + ' ' + y + 'H' + (x + w - dr) + 'A' + dr + ' ' + (h / 2) + ' 0 0 1 ' + (x + w - dr) + ' ' + (y + h) + 'H' + x + 'Z"' + st + '/>';
+        }
+        else if (it.shape === 'docs') {
+            var so = stackOf(it), dw = w - 2 * so, dh = h - 2 * so, dv = Math.min(8, dh * 0.15);
+            var one = function (ox, oy) {
+                return '<path d="M' + (x + ox) + ' ' + (y + oy) + 'H' + (x + ox + dw) + 'V' + (y + oy + dh - dv) + 'Q' + (x + ox + dw * 0.75) + ' ' + (y + oy + dh - dv * 2) + ' ' + (x + ox + dw / 2) + ' ' + (y + oy + dh - dv)
+                    + 'T' + (x + ox) + ' ' + (y + oy + dh - dv) + 'Z"' + st + '/>';
+            };
+            g = one(2 * so, 0) + one(so, so) + one(0, 2 * so);
+        }
+        else if (it.shape === 'offpage') { g = '<path d="M' + x + ' ' + y + 'H' + (x + w) + 'V' + (y + h * 0.66) + 'L' + (x + w / 2) + ' ' + (y + h) + 'L' + x + ' ' + (y + h * 0.66) + 'Z"' + st + '/>'; }
+        else if (it.shape === 'note') {
+            var nf = Math.min(16, w * 0.14, h * 0.2);
+            g = '<path d="M' + x + ' ' + y + 'H' + (x + w) + 'V' + (y + h - nf) + 'L' + (x + w - nf) + ' ' + (y + h) + 'H' + x + 'Z"' + st + '/>'
+                + '<path d="M' + (x + w) + ' ' + (y + h - nf) + 'H' + (x + w - nf) + 'V' + (y + h) + '" fill="' + pal(it.line).s + '" fill-opacity="0.18" stroke="' + pal(it.line).s + '" stroke-width="1.2"/>';
+        }
         else { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"' + st + '/>'; }
         var fs = shapeFs(it), lh = fs * 1.25, txt = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs) : [];
         if (txt.length) {
-            var cy = y + (it.shape === 'doc' ? (h - wv) / 2 : h / 2), y0 = cy - (txt.length - 1) * lh / 2 + fs * 0.35;
-            g += '<text x="' + (x + w / 2) + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
-                + txt.map(function (l, i) { return '<tspan x="' + (x + w / 2) + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
+            var cy = shapeTextCy(it), y0 = cy - (txt.length - 1) * lh / 2 + fs * 0.35;
+            // Vários documentos: o texto vai no da frente (embaixo à esquerda).
+            var tx = x + (it.shape === 'docs' ? (w - 2 * stackOf(it)) / 2 : w / 2);
+            g += '<text x="' + tx + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
+                + txt.map(function (l, i) { return '<tspan x="' + tx + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
         }
         return '<g data-id="' + it.id + '">' + g + '</g>';
     }
@@ -489,8 +581,18 @@
     function anchor(ic, side) {
         if (ic.t === 'shape') {
             // Bordas da forma; no paralelogramo, o meio dos lados inclinados.
-            var sk = ic.shape === 'data' ? Math.min(20, ic.w * 0.15) / 2 : 0, mx = ic.x + ic.w / 2, my = ic.y + ic.h / 2;
-            if (side === 'n') { return { x: mx, y: ic.y }; }
+            // Lados inclinados (dados, operação manual): o meio do lado.
+            var sk = ic.shape === 'data' || ic.shape === 'manop' ? skewOf(ic) / 2 : 0, mx = ic.x + ic.w / 2, my = ic.y + ic.h / 2;
+            if (ic.shape === 'docs') {
+                // Vários documentos: bordas do documento da frente.
+                var so = stackOf(ic), fw = ic.w - 2 * so, fh = ic.h - 2 * so, fx = ic.x, fy = ic.y + 2 * so;
+                if (side === 'n') { return { x: ic.x + ic.w / 2, y: ic.y }; }
+                if (side === 's') { return { x: fx + fw / 2, y: fy + fh - Math.min(8, fh * 0.15) }; }
+                if (side === 'o') { return { x: fx, y: fy + fh / 2 }; }
+                return { x: ic.x + ic.w, y: ic.y + fh / 2 };
+            }
+            // Entrada manual: o topo é inclinado — o meio dele.
+            if (side === 'n') { return { x: mx, y: ic.y + (ic.shape === 'manin' ? ic.h * 0.11 : 0) }; }
             // Documento: o meio da borda de baixo é a crista da onda.
             if (side === 's') { return { x: mx, y: ic.y + ic.h - (ic.shape === 'doc' ? Math.min(9, ic.h * 0.15) : 0) }; }
             if (side === 'o') { return { x: ic.x + sk, y: my }; }
@@ -1236,15 +1338,21 @@
         var marq = root.querySelector('.cx-board-marq'), props = root.querySelector('.cx-board-props');
 
         /* ---------- paleta ---------- */
+        var palShut = {};
         function paleta() {
             if (flow) {
                 // Q5b: só formas (os ícones são da Planta e da Topologia).
-                root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Fluxograma</div><div class="cx-board-grid">'
-                    + Object.keys(SHAPES).map(function (k) {
-                        var ck = SHAPES[k].color, demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: k === 'conn' ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck });
-                        return '<button type="button" class="cx-board-ic" data-shape="' + k + '" title="' + esc(SHAPES[k].label) + '">'
-                            + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo) + '</svg><span>' + esc(SHAPES[k].label) + '</span></button>';
-                    }).join('') + '</div>';
+                // Q5e: seções recolhíveis (clique no título).
+                root.querySelector('.cx-board-icons').innerHTML = SHAPE_GROUPS.map(function (gr) {
+                    var shut = !!palShut[gr.k];
+                    return '<button type="button" class="cx-board-cat cx-board-cat-t" data-grp="' + gr.k + '" aria-expanded="' + !shut + '">' + (shut ? '▸ ' : '▾ ') + esc(gr.label) + '</button>'
+                        + (shut ? '' : '<div class="cx-board-grid">' + gr.items.map(function (k) {
+                            var ck = SHAPES[k].color, small = ['conn', 'offpage'].indexOf(k) >= 0;
+                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck });
+                            return '<button type="button" class="cx-board-ic" data-shape="' + k + '" title="' + esc(SHAPES[k].label) + '">'
+                                + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo) + '</svg><span>' + esc(SHAPES[k].label) + '</span></button>';
+                        }).join('') + '</div>');
+                }).join('');
                 return;
             }
             var q = (root.querySelector('.cx-board-q').value || '').trim().toLowerCase();
@@ -2140,6 +2248,11 @@
         }
 
         /* ---------- arraste da paleta ---------- */
+        root.querySelector('.cx-board-icons').addEventListener('click', function (e) {
+            var gb = e.target.closest('[data-grp]'); if (!gb) { return; }
+            palShut[gb.getAttribute('data-grp')] = !palShut[gb.getAttribute('data-grp')];
+            paleta();
+        });
         root.querySelector('.cx-board-icons').addEventListener('pointerdown', function (e) {
             var b = e.target.closest('[data-icon],[data-shape]'); if (!b) { return; }
             e.preventDefault();
@@ -2738,5 +2851,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

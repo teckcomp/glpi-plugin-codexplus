@@ -2208,3 +2208,6 @@ html.cx-board-open { overflow: hidden; }
 /* Q5d — barra da ligação de fluxo */
 .cx-fbar-sel { font-size: 12px; padding: 1px 2px; border: 1px solid #d3d1c7; border-radius: 6px; max-width: 110px; }
 .cx-fbar-lab { font-size: 11px; color: #5F5E5A; margin-left: 2px; }
+/* Q5e — seções recolhíveis da paleta do fluxograma */
+.cx-board-cat-t { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 2px 0; cursor: pointer; }
+.cx-board-cat-t:hover { color: #1d2330; }

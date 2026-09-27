@@ -1,16 +1,42 @@
 {# Codex+ — Biblioteca (bloco B1, Claudio 26/09/2026).
-   Prateleira dos documentos publicados que a pessoa lê, Setor → Categoria.
+   Prateleira dos documentos que a pessoa lê, Setor → Categoria.
    Entrada de quem só lê (e do Self-Service); aba do Painel para quem produz.
-   Busca e filtro por tipo no navegador (public/js/codexplus.js não é
-   envolvido: o script abaixo só esconde linhas).
-   R5 (Claudio, 26/09/2026): para quem produz, a mesma prateleira com
-   filtro de Situação (padrão Publicados), "Só os meus" (responsável) e a
-   Lixeira, com Restaurar. Substitui a antiga tela Documentos.
-   Variáveis: shelf (sectors, total, types, status), doctypes, client_types,
-   producer, can_templates, statuses, trash, me, q, situacao, self, csrf,
+   R5 (Claudio, 26/09/2026): para quem produz, filtro de Situação (padrão
+   Publicados), "Só os meus" (responsável) e a Lixeira, com Restaurar.
+   B2a (Claudio, 27/09/2026): vista Estante (padrão) ou Lista. Na Estante
+   cada documento vira lombada (cor do tipo, bolinha da situação; rascunho e
+   em validação tracejados, só para quem produz), em pé sobre a tábua escura
+   (modelo C). O filtro esconde o <li> nas duas vistas.
+   B2b (Claudio, 27/09/2026): três níveis, cada um com endereço próprio —
+   nichos dos setores (sem parâmetro), nichos das categorias (?setor=),
+   lombadas da categoria (&cat=) — e a busca em tudo (?q=). Nicho mostra os
+   5 fichários mais recentes que passam no filtro; estante mínima de 12
+   nichos (4 × 3), os vazios com decoração (parts/lib-decor).
+   Variáveis: shelf (sectors, total, types, status), level (mode, sector,
+   category), niches, decor, new_url, doctypes, client_types, producer,
+   can_templates, statuses, trash, me, q, situacao, tipo, meus, self, csrf,
    form_url.
    Estilos em public/css/codexplus.css, seção 21. #}
-<div class="codexplus-app cx-lib" data-cx-lib>
+{% macro spine(d, doctypes, statuses, form_url, me, fic) %}
+    {% set cx_draft = d.status in ['rascunho', 'aprovacao', 'validacao'] %}
+    {% if d.status == 'publicado' %}
+        {% set cx_dot = d.expiry == 'vencido' ? 'ex' : (d.expiry == 'avencer' ? 'wa' : 'ok') %}
+        {% set cx_sit = d.expiry == 'vencido' ? __('revisão vencida', 'codexplus') : (d.expiry == 'avencer' ? __('a vencer', 'codexplus') : __('vigente', 'codexplus')) %}
+    {% else %}
+        {% set cx_dot = 'dr' %}
+        {% set cx_sit = statuses[d.status] ?? d.status %}
+    {% endif %}
+    <a class="cx-lib-spine cx-sp-{{ d.doctype }}{{ cx_draft ? ' is-draft' : '' }}{{ d.status == 'obsoleto' ? ' is-obsolete' : '' }}{{ fic ? ' cx-lib-fic' : '' }}"
+       href="{{ form_url }}?id={{ d.id }}"
+       {% if fic %}data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"{% endif %}
+       title="{{ d.code }} · {{ d.name }} · {{ doctypes[d.doctype] ?? d.doctype }} · {{ cx_sit }}{% if d.in_revision %} · {{ __('em atualização', 'codexplus') }}{% endif %}">
+        <i class="cx-lib-dot cx-lib-dot--{{ cx_dot }}" aria-hidden="true"></i>
+        <span class="cx-lib-spine-t"><b>{{ d.code }}</b><br>{{ d.name }}</span>
+    </a>
+{% endmacro %}
+{% import _self as cx %}
+{% set cx_niche_mode = level.mode in ['setores', 'categorias'] %}
+<div class="codexplus-app cx-lib" data-cx-lib data-view="estante" data-mode="{{ level.mode }}">
 
     {% include '@codexplus/parts/brand.html.twig' with {
         title: __('Codex+', 'codexplus'),
@@ -28,11 +54,20 @@
     </nav>
 
     <div class="cx-lib-bar">
-        <label class="cx-lib-search">
-            <i class="ti ti-search"></i>
-            <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
-                   aria-label="{{ __('Buscar por título ou código', 'codexplus') }}">
-        </label>
+        {% if cx_niche_mode %}
+            {# B2b: nos nichos, Enter busca em toda a Biblioteca. #}
+            <form class="cx-lib-search" method="get" action="{{ self }}" role="search">
+                <i class="ti ti-search"></i>
+                <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
+                       aria-label="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}">
+            </form>
+        {% else %}
+            <label class="cx-lib-search">
+                <i class="ti ti-search"></i>
+                <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
+                       aria-label="{{ __('Buscar por título ou código', 'codexplus') }}">
+            </label>
+        {% endif %}
         {% if producer %}
             <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por situação', 'codexplus') }}">
                 {% for k, label in statuses|merge({'todos': __('Todos', 'codexplus')}) %}
@@ -44,25 +79,78 @@
                     <i class="ti ti-trash"></i> {{ __('Lixeira', 'codexplus') }} <span>{{ trash|length }}</span>
                 </button>
             </div>
-            <label class="cx-lib-mine"><input type="checkbox" data-cx-lib-mine> {{ __('Só os meus (responsável)', 'codexplus') }}</label>
+            <label class="cx-lib-mine"><input type="checkbox" data-cx-lib-mine{{ meus ? ' checked' : '' }}> {{ __('Só os meus (responsável)', 'codexplus') }}</label>
         {% endif %}
-        <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por tipo', 'codexplus') }}">
-            <button type="button" class="cx-lib-type is-active" data-cx-lib-type="">{{ __('Todos', 'codexplus') }} <span>{{ shelf.total }}</span></button>
+        {% if not cx_niche_mode %}
+            <div class="cx-lib-types cx-lib-views" role="group" aria-label="{{ __('Vista', 'codexplus') }}">
+                <button type="button" class="cx-lib-type is-active" data-cx-lib-view="estante"><i class="ti ti-books"></i> {{ __('Estante', 'codexplus') }}</button>
+                <button type="button" class="cx-lib-type" data-cx-lib-view="lista"><i class="ti ti-list"></i> {{ __('Lista', 'codexplus') }}</button>
+            </div>
+        {% endif %}
+        <div class="cx-lib-types{{ cx_niche_mode ? ' cx-lib-views' : '' }}" role="group" aria-label="{{ __('Filtrar por tipo', 'codexplus') }}">
+            <button type="button" class="cx-lib-type{{ tipo == '' or shelf.types[tipo] is not defined ? ' is-active' : '' }}" data-cx-lib-type="">{{ __('Todos', 'codexplus') }} <span>{{ shelf.total }}</span></button>
             {% for t, n in shelf.types %}
-                <button type="button" class="cx-lib-type" data-cx-lib-type="{{ t }}">{{ t }} <span>{{ n }}</span></button>
+                <button type="button" class="cx-lib-type{{ tipo == t ? ' is-active' : '' }}" data-cx-lib-type="{{ t }}">{{ t }} <span>{{ n }}</span></button>
             {% endfor %}
         </div>
     </div>
 
-    {% if shelf.total == 0 %}
+    {# B2b: caminho do nível aberto. #}
+    <nav class="cx-lib-crumb" aria-label="{{ __('Caminho', 'codexplus') }}">
+        <a href="{{ self }}" data-cx-lib-nav><i class="ti ti-books"></i> {{ __('Biblioteca', 'codexplus') }}</a>
+        {% if level.sector %}
+            <span class="cx-lib-crumb-sep">›</span>
+            {% if level.category %}
+                <a href="{{ self }}?setor={{ level.sector.id }}" data-cx-lib-nav>{{ level.sector.name }}</a>
+                <span class="cx-lib-crumb-sep">›</span>
+                <span>{{ level.category.name }}</span>
+            {% else %}
+                <span>{{ level.sector.name }}</span>
+            {% endif %}
+        {% elseif level.mode == 'tudo' %}
+            <span class="cx-lib-crumb-sep">›</span>
+            <span>{{ __('Busca', 'codexplus') }}</span>
+        {% endif %}
+    </nav>
+    <p class="cx-lib-sub">
+        {% if level.mode == 'setores' %}{{ niches|length }} {{ niches|length == 1 ? __('setor', 'codexplus') : __('setores', 'codexplus') }} · {% endif %}
+        {% if level.mode == 'categorias' %}{{ niches|length }} {{ niches|length == 1 ? __('categoria', 'codexplus') : __('categorias', 'codexplus') }} · {% endif %}
+        <span data-cx-lib-total>{{ shelf.total }}</span> {{ __('documentos', 'codexplus') }}
+    </p>
+
+    {% if shelf.total == 0 and level.mode != 'categorias' %}
         <div class="cx-lib-empty">
             <i class="ti ti-books"></i>
             <p>{{ __('Nenhum documento publicado para você ainda. Quando um documento for publicado com você, seu grupo ou seu perfil na leitura, ele aparece aqui.', 'codexplus') }}</p>
         </div>
     {% endif %}
 
-    {% for s in shelf.sectors %}
-        <details class="cx-lib-sector" open>
+    {% if cx_niche_mode %}
+        <div class="cx-lib-niches" data-cx-lib-niches>
+            {% for n in niches %}
+                <div class="cx-lib-niche" data-href="{{ n.href }}">
+                    <div class="cx-lib-niche-row">
+                        {% for d in n.recent %}
+                            {{ cx.spine(d, doctypes, statuses, form_url, me, true) }}
+                        {% endfor %}
+                        <span class="cx-lib-more" data-cx-lib-more></span>
+                    </div>
+                    <a class="cx-lib-plank" href="{{ n.href }}" data-cx-lib-nav>
+                        <b>{{ n.name }}</b><span data-cx-lib-n>{{ n.recent|length }}</span>
+                    </a>
+                </div>
+            {% endfor %}
+            {% for k in decor %}
+                <div class="cx-lib-niche is-decor" aria-hidden="true">
+                    <div class="cx-lib-niche-row">{% include '@codexplus/parts/lib-decor.html.twig' with {k: k} only %}</div>
+                    <div class="cx-lib-plank"></div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% for s in (cx_niche_mode ? [] : shelf.sectors) %}
+        <details class="cx-lib-sector{{ level.mode == 'docs' ? ' is-flat' : '' }}" open>
             <summary>
                 <i class="ti ti-building"></i> {{ s.name }}
                 <span class="cx-lib-count">{{ s.total }}</span>
@@ -72,7 +160,7 @@
                     <h3><i class="ti ti-folder"></i> {{ c.name }}</h3>
                     <ul class="cx-lib-list">
                         {% for d in c.docs %}
-                            <li class="cx-lib-doc" data-type="{{ d.doctype }}" data-status="{{ d.status }}"
+                            <li class="cx-lib-doc" data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}"
                                 data-mine="{{ d.owner_id == me ? '1' : '0' }}"
                                 data-text="{{ (d.code ~ ' ' ~ d.name)|lower }}">
                                 <span class="codexplus-code cx-code-chip cx-code-type-{{ d.doctype }}">{{ d.code }}</span>
@@ -90,8 +178,14 @@
                                 {% if d.expiry == 'vencido' %}
                                     <span class="cx-lib-tag cx-lib-tag--warn">{{ __('revisão vencida', 'codexplus') }}</span>
                                 {% endif %}
+                                {{ cx.spine(d, doctypes, statuses, form_url, me, false) }}
                             </li>
                         {% endfor %}
+                        {% if new_url %}
+                            <li class="cx-lib-new">
+                                <a href="{{ new_url }}"><i class="ti ti-plus"></i> {{ __('Novo documento', 'codexplus') }}<small>{{ __('nesta categoria', 'codexplus') }}</small></a>
+                            </li>
+                        {% endif %}
                     </ul>
                 </section>
             {% endfor %}
@@ -131,25 +225,47 @@
 (function () {
     var root = document.querySelector('[data-cx-lib]');
     if (!root) { return; }
+    var mode = root.getAttribute('data-mode');
+    var nichos = mode === 'setores' || mode === 'categorias';
+    var MAX_FIC = 5; // B2b: fichários por nicho
     var q = root.querySelector('[data-cx-lib-q]');
-    var tipo = '';
+    var tBtn = root.querySelector('[data-cx-lib-type].is-active');
+    var tipo = tBtn ? tBtn.getAttribute('data-cx-lib-type') : '';
     // R5: situação (só para quem produz; leitor não tem os botões e vê só publicados).
     var stBtn = root.querySelector('[data-cx-lib-st].is-active');
     var st = stBtn ? stBtn.getAttribute('data-cx-lib-st') : '';
     var mine = root.querySelector('[data-cx-lib-mine]');
     var lixo = root.querySelector('[data-cx-lib-trash]');
+    var grade = root.querySelector('[data-cx-lib-niches]');
+    function passa(el, termo) {
+        return (!st || st === 'todos' || el.getAttribute('data-status') === st)
+            && (!mine || !mine.checked || el.getAttribute('data-mine') === '1')
+            && (!tipo || el.getAttribute('data-type') === tipo)
+            && (!termo || (el.getAttribute('data-text') || '').indexOf(termo) >= 0);
+    }
+    // B2b: os links de nível levam os filtros junto (situação, tipo, só os meus).
+    root.querySelectorAll('[data-cx-lib-nav]').forEach(function (a) { a.setAttribute('data-base', a.getAttribute('href')); });
+    root.querySelectorAll('.cx-lib-niche[data-href]').forEach(function (n) { n.setAttribute('data-base', n.getAttribute('data-href')); });
+    function leva() {
+        var p = [];
+        if (st && st !== 'lixeira') { p.push('situacao=' + encodeURIComponent(st)); }
+        if (tipo) { p.push('tipo=' + encodeURIComponent(tipo)); }
+        if (mine && mine.checked) { p.push('meus=1'); }
+        function junta(b) { return p.length ? b + (b.indexOf('?') >= 0 ? '&' : '?') + p.join('&') : b; }
+        root.querySelectorAll('[data-cx-lib-nav]').forEach(function (a) { a.setAttribute('href', junta(a.getAttribute('data-base'))); });
+        root.querySelectorAll('.cx-lib-niche[data-href]').forEach(function (n) { n.setAttribute('data-href', junta(n.getAttribute('data-base'))); });
+    }
     function aplica() {
-        var termo = (q.value || '').trim().toLowerCase();
+        var termo = nichos ? '' : (q.value || '').trim().toLowerCase();
         var algum = false;
         var naLixeira = st === 'lixeira';
+        var ids = {};
         if (lixo) { lixo.hidden = !naLixeira; }
+        if (grade) { grade.hidden = naLixeira; }
         root.querySelectorAll('.cx-lib-sector:not(.cx-lib-trash) .cx-lib-doc').forEach(function (li) {
-            var ok = !naLixeira
-                && (!st || st === 'todos' || li.getAttribute('data-status') === st)
-                && (!mine || !mine.checked || li.getAttribute('data-mine') === '1')
-                && (!tipo || li.getAttribute('data-type') === tipo)
-                && (!termo || li.getAttribute('data-text').indexOf(termo) >= 0);
+            var ok = !naLixeira && passa(li, termo);
             li.hidden = !ok;
+            if (ok) { ids[li.getAttribute('data-id')] = 1; }
             algum = algum || ok;
         });
         root.querySelectorAll('.cx-lib-category').forEach(function (sec) {
@@ -159,10 +275,45 @@
             s.hidden = !s.querySelector('.cx-lib-doc:not([hidden])');
             if (termo || tipo) { s.open = true; }
         });
+        // B2b: em cada nicho, os MAX_FIC mais recentes que passam no filtro.
+        root.querySelectorAll('.cx-lib-niche:not(.is-decor)').forEach(function (n) {
+            var m = 0;
+            n.querySelectorAll('.cx-lib-fic').forEach(function (f) {
+                var ok = !naLixeira && passa(f, '');
+                if (ok) { m++; ids[f.getAttribute('data-id')] = 1; }
+                f.hidden = !(ok && m <= MAX_FIC);
+            });
+            n.querySelector('[data-cx-lib-n]').textContent = m;
+            var mais = n.querySelector('[data-cx-lib-more]');
+            mais.textContent = m > MAX_FIC ? '+' + (m - MAX_FIC) : '';
+            n.classList.toggle('is-empty', m === 0);
+        });
+        var tot = root.querySelector('[data-cx-lib-total]');
+        if (tot) { tot.textContent = Object.keys(ids).length; }
         var none = root.querySelector('[data-cx-lib-none]');
-        if (none) { none.hidden = naLixeira || algum || !root.querySelector('.cx-lib-sector:not(.cx-lib-trash) .cx-lib-doc'); }
+        if (none) { none.hidden = nichos || naLixeira || algum || !root.querySelector('.cx-lib-sector:not(.cx-lib-trash) .cx-lib-doc'); }
+        leva();
     }
-    q.addEventListener('input', aplica);
+    // B2b: clicar no nicho (fora de um fichário) entra no setor ou na categoria.
+    root.addEventListener('click', function (e) {
+        var n = e.target.closest('.cx-lib-niche[data-href]');
+        if (n && !e.target.closest('a')) { window.location.href = n.getAttribute('data-href'); }
+    });
+    // B2a: vista Estante (padrão) ou Lista, lembrada neste navegador.
+    var vistas = root.querySelectorAll('[data-cx-lib-view]');
+    function vista(v) {
+        v = v === 'lista' ? 'lista' : 'estante';
+        root.setAttribute('data-view', v);
+        vistas.forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-cx-lib-view') === v); });
+        try { window.localStorage.setItem('codexplus.lib.view', v); } catch (e) { /* sem storage: fica na sessão */ }
+    }
+    vistas.forEach(function (b) {
+        b.addEventListener('click', function () { vista(b.getAttribute('data-cx-lib-view')); });
+    });
+    var salva = null;
+    try { salva = window.localStorage.getItem('codexplus.lib.view'); } catch (e) { salva = null; }
+    vista(salva);
+    if (!nichos) { q.addEventListener('input', aplica); }
     if (mine) { mine.addEventListener('change', aplica); }
     root.querySelectorAll('[data-cx-lib-st]').forEach(function (b) {
         b.addEventListener('click', function () {

@@ -2020,6 +2020,80 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 /* R5: filtros de quem produz e lixeira na Biblioteca (seção 21). */
 .cx-lib-mine { display: inline-flex; align-items: center; gap: 6px; font-size: .88em; color: var(--cx-muted); margin: 0; }
 .cx-lib-trash-title { font-family: var(--cx-font-display); font-size: 1.05rem; margin: 12px 0 8px; display: flex; gap: 8px; align-items: center; }
+/* B2a: vista Estante (modelo C, Claudio 27/09/2026). Lombada = documento,
+   cor do tipo, bolinha da situação; tábua escura a cada 164 px de altura
+   (linha = 164 px de lombada + 26 px de tábua, pelo gap vertical). */
+.cx-lib-doc[hidden] { display: none !important; }
+.cx-lib-spine { display: none; }
+.cx-lib-views { margin-left: auto; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-list {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 26px 3px; padding: 0 12px 26px; margin: 0 0 12px;
+    background: repeating-linear-gradient(to bottom, transparent 0 164px, #444441 164px 190px); border-radius: 3px; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-doc { display: block; height: 164px; padding: 14px 0 0; border: 0; box-sizing: border-box; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-doc > :not(.cx-lib-spine) { display: none; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-spine { display: flex; }
+.cx-sp-POP { --sp: var(--cx-type-POP); --sp-bg: var(--cx-type-POP-bg); --sp-ink: var(--cx-type-POP-ink); }
+.cx-sp-PSG { --sp: var(--cx-type-PSG); --sp-bg: var(--cx-type-PSG-bg); --sp-ink: var(--cx-type-PSG-ink); }
+.cx-sp-MAN { --sp: var(--cx-type-MAN); --sp-bg: var(--cx-type-MAN-bg); --sp-ink: var(--cx-type-MAN-ink); }
+.cx-sp-PRP { --sp: var(--cx-type-PRP); --sp-bg: var(--cx-type-PRP-bg); --sp-ink: var(--cx-type-PRP-ink); }
+.cx-sp-DIA { --sp: var(--cx-type-DIA); --sp-bg: var(--cx-type-DIA-bg); --sp-ink: var(--cx-type-DIA-ink); }
+.cx-sp-LAU { --sp: var(--cx-type-LAU); --sp-bg: var(--cx-type-LAU-bg); --sp-ink: var(--cx-type-LAU-ink); }
+.cx-sp-DTC { --sp: var(--cx-type-DTC); --sp-bg: var(--cx-type-DTC-bg); --sp-ink: var(--cx-type-DTC-ink); }
+.cx-sp-DIV { --sp: var(--cx-type-DIV); --sp-bg: var(--cx-type-DIV-bg); --sp-ink: var(--cx-type-DIV-ink); }
+.cx-lib-spine { position: relative; width: 34px; height: 150px; box-sizing: border-box; justify-content: center; padding-top: 17px;
+    border-radius: 3px 3px 0 0; background: var(--sp, #6b6a64); color: #fff; text-decoration: none; transition: transform .12s ease-out; }
+.cx-lib-spine:hover, .cx-lib-spine:focus-visible { transform: translateY(-10px); color: #fff; text-decoration: none; }
+.cx-lib-spine:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: 2px; }
+.cx-lib-spine-t { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--cx-font); font-size: 11px; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 126px; }
+.cx-lib-spine-t b { font-family: var(--cx-mono); font-weight: 500; }
+.cx-lib-spine.is-draft { background: var(--sp-bg, #eeede8); border: 1.5px dashed var(--sp, #6b6a64); color: var(--sp-ink, #4a4944); }
+.cx-lib-spine.is-draft:hover, .cx-lib-spine.is-draft:focus-visible { color: var(--sp-ink, #4a4944); }
+.cx-lib-spine.is-obsolete { filter: grayscale(.85); }
+.cx-lib-dot { position: absolute; top: 5px; left: 50%; margin-left: -5px; width: 10px; height: 10px; box-sizing: border-box;
+    border-radius: 50%; border: 2px solid #fff; }
+.cx-lib-dot--ok { background: var(--cx-ok); }
+.cx-lib-dot--wa { background: var(--cx-warn-mark); }
+.cx-lib-dot--ex { background: var(--cx-danger); }
+.cx-lib-dot--dr { background: var(--cx-faint); }
+/* B2b: três níveis (Claudio, 27/09/2026). Nichos 4 × 3 no mínimo, com os
+   fichários recentes em pé sobre a tábua; os vazios com decoração. */
+.cx-lib-crumb { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--cx-font-display);
+    font-size: 1.15rem; margin: 0 0 2px; }
+.cx-lib-crumb a { color: var(--cx-accent); text-decoration: none; }
+.cx-lib-crumb a:hover { text-decoration: underline; }
+.cx-lib-crumb-sep { color: var(--cx-faint); }
+.cx-lib-sub { color: var(--cx-muted); font-size: .88em; margin: 0 0 14px; }
+.cx-lib-niches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 22px; margin: 0 0 18px; }
+.cx-lib-niches[hidden] { display: none; }
+.cx-lib-niche { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--cx-border-soft); }
+.cx-lib-niche:nth-child(4n) { border-right: 0; }
+.cx-lib-niche[data-href] { cursor: pointer; }
+.cx-lib-niche-row { display: flex; align-items: flex-end; gap: 3px; height: 164px; padding: 14px 12px 0; box-sizing: border-box; overflow: hidden; }
+.cx-lib-niche[data-href]:hover .cx-lib-niche-row { background: var(--cx-surface-1); }
+.cx-lib-niche .cx-lib-spine { display: flex; flex: none; }
+.cx-lib-niche .cx-lib-spine[hidden] { display: none; }
+.cx-lib-niche.is-decor .cx-lib-niche-row { justify-content: center; }
+.cx-lib-decor { display: block; flex: none; }
+.cx-lib-more { align-self: flex-end; padding: 0 0 6px 4px; font-size: .8em; color: var(--cx-muted); white-space: nowrap; }
+.cx-lib-plank { height: 26px; background: #444441; color: #F1EFE8; display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 0 12px; font-size: .85em; text-decoration: none; }
+a.cx-lib-plank:hover, a.cx-lib-plank:focus-visible { color: #fff; text-decoration: none; }
+.cx-lib-plank b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-lib-plank span { color: #B4B2A9; }
+@media (max-width: 760px) {
+    .cx-lib-niches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cx-lib-niche:nth-child(4n) { border-right: 1px solid var(--cx-border-soft); }
+    .cx-lib-niche:nth-child(2n) { border-right: 0; }
+}
+.cx-lib-sector.is-flat { border: 0; padding: 0; background: transparent; }
+.cx-lib-sector.is-flat > summary, .cx-lib-sector.is-flat .cx-lib-category h3 { display: none; }
+.cx-lib-new { padding: 8px 4px; border-top: 1px solid var(--cx-border-soft); }
+.cx-lib-new a { display: inline-flex; align-items: center; gap: 6px; color: var(--cx-type-PSG-ink); font-weight: 600; text-decoration: none; }
+.cx-lib-new small { color: var(--cx-muted); font-weight: 400; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new { height: 164px; padding: 14px 0 0 8px; border: 0; box-sizing: border-box; }
+.cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new a { flex-direction: column; justify-content: center; width: 96px; height: 150px;
+    border: 1.5px dashed var(--cx-type-PSG); border-radius: 6px; background: var(--cx-surface); font-size: .8em; text-align: center; box-sizing: border-box; }
 
 /* =========================================================================
    22. PLANILHA (bloco PL1) — public/js/codexplus-sheet.js

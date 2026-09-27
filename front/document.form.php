@@ -568,7 +568,11 @@ if ($inRevision) {
 
 Wiki::pageHeader(); // S1
 
-$categoryIds = $isNew ? [] : Document_Category::getCategoryIds($id);
+// B2b: "+ Novo documento" da Biblioteca chega com ?cat= (categoria aberta).
+$presetCat   = $isNew ? (int) ($_GET['cat'] ?? 0) : 0;
+$categoryIds = $isNew
+    ? (($presetCat > 0 && (new Category())->getFromDB($presetCat)) ? [$presetCat] : [])
+    : Document_Category::getCategoryIds($id);
 $canManage   = !$isNew && $doc->canManage();
 
 // Campos de formulário gerados pelo GLPI (devolvem string com display=false).

@@ -2064,12 +2064,15 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-lib-crumb a:hover { text-decoration: underline; }
 .cx-lib-crumb-sep { color: var(--cx-faint); }
 .cx-lib-sub { color: var(--cx-muted); font-size: .88em; margin: 0 0 14px; }
-.cx-lib-niches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 22px; margin: 0 0 18px; }
+.cx-lib-niches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 14px; row-gap: 0; margin: 0 0 18px; }
 .cx-lib-niches[hidden] { display: none; }
-.cx-lib-niche { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--cx-border-soft); }
-.cx-lib-niche:nth-child(4n) { border-right: 0; }
+.cx-lib-niche { position: relative; display: flex; flex-direction: column; min-width: 0; }
+/* B2c: montante vertical no vão entre as colunas, de cima a baixo. */
+.cx-lib-niche::after { content: ""; position: absolute; top: 0; bottom: 0; right: -14px; width: 14px; background: #2C2C2A; }
+.cx-lib-niche:nth-child(4n)::after { display: none; }
 .cx-lib-niche[data-href] { cursor: pointer; }
-.cx-lib-niche-row { display: flex; align-items: flex-end; gap: 3px; height: 164px; padding: 14px 12px 0; box-sizing: border-box; overflow: hidden; }
+.cx-lib-niche-row { display: flex; align-items: flex-end; gap: 3px; height: 186px; padding: 36px 12px 0; box-sizing: border-box; overflow: hidden; }
+.cx-lib-niche-docs { display: flex; align-items: flex-end; gap: 3px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
 .cx-lib-niche[data-href]:hover .cx-lib-niche-row { background: var(--cx-surface-1); }
 .cx-lib-niche .cx-lib-spine { display: flex; flex: none; }
 .cx-lib-niche .cx-lib-spine[hidden] { display: none; }
@@ -2083,9 +2086,32 @@ a.cx-lib-plank:hover, a.cx-lib-plank:focus-visible { color: #fff; text-decoratio
 .cx-lib-plank span { color: #B4B2A9; }
 @media (max-width: 760px) {
     .cx-lib-niches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .cx-lib-niche:nth-child(4n) { border-right: 1px solid var(--cx-border-soft); }
-    .cx-lib-niche:nth-child(2n) { border-right: 0; }
+    .cx-lib-niche:nth-child(4n)::after { display: block; }
+    .cx-lib-niche:nth-child(2n)::after { display: none; }
 }
+/* B2c: aparador e rolos de planta (diagramas do setor, nível 1). Papel
+   quase preto (Claudio, 27/09/2026); etiqueta na cor do DIA. */
+.cx-lib { --cx-roll: #2A0A0E; --cx-roll-top: #46161C; --cx-roll-line: #160406; }
+.cx-lib-dg { display: flex; align-items: flex-end; gap: 4px; flex: none; margin-left: auto; }
+.cx-lib-dg[hidden] { display: none; }
+.cx-lib-bookend { display: block; flex: none; margin: 0 6px 0 8px; }
+.cx-lib-roll { position: relative; display: block; width: 32px; height: 126px; flex: none; text-decoration: none; transition: transform .12s ease-out; }
+.cx-lib-roll--h0 { height: 132px; }
+.cx-lib-roll--h1 { height: 118px; }
+.cx-lib-roll[hidden] { display: none; }
+.cx-lib-roll:hover, .cx-lib-roll:focus-visible { transform: translateY(-10px); text-decoration: none; }
+.cx-lib-roll:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: 2px; }
+.cx-lib-roll-body { position: absolute; left: 0; right: 0; top: 6px; bottom: 0; background: var(--cx-roll);
+    border: 1px solid var(--cx-roll-line); border-top: 0; border-radius: 0 0 3px 3px; }
+.cx-lib-roll-top { position: absolute; left: 0; right: 0; top: 0; height: 12px; box-sizing: border-box; border-radius: 50%;
+    background: var(--cx-roll-top); border: 1px solid var(--cx-roll-line); }
+.cx-lib-roll-band { position: absolute; left: 0; right: 0; top: 22%; height: 50%; box-sizing: border-box; display: flex;
+    align-items: center; justify-content: center; background: var(--cx-type-DIA); }
+.cx-lib-roll-band span { writing-mode: vertical-rl; transform: rotate(180deg); color: #fff; font-family: var(--cx-mono);
+    font-size: 11px; white-space: nowrap; }
+.cx-lib-roll.is-draft .cx-lib-roll-band { background: var(--cx-type-DIA-bg); border: 1.5px dashed var(--cx-type-DIA); }
+.cx-lib-roll.is-draft .cx-lib-roll-band span { color: var(--cx-type-DIA-ink); }
+.cx-lib-roll .cx-lib-dot { top: auto; bottom: 8px; border-color: var(--cx-roll-top); }
 .cx-lib-sector.is-flat { border: 0; padding: 0; background: transparent; }
 .cx-lib-sector.is-flat > summary, .cx-lib-sector.is-flat .cx-lib-category h3 { display: none; }
 .cx-lib-new { padding: 8px 4px; border-top: 1px solid var(--cx-border-soft); }

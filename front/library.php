@@ -72,7 +72,13 @@ $base   = $self . '?';
 $niches = [];
 if ($mode === 'setores') {
     foreach ($shelf['sectors'] as $s) {
-        $niches[] = ['name' => $s['name'], 'href' => $base . 'setor=' . $s['id'], 'recent' => $s['recent']];
+        // B2c: no nível 1, os diagramas vão depois do aparador (rolos).
+        $niches[] = [
+            'name'   => $s['name'],
+            'href'   => $base . 'setor=' . $s['id'],
+            'recent' => array_values(array_filter($s['recent'], static fn ($d) => $d['doctype'] !== 'DIA')),
+            'dias'   => array_values(array_filter($s['recent'], static fn ($d) => $d['doctype'] === 'DIA')),
+        ];
     }
     $scope = $shelf['sectors'];
 } elseif ($mode === 'categorias') {
@@ -81,6 +87,7 @@ if ($mode === 'setores') {
             'name'   => $c['name'],
             'href'   => $base . 'setor=' . $sector['id'] . '&cat=' . $c['id'],
             'recent' => $c['recent'],
+            'dias'   => [],
         ];
     }
     $scope = [$sector];

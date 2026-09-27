@@ -12,6 +12,9 @@
    lombadas da categoria (&cat=) — e a busca em tudo (?q=). Nicho mostra os
    5 fichários mais recentes que passam no filtro; estante mínima de 12
    nichos (4 × 3), os vazios com decoração (parts/lib-decor).
+   B2c (Claudio, 27/09/2026): montantes verticais entre as colunas; no nível
+   1, aparador dentro do nicho e os diagramas do setor à direita como rolos
+   de planta (até 3, papel quase preto #2A0A0E, etiqueta na cor do DIA).
    Variáveis: shelf (sectors, total, types, status), level (mode, sector,
    category), niches, decor, new_url, doctypes, client_types, producer,
    can_templates, statuses, trash, me, q, situacao, tipo, meus, self, csrf,
@@ -32,6 +35,24 @@
        title="{{ d.code }} · {{ d.name }} · {{ doctypes[d.doctype] ?? d.doctype }} · {{ cx_sit }}{% if d.in_revision %} · {{ __('em atualização', 'codexplus') }}{% endif %}">
         <i class="cx-lib-dot cx-lib-dot--{{ cx_dot }}" aria-hidden="true"></i>
         <span class="cx-lib-spine-t"><b>{{ d.code }}</b><br>{{ d.name }}</span>
+    </a>
+{% endmacro %}
+{% macro roll(d, doctypes, statuses, form_url, me) %}
+    {% if d.status == 'publicado' %}
+        {% set cx_dot = d.expiry == 'vencido' ? 'ex' : (d.expiry == 'avencer' ? 'wa' : 'ok') %}
+        {% set cx_sit = d.expiry == 'vencido' ? __('revisão vencida', 'codexplus') : (d.expiry == 'avencer' ? __('a vencer', 'codexplus') : __('vigente', 'codexplus')) %}
+    {% else %}
+        {% set cx_dot = 'dr' %}
+        {% set cx_sit = statuses[d.status] ?? d.status %}
+    {% endif %}
+    <a class="cx-lib-roll{{ d.status in ['rascunho', 'aprovacao', 'validacao'] ? ' is-draft' : '' }} cx-lib-roll--h{{ d.id % 3 }}"
+       href="{{ form_url }}?id={{ d.id }}"
+       data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"
+       title="{{ d.code }} · {{ d.name }} · {{ doctypes[d.doctype] ?? d.doctype }} · {{ cx_sit }}">
+        <span class="cx-lib-roll-body"></span>
+        <span class="cx-lib-roll-band"><span>{{ d.code }}</span></span>
+        <span class="cx-lib-roll-top"></span>
+        <i class="cx-lib-dot cx-lib-dot--{{ cx_dot }}" aria-hidden="true"></i>
     </a>
 {% endmacro %}
 {% import _self as cx %}
@@ -130,13 +151,26 @@
             {% for n in niches %}
                 <div class="cx-lib-niche" data-href="{{ n.href }}">
                     <div class="cx-lib-niche-row">
-                        {% for d in n.recent %}
-                            {{ cx.spine(d, doctypes, statuses, form_url, me, true) }}
-                        {% endfor %}
-                        <span class="cx-lib-more" data-cx-lib-more></span>
+                        <div class="cx-lib-niche-docs">
+                            {% for d in n.recent %}
+                                {{ cx.spine(d, doctypes, statuses, form_url, me, true) }}
+                            {% endfor %}
+                            <span class="cx-lib-more" data-cx-lib-more></span>
+                        </div>
+                        {% if n.dias is not empty %}
+                            {# B2c: aparador e rolos de planta (diagramas do setor). #}
+                            <div class="cx-lib-dg" data-cx-lib-dg>
+                                <svg class="cx-lib-bookend" viewBox="0 0 30 104" width="30" height="104" aria-hidden="true" focusable="false"><path d="M0 104V98H14L20 4H28L20 98H30V104Z" fill="#888780"/><path d="M20 4H28L20 98H14Z" fill="#5F5E5A"/><path d="M20 4H28L27.4 13H19.4Z" fill="#B4B2A9"/></svg>
+                                {% for d in n.dias %}
+                                    {{ cx.roll(d, doctypes, statuses, form_url, me) }}
+                                {% endfor %}
+                                <span class="cx-lib-more" data-cx-lib-more-d></span>
+                            </div>
+                        {% endif %}
                     </div>
                     <a class="cx-lib-plank" href="{{ n.href }}" data-cx-lib-nav>
-                        <b>{{ n.name }}</b><span data-cx-lib-n>{{ n.recent|length }}</span>
+                        <b>{{ n.name }}</b>
+                        <span><span data-cx-lib-n>{{ n.recent|length + n.dias|length }}</span><span data-cx-lib-nd data-one="{{ __('diagrama', 'codexplus') }}" data-many="{{ __('diagramas', 'codexplus') }}"></span></span>
                     </a>
                 </div>
             {% endfor %}
@@ -228,6 +262,7 @@
     var mode = root.getAttribute('data-mode');
     var nichos = mode === 'setores' || mode === 'categorias';
     var MAX_FIC = 5; // B2b: fichários por nicho
+    var MAX_DIA = 3; // B2c: rolos de planta por nicho (nível 1)
     var q = root.querySelector('[data-cx-lib-q]');
     var tBtn = root.querySelector('[data-cx-lib-type].is-active');
     var tipo = tBtn ? tBtn.getAttribute('data-cx-lib-type') : '';
@@ -283,10 +318,24 @@
                 if (ok) { m++; ids[f.getAttribute('data-id')] = 1; }
                 f.hidden = !(ok && m <= MAX_FIC);
             });
-            n.querySelector('[data-cx-lib-n]').textContent = m;
+            // B2c: rolos de planta depois do aparador (só no nível 1).
+            var md = 0;
+            n.querySelectorAll('.cx-lib-roll').forEach(function (r) {
+                var ok = !naLixeira && passa(r, '');
+                if (ok) { md++; ids[r.getAttribute('data-id')] = 1; }
+                r.hidden = !(ok && md <= MAX_DIA);
+            });
+            var dg = n.querySelector('[data-cx-lib-dg]');
+            if (dg) {
+                dg.hidden = md === 0;
+                n.querySelector('[data-cx-lib-more-d]').textContent = md > MAX_DIA ? '+' + (md - MAX_DIA) : '';
+            }
+            n.querySelector('[data-cx-lib-n]').textContent = m + md;
+            var nd = n.querySelector('[data-cx-lib-nd]');
+            nd.textContent = md ? ' · ' + md + ' ' + nd.getAttribute(md === 1 ? 'data-one' : 'data-many') : '';
             var mais = n.querySelector('[data-cx-lib-more]');
             mais.textContent = m > MAX_FIC ? '+' + (m - MAX_FIC) : '';
-            n.classList.toggle('is-empty', m === 0);
+            n.classList.toggle('is-empty', m + md === 0);
         });
         var tot = root.querySelector('[data-cx-lib-total]');
         if (tot) { tot.textContent = Object.keys(ids).length; }

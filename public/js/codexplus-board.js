@@ -52,6 +52,12 @@
    banco de dados, entrada e operação manual, preparação, atraso, vários
    documentos, conector de página, nota adesiva) e paleta em seções
    recolhíveis (BPMN entra no Q5e-2).
+   Q5e-2 (27/09/2026): seção BPMN — eventos de início, intermediário e fim
+   (tipo em `mk`: simples, mensagem, temporizador), tarefa (mk: usuário,
+   serviço, manual), subprocesso, gateways exclusivo/paralelo/inclusivo,
+   objeto de dados, anotação e grupo. Notação padrão (a mesma do Bizagi),
+   desenho próprio. Eventos, gateways e objeto de dados levam o nome
+   EMBAIXO da forma, como no BPMN; os demais, dentro.
    ========================================================================= */
 (function () {
     'use strict';
@@ -105,11 +111,36 @@
         delay:   { label: 'Atraso / espera',    w: 130, h: 60,  color: 'ambar' },
         docs:    { label: 'Vários documentos',  w: 160, h: 76,  color: 'roxo' },
         offpage: { label: 'Conector de página', w: 64,  h: 64,  color: 'cinza' },
-        note:    { label: 'Nota adesiva',       w: 150, h: 100, color: 'ambar2' }
+        note:    { label: 'Nota adesiva',       w: 150, h: 100, color: 'ambar2' },
+        // Q5e-2 — BPMN
+        evstart: { label: 'Evento de início',     w: 40,  h: 40,  color: 'verde' },
+        evmid:   { label: 'Evento intermediário', w: 40,  h: 40,  color: 'ambar' },
+        evend:   { label: 'Evento de fim',        w: 40,  h: 40,  color: 'vermelho' },
+        task:    { label: 'Tarefa',               w: 150, h: 70,  color: 'azul' },
+        bsub:    { label: 'Subprocesso (BPMN)',   w: 150, h: 70,  color: 'azul' },
+        gwx:     { label: 'Gateway exclusivo',    w: 50,  h: 50,  color: 'ambar' },
+        gwp:     { label: 'Gateway paralelo',     w: 50,  h: 50,  color: 'ambar' },
+        gwi:     { label: 'Gateway inclusivo',    w: 50,  h: 50,  color: 'ambar' },
+        dataobj: { label: 'Objeto de dados',      w: 40,  h: 52,  color: 'branco' },
+        annot:   { label: 'Anotação',             w: 150, h: 60,  color: 'cinza' },
+        group:   { label: 'Grupo',                w: 280, h: 180, color: 'cinza' }
     };
+    // Nome embaixo da forma (BPMN); formas sempre redondas/quadradas; sem fundo.
+    var LABEL_BELOW = ['evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi', 'dataobj'];
+    var SQUARE = ['conn', 'evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi'];
+    var NO_FILL = ['annot', 'group'];
+    // Tipo do evento e da tarefa (marcador desenhado dentro).
+    var EV_MK = { none: 'Simples', msg: 'Mensagem', timer: 'Temporizador' };
+    var TASK_MK = { none: 'Simples', user: 'Usuário', service: 'Serviço', manual: 'Manual' };
+    var MK_OPTS = { evstart: EV_MK, evmid: EV_MK, evend: EV_MK, task: TASK_MK };
+    // Atalhos da paleta: mesma forma com o tipo já escolhido.
+    var PRESETS = { 'evmid:msg': 'Mensagem', 'evmid:timer': 'Temporizador' };
+    function below(it) { return LABEL_BELOW.indexOf(it.shape) >= 0; }
+    function labelW(it) { return Math.max(it.w * 2.4, 110); }
     // Paleta em seções (Q5e). Forma nova = uma linha em SHAPES e o nome aqui.
     var SHAPE_GROUPS = [
-        { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] }
+        { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] },
+        { k: 'bpmn', label: 'BPMN', items: ['evstart', 'evmid', 'evend', 'evmid:msg', 'evmid:timer', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'] }
     ];
     // Medidas internas de cada forma (desenho, texto e âncoras usam as mesmas).
     function skewOf(it) { return Math.min(20, it.w * 0.15); }
@@ -225,12 +256,14 @@
         }
         return h + '</g>';
     }
-    function shapeMinW(it) { return it.shape === 'conn' ? 24 : 40; }
+    function shapeMinW(it) { return SQUARE.indexOf(it.shape) >= 0 || it.shape === 'dataobj' ? 24 : 40; }
     // Largura útil do texto dentro de cada forma.
     function shapeInner(it) {
         var w = it.w;
+        if (below(it)) { return labelW(it); }
         switch (it.shape) {
             case 'dec': return w * 0.56;
+            case 'group': return w - 20;
             case 'data': return w - 44;
             case 'conn': return w - 8;
             case 'term': return w - 26;
@@ -262,7 +295,11 @@
     function shapeNeed(it) {
         var fs = shapeFs(it), lines = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs).length : 0;
         var need = lines * fs * 1.25;
+        if (below(it) || it.shape === 'group') { return 0; }   // nome fora da forma / no canto
         switch (it.shape) {
+            case 'task': return Math.ceil(need + fs * 1.4 + (it.mk && it.mk !== 'none' ? 16 : 0));
+            case 'bsub': return Math.ceil(need + fs * 1.4 + 16);
+            case 'annot': return Math.ceil(need + fs);
             case 'dec': return Math.ceil(need / 0.5 + 12);
             case 'doc': return Math.ceil(need + fs * 2);
             case 'db': return Math.ceil(need + fs * 1.4 + dbRy(it) * 3);
@@ -282,9 +319,43 @@
         it.w = Math.max(shapeMinW(it), Math.min(SHAPE_MAX, Math.round(+it.w > 0 ? +it.w : b.w * k)));
         it.h = Math.max(shapeMinW(it), Math.min(SHAPE_MAX, Math.round(+it.h > 0 ? +it.h : b.h * k)));
         it.h = Math.max(it.h, Math.min(SHAPE_MAX, shapeNeed(it)));
-        if (it.shape === 'conn') { it.w = it.h = Math.max(it.w, it.h); }
+        if (SQUARE.indexOf(it.shape) >= 0) { it.w = it.h = Math.max(it.w, it.h); }
         delete it.sz;
         return it;
+    }
+    // Marcadores BPMN (traço na cor da borda).
+    function markerSvg(it, c) {
+        var x = it.x, y = it.y, w = it.w, h = it.h, cx = x + w / 2, cy = y + h / 2, r = w / 2, sw = ' fill="none" stroke="' + c + '" stroke-width="1.4"';
+        var mk = it.mk || 'none';
+        if (/^ev/.test(it.shape)) {
+            if (mk === 'msg') {
+                var ew = r * 0.95, eh = r * 0.64;
+                return '<rect x="' + (cx - ew / 2).toFixed(1) + '" y="' + (cy - eh / 2).toFixed(1) + '" width="' + ew.toFixed(1) + '" height="' + eh.toFixed(1) + '"' + sw + '/>'
+                    + '<path d="M' + (cx - ew / 2).toFixed(1) + ' ' + (cy - eh / 2).toFixed(1) + 'L' + cx.toFixed(1) + ' ' + (cy + eh * 0.1).toFixed(1) + 'L' + (cx + ew / 2).toFixed(1) + ' ' + (cy - eh / 2).toFixed(1) + '"' + sw + '/>';
+            }
+            if (mk === 'timer') {
+                var tr = r * 0.52;
+                return '<circle cx="' + cx + '" cy="' + cy + '" r="' + tr.toFixed(1) + '"' + sw + '/>'
+                    + '<path d="M' + cx + ' ' + (cy - tr * 0.75).toFixed(1) + 'V' + cy + 'L' + (cx + tr * 0.55).toFixed(1) + ' ' + (cy + tr * 0.3).toFixed(1) + '"' + sw + '/>';
+            }
+            return '';
+        }
+        if (it.shape === 'task') {
+            var mx = x + 8, my = y + 7;
+            if (mk === 'user') {
+                return '<circle cx="' + (mx + 7) + '" cy="' + (my + 4) + '" r="3.5"' + sw + '/><path d="M' + mx + ' ' + (my + 16) + 'Q' + (mx + 7) + ' ' + (my + 6) + ' ' + (mx + 14) + ' ' + (my + 16) + 'Z"' + sw + '/>';
+            }
+            if (mk === 'service') {
+                var gx = mx + 7, gy = my + 7, sp = '';
+                for (var a = 0; a < 8; a++) { var an = a * Math.PI / 4; sp += 'M' + (gx + Math.cos(an) * 5).toFixed(1) + ' ' + (gy + Math.sin(an) * 5).toFixed(1) + 'L' + (gx + Math.cos(an) * 7.5).toFixed(1) + ' ' + (gy + Math.sin(an) * 7.5).toFixed(1); }
+                return '<circle cx="' + gx + '" cy="' + gy + '" r="5"' + sw + '/><circle cx="' + gx + '" cy="' + gy + '" r="2"' + sw + '/><path d="' + sp + '"' + sw + '/>';
+            }
+            if (mk === 'manual') {
+                return '<rect x="' + mx + '" y="' + (my + 3) + '" width="7" height="11" rx="2"' + sw + '/><path d="M' + (mx + 7) + ' ' + (my + 4) + 'H' + (mx + 15) + 'M' + (mx + 7) + ' ' + (my + 7.5) + 'H' + (mx + 16)
+                    + 'M' + (mx + 7) + ' ' + (my + 11) + 'H' + (mx + 14) + 'M' + (mx + 2) + ' ' + (my + 3) + 'L' + (mx + 4) + ' ' + my + '"' + sw + '/>';
+            }
+        }
+        return '';
     }
     // Centro vertical do texto (fora das partes "decorativas" de cada forma).
     function shapeTextCy(it) {
@@ -295,11 +366,13 @@
             case 'manin': return y + h * 0.22 + (h * 0.78) / 2;
             case 'docs': var so = stackOf(it); return y + 2 * so + (h - 2 * so - Math.min(8, (h - 2 * so) * 0.15)) / 2;
             case 'offpage': return y + h * 0.36;
+            case 'task': return y + h / 2 + (it.mk && it.mk !== 'none' ? 6 : 0);
+            case 'bsub': return y + (h - 14) / 2;
         }
         return y + h / 2;
     }
-    function shapeSvg(it) {
-        var x = it.x, y = it.y, w = it.w, h = it.h, ink = pal(it.ink).t;
+    function shapeSvg(it, forExport) {
+        var x = it.x, y = it.y, w = it.w, h = it.h, ink = pal(it.ink).t, lc = pal(it.line).s;
         var st = ' fill="' + pal(it.fill).f + '" stroke="' + pal(it.line).s + '" stroke-width="1.6"', g = '', wv = Math.min(9, h * 0.15);
         if (it.shape === 'term') { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + Math.min(h, w) / 2 + '"' + st + '/>'; }
         else if (it.shape === 'dec') { g = '<path d="M' + (x + w / 2) + ' ' + y + 'L' + (x + w) + ' ' + (y + h / 2) + 'L' + (x + w / 2) + ' ' + (y + h) + 'L' + x + ' ' + (y + h / 2) + 'Z"' + st + '/>'; }
@@ -343,13 +416,62 @@
             g = '<path d="M' + x + ' ' + y + 'H' + (x + w) + 'V' + (y + h - nf) + 'L' + (x + w - nf) + ' ' + (y + h) + 'H' + x + 'Z"' + st + '/>'
                 + '<path d="M' + (x + w) + ' ' + (y + h - nf) + 'H' + (x + w - nf) + 'V' + (y + h) + '" fill="' + pal(it.line).s + '" fill-opacity="0.18" stroke="' + pal(it.line).s + '" stroke-width="1.2"/>';
         }
+        else if (/^ev/.test(it.shape)) {
+            var er = w / 2, ecx = x + er, ecy = y + h / 2, fl = pal(it.fill).f;
+            if (it.shape === 'evend') { g = '<circle cx="' + ecx + '" cy="' + ecy + '" r="' + (er - 1.75) + '" fill="' + fl + '" stroke="' + lc + '" stroke-width="3.5"/>'; }
+            else if (it.shape === 'evmid') {
+                g = '<circle cx="' + ecx + '" cy="' + ecy + '" r="' + er + '"' + st + '/><circle cx="' + ecx + '" cy="' + ecy + '" r="' + Math.max(2, er - 3.5) + '" fill="none" stroke="' + lc + '" stroke-width="1.4"/>';
+            }
+            else { g = '<circle cx="' + ecx + '" cy="' + ecy + '" r="' + er + '"' + st + '/>'; }
+            g += markerSvg(it, lc);
+        }
+        else if (it.shape === 'task' || it.shape === 'bsub') {
+            g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="10"' + st + '/>' + markerSvg(it, lc);
+            if (it.shape === 'bsub') {
+                var bx = x + w / 2 - 7, by = y + h - 17;
+                g += '<rect x="' + bx + '" y="' + by + '" width="14" height="14" fill="none" stroke="' + lc + '" stroke-width="1.4"/>'
+                    + '<path d="M' + (bx + 7) + ' ' + (by + 3) + 'V' + (by + 11) + 'M' + (bx + 3) + ' ' + (by + 7) + 'H' + (bx + 11) + '" stroke="' + lc + '" stroke-width="1.6"/>';
+            }
+        }
+        else if (/^gw/.test(it.shape)) {
+            g = '<path d="M' + (x + w / 2) + ' ' + y + 'L' + (x + w) + ' ' + (y + h / 2) + 'L' + (x + w / 2) + ' ' + (y + h) + 'L' + x + ' ' + (y + h / 2) + 'Z"' + st + '/>';
+            var gcx = x + w / 2, gcy = y + h / 2, q = w * 0.17, ms = ' stroke="' + lc + '" stroke-width="' + Math.max(2, w * 0.06).toFixed(1) + '" fill="none" stroke-linecap="round"';
+            if (it.shape === 'gwx') { g += '<path d="M' + (gcx - q) + ' ' + (gcy - q) + 'L' + (gcx + q) + ' ' + (gcy + q) + 'M' + (gcx + q) + ' ' + (gcy - q) + 'L' + (gcx - q) + ' ' + (gcy + q) + '"' + ms + '/>'; }
+            else if (it.shape === 'gwp') { g += '<path d="M' + gcx + ' ' + (gcy - q * 1.3) + 'V' + (gcy + q * 1.3) + 'M' + (gcx - q * 1.3) + ' ' + gcy + 'H' + (gcx + q * 1.3) + '"' + ms + '/>'; }
+            else { g += '<circle cx="' + gcx + '" cy="' + gcy + '" r="' + (q * 1.2).toFixed(1) + '"' + ms + '/>'; }
+        }
+        else if (it.shape === 'dataobj') {
+            var ff = Math.min(10, w * 0.3);
+            g = '<path d="M' + x + ' ' + y + 'H' + (x + w - ff) + 'L' + (x + w) + ' ' + (y + ff) + 'V' + (y + h) + 'H' + x + 'Z"' + st + '/>'
+                + '<path d="M' + (x + w - ff) + ' ' + y + 'V' + (y + ff) + 'H' + (x + w) + '" fill="none" stroke="' + lc + '" stroke-width="1.4"/>';
+        }
+        else if (it.shape === 'annot') {
+            // Colchete aberto; o retângulo invisível deixa clicar no meio.
+            g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#fff" fill-opacity="0"/>'
+                + '<path d="M' + (x + 12) + ' ' + y + 'H' + x + 'V' + (y + h) + 'H' + (x + 12) + '" fill="none" stroke="' + lc + '" stroke-width="1.6"/>';
+        }
+        else if (it.shape === 'group') {
+            // Sem fundo: o que está dentro continua clicável. Borda mais larga
+            // (invisível) só na tela, para pegar o grupo pela borda.
+            g = (forExport ? '' : '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="12" fill="none" stroke="transparent" stroke-width="12" vector-effect="non-scaling-stroke"/>')
+                + '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="12" fill="none" stroke="' + lc + '" stroke-width="1.6" stroke-dasharray="10 4 2 4"/>';
+        }
         else { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"' + st + '/>'; }
         var fs = shapeFs(it), lh = fs * 1.25, txt = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs) : [];
         if (txt.length) {
             var cy = shapeTextCy(it), y0 = cy - (txt.length - 1) * lh / 2 + fs * 0.35;
             // Vários documentos: o texto vai no da frente (embaixo à esquerda).
-            var tx = x + (it.shape === 'docs' ? (w - 2 * stackOf(it)) / 2 : w / 2);
-            g += '<text x="' + tx + '" y="' + y0.toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
+            var tx = x + (it.shape === 'docs' ? (w - 2 * stackOf(it)) / 2 : w / 2), anc = 'middle';
+            // BPMN: nome embaixo (eventos, gateways, objeto de dados); anotação
+            // e grupo alinhados à esquerda (grupo no canto de cima).
+            if (/^gw/.test(it.shape)) {
+                // Gateway: nome acima e à esquerda (longe das 4 pontas, como no Bizagi).
+                tx = x + w * 0.3; anc = 'end'; y0 = y - 6 - (txt.length - 1) * lh;
+            }
+            else if (below(it)) { y0 = y + h + fs + 3; }
+            else if (it.shape === 'annot') { tx = x + 10; anc = 'start'; }
+            else if (it.shape === 'group') { tx = x + 10; anc = 'start'; y0 = y + fs + 6; }
+            g += '<text x="' + tx + '" y="' + y0.toFixed(1) + '" text-anchor="' + anc + '" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
                 + txt.map(function (l, i) { return '<tspan x="' + tx + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
         }
         return '<g data-id="' + it.id + '">' + g + '</g>';
@@ -479,6 +601,7 @@
                 sh.fill = FLOW_COLORS[it.fill] ? it.fill : old;
                 sh.line = FLOW_COLORS[it.line] ? it.line : old;
                 sh.ink = FLOW_COLORS[it.ink] ? it.ink : old;
+                if (MK_OPTS[sh.shape]) { sh.mk = MK_OPTS[sh.shape][it.mk] ? it.mk : 'none'; }
                 out.items.push(shapeFit(sh));
                 return;
             }
@@ -823,7 +946,7 @@
 
     /* ---------------- desenho de um item (tela e PNG) ---------------- */
     function itemSvg(it, forExport) {
-        if (it.t === 'shape') { return shapeSvg(it); }
+        if (it.t === 'shape') { return shapeSvg(it, forExport); }
         if (it.t === 'zone') {
             return '<g data-id="' + it.id + '"><rect x="' + it.x + '" y="' + it.y + '" width="' + it.w + '" height="' + it.h
                 + '" rx="10" fill="' + it.color + '" fill-opacity="0.05" stroke="' + it.color + '" stroke-width="2" stroke-dasharray="8 5"/>'
@@ -936,8 +1059,23 @@
         return h + '<p class="cx-board-none">Sem fio e Lógica/VPN não entram. Áreas e textos não contam.</p></div>';
     }
 
+    // A forma sem o nome de baixo: seleção, alças e guias usam esta.
+    function coreBox(it) { return it.t === 'shape' ? { x: it.x, y: it.y, w: it.w, h: it.h } : bbox(it); }
     function bbox(it) {
-        if (it.t === 'shape') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
+        if (it.t === 'shape') {
+            // Nome embaixo (BPMN): entra no contorno (seleção por área, PNG).
+            if (below(it) && String(it.text || '').trim()) {
+                var fsb = shapeFs(it), ls = wrapText(it.text, labelW(it), fsb), lw = Math.max.apply(null, ls.map(function (l) { return l.length; })) * fsb * 0.55;
+                if (/^gw/.test(it.shape)) {
+                    var gl = it.x + it.w * 0.3 - lw, gt = it.y - 6 - (ls.length - 1) * fsb * 1.25 - fsb;
+                    var gx0 = Math.min(it.x, gl), gy0 = Math.min(it.y, gt);
+                    return { x: gx0, y: gy0, w: it.x + it.w - gx0, h: it.y + it.h - gy0 };
+                }
+                var bx = Math.min(it.x, it.x + it.w / 2 - lw / 2);
+                return { x: bx, y: it.y, w: Math.max(it.x + it.w, it.x + it.w / 2 + lw / 2) - bx, h: it.h + 3 + ls.length * fsb * 1.25 + 2 };
+            }
+            return { x: it.x, y: it.y, w: it.w, h: it.h };
+        }
         if (it.t === 'zone') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'duct') {
             var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }), pd = (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w / 2 + 2;
@@ -1346,11 +1484,12 @@
                 root.querySelector('.cx-board-icons').innerHTML = SHAPE_GROUPS.map(function (gr) {
                     var shut = !!palShut[gr.k];
                     return '<button type="button" class="cx-board-cat cx-board-cat-t" data-grp="' + gr.k + '" aria-expanded="' + !shut + '">' + (shut ? '▸ ' : '▾ ') + esc(gr.label) + '</button>'
-                        + (shut ? '' : '<div class="cx-board-grid">' + gr.items.map(function (k) {
-                            var ck = SHAPES[k].color, small = ['conn', 'offpage'].indexOf(k) >= 0;
-                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck });
-                            return '<button type="button" class="cx-board-ic" data-shape="' + k + '" title="' + esc(SHAPES[k].label) + '">'
-                                + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo) + '</svg><span>' + esc(SHAPES[k].label) + '</span></button>';
+                        + (shut ? '' : '<div class="cx-board-grid">' + gr.items.map(function (key) {
+                            var k = key.split(':')[0], mk = key.split(':')[1] || '', name = PRESETS[key] || SHAPES[k].label;
+                            var ck = SHAPES[k].color, small = ['conn', 'offpage', 'dataobj'].indexOf(k) >= 0 || SQUARE.indexOf(k) >= 0;
+                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none' });
+                            return '<button type="button" class="cx-board-ic" data-shape="' + k + '"' + (mk ? ' data-mk="' + mk + '"' : '') + ' title="' + esc(name) + '">'
+                                + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo, true) + '</svg><span>' + esc(name) + '</span></button>';
                         }).join('') + '</div>');
                 }).join('');
                 return;
@@ -1718,7 +1857,7 @@
                         + '" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>'
                         + (sel.length === 1 && !it.lock ? linkHandles(it) : '') : '';
                 }
-                var b = bbox(it);
+                var b = coreBox(it);
                 return '<rect x="' + (b.x - 4) + '" y="' + (b.y - 4) + '" width="' + (b.w + 8) + '" height="' + (b.h + 8)
                     + '" fill="none" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" stroke-dasharray="' + (5 / view.z) + ' ' + (3 / view.z) + '"/>'
                     + (it.lock ? '<text x="' + (b.x + b.w + 6) + '" y="' + (b.y + 4) + '" font-size="' + (12 / view.z) + '" fill="#378ADD">🔒</text>' : '')
@@ -1878,6 +2017,7 @@
                 h += '<p><strong>' + esc(SHAPES[it.shape].label) + '</strong></p>'
                     + '<label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha.</p>'
+                    + (MK_OPTS[it.shape] ? '<label class="cx-board-f"><span>' + (it.shape === 'task' ? 'Tipo de tarefa' : 'Tipo de evento') + '</span><select data-k="mk">' + optsOf(MK_OPTS[it.shape], it.mk || 'none') + '</select></label>' : '')
                     + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="fs">' + FS_LIST.map(function (v) { return '<option value="' + v + '"' + (v === shapeFs(it) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
                     + '<p class="cx-board-none">Tamanho: puxe os quadradinhos brancos (Shift mantém a proporção; Alt solta da grade). A altura nunca fica menor que o texto. Cores, negrito, letra e camadas: na barra sobre a forma.</p>';
             } else if (it.t === 'link' && it.kind === 'fluxo') {
@@ -1966,6 +2106,7 @@
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
             if (it.t === 'shape' && k === 'text') { it.text = String(it.text).slice(0, 500); shapeFit(it); }
+            if (it.t === 'shape' && k === 'mk') { shapeFit(it); }
             if ((it.t === 'shape' && k === 'fs') || (it.t === 'text' && k === 'px')) { it[k] = +v; if (it.t === 'shape') { shapeFit(it); } }
             if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
             paint();
@@ -2018,12 +2159,15 @@
             render();
         }
 
-        function addShape(shape, x, y) {
+        function addShape(shape, x, y, mk) {
             snap();
             var ck = SHAPES[shape].color;
-            var it = shapeFit({ id: uid(), t: 'shape', shape: shape, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' });
+            var it = { id: uid(), t: 'shape', shape: shape, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' };
+            if (MK_OPTS[shape]) { it.mk = MK_OPTS[shape][mk] ? mk : 'none'; }
+            shapeFit(it);
             it.x = Math.round((x - it.w / 2) / GRID) * GRID; it.y = Math.round((y - it.h / 2) / GRID) * GRID;
-            D.items.push(it);
+            // Grupo nasce atrás de tudo (é uma moldura em volta de outras formas).
+            if (shape === 'group') { D.items.unshift(it); } else { D.items.push(it); }
             sel = [it.id];
             render();
             return it;
@@ -2056,7 +2200,7 @@
             it.x = x1; it.y = y1; it.w = x2 - x1; it.h = y2 - y1;
             if (it.t === 'shape') {
                 shapeFit(it);
-                // Texto pediu mais altura (ou o conector ficou redondo): cresce
+                // Texto pediu mais altura (ou a forma é quadrada): cresce
                 // para o lado oposto ao da alça puxada.
                 if (d.indexOf('n') >= 0) { it.y = y2 - it.h; }
                 if (d.indexOf('w') >= 0) { it.x = x2 - it.w; }
@@ -2086,7 +2230,10 @@
                 + '" style="background:' + bg + ';border-color:' + bd + (what === 'line' ? ';border-width:3px' : '') + '"></button>';
         }
         // Fundo: só forma. Borda: forma e moldura. Texto: forma e texto.
-        function applies(i, what) { return i.t === 'shape' || (what === 'line' ? i.t === 'zone' : what === 'ink' && i.t === 'text'); }
+        function applies(i, what) {
+            if (i.t === 'shape') { return !(what === 'fill' && NO_FILL.indexOf(i.shape) >= 0); }
+            return what === 'line' ? i.t === 'zone' : what === 'ink' && i.t === 'text';
+        }
         function palKeyOf(it, what) {
             if (it.t === 'shape') { return it[what]; }
             var hex = it.color, found = null;
@@ -2133,7 +2280,7 @@
             if (ls.length && ls.length === sel.length && !ed && (!drag || drag.k === 'lbl')) { drawLinkBar(ls); return; }
             var its = styled();
             if (!its.length || its.length !== sel.length || ed || (drag && drag.k !== 'rs' && drag.k !== 'move')) { fbar.hidden = true; return; }
-            var hasShape = its.some(function (i) { return i.t === 'shape'; }), hasText = its.some(function (i) { return i.t !== 'zone'; });
+            var hasShape = its.some(function (i) { return i.t === 'shape' && NO_FILL.indexOf(i.shape) < 0; }), hasText = its.some(function (i) { return i.t !== 'zone'; });
             var hasLine = its.some(function (i) { return i.t !== 'text'; });
             var first = its[0], pop = fbar.__pop || '';
             var fsNow = first.t === 'shape' ? shapeFs(first) : first.t === 'text' ? (first.px || TEXT_PX[first.size] || 15) : 0;
@@ -2231,9 +2378,13 @@
             ta.className = 'cx-board-inplace';
             ta.value = first !== undefined ? first : (it.text || '');
             var fs = shapeFs(it) * view.z;
-            var off = svgOff();
-            ta.style.cssText = 'left:' + (off.x + view.x + it.x * view.z) + 'px;top:' + (off.y + view.y + it.y * view.z) + 'px;width:' + (it.w * view.z)
-                + 'px;height:' + (it.h * view.z) + 'px;font-size:' + fs + 'px;color:' + pal(it.ink).t + (it.b ? ';font-weight:bold' : '');
+            var off = svgOff(), bx = it.x, by = it.y, bw = it.w, bh = it.h;
+            // BPMN: o nome é escrito embaixo da forma; no grupo, no canto de cima.
+            if (/^gw/.test(it.shape)) { bw = labelW(it); bh = shapeFs(it) * 3.6; bx = it.x + it.w * 0.3 - bw; by = it.y - bh - 2; }
+            else if (below(it)) { bw = labelW(it); bx = it.x + it.w / 2 - bw / 2; by = it.y + it.h + 2; bh = shapeFs(it) * 3.6; }
+            else if (it.shape === 'group') { bh = Math.min(it.h, shapeFs(it) * 3); }
+            ta.style.cssText = 'left:' + (off.x + view.x + bx * view.z) + 'px;top:' + (off.y + view.y + by * view.z) + 'px;width:' + (bw * view.z)
+                + 'px;height:' + (bh * view.z) + 'px;font-size:' + fs + 'px;color:' + pal(it.ink).t + (it.b ? ';font-weight:bold' : '');
             stage.appendChild(ta);
             ed = { id: it.id, ta: ta };
             drawFbar();
@@ -2256,7 +2407,7 @@
         root.querySelector('.cx-board-icons').addEventListener('pointerdown', function (e) {
             var b = e.target.closest('[data-icon],[data-shape]'); if (!b) { return; }
             e.preventDefault();
-            var shape = b.getAttribute('data-shape');
+            var shape = b.getAttribute('data-shape'), pmk = b.getAttribute('data-mk') || '';
             var icon = b.getAttribute('data-icon'), moved = false, sx = e.clientX, sy = e.clientY;
             var ghost = document.createElement('div');
             ghost.className = 'cx-board-ghost';
@@ -2270,7 +2421,7 @@
                 document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
                 if (ghost.parentNode) { ghost.remove(); }
                 var r = svg.getBoundingClientRect();
-                var put = function (x, y) { if (shape) { addShape(shape, x, y); } else { addIcon(icon, x, y); } };
+                var put = function (x, y) { if (shape) { addShape(shape, x, y, pmk); } else { addIcon(icon, x, y); } };
                 if (!moved) {
                     var c = toBoard({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
                     put(c.x, c.y);
@@ -2350,7 +2501,7 @@
                 if (lL && lL.t === 'link' && !lL.lock) { sel = [lL.id]; snap(); drag = { k: 'lbl', id: lL.id, moved: false }; }
                 else if (lL) { sel = [lL.id]; }
             } else if (e.target.getAttribute('data-rs') && sel.length === 1) {
-                var ri = get(sel[0]), rb = bbox(ri);
+                var ri = get(sel[0]), rb = coreBox(ri);
                 snap();
                 drag = { k: 'rs', id: ri.id, dir: e.target.getAttribute('data-rs'), p: p, s: { x: rb.x, y: rb.y, w: rb.w, h: rb.h, px: ri.px || TEXT_PX[ri.size] || 15 } };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
@@ -2505,12 +2656,12 @@
                 if (!drag.moved) { snap(); drag.moved = true; }
                 var dx = p.x - drag.p.x, dy = p.y - drag.p.y;
                 // Guias: o centro do primeiro item gruda no centro de outro item (6 px).
-                var first = get(drag.start[0].id), b0 = bbox(first);
+                var first = get(drag.start[0].id), b0 = coreBox(first);
                 var cx = drag.start[0].x + dx + b0.w / 2, cy = drag.start[0].y + dy + b0.h / 2;
                 var gx = null, gy = null;
                 D.items.forEach(function (o) {
                     if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || o.t === 'duct') { return; }
-                    var b = bbox(o), ox = b.x + b.w / 2, oy = b.y + b.h / 2;
+                    var b = coreBox(o), ox = b.x + b.w / 2, oy = b.y + b.h / 2;
                     if (gx === null && Math.abs(ox - cx) < SNAP / view.z) { gx = ox; }
                     if (gy === null && Math.abs(oy - cy) < SNAP / view.z) { gy = oy; }
                 });
@@ -2553,7 +2704,7 @@
                         var orig = get(drag.from), saidas = D.items.filter(function (l) { return l.t === 'link' && l.a.id === drag.from; }).length;
                         L.kind = 'fluxo'; L.ends = 'arrow'; L.cable = ''; L.showId = false; L.showM = false;
                         L.lc = 'cinza'; L.lw = 'f'; L.dash = 'solid'; L.ea = 'none'; L.eb = 'arrow'; L.lt = 0.5; L.lbg = 'branco';
-                        L.label = orig && orig.shape === 'dec' ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
+                        L.label = orig && (orig.shape === 'dec' || orig.shape === 'gwx') ? (saidas === 0 ? 'Sim' : saidas === 1 ? 'Não' : '') : '';
                     }
                     D.items.push(L);
                     sel = [L.id];
@@ -2851,5 +3002,5 @@
             setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { open: open, MODES: MODES, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

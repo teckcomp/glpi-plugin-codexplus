@@ -3,6 +3,12 @@
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
 > Estado: `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da noite:
+> **Biblioteca em estante, B2a a B2c** — três níveis (nichos dos setores,
+> nichos das categorias, lombadas), estante mínima de 12 nichos com
+> decoração, montantes, aparador e rolos de planta dos diagramas (seção 3.8;
+> commits `23f9a5c` e `810aa85`; achados 87 a 91). **Decisão de Claudio:
+> produção antecipada para 28/09/2026**, para começar a redigir documentos
+> (ROADMAP, "Ordem até produção"). Antes, na mesma noite:
 > **Fluxograma, Q5a a Q5f** — subtipo de DIA sobre o motor de quadro, formas
 > de fluxograma e BPMN, estilo, ligações completas, "+" rápido e alinhar
 > (seção 3.7; commits `6ef31e5` a `e694ddd`; achados 81 a 86). Antes, no
@@ -1197,6 +1203,59 @@ motor aplica isso ao abrir qualquer quadro (achado 84).
 - **Alinhar** (6) com 2 ou mais selecionados e **Distribuir** (2) com 3 ou
   mais, na barra flutuante.
 
+### 3.8 Sessão de 27/09/2026 (noite, depois do Q5) — Biblioteca em estante
+
+> Decisões de Claudio, 27/09/2026, sempre com mockup antes (referências dele:
+> a prateleira do Adendo 2 do Pessoas+ e duas fotos de estante). Commits
+> `23f9a5c` (B2a + B2b, um commit: o B2a não chegou a ser aplicado sozinho) e
+> `810aa85` (B2c). Sem schema novo: continua `0.6.10-alpha`.
+
+#### Por que agora
+
+Claudio antecipou a produção para 28/09 para começar a redigir documentos
+(ROADMAP, "Ordem até produção"). A Biblioteca é a porta de quem só lê, então
+ganhou a estante antes da subida. O motor de quadro (Q5g em diante), 3c,
+R6-b, R7 e Etapa 5 seguem depois, já em produção.
+
+#### Três níveis, cada um com endereço (blocos B2a e B2b, `23f9a5c`)
+
+- **`library.php`** (sem parâmetro): estante com **um nicho por setor**; no
+  nicho, os **5 fichários mais recentes** que passam no filtro (lombada:
+  código com revisão, título, cor do tipo, bolinha da situação) e "+N"; na
+  tábua, nome e total. Clique no fichário abre o documento; no resto do nicho
+  (ou no nome na tábua), entra no setor.
+- **`?setor=ID`**: nichos das **categorias** do setor, mesma regra.
+- **`?setor=ID&cat=ID`**: as **lombadas** da categoria em pé sobre a tábua,
+  botão **Estante/Lista** (lembrado no navegador) e **"+ Novo documento"**
+  (quem tem Criar), que abre o formulário com a **categoria preenchida**
+  (`document.form.php?cat=`).
+- **`?q=`**: busca em toda a Biblioteca (a estante inteira, filtrando ao
+  digitar); nos níveis 1 e 2, a busca é um formulário (Enter).
+- Caminho no topo (**Biblioteca › Setor › Categoria**); Voltar do navegador
+  funciona; os filtros (situação, tipo, só os meus) vão junto nos links.
+- **Estilo "barra escura"** (modelo C de Claudio): sem fundo, tábua
+  `#444441`. Rascunho e em validação na **mesma prateleira, tracejados**, só
+  para quem produz. Lixeira sempre em lista.
+- **Estante mínima de 12 nichos, 4 por linha** (Claudio); os vazios ganham
+  **decoração** (8 desenhos próprios em `parts/lib-decor.html.twig`: vaso,
+  livros, relógio, troféu, caixa, luminária, quadro, globo), escolhida pela
+  posição e pelo nível (não muda a cada recarga, nunca igual à vizinha —
+  `Library::decor()`). Do 13º em diante, cresce uma linha de 4. Tela estreita:
+  2 por linha.
+- `Library::shelf()` passou a devolver `id` e `recent` (por recência) de
+  setor e categoria; `Library::counts()` conta o nível aberto.
+
+#### Montantes, aparador e rolos de planta (bloco B2c, `810aa85`)
+
+- **Montante vertical** de 14 px entre as colunas, de cima a baixo (achado 89).
+- **Só no nível 1:** no nicho do setor, os documentos que não são diagrama à
+  esquerda (até 5) e, depois de um **aparador**, os **diagramas como rolos de
+  planta em pé** (até 3, "+N"): papel quase preto **`#2A0A0E`** (escolha de
+  Claudio entre três tons; variável `--cx-roll`), tampa oval, etiqueta na cor
+  do DIA com o código, bolinha da situação; rascunho com etiqueta tracejada.
+  Na tábua: "17 · 3 diagramas". Setor sem diagrama não tem aparador.
+- Nos níveis 2 e 3 os diagramas seguem como fichários e lombadas.
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -1814,6 +1873,28 @@ depender do comportamento errático de `position: fixed` na impressão.
     `fill-opacity="0"` (conta como pintado, recebe o clique); Grupo: sem
     fundo de propósito (o que está dentro continua clicável) e borda
     transparente larga só na tela.
+87. **Uma lista, duas vistas.** A Biblioteca filtra no cliente escondendo o
+    `<li>`; a lombada mora dentro do mesmo `<li>`, e a vista (Estante/Lista)
+    é só CSS pelo `data-view` do contêiner. Como a estante dá `display:block`
+    ao `<li>`, o `[hidden]` precisa de `display: none !important`.
+88. **Tábua contínua com um gradiente.** `repeating-linear-gradient` (164 px
+    transparente + 26 px de tábua) no `<ul>` e `gap` vertical de 26 px: cada
+    linha de lombadas cai exatamente sobre uma tábua, inclusive a última
+    linha incompleta (`padding-bottom` de 26 px).
+89. **Montante no vão da grade.** `column-gap: 14px` + `::after` de 14 px à
+    direita de cada nicho (`:nth-child(4n)` sem; na tela estreita, `2n`), com
+    `row-gap: 0` e o respiro dentro do nicho (`padding-top`) — assim o
+    montante é contínuo de cima a baixo.
+90. **Nicho clicável com links dentro não pode ser `<a>`** (link dentro de
+    link é inválido): o nicho é `div[data-href]` com clique em JS que ignora
+    cliques em `a`; o nome na tábua é o `<a>` real (teclado e leitor de tela).
+91. **Harness do controlador.** Um GLPI de mentira (`inc/includes.php` com
+    `Session`, `Html`, `TemplateRenderer` usando o Twig 3.14 de verdade e os
+    stubs das classes vizinhas) roda o `front/library.php` e a `Library`
+    reais sobre 100 documentos de exemplo, em todos os modos. Screenshot e
+    teste de clique no Chrome headless (`--screenshot`, `--dump-dom` com um
+    script que escreve o resultado no `<title>`). Mais forte que renderizar
+    só o template.
 
 ## 6. Contrato de código — não quebrar
 
@@ -1886,7 +1967,7 @@ codexplus/
 ├── src/
 │   ├── Install.php            schema, direitos, modelos semeados
 │   ├── Wiki.php               entrada do menu e cabeçalho das páginas (R5)
-│   ├── Library.php            Biblioteca: Setor → Categoria, lixeira (B1, R5)
+│   ├── Library.php            Biblioteca: Setor → Categoria, lixeira, nichos e decoração (B1, R5, B2)
 │   ├── LegacyMigration.php    migração da Base de Conhecimento (R4)
 │   ├── DocumentMeta.php       tipos, código, vencimento, fluxo por tipo (P2)
 │   ├── Template.php           modelos por tipo, lista da criação, sem imagem (R3b4, M1)

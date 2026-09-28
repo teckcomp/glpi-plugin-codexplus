@@ -25,6 +25,9 @@ manuais e propostas, com exportação em PDF com a marca da empresa.
   rodapé com marcadores, com rodapé próprio por documento
 - **Diagramas (DIA):** organograma, cronograma, matriz RACI e **fluxograma**
   (formas de fluxograma e BPMN, estilo, ligações, "+" rápido, PDF e PNG)
+- **Biblioteca em estante:** setores e categorias em nichos com os
+  documentos recentes, lombadas por tipo e situação, diagramas como rolos de
+  planta, busca em tudo e vista em lista
 
 ## Tipos de documento
 

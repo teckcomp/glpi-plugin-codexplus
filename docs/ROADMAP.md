@@ -1,7 +1,10 @@
 # Codex+ — roadmap
 
 > Estado em `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da
-> noite: **Fluxograma Q5a a Q5f** (commits `6ef31e5` a `e694ddd`; CONTEXTO,
+> noite: **Biblioteca em estante B2a a B2c** (commits `23f9a5c` e `810aa85`;
+> CONTEXTO, seção 3.8). **Decisão de Claudio: produção antecipada para
+> 28/09/2026**, para começar a redigir documentos — ver "Ordem até produção".
+> Antes, na mesma noite: **Fluxograma Q5a a Q5f** (commits `6ef31e5` a `e694ddd`; CONTEXTO,
 > seção 3.7). Próximo: **Q5g — raias verticais** (mockup antes). Antes, na
 > tarde: **Q3 e
 > Q4 fechados**, mais T2, Q2f, T3 e E6 (commits `5396fe9` a `a76b16c`;
@@ -62,6 +65,17 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 ### Ordem até produção, acordada com Claudio em 20/09/2026 (revista em 26/09)
 
 Vale sobre a lista acima quando houver conflito.
+
+> **Decisão de Claudio, 27/09/2026 (noite): produção antecipada.** A regra
+> "roadmap até o fim, produção depois" foi revista: a documentação sobe em
+> 28/09 para Claudio começar a redigir documentos. Antes da subida, só:
+> Biblioteca em estante (**B2a a B2c ✅**), versão **`0.7.0`**, **teste de
+> instalação do zero** numa instância limpa (`glpi-limpo` + `glpidb_limpo`,
+> apagada depois), backup e roteiro de produção, e **um documento real de
+> ponta a ponta** antes de liberar para os outros. Os itens abaixo que não
+> estão riscados (7, 11 a 15) continuam, agora com atualização por `git
+> pull` em produção. Fluxogramas feitos antes das raias continuam válidos (o
+> `lane` já é aceito pelo `validateBoard`).
 
 1. ~~Finalizar organograma~~ ✅ (2d-3 fechado na R6-a)
 2. ~~Papéis e validação~~ ✅ A1, A2 (25/09) e **P1** (26/09: papéis pelo
@@ -348,7 +362,12 @@ depois da Etapa 5.
 ## Marco — Pronto para produção
 
 O Codex+ **não está em produção** (decisão de 19/09/2026). Sobe quando todos
-os critérios abaixo estiverem cumpridos:
+os critérios abaixo estiverem cumpridos.
+
+> **Revisto por Claudio em 27/09/2026:** sobe em 28/09 com o mínimo da
+> "Ordem até produção" (instalação do zero testada, `0.7.0`, backup,
+> roteiro). Os critérios abaixo passam a ser o marco de **"produção
+> completa"** e seguem sendo fechados lá.
 
 - [ ] PDF validado com documentos reais de cada tipo, principalmente proposta
 - [ ] Modelos com conteúdo de verdade (3c)
@@ -392,6 +411,8 @@ os critérios abaixo estiverem cumpridos:
 | Q4a | "+ Ícone" do Super-Admin: tabela nova, recorte, nome, categoria, busca; cópia do ícone no quadro (`0.6.10-alpha`, reinstalar) | `bed0707` |
 | Q4b | Tirar o fundo (cantos, tolerância, borda suave) e silhueta na cor da categoria; ícone em 256 px | `c4cdd5e` |
 | Q4c | Gerenciar ícones criados: editar (silhueta repintada) e excluir (quadros mantêm a cópia) | `a76b16c` |
+| B2a, B2b | Biblioteca em estante (modelo C): três níveis com endereço (nichos dos setores, nichos das categorias, lombadas); 5 fichários recentes por nicho; mínimo de 12 nichos (4 × 3) com decoração; Estante/Lista; "+ Novo documento" com a categoria preenchida | `23f9a5c` |
+| B2c | Montantes verticais; no nível 1, aparador e até 3 diagramas como rolos de planta (papel `#2A0A0E`) | `810aa85` |
 
 ## Motor de quadro (decidido em 26/09/2026)
 

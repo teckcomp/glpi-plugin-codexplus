@@ -34,6 +34,7 @@ use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\DocumentVersion;
 use GlpiPlugin\Codexplus\Rights;
+use GlpiPlugin\Codexplus\Sector;
 use GlpiPlugin\Codexplus\Wiki;
 
 include('../../../inc/includes.php');
@@ -87,6 +88,28 @@ $postedCategories = static function (): array {
 };
 
 /**
+ * SC1 (Claudio, 27/09/2026): Setor / Categorias. As categorias ficam só as do
+ * setor escolhido (o seletor já filtra; aqui é a conferência do servidor).
+ */
+$postedPlacement = static function () use ($postedCategories): array {
+    $cats  = $postedCategories();
+    $setor = (int) ($_POST['_sector'] ?? 0);
+    if ($setor <= 0 || !$cats) {
+        return $cats;
+    }
+    $mapa  = Category::sectorsOf($cats);
+    $ficam = array_values(array_filter($cats, static fn ($c) => ($mapa[$c] ?? 0) === $setor));
+    if (count($ficam) < count($cats)) {
+        Session::addMessageAfterRedirect(
+            __('Categorias de outro setor foram tiradas: o documento fica num setor só.', 'codexplus'),
+            false,
+            WARNING
+        );
+    }
+    return $ficam;
+};
+
+/**
  * Bloco T1: cliente vinculado (Laudo e Documentação Técnica). O tipo do
  * vínculo vem num campo oculto; Document::normalizeClient confere tudo.
  */
@@ -108,7 +131,7 @@ if (isset($_POST['add'])) {
         'name'        => (string) ($_POST['name'] ?? ''),
         'doctype'     => (string) ($_POST['doctype'] ?? ''),
         'content'     => (string) ($_POST['content'] ?? ''),
-        '_categories' => $postedCategories(),
+        '_categories' => $postedPlacement(),
     ] + $postedFiles();
     // Cliente só existe em proposta (o campo some da tela nos outros tipos;
     // aqui garante que valor esquecido nele não seja gravado).
@@ -384,10 +407,11 @@ if ($id > 0 && isset($_POST['update'])) {
             }
         }
 
-        // Categorias: diferença entre o que está gravado e o que veio.
+        // Categorias: diferença entre o que está gravado e o que veio. SC1:
+        // só quando o seletor veio no formulário (_placement).
         $current = Document_Category::getCategoryIds($id);
-        $wanted  = $postedCategories();
-        {
+        $wanted  = $postedPlacement();
+        if (isset($_POST['_placement'])) {
             foreach (array_diff($wanted, $current) as $cid) {
                 $link = new Document_Category();
                 $row  = ['plugin_codexplus_documents_id' => $id, 'plugin_codexplus_categories_id' => $cid];
@@ -577,6 +601,7 @@ $canManage   = !$isNew && $doc->canManage();
 
 // Campos de formulário gerados pelo GLPI (devolvem string com display=false).
 $widgets = [];
+$placement = null; // SC1: seletor Setor / Categorias (só na edição)
 // Bloco T1: cliente para a tela. name = o que se mostra (vinculado pelo nome
 // atual, ou o texto da proposta); itemtype e source_label = o campo de edição.
 $client = [
@@ -586,21 +611,31 @@ $client = [
 ];
 if ($canEdit) {
     $catCanChange = $isNew || ($canManage && $doc->fields['status'] === Document::STATUS_DRAFT);
-    // Select múltiplo por AJAX: o GLPI usa o nome como veio (precisa do
-    // "[]"); no modo somente leitura ele mesmo acrescenta o "[]".
-    $catParams = [
-        'name'     => $catCanChange ? '_categories[]' : '_categories',
-        'multiple' => true,
-        // Com 'multiple', o GLPI lê as escolhidas de 'value' e sobrescreve
-        // 'values' (Dropdown::show, 11.0.6) — achado 41.
-        'value'    => $categoryIds,
-        'display'  => false,
-        'width'    => '100%',
-    ];
-    if (!$catCanChange) {
-        $catParams['readonly'] = true;
+    // SC1 (Claudio, 27/09/2026): Setor / Categorias na mesma linha. O setor
+    // filtra as categorias; só o Super-Admin cria pelo "+"
+    // (ajax/placement.php). Montado por public/js/codexplus-docform.js.
+    $mapaSetor = Category::sectorsOf($categoryIds);
+    $setoresDoc = array_values(array_unique(array_filter($mapaSetor)));
+    $escolhidas = [];
+    foreach ($categoryIds as $cid) {
+        $escolhidas[] = [
+            'id'     => $cid,
+            'name'   => Dropdown::getDropdownName(Category::getTable(), $cid),
+            'sector' => $mapaSetor[$cid] ?? 0,
+        ];
     }
-    $widgets['categories'] = Category::dropdown($catParams);
+    $placement = [
+        'can_change' => $catCanChange,
+        'can_create' => Rights::isSuperAdmin(),
+        'ajax'       => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/placement.php',
+        'json'       => json_encode([
+            'tree'     => Category::placementTree(),
+            // Documento antigo em dois setores: vale o da 1ª categoria (aviso na tela).
+            'sector'   => $setoresDoc[0] ?? 0,
+            'selected' => $escolhidas,
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE),
+        'sector_name' => ($setoresDoc[0] ?? 0) > 0 ? Dropdown::getDropdownName(Sector::getTable(), $setoresDoc[0]) : '',
+    ];
 
     if ($isNew) {
         $preset = (string) ($_GET['doctype'] ?? 'POP');
@@ -859,6 +894,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
     'category_names' => $categoryNames,
+    'placement'      => $placement,
     'sector_names'   => $sectorNames,
     'validation_comment' => $isNew ? '' : (string) ($doc->fields['validation_comment'] ?? ''),
     'validator_name'     => $version['on'] ? $version['validator']

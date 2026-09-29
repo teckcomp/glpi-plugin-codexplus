@@ -767,6 +767,10 @@ class Document extends CommonDBTM
         if (!$this->canSubmit()) {
             return $this->deny(__('Sem direito de enviar este documento para validação.', 'codexplus'));
         }
+        // SC1: sai do rascunho só com lugar na estante.
+        if (($erro = $this->placementError()) !== null) {
+            return $this->deny($erro);
+        }
         // 1ª etapa precisa do responsável com o bit Aprovar (P1).
         if (!Rights::isSuperAdmin()) {
             $owner = (int) ($this->fields['users_id_owner'] ?? 0);
@@ -842,6 +846,9 @@ class Document extends CommonDBTM
     {
         if (!$this->canPublishDirect()) {
             return $this->deny(__('Sem direito de publicar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
+        }
+        if (($erro = $this->placementError()) !== null) {
+            return $this->deny($erro);
         }
         $extra = [];
         if ((int) $this->fields['revision'] > 0) {
@@ -1047,6 +1054,27 @@ class Document extends CommonDBTM
             $this->getFromDB((int) $this->fields['id']);
         }
         return (bool) $ok;
+    }
+
+    /**
+     * SC1 (Claudio, 27/09/2026): setor e categoria são obrigatórios para sair
+     * do rascunho — ao menos uma categoria, todas com setor e do mesmo setor.
+     * Devolve a mensagem do que falta, ou null quando está tudo certo.
+     */
+    public function placementError(): ?string
+    {
+        $ids = Document_Category::getCategoryIds((int) $this->getID());
+        if (!$ids) {
+            return __('Escolha o setor e ao menos uma categoria e salve antes de enviar: é o lugar do documento na estante.', 'codexplus');
+        }
+        $setores = Category::sectorsOf($ids);
+        if (in_array(0, $setores, true) || count($setores) < count($ids)) {
+            return __('Uma das categorias não tem setor. O Super-Admin dá o setor em Configurar > Listas suspensas > Codex+ > Categorias.', 'codexplus');
+        }
+        if (count(array_unique($setores)) > 1) {
+            return __('As categorias são de setores diferentes. Deixe só as de um setor e salve.', 'codexplus');
+        }
+        return null;
     }
 
     private function deny(string $msg): bool

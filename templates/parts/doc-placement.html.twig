@@ -1,0 +1,46 @@
+{# Codex+ — Setor / Categorias do formulário do documento (bloco SC1,
+   Claudio 27/09/2026). O setor filtra as categorias (várias, todas do mesmo
+   setor); os dois são obrigatórios para sair do rascunho (Document::
+   placementError); "+" só para o Super-Admin (ajax/placement.php).
+   Comportamento em public/js/codexplus-docform.js (placement).
+   Variáveis: placement (can_change, can_create, ajax, json, sector_name) ou
+   null; category_names. #}
+{% if placement and placement.can_change %}
+    <div class="cx-place" data-cx-place data-ajax="{{ placement.ajax }}" data-can-create="{{ placement.can_create ? '1' : '0' }}">
+        <script type="application/json" data-cx-place-data>{{ placement.json|raw }}</script>
+        <input type="hidden" name="_placement" value="1">
+        <div class="cx-place-grid">
+            <div class="cx-place-col">
+                <label for="cx-place-sector">{{ __('Setor', 'codexplus') }} <span class="cx-place-req">*</span></label>
+                <div class="cx-place-line">
+                    <select id="cx-place-sector" name="_sector" class="form-select" data-cx-place-sector></select>
+                    {% if placement.can_create %}
+                        <button type="button" class="btn btn-outline-secondary cx-place-plus" data-cx-place-new="sector"
+                                title="{{ __('Criar setor', 'codexplus') }}" aria-label="{{ __('Criar setor', 'codexplus') }}"><i class="ti ti-plus"></i></button>
+                    {% endif %}
+                </div>
+                <div data-cx-place-mini="sector"></div>
+                <div class="codexplus-form-hint">{{ __('Onde o documento mora na estante.', 'codexplus') }}</div>
+            </div>
+            <div class="cx-place-col">
+                <label for="cx-place-cat">{{ __('Categorias', 'codexplus') }} <span class="cx-place-req">*</span></label>
+                <div class="cx-place-line">
+                    <div class="cx-place-cats" data-cx-place-cats></div>
+                    {% if placement.can_create %}
+                        <button type="button" class="btn btn-outline-secondary cx-place-plus" data-cx-place-new="category" hidden
+                                title="{{ __('Criar categoria neste setor', 'codexplus') }}" aria-label="{{ __('Criar categoria neste setor', 'codexplus') }}"><i class="ti ti-plus"></i></button>
+                    {% endif %}
+                </div>
+                <div data-cx-place-mini="category"></div>
+                <div class="codexplus-form-hint" data-cx-place-hint>{{ __('Só as categorias do setor escolhido. Pode marcar mais de uma.', 'codexplus') }}</div>
+            </div>
+        </div>
+        <div class="cx-place-warn" data-cx-place-warn hidden></div>
+        <div class="cx-place-shelf" data-cx-place-shelf></div>
+    </div>
+{% else %}
+    <label>{{ __('Setor / Categorias', 'codexplus') }}</label>
+    <div class="cx-place-ro">
+        {% if category_names %}{{ placement and placement.sector_name ? placement.sector_name ~ ' › ' : '' }}{{ category_names|join(', ') }}{% else %}—{% endif %}
+    </div>
+{% endif %}

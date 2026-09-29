@@ -250,12 +250,9 @@
                         </div>
                     {% endif %}
 
+                    {# SC1: Setor / Categorias (parts/doc-placement). #}
                     <div class="cx-docform-field cx-docform-field--wide">
-                        <label>{{ __('Categorias', 'codexplus') }}</label>
-                        {{ widgets.categories|raw }}
-                        <div class="codexplus-form-hint">
-                            {{ __('Organiza o documento na estante (a categoria define o setor).', 'codexplus') }}
-                        </div>
+                        {% include '@codexplus/parts/doc-placement.html.twig' with {placement: placement, category_names: category_names} only %}
                     </div>
 
                     {% if widgets.owner is defined %}

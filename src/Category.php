@@ -109,6 +109,70 @@ class Category extends CommonTreeDropdown
         return $input;
     }
 
+    /**
+     * SC1 (Claudio, 27/09/2026): setores visíveis na entidade, cada um com as
+     * suas categorias (nome completo, em ordem), para o seletor Setor /
+     * Categorias do formulário. Categoria sem setor não entra (não teria
+     * onde morar na estante).
+     *
+     * @return array<int, array{id: int, name: string, categories: array<int, array{id: int, name: string}>}>
+     */
+    public static function placementTree(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $st      = Sector::getTable();
+        $sectors = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'name'],
+            'FROM'   => $st,
+            'WHERE'  => [getEntitiesRestrictCriteria($st, '', '', true)],
+            'ORDER'  => ['name'],
+        ]) as $r) {
+            $sectors[(int) $r['id']] = ['id' => (int) $r['id'], 'name' => (string) $r['name'], 'categories' => []];
+        }
+        $ct = static::getTable();
+        foreach ($DB->request([
+            'SELECT' => ['id', 'completename', self::SECTOR_FIELD],
+            'FROM'   => $ct,
+            'WHERE'  => [getEntitiesRestrictCriteria($ct, '', '', true)],
+            'ORDER'  => ['completename'],
+        ]) as $r) {
+            $sid = (int) $r[self::SECTOR_FIELD];
+            if (isset($sectors[$sid])) {
+                $sectors[$sid]['categories'][] = ['id' => (int) $r['id'], 'name' => (string) $r['completename']];
+            }
+        }
+        return array_values($sectors);
+    }
+
+    /**
+     * SC1: setor de cada categoria, numa consulta (0 = sem setor).
+     *
+     * @param int[] $ids
+     * @return array<int, int> id da categoria => id do setor
+     */
+    public static function sectorsOf(array $ids): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        $out = [];
+        if (!$ids) {
+            return $out;
+        }
+        foreach ($DB->request([
+            'SELECT' => ['id', self::SECTOR_FIELD],
+            'FROM'   => static::getTable(),
+            'WHERE'  => ['id' => $ids],
+        ]) as $r) {
+            $out[(int) $r['id']] = (int) $r[self::SECTOR_FIELD];
+        }
+        return $out;
+    }
+
     /** Setor gravado numa categoria (0 = sem setor ou inexistente). */
     public static function getSectorOf(int $categoryId): int
     {

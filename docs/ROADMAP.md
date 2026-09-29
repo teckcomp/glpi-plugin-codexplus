@@ -1,9 +1,12 @@
 # Codex+ — roadmap
 
-> Estado em `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da
-> noite: **Biblioteca em estante B2a a B2c** (commits `23f9a5c` e `810aa85`;
-> CONTEXTO, seção 3.8). **Decisão de Claudio: produção antecipada para
-> 28/09/2026**, para começar a redigir documentos — ver "Ordem até produção".
+> Estado em **`v0.7.0`** (tag `v0.7.0`) · atualizado na madrugada de
+> 28/09/2026: **SC1 Setor / Categorias** (`dfe0e58`), **0.7.0** (`29c5088`)
+> e **instalação do zero testada** (CONTEXTO, seção 3.9). **Produção
+> adiada por Claudio** até o escopo combinado ficar pronto (estimativa dele:
+> ~2 dias) — ver "Ordem até produção". Antes, na noite de 27/09:
+> **Biblioteca em estante B2a a B2c** (commits `23f9a5c` e `810aa85`;
+> CONTEXTO, seção 3.8).
 > Antes, na mesma noite: **Fluxograma Q5a a Q5f** (commits `6ef31e5` a `e694ddd`; CONTEXTO,
 > seção 3.7). Próximo: **Q5g — raias verticais** (mockup antes). Antes, na
 > tarde: **Q3 e
@@ -66,6 +69,17 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 
 Vale sobre a lista acima quando houver conflito.
 
+> **Atualização, 28/09/2026 (madrugada): produção adiada por Claudio.** A
+> subida de 28/09 não aconteceu; sobe "quando estiver tudo pronto"
+> (estimativa de Claudio: ~2 dias). **A decidir no começo da próxima
+> sessão:** "pronto" = (a) o roadmap inteiro (itens 7 e 11 a 15: ~15 a 20
+> blocos, várias sessões) ou (b) o recorte para escrever documentos (R6-b,
+> 3c, caça a bugs, PDF validado, logo; R7 se o acesso por link for preciso
+> desde o início), com Q5g a Q6 e Etapa 5 depois, já em produção
+> (sugestão). Também a confirmar: **qual servidor é a produção**. Já feito
+> para a subida: B2a a B2c, **SC1**, **`0.7.0` com tag** e **instalação do
+> zero testada**.
+>
 > **Decisão de Claudio, 27/09/2026 (noite): produção antecipada.** A regra
 > "roadmap até o fim, produção depois" foi revista: a documentação sobe em
 > 28/09 para Claudio começar a redigir documentos. Antes da subida, só:
@@ -374,7 +388,8 @@ os critérios abaixo estiverem cumpridos.
 - [ ] Direitos por perfil definidos e testados
 - [ ] Etapa R concluída (documentos próprios, permissões, histórico, anônimo)
 - [ ] Logo definitiva configurada
-- [ ] Instalação e atualização testadas do zero numa instância limpa
+- [x] Instalação e atualização testadas do zero numa instância limpa ✅ 28/09
+  (tag `v0.7.0`, banco idêntico ao da homologação — CONTEXTO, achado 92)
 
 ---
 
@@ -413,6 +428,8 @@ os critérios abaixo estiverem cumpridos.
 | Q4c | Gerenciar ícones criados: editar (silhueta repintada) e excluir (quadros mantêm a cópia) | `a76b16c` |
 | B2a, B2b | Biblioteca em estante (modelo C): três níveis com endereço (nichos dos setores, nichos das categorias, lombadas); 5 fichários recentes por nicho; mínimo de 12 nichos (4 × 3) com decoração; Estante/Lista; "+ Novo documento" com a categoria preenchida | `23f9a5c` |
 | B2c | Montantes verticais; no nível 1, aparador e até 3 diagramas como rolos de planta (papel `#2A0A0E`) | `810aa85` |
+| SC1 | Setor / Categorias no formulário: setor filtra categorias; "+" só do Super-Admin; obrigatórios para sair do rascunho | `dfe0e58` |
+| 0.7.0 | Versão 0.7.0 com tag `v0.7.0`; instalação do zero testada numa instância limpa | `29c5088` |
 
 ## Motor de quadro (decidido em 26/09/2026)
 

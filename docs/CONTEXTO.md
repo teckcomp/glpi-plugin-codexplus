@@ -2,13 +2,16 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: `v0.6.10-alpha` · atualizado em 27/09/2026, fim da sessão da noite:
-> **Biblioteca em estante, B2a a B2c** — três níveis (nichos dos setores,
+> Estado: **`v0.7.0`** (tag `v0.7.0`, commit `29c5088`) · atualizado na
+> madrugada de 28/09/2026: **SC1 — Setor / Categorias no formulário**
+> (`dfe0e58`), **versão 0.7.0** e **instalação do zero testada** numa
+> instância limpa (banco idêntico ao da homologação) — seção 3.9; achados 92
+> a 94. **Produção adiada por Claudio** (28/09): sobe quando o escopo
+> combinado estiver pronto (ROADMAP, "Ordem até produção"). Antes, na noite
+> de 27/09: **Biblioteca em estante, B2a a B2c** — três níveis (nichos dos setores,
 > nichos das categorias, lombadas), estante mínima de 12 nichos com
 > decoração, montantes, aparador e rolos de planta dos diagramas (seção 3.8;
-> commits `23f9a5c` e `810aa85`; achados 87 a 91). **Decisão de Claudio:
-> produção antecipada para 28/09/2026**, para começar a redigir documentos
-> (ROADMAP, "Ordem até produção"). Antes, na mesma noite:
+> commits `23f9a5c` e `810aa85`; achados 87 a 91). Antes, na mesma noite:
 > **Fluxograma, Q5a a Q5f** — subtipo de DIA sobre o motor de quadro, formas
 > de fluxograma e BPMN, estilo, ligações completas, "+" rápido e alinhar
 > (seção 3.7; commits `6ef31e5` a `e694ddd`; achados 81 a 86). Antes, no
@@ -1256,6 +1259,53 @@ R6-b, R7 e Etapa 5 seguem depois, já em produção.
   Na tábua: "17 · 3 diagramas". Setor sem diagrama não tem aparador.
 - Nos níveis 2 e 3 os diagramas seguem como fichários e lombadas.
 
+### 3.9 Madrugada de 28/09/2026 — Setor / Categorias, 0.7.0, instalação do zero
+
+> Decisões de Claudio, com mockup antes. Commits `dfe0e58` (SC1) e `29c5088`
+> (0.7.0, tag `v0.7.0`). Sem schema novo.
+
+#### Onde o documento mora e quem o vê (esclarecido com Claudio)
+
+- **Prateleira ≠ leitura.** O setor e a categoria dizem **onde** o documento
+  mora na estante; **quem abre** é quem está na **Leitura** dele (usuário,
+  grupo ou perfil). Pertencer a um setor não dá acesso a nada. Para o
+  leitor, o documento aparece quando: publicado (ou em revisão, com a
+  versão anterior) + perfil com Ler + na Leitura + entidade.
+- **Um lugar só (decisão de Claudio).** Documento feito pelo T.I. e usado
+  pelo Comercial e Compras mora em **T.I. › categoria**; Comercial e Compras
+  entram na Leitura e o encontram no nicho do T.I. ou pela busca. Categoria
+  com o mesmo nome em dois setores são duas categorias (a do setor escolhido
+  é a que vale).
+
+#### Setor / Categorias no formulário (bloco SC1, `dfe0e58`)
+
+- Mesma linha, **Setor antes**: o setor filtra as categorias (só as dele;
+  várias, todas do mesmo setor). Trocar de setor tira as do anterior, com
+  aviso. Linha "Na estante: Setor › Categoria".
+- **"+" só para o Super-Admin** (Claudio): cria setor, ou categoria já no
+  setor escolhido, ali mesmo (`ajax/placement.php`; nome repetido no mesmo
+  lugar devolve o existente). Renomear e excluir continuam em Listas
+  suspensas.
+- **Obrigatórios para sair do rascunho** (Claudio): Enviar e Publicar direto
+  exigem ao menos uma categoria, com setor, todas do mesmo setor
+  (`Document::placementError()`). Rascunho pode ficar sem.
+- Documento antigo em dois setores: vale o da 1ª categoria, aviso na tela, e
+  ao salvar ficam só as desse setor. Publicado mostra só texto.
+- Parcial `templates/parts/doc-placement.html.twig`; comportamento em
+  `codexplus-docform.js` (`placement`). SC1-2: alinhamento (achado 94).
+- Na homologação ficaram 8 documentos de teste sem categoria (7 rascunhos e
+  o publicado id 7, "Teste R3a", no "Sem setor"); produção começa vazia.
+
+#### 0.7.0 e instalação do zero (`29c5088`, tag `v0.7.0`)
+
+- Versão `0.7.0` (sem schema novo); na homologação, `plugin:install --force`
+  + `plugin:activate` (achado 63).
+- **Teste do zero:** GLPI 11.0.6 novo em `/var/www/html/glpi-limpo`, banco
+  `glpidb_limpo`, Codex+ clonado pela tag → instalou e ativou; **121
+  colunas idênticas** às da homologação (achado 92); Super-Admin nasce com
+  todos os direitos (23567), os outros perfis só com Ler. Tudo apagado
+  depois. Critério do marco cumprido.
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -1895,6 +1945,17 @@ depender do comportamento errático de `position: fixed` na impressão.
     teste de clique no Chrome headless (`--screenshot`, `--dump-dom` com um
     script que escreve o resultado no `<title>`). Mais forte que renderizar
     só o template.
+92. **Instalação do zero se confere pelo `information_schema`.** Listar
+    tabela, coluna, tipo, nulo e padrão das tabelas `glpi\_plugin\_codexplus%`
+    nos dois bancos (`mysql -N`), ordenar e fazer `diff`: igual = o
+    instalador novo e as atualizações chegam ao mesmo banco. GLPI novo pelo
+    console: `database:install --db-host --db-name --db-user --db-password
+    --default-language=pt_BR -n`; plugin por `git clone --branch <tag>`.
+93. **`su` sem hífen não traz `/usr/sbin` no `PATH`** (`a2ensite`,
+    `apache2ctl`… "comando não encontrado"). Entrar como root com `su -`.
+94. **O GLPI estiliza todo `<select>`** (borda, altura, padding): um select
+    dentro de outra caixa (os chips do SC1) precisa zerar isso com
+    `!important`, senão vira caixa dentro de caixa e corta o texto.
 
 ## 6. Contrato de código — não quebrar
 

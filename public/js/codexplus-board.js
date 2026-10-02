@@ -173,8 +173,8 @@
     var SHAPE_GROUPS = [
         { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] },
         { k: 'bpmn', label: 'BPMN', items: ['evstart', 'evmid', 'evend', 'evmid:msg', 'evmid:timer', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'] },
-        // Q5j-1: uma entrada (Pessoa); o Q5j-2 abre a seção com todos e busca.
-        { k: 'ico', label: 'Ícones', items: ['ico'] }
+        // Q5j-2: todos os desenhos do catálogo, em subgrupos (montados na paleta).
+        { k: 'ico', label: 'Ícones', items: [] }
     ];
     // Medidas internas de cada forma (desenho, texto e âncoras usam as mesmas).
     function skewOf(it) { return Math.min(20, it.w * 0.15); }
@@ -528,6 +528,8 @@
         });
     }
     function uid() { return 'n' + Math.random().toString(36).slice(2, 9); }
+    // Busca sem acento e sem maiúscula ("tecnico" acha "Técnico").
+    function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
     function clone(o) { return JSON.parse(JSON.stringify(o)); }
     function Icons() { return window.CodexplusIcons; }
 
@@ -1505,7 +1507,7 @@
             + '<button type="button" data-act="save" class="cx-board-ok">' + saveLabel + '</button>'
             + '</div>'
             + '<div class="cx-board-body">'
-            + '<aside class="cx-board-pal">' + (flow ? '' : '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
+            + '<aside class="cx-board-pal">' + (flow ? '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar forma ou ícone"></div>' : '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
             + (LIB.canCreate ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
             + '</div>') + '<div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
@@ -1532,20 +1534,36 @@
         var palShut = {};
         function paleta() {
             if (flow) {
-                // Q5b: só formas (os ícones são da Planta e da Topologia).
-                // Q5e: seções recolhíveis (clique no título).
-                root.querySelector('.cx-board-icons').innerHTML = SHAPE_GROUPS.map(function (gr) {
-                    var shut = !!palShut[gr.k];
+                // Q5b: só formas (os ícones de rede são da Planta e da Topologia).
+                // Q5e: seções recolhíveis (clique no título). Q5j-2: ícones
+                // genéricos em subgrupos e busca por nome (forma ou ícone);
+                // buscando, todas as seções abrem e as vazias somem.
+                var fq = norm(root.querySelector('.cx-board-q').value);
+                var hit = function (txt) { return !fq || norm(txt).indexOf(fq) >= 0; };
+                var btn = function (key) {
+                    var k = key.split(':')[0], mk = key.split(':')[1] || '', name = PRESETS[key] || SHAPES[k].label;
+                    var ck = SHAPES[k].color, small = ['conn', 'offpage', 'dataobj'].indexOf(k) >= 0 || SQUARE.indexOf(k) >= 0;
+                    var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none', ico: mk || ICO_DEFAULT });
+                    if (k === 'ico') { name = icoName(mk || ICO_DEFAULT); }
+                    return '<button type="button" class="cx-board-ic" data-shape="' + k + '"' + (mk ? ' data-mk="' + mk + '"' : '') + ' title="' + esc(name) + '">'
+                        + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo, true) + '</svg><span>' + esc(name) + '</span></button>';
+                };
+                var html = SHAPE_GROUPS.map(function (gr) {
+                    var shut = !fq && !!palShut[gr.k], body = '';
+                    if (gr.k === 'ico') {
+                        body = Lucide().CATS.map(function (c) {
+                            var ks = c.items.filter(function (k) { return hit(icoName(k) + ' ' + k + ' ' + c.label); });
+                            return ks.length ? '<div class="cx-board-cat cx-board-subcat">' + esc(c.label) + '</div><div class="cx-board-grid">' + ks.map(function (k) { return btn('ico:' + k); }).join('') + '</div>' : '';
+                        }).join('');
+                    } else {
+                        var ks = gr.items.filter(function (key) { return hit(PRESETS[key] || SHAPES[key.split(':')[0]].label); });
+                        body = ks.length ? '<div class="cx-board-grid">' + ks.map(btn).join('') + '</div>' : '';
+                    }
+                    if (fq && !body) { return ''; }
                     return '<button type="button" class="cx-board-cat cx-board-cat-t" data-grp="' + gr.k + '" aria-expanded="' + !shut + '">' + (shut ? '▸ ' : '▾ ') + esc(gr.label) + '</button>'
-                        + (shut ? '' : '<div class="cx-board-grid">' + gr.items.map(function (key) {
-                            var k = key.split(':')[0], mk = key.split(':')[1] || '', name = PRESETS[key] || SHAPES[k].label;
-                            var ck = SHAPES[k].color, small = ['conn', 'offpage', 'dataobj'].indexOf(k) >= 0 || SQUARE.indexOf(k) >= 0;
-                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none', ico: mk || ICO_DEFAULT });
-                            if (k === 'ico') { name = icoName(mk || ICO_DEFAULT); }
-                            return '<button type="button" class="cx-board-ic" data-shape="' + k + '"' + (mk ? ' data-mk="' + mk + '"' : '') + ' title="' + esc(name) + '">'
-                                + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo, true) + '</svg><span>' + esc(name) + '</span></button>';
-                        }).join('') + '</div>');
+                        + (shut ? '' : body);
                 }).join('');
+                root.querySelector('.cx-board-icons').innerHTML = html || '<p class="cx-board-none">Nada encontrado.</p>';
                 return;
             }
             var q = (root.querySelector('.cx-board-q').value || '').trim().toLowerCase();
@@ -1564,7 +1582,7 @@
             root.querySelector('.cx-board-icons').innerHTML = (h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>')
                 + (LIB.canCreate && I.customs().length ? '<button type="button" class="cx-board-mgic">Gerenciar ícones criados (' + I.customs().length + ')</button>' : '');
         }
-        if (!flow) { root.querySelector('.cx-board-q').addEventListener('input', paleta); }
+        root.querySelector('.cx-board-q').addEventListener('input', paleta);
 
         /* ---------- Q4a: novo ícone a partir de imagem (Super-Admin) ----------
            Recorte quadrado arrastável sobre a imagem; sai um PNG de 256 px

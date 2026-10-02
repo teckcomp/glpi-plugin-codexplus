@@ -79,3 +79,6 @@ Quem for dar andamento ao plugin deve ler, nesta ordem:
 ## Licença
 
 GPL-2.0-or-later · Teckcomp I.T. Services
+
+Os ícones genéricos do fluxograma (`public/js/codexplus-lucide.js`) são desenhos da
+biblioteca [Lucide](https://lucide.dev), licença ISC — texto em `LICENSES/lucide-ISC.txt`.

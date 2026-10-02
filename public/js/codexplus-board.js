@@ -139,12 +139,18 @@
         gwi:     { label: 'Gateway inclusivo',    w: 50,  h: 50,  color: 'ambar' },
         dataobj: { label: 'Objeto de dados',      w: 40,  h: 52,  color: 'branco' },
         annot:   { label: 'Anotação',             w: 150, h: 60,  color: 'cinza' },
-        group:   { label: 'Grupo',                w: 280, h: 180, color: 'cinza' }
+        group:   { label: 'Grupo',                w: 280, h: 180, color: 'cinza' },
+        // Q5j — ícone genérico (Lucide, public/js/codexplus-lucide.js): traço no
+        // tom da borda, nome embaixo, sempre quadrado, sem fundo.
+        ico:     { label: 'Ícone',                w: 48,  h: 48,  color: 'azul' }
     };
+    var ICO_DEFAULT = 'user';
+    function Lucide() { return window.CodexplusLucide || { CATS: [], NAME: {}, SVG: {} }; }
+    function icoName(k) { return Lucide().NAME[k] || 'Ícone'; }
     // Nome embaixo da forma (BPMN); formas sempre redondas/quadradas; sem fundo.
-    var LABEL_BELOW = ['evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi', 'dataobj'];
-    var SQUARE = ['conn', 'evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi'];
-    var NO_FILL = ['annot', 'group'];
+    var LABEL_BELOW = ['evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi', 'dataobj', 'ico'];
+    var SQUARE = ['conn', 'evstart', 'evmid', 'evend', 'gwx', 'gwp', 'gwi', 'ico'];
+    var NO_FILL = ['annot', 'group', 'ico'];
     // Tipo do evento e da tarefa (marcador desenhado dentro).
     var EV_MK = { none: 'Simples', msg: 'Mensagem', timer: 'Temporizador' };
     var TASK_MK = { none: 'Simples', user: 'Usuário', service: 'Serviço', manual: 'Manual' };
@@ -159,14 +165,16 @@
     // ponto de partida/chegada, decisão ou marcador — aí vem o passo comum.
     function nextShapeOf(k) {
         if (BPMN_SET.indexOf(k) >= 0) { return ['task', 'bsub'].indexOf(k) >= 0 ? k : 'task'; }
-        return ['term', 'dec', 'conn', 'offpage', 'note', 'data', 'db'].indexOf(k) >= 0 ? 'proc' : k;
+        return ['term', 'dec', 'conn', 'offpage', 'note', 'data', 'db', 'ico'].indexOf(k) >= 0 ? 'proc' : k;
     }
     var OPP = { n: 's', s: 'n', l: 'o', o: 'l' };
     function labelW(it) { return Math.max(it.w * 2.4, 110); }
     // Paleta em seções (Q5e). Forma nova = uma linha em SHAPES e o nome aqui.
     var SHAPE_GROUPS = [
         { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] },
-        { k: 'bpmn', label: 'BPMN', items: ['evstart', 'evmid', 'evend', 'evmid:msg', 'evmid:timer', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'] }
+        { k: 'bpmn', label: 'BPMN', items: ['evstart', 'evmid', 'evend', 'evmid:msg', 'evmid:timer', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'] },
+        // Q5j-1: uma entrada (Pessoa); o Q5j-2 abre a seção com todos e busca.
+        { k: 'ico', label: 'Ícones', items: ['ico'] }
     ];
     // Medidas internas de cada forma (desenho, texto e âncoras usam as mesmas).
     function skewOf(it) { return Math.min(20, it.w * 0.15); }
@@ -482,6 +490,17 @@
             g = (forExport ? '' : '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="12" fill="none" stroke="transparent" stroke-width="12" vector-effect="non-scaling-stroke"/>')
                 + '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="12" fill="none" stroke="' + lc + '" stroke-width="1.6" stroke-dasharray="10 4 2 4"/>';
         }
+        else if (it.shape === 'ico') {
+            // Q5j: desenho Lucide (24×24) escalado para a forma; retângulo
+            // invisível para pegar no meio. Chave fora do catálogo: um "?".
+            // Traço de no máximo 4 px na tela: o ícone grande não engorda.
+            var body = Lucide().SVG[it.ico], k24 = w / 24, sw24 = Math.min(2, 4 / k24);
+            g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#fff" fill-opacity="0"/>';
+            g += body
+                ? '<g transform="translate(' + x + ' ' + y + ') scale(' + k24.toFixed(4) + ')" fill="none" stroke="' + lc + '" stroke-width="' + sw24.toFixed(3) + '" stroke-linecap="round" stroke-linejoin="round">' + body + '</g>'
+                : '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6" fill="none" stroke="' + lc + '" stroke-width="1.4" stroke-dasharray="4 3"/>'
+                  + '<text x="' + (x + w / 2) + '" y="' + (y + h / 2 + w * 0.15) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + (w * 0.42).toFixed(1) + '" fill="' + lc + '">?</text>';
+        }
         else { g = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"' + st + '/>'; }
         var fs = shapeFs(it), lh = fs * 1.25, txt = String(it.text || '').trim() ? wrapText(it.text, shapeInner(it), fs) : [];
         if (txt.length) {
@@ -628,6 +647,9 @@
                 sh.line = FLOW_COLORS[it.line] ? it.line : old;
                 sh.ink = FLOW_COLORS[it.ink] ? it.ink : old;
                 if (MK_OPTS[sh.shape]) { sh.mk = MK_OPTS[sh.shape][it.mk] ? it.mk : 'none'; }
+                // Q5j: a chave fica mesmo fora do catálogo (desenha "?"), para
+                // não perder o que outra versão gravou.
+                if (sh.shape === 'ico') { sh.ico = /^[a-z0-9-]{1,40}$/.test(String(it.ico || '')) ? String(it.ico) : ICO_DEFAULT; }
                 out.items.push(shapeFit(sh));
                 return;
             }
@@ -1518,7 +1540,8 @@
                         + (shut ? '' : '<div class="cx-board-grid">' + gr.items.map(function (key) {
                             var k = key.split(':')[0], mk = key.split(':')[1] || '', name = PRESETS[key] || SHAPES[k].label;
                             var ck = SHAPES[k].color, small = ['conn', 'offpage', 'dataobj'].indexOf(k) >= 0 || SQUARE.indexOf(k) >= 0;
-                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none' });
+                            var demo = shapeFit({ id: 'p', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none', ico: mk || ICO_DEFAULT });
+                            if (k === 'ico') { name = icoName(mk || ICO_DEFAULT); }
                             return '<button type="button" class="cx-board-ic" data-shape="' + k + '"' + (mk ? ' data-mk="' + mk + '"' : '') + ' title="' + esc(name) + '">'
                                 + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="44" height="30">' + shapeSvg(demo, true) + '</svg><span>' + esc(name) + '</span></button>';
                         }).join('') + '</div>');
@@ -2087,8 +2110,13 @@
             var it = get(sel[0]), h = '';
             var optsOf = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
             if (it.t === 'shape') {
-                h += '<p><strong>' + esc(SHAPES[it.shape].label) + '</strong></p>'
-                    + '<label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
+                h += '<p><strong>' + esc(it.shape === 'ico' ? 'Ícone: ' + icoName(it.ico) : SHAPES[it.shape].label) + '</strong></p>'
+                    + (it.shape === 'ico' ? '<label class="cx-board-f"><span>Desenho</span><select data-k="ico">'
+                        + (Lucide().SVG[it.ico] ? '' : '<option value="' + esc(it.ico) + '" selected>(desconhecido: ' + esc(it.ico) + ')</option>')
+                        + Lucide().CATS.map(function (c) {
+                            return '<optgroup label="' + esc(c.label) + '">' + c.items.map(function (k) { return '<option value="' + k + '"' + (k === it.ico ? ' selected' : '') + '>' + esc(icoName(k)) + '</option>'; }).join('') + '</optgroup>';
+                        }).join('') + '</select></label>' : '')
+                    + '<label class="cx-board-f"><span>' + (it.shape === 'ico' ? 'Nome (embaixo)' : 'Texto') + '</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha.</p>'
                     + (MK_OPTS[it.shape] ? '<label class="cx-board-f"><span>' + (it.shape === 'task' ? 'Tipo de tarefa' : 'Tipo de evento') + '</span><select data-k="mk">' + optsOf(MK_OPTS[it.shape], it.mk || 'none') + '</select></label>' : '')
                     + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="fs">' + FS_LIST.map(function (v) { return '<option value="' + v + '"' + (v === shapeFs(it) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
@@ -2237,6 +2265,8 @@
             var ck = SHAPES[shape].color;
             var it = { id: uid(), t: 'shape', shape: shape, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' };
             if (MK_OPTS[shape]) { it.mk = MK_OPTS[shape][mk] ? mk : 'none'; }
+            // Q5j: no ícone, o data-mk da paleta é a chave do desenho.
+            if (shape === 'ico') { it.ico = Lucide().SVG[mk] ? mk : ICO_DEFAULT; it.text = ''; }
             shapeFit(it);
             it.x = Math.round((x - it.w / 2) / GRID) * GRID; it.y = Math.round((y - it.h / 2) / GRID) * GRID;
             // Grupo nasce atrás de tudo (é uma moldura em volta de outras formas).

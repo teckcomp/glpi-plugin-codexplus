@@ -72,6 +72,17 @@
     var SNAP = 6;
     var COLORS = ['#185FA5', '#1D9E75', '#D85A30', '#534AB7', '#A32D2D', '#5F5E5A'];
     var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma' };
+    /* Folha do fluxograma (Claudio, 02/10/2026): tamanhos prontos e um
+       personalizado; cresce para a direita e para baixo, sem mover o desenho,
+       e nunca fica menor que o desenho. Limite 6000 (o mesmo do clean() e do
+       Diagram::validate). O PNG, a leitura e o PDF recortam pelo conteúdo,
+       então a folha só muda a área de trabalho do editor. */
+    var PAGE_SIZES = [
+        { v: '1400x900',  l: 'Padrão (1400 × 900)' },
+        { v: '2400x1500', l: 'Médio (2400 × 1500)' },
+        { v: '3600x2200', l: 'Grande (3600 × 2200)' },
+        { v: '6000x4000', l: 'Máximo (6000 × 4000)' }
+    ];
     var PXM_DEFAULT = 20;   // sem escala definida: 1 m = 20 px (aproximado)
     var PXM = PXM_DEFAULT;  // escala do quadro em uso (render e PNG)
     var SIDES = ['n', 'l', 's', 'o'];   // bordas do ícone: norte, leste, sul, oeste
@@ -1453,6 +1464,11 @@
             + '<button type="button" data-act="zout" title="Afastar">−</button><span class="cx-board-zoom">100%</span>'
             + '<button type="button" data-act="zin" title="Aproximar">+</button>'
             + '<button type="button" data-act="fit" title="Ajustar à tela">Ajustar</button>'
+            + (flow ? '<span class="cx-board-sep"></span><label class="cx-board-op cx-board-page" title="Tamanho da folha (cresce para a direita e para baixo)">Folha '
+                + '<select data-act="page">' + PAGE_SIZES.map(function (p) { return '<option value="' + p.v + '">' + p.l + '</option>'; }).join('')
+                + '<option value="custom">Personalizado</option></select>'
+                + '<span class="cx-board-pagec" hidden><input type="number" min="400" max="6000" step="100" data-pg="w" title="Largura (px)"> × '
+                + '<input type="number" min="300" max="6000" step="100" data-pg="h" title="Altura (px)"></span></label>' : '')
             + (D.mode === 'planta'
                 ? '<span class="cx-board-sep"></span><button type="button" data-act="bg">' + (bgUrl ? 'Trocar planta' : 'Enviar planta') + '</button>'
                   + '<label class="cx-board-op" title="Transparência da planta">Planta <input type="range" min="10" max="100" step="5" data-act="op" value="' + Math.round(D.bgOpacity * 100) + '"></label>'
@@ -1846,6 +1862,44 @@
             root.querySelector('[data-act="undo"]').disabled = !hist.length;
             root.querySelector('[data-act="redo"]').disabled = !redo.length;
             root.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-tool') === tool); });
+            syncPage();
+        }
+        /* ---------- folha (fluxograma) ---------- */
+        // Menor folha que ainda cabe o desenho (com sobra de 40 px).
+        function pageMin() {
+            var x2 = 0, y2 = 0, fnd = finder(D.items);
+            D.items.forEach(function (it) {
+                if (it.t === 'link') {
+                    (routePts(it, fnd) || []).forEach(function (q) { x2 = Math.max(x2, q.x); y2 = Math.max(y2, q.y); });
+                    return;
+                }
+                var b = bbox(it); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
+            });
+            return { w: Math.max(400, Math.ceil(x2 + 40)), h: Math.max(300, Math.ceil(y2 + 40)) };
+        }
+        function syncPage() {
+            var s = root.querySelector('[data-act="page"]');
+            if (!s) { return; }
+            var v = D.w + 'x' + D.h, pre = PAGE_SIZES.some(function (p) { return p.v === v; });
+            var c = root.querySelector('.cx-board-pagec');
+            if (document.activeElement !== s) { s.value = pre ? v : 'custom'; }
+            c.hidden = s.value !== 'custom';
+            c.querySelectorAll('input').forEach(function (i) {
+                if (document.activeElement !== i) { i.value = i.getAttribute('data-pg') === 'w' ? D.w : D.h; }
+            });
+        }
+        function setPage(w, h) {
+            w = Math.round(+w); h = Math.round(+h);
+            if (!(w > 0) || !(h > 0)) { syncPage(); return; }
+            w = Math.max(400, Math.min(6000, w)); h = Math.max(300, Math.min(6000, h));
+            var m = pageMin(), cw = Math.min(6000, Math.max(w, m.w)), ch = Math.min(6000, Math.max(h, m.h));
+            if (cw === D.w && ch === D.h) { syncPage(); return; }
+            snap();
+            D.w = cw; D.h = ch;
+            render();
+            if (cw > w || ch > h) {
+                notify(editor, 'O desenho não cabe em ' + w + ' × ' + h + '. A folha ficou em ' + cw + ' × ' + ch + ', o menor tamanho em que ele cabe.');
+            }
         }
         function drawSel() {
             drawSelBody();
@@ -3008,6 +3062,16 @@
         });
         var op = root.querySelector('[data-act="op"]');
         if (op) { op.addEventListener('input', function () { D.bgOpacity = +op.value / 100; render(); }); }
+        var pgSel = root.querySelector('[data-act="page"]');
+        if (pgSel) {
+            pgSel.addEventListener('change', function () {
+                if (pgSel.value === 'custom') { root.querySelector('.cx-board-pagec').hidden = false; root.querySelector('[data-pg="w"]').focus(); return; }
+                var p = pgSel.value.split('x'); setPage(p[0], p[1]); pgSel.blur();
+            });
+            root.querySelectorAll('[data-pg]').forEach(function (i) {
+                i.addEventListener('change', function () { setPage(root.querySelector('[data-pg="w"]').value, root.querySelector('[data-pg="h"]').value); });
+            });
+        }
         var lgChk = root.querySelector('[data-act="legend"]');
         if (lgChk) { lgChk.addEventListener('change', function () { D.legend = lgChk.checked; }); }
 

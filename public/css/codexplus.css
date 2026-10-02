@@ -2211,6 +2211,11 @@ html.cx-board-open { overflow: hidden; }
 .cx-board-spacer { flex: 1; }
 .cx-board-zoom { min-width: 42px; text-align: center; font-size: .85em; color: var(--cx-muted); }
 .cx-board-op { display: inline-flex; align-items: center; gap: 6px; font-size: .85em; color: var(--cx-muted); margin: 0 4px; }
+/* Folha do fluxograma (02/10/2026). */
+.cx-board-page select, .cx-board-page input { border: 1px solid var(--cx-border); border-radius: 6px; padding: 3px 6px; font-size: 1em; background: #fff; color: inherit; }
+.cx-board-page input { width: 74px; }
+.cx-board-pagec { display: inline-flex; align-items: center; gap: 4px; }
+.cx-board-pagec[hidden] { display: none !important; }
 .cx-board-body { flex: 1; display: grid; grid-template-columns: 250px minmax(0, 1fr) 270px; min-height: 0; }
 .cx-board-pal, .cx-board-props { background: #fff; overflow: auto; padding: 10px; }
 .cx-board-pal { border-right: 1px solid var(--cx-border); }

@@ -1630,6 +1630,7 @@
             + '<button type="button" data-act="zout" title="Afastar">−</button><span class="cx-board-zoom">100%</span>'
             + '<button type="button" data-act="zin" title="Aproximar">+</button>'
             + '<button type="button" data-act="fit" title="Ajustar à tela">Ajustar</button>'
+            + '<button type="button" data-act="find" title="Buscar no quadro (Ctrl+F)">Buscar</button>'
             + (flow ? '<span class="cx-board-sep"></span><label class="cx-board-op cx-board-page" title="Tamanho da folha (cresce para a direita e para baixo)">Folha '
                 + '<select data-act="page">' + PAGE_SIZES.map(function (p) { return '<option value="' + p.v + '">' + p.l + '</option>'; }).join('')
                 + '<option value="custom">Personalizado</option></select>'
@@ -1654,7 +1655,7 @@
             + '</div>') + '<div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
-            + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
+            + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-find"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
             + '<div class="cx-board-hint">' + (flow
                 ? 'Arraste uma forma da paleta para o quadro. Duplo clique na forma (ou comece a digitar) escreve nela. Com a forma selecionada, puxe uma alça azul até outra forma para ligar: a 1ª saída da decisão nasce Sim, a 2ª Não. Arraste o fundo para mover a vista; roda do mouse dá zoom.'
@@ -1669,7 +1670,7 @@
         var gZones = root.querySelector('.cx-board-zones'), gItems = root.querySelector('.cx-board-items');
         var gLinks = root.querySelector('.cx-board-links'), gDucts = root.querySelector('.cx-board-ducts');
         var ductDraft = null;   // pontos da eletrocalha em desenho
-        var gSel = root.querySelector('.cx-board-sel'), gGuides = root.querySelector('.cx-board-guides');
+        var gSel = root.querySelector('.cx-board-sel'), gGuides = root.querySelector('.cx-board-guides'), gFind = root.querySelector('.cx-board-find');
         var marq = root.querySelector('.cx-board-marq'), props = root.querySelector('.cx-board-props');
 
         /* ---------- paleta ---------- */
@@ -2099,7 +2100,110 @@
         }
         function drawSel() {
             drawSelBody();
+            drawFind();
             if (typeof drawFbar === 'function') { drawFbar(); }
+        }
+        /* ---------- Q5h-3: buscar no quadro (Claudio, 02/10/2026) ----------
+           Ctrl+F ou "Buscar": caixa no canto do quadro. Procura sem acento no
+           texto das formas, título e descrição das raias, textos, molduras,
+           rótulos de ícones e de ligações. Todas as achadas ficam contornadas;
+           Enter vai para a próxima (Shift+Enter, anterior), centraliza e
+           seleciona. Esc fecha. */
+        var find = null;   // { q, hits: [id], i }
+        function itemText(it) {
+            if (it.t === 'shape') { return it.text; }
+            if (it.t === 'lane') { return (it.title || '') + ' ' + (it.desc || ''); }
+            if (it.t === 'text') { return it.text; }
+            if (it.t === 'zone' || it.t === 'icon' || it.t === 'duct') { return it.label; }
+            if (it.t === 'link') { return (it.label || '') + ' ' + (it.cable || ''); }
+            return '';
+        }
+        function findRun(q) {
+            var nq = norm(q), hits = [];
+            if (nq) {
+                hits = D.items.filter(function (it) { return norm(itemText(it)).indexOf(nq) >= 0; })
+                    .map(function (it) { return { id: it.id, b: findBox(it.id) || { x: 0, y: 0 } }; })
+                    .sort(function (a, b) { return (a.b.y - b.b.y) || (a.b.x - b.b.x); })
+                    .map(function (h) { return h.id; });
+            }
+            find.q = q; find.hits = hits; find.i = hits.length ? 0 : -1;
+            findInfo();
+            drawFind();
+        }
+        function findInfo() {
+            var el = root.querySelector('.cx-board-findn'); if (!el || !find) { return; }
+            el.textContent = !norm(find.q) ? '' : find.hits.length ? (find.i + 1) + ' de ' + find.hits.length : 'nada';
+            el.classList.toggle('is-none', !!norm(find.q) && !find.hits.length);
+        }
+        function findBox(id) {
+            var it = get(id); if (!it) { return null; }
+            if (it.t === 'link') { var ps = routePts(it, get) || []; if (!ps.length) { return null; }
+                var xs = ps.map(function (q) { return q.x; }), ys = ps.map(function (q) { return q.y; });
+                return { x: Math.min.apply(null, xs), y: Math.min.apply(null, ys), w: Math.max.apply(null, xs) - Math.min.apply(null, xs), h: Math.max.apply(null, ys) - Math.min.apply(null, ys) }; }
+            return bbox(it);
+        }
+        function drawFind() {
+            if (!gFind) { return; }
+            if (!find || !find.hits.length) { gFind.innerHTML = ''; return; }
+            var sw = 2 / view.z, pad = 6 / view.z;
+            gFind.innerHTML = find.hits.map(function (id, i) {
+                var b = findBox(id); if (!b) { return ''; }
+                var cur = i === find.i;
+                return '<rect x="' + (b.x - pad) + '" y="' + (b.y - pad) + '" width="' + (b.w + 2 * pad) + '" height="' + (b.h + 2 * pad) + '" rx="' + (6 / view.z)
+                    + '" fill="#EF9F27" fill-opacity="' + (cur ? 0.18 : 0.08) + '" stroke="#EF9F27" stroke-width="' + (cur ? sw * 1.6 : sw) + '" pointer-events="none"/>';
+            }).join('');
+        }
+        function findGo(step) {
+            if (!find || !find.hits.length) { return; }
+            find.i = (find.i + step + find.hits.length) % find.hits.length;
+            var id = find.hits[find.i], b = findBox(id), r = svg.getBoundingClientRect();
+            if (b && r.width) {
+                // Cabe com folga? Senão, afasta até caber.
+                var z = Math.min(view.z, (r.width * 0.8) / Math.max(b.w, 1), (r.height * 0.8) / Math.max(b.h, 1));
+                view.z = Math.max(0.1, z);
+                view.x = r.width / 2 - (b.x + b.w / 2) * view.z;
+                view.y = r.height / 2 - (b.y + b.h / 2) * view.z;
+                applyView();
+            }
+            sel = [id];
+            findInfo();
+            render();
+        }
+        function findOpen() {
+            var box = root.querySelector('.cx-board-findbox');
+            if (!box) {
+                box = document.createElement('div');
+                box.className = 'cx-board-findbox';
+                box.innerHTML = '<input type="search" class="cx-board-findq" placeholder="Buscar no quadro" aria-label="Buscar no quadro" autocomplete="off">'
+                    + '<span class="cx-board-findn" aria-live="polite"></span>'
+                    + '<button type="button" data-fd="-1" title="Anterior (Shift+Enter)">↑</button><button type="button" data-fd="1" title="Próxima (Enter)">↓</button>'
+                    + '<button type="button" data-fd="x" title="Fechar (Esc)">✕</button>';
+                root.querySelector('.cx-board-stage').appendChild(box);
+                var inp = box.querySelector('.cx-board-findq');
+                inp.addEventListener('input', function () { findRun(inp.value); if (find.hits.length) { find.i = -1; findGo(1); } });
+                inp.addEventListener('keydown', function (e) {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); findGo(e.shiftKey ? -1 : 1); }
+                    else if (e.key === 'Escape') { e.preventDefault(); findClose(); }
+                });
+                box.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-fd]'); if (!b) { return; }
+                    var v = b.getAttribute('data-fd');
+                    if (v === 'x') { findClose(); } else { findGo(+v); }
+                });
+            }
+            if (!find) { find = { q: '', hits: [], i: -1 }; }
+            box.hidden = false;
+            var q = box.querySelector('.cx-board-findq');
+            q.focus(); q.select();
+            if (q.value) { findRun(q.value); }
+        }
+        function findClose() {
+            var box = root.querySelector('.cx-board-findbox');
+            if (box) { box.hidden = true; }
+            find = null;
+            drawFind();
+            svg.focus && svg.focus();
         }
         function drawSelBody() {
             gSel.innerHTML = sel.map(function (id) {
@@ -3353,6 +3457,7 @@
             if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
             if (ed) { return; }
             if (mini && e.key === 'Escape') { e.preventDefault(); miniClose(); return; }
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); findOpen(); return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
             if (tool === 'duct') {
@@ -3487,6 +3592,7 @@
             else if (a === 'redo') { redoIt(); }
             else if (a === 'zin' || a === 'zout') { var r = svg.getBoundingClientRect(); zoomAt(a === 'zin' ? 1.2 : 1 / 1.2, r.width / 2, r.height / 2); drawSel(); }
             else if (a === 'fit') { fit(); drawSel(); }
+            else if (a === 'find') { findOpen(); }
             else if (a === 'bg') { pickBg(); }
             else if (a === 'rot') { rotate(); }
             else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }

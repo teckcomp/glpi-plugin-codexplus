@@ -71,7 +71,10 @@
     var GRID = 10;
     var SNAP = 6;
     var COLORS = ['#185FA5', '#1D9E75', '#D85A30', '#534AB7', '#A32D2D', '#5F5E5A'];
-    var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma' };
+    var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma', organograma: 'Organograma' };
+    // Q6b-1 (Claudio, 03/10/2026): organograma no motor. O desenho e as regras
+    // (chefia, linha x cartão, arranjo) vêm de codexplus-orgdraw.js.
+    function OD() { return window.CodexplusOrgDraw || null; }
     /* Folha do fluxograma (Claudio, 02/10/2026): tamanhos prontos e um
        personalizado; cresce para a direita e para baixo, sem mover o desenho,
        e nunca fica menor que o desenho. Limite 6000 (o mesmo do clean() e do
@@ -743,6 +746,9 @@
 
     function clean(d, mode) {
         var out = starter(d && d.mode || mode);
+        // Q6b-1: o organograma guarda o próprio JSON (o de sempre) em `org`;
+        // os itens do quadro são derivados dele a cada desenho.
+        if (out.mode === 'organograma') { out.legend = false; out.org = OD() ? OD().normalize(d && d.org) : null; return out; }
         if (!d || typeof d !== 'object') { return out; }
         // Q4a: ícones da instalação guardados no quadro entram antes da
         // conferência dos itens (ícone desconhecido vira genérico).
@@ -1253,6 +1259,7 @@
     // A forma sem o nome de baixo: seleção, alças e guias usam esta.
     function coreBox(it) { return it.t === 'shape' ? { x: it.x, y: it.y, w: it.w, h: it.h } : bbox(it); }
     function bbox(it) {
+        if (it.t === 'org' || it.t === 'orow') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'shape') {
             // Nome embaixo (BPMN): entra no contorno (seleção por área, PNG).
             if (below(it) && String(it.text || '').trim()) {
@@ -2183,6 +2190,7 @@
     function build(editor, node, D, bgUrl, bgChanged, host) {
         var flow = D.mode === 'fluxograma';
         if (flow) { D.legend = false; D.pxm = 0; }
+        var org = D.mode === 'organograma' && !!OD() && !!D.org;
         var saveLabel = host ? 'Salvar ' + MODES[D.mode].toLowerCase() : (node ? 'Salvar quadro' : 'Inserir no documento');
         var hist = [], redo = [], sel = [], tool = 'select', clip = null;
         var view = { z: 1, x: 40, y: 40 };
@@ -2259,6 +2267,24 @@
             + '</div>';
         document.body.appendChild(root);
         document.documentElement.classList.add('cx-board-open');
+        if (org) {
+            // Q6b-1: barra do organograma — sem formas, ícones, molduras,
+            // agrupar ou PNG (chegam nos blocos seguintes o que fizer sentido).
+            root.querySelector('.cx-board-tools').innerHTML =
+                '<button type="button" data-act="arrumar" title="Devolver todos os cartões ao arranjo automático">Arrumar</button>'
+                + '<span class="cx-board-sep"></span>'
+                + '<button type="button" data-act="undo" title="Desfazer (Ctrl+Z)">↶</button>'
+                + '<button type="button" data-act="redo" title="Refazer (Ctrl+Y)">↷</button>'
+                + '<span class="cx-board-sep"></span>'
+                + '<button type="button" data-act="zout" title="Afastar">−</button><span class="cx-board-zoom">100%</span>'
+                + '<button type="button" data-act="zin" title="Aproximar">+</button>'
+                + '<button type="button" data-act="fit" title="Ajustar à tela">Ajustar</button>'
+                + '<button type="button" data-act="find" title="Buscar pessoa ou cargo (Ctrl+F)">Buscar</button>'
+                + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>';
+            ['[data-act="legend"]', '[data-act="png"]'].forEach(function (q) { var el = root.querySelector(q); if (el) { (el.closest('label') || el).remove(); } });
+            root.querySelector('.cx-board-pal-top').style.display = 'none';
+            root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para ver os dados. Arraste um cartão para soltá-lo onde quiser (a equipe vai junto); arraste uma pessoa de dentro de um cartão para dar a ela um cartão próprio. “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
+        }
 
         var svg = root.querySelector('.cx-board-svg'), vp = root.querySelector('.vp');
         var paper = root.querySelector('.cx-board-paper'), bgImgEl = root.querySelector('.cx-board-bgimg');
@@ -2278,6 +2304,7 @@
         /* ---------- paleta ---------- */
         var palShut = {}, laneDirPal = null;
         function paleta() {
+            if (org) { orgPalette(); return; }
             if (flow) {
                 // Q5b: só formas (os ícones de rede são da Planta e da Topologia).
                 // Q5e: seções recolhíveis (clique no título). Q5j-2: ícones
@@ -2599,6 +2626,118 @@
         function byId(id) { return D.items.some(function (i) { return i.id === id; }); }
         function get(id) { for (var i = 0; i < D.items.length; i++) { if (D.items[i].id === id) { return D.items[i]; } } return null; }
 
+        /* ---------- Q6b-1: organograma (Claudio, 03/10/2026) ----------
+           D.org é a verdade (o JSON gravado de sempre). A cada desenho, o
+           arranjo roda de novo e D.items vira a lista de caixas: o cartão
+           (t: 'org') e cada pessoa listada nele (t: 'orow'). Seleção, busca,
+           minimapa e ajuste usam essas caixas como os outros itens. */
+        var ORG_PAD = 40, oparts = null, oOrigin = null;
+        function orgSync() {
+            oparts = OD().parts(D.org);
+            var o = oparts.L.origin;
+            // Se o arranjo cresceu para a esquerda/cima, tudo anda junto: a
+            // vista compensa para nada pular na tela.
+            if (oOrigin && (o.x !== oOrigin.x || o.y !== oOrigin.y)) {
+                view.x -= (o.x - oOrigin.x) * view.z; view.y -= (o.y - oOrigin.y) * view.z;
+                vp.setAttribute('transform', 'translate(' + view.x + ' ' + view.y + ') scale(' + view.z + ')');
+            }
+            oOrigin = { x: o.x, y: o.y };
+            D.items = oparts.boxes.map(function (b) {
+                return { id: b.id, t: b.t === 'card' ? 'org' : 'orow', card: b.card || '', x: b.x + ORG_PAD, y: b.y + ORG_PAD, w: b.w, h: b.h, color: b.color || '' };
+            });
+            D.w = Math.ceil(oparts.L.w + 2 * ORG_PAD); D.h = Math.ceil(oparts.L.h + 2 * ORG_PAD);
+        }
+        function orgNode(id) { var ns = D.org.nodes; for (var i = 0; i < ns.length; i++) { if (ns[i].id === id) { return ns[i]; } } return null; }
+        function orgGrid(v) { return Math.max(0, Math.round(v / GRID) * GRID); }
+        function orgPalette() {
+            var c = {}, vagas = 0, total = 0;
+            D.org.nodes.forEach(function (n) {
+                if (n.group) { return; }
+                if (!n.name.trim()) { vagas++; return; }
+                c[n.lvl] = (c[n.lvl] || 0) + 1; total++;
+            });
+            var row = function (sw, txt, num) {
+                return '<div class="cx-board-olv" style="display:flex;align-items:center;gap:8px;padding:4px 12px;font-size:12.5px">' + sw + '<span>' + esc(txt) + '</span><b style="margin-left:auto">' + num + '</b></div>';
+            };
+            root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Níveis</div>'
+                + D.org.levels.map(function (l) { return row('<i style="width:18px;height:6px;border-radius:2px;display:inline-block;background:' + esc(l.color) + '"></i>', l.label, c[l.key] || 0); }).join('')
+                + row('<i style="width:18px;height:8px;border:1px dashed #888;border-radius:2px;display:inline-block;box-sizing:border-box"></i>', 'Vagas em aberto', vagas)
+                + row('<i style="width:18px;display:inline-block"></i>', 'Pessoas nomeadas', total)
+                + '<p class="cx-board-none" style="padding:8px 12px">Os elementos para arrastar (Cargo, Área, Vaga, Assessoria, Terceiro) e a edição dos níveis chegam nas próximas etapas.</p>';
+        }
+        function orgProps() {
+            var n = sel.length === 1 && orgNode(sel[0]);
+            if (!n) {
+                props.innerHTML = '<p class="cx-board-none">Clique num cartão ou numa pessoa para ver os dados.</p>'
+                    + '<p class="cx-board-none">Atalhos: Ctrl+Z desfaz · Ctrl+Y refaz · Ctrl+F busca · Esc limpa a seleção.</p>';
+                return;
+            }
+            var T = OD().tree(D.org), chefe = T.parentOf[n.id] && orgNode(T.parentOf[n.id]);
+            var lv = null; D.org.levels.forEach(function (l) { if (l.key === n.lvl) { lv = l; } });
+            var reps = D.org.edges.filter(function (e) { return !e.boss && (e.from === n.id || e.to === n.id); }).map(function (e) {
+                var o = orgNode(e.from === n.id ? e.to : e.from); return o ? OD().label(o) : '';
+            }).filter(Boolean);
+            var free = typeof n.x === 'number', it = get(n.id);
+            var linha = function (k, v) { return v ? '<p style="margin:0 0 8px;font-size:13px"><span class="cx-board-none" style="display:block;margin:0;font-size:11.5px">' + k + '</span>' + v + '</p>' : ''; };
+            var marcas = [n.pend ? 'a confirmar' : '', n.dashed ? 'borda tracejada' : '', n.kind === 'assessoria' ? 'assessoria' : '', n.kind === 'terceiro' ? 'externo' : ''].filter(Boolean).join(' · ');
+            props.innerHTML = '<p><strong>' + (n.group ? 'Área ou equipe' : !n.name.trim() ? 'Vaga em aberto' : 'Pessoa') + '</strong></p>'
+                + linha('Nome', esc(OD().label(n)))
+                + linha('Cargo ou função', esc(n.role))
+                + linha('Nível', lv ? '<i style="width:14px;height:6px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:middle;background:' + esc(lv.color) + '"></i>' + esc(lv.label) : '')
+                + linha('Responde a', chefe ? esc(OD().label(chefe) + (chefe.role ? ' — ' + chefe.role : '')) : 'Ninguém (topo)')
+                + linha('Equipe direta', String(T.kids[n.id].length))
+                + linha('Reportes (tracejado)', reps.length ? esc(reps.join(', ')) : '')
+                + linha('Observação', esc(n.note))
+                + linha('Marcações', esc(marcas))
+                + linha('Posição', free ? 'Solto: fica onde foi largado.' : it && it.t === 'orow' ? 'Na lista do cartão do chefe.' : 'No arranjo automático.')
+                + (free ? '<p><button type="button" class="cx-board-ok" data-oa="back">Devolver ao arranjo</button></p>' : '')
+                + '<p class="cx-board-none">Para editar os dados, use por enquanto o organograma da página.</p>';
+        }
+        props.addEventListener('click', function (e) {
+            var b = org && e.target.closest('[data-oa]');
+            if (!b) { return; }
+            var n = sel.length === 1 && orgNode(sel[0]);
+            if (b.getAttribute('data-oa') === 'back' && n) { snap(); delete n.x; delete n.y; render(); }
+        });
+        // Ponteiro no organograma: clique seleciona; arrastar cartão o solta
+        // onde largar (a equipe ancorada vai junto); arrastar pessoa da lista
+        // dá a ela um cartão próprio; arrastar o fundo move a vista.
+        function orgDown(e) {
+            if (e.button === 2) { return; }
+            var id = hit(e.target), it = id && get(id);
+            try { svg.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ }
+            if (e.button === 1 || space || !it) {
+                if (!it && sel.length) { sel = []; render(); }
+                drag = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+                svg.classList.add('is-panning');
+                return;
+            }
+            sel = [it.id]; render();
+            var row = it.t === 'orow';
+            drag = { k: 'omove', id: it.id, sx: e.clientX, sy: e.clientY, moved: false,
+                box: { x: it.x, y: it.y, w: row ? 185 : it.w, h: row ? 56 : it.h } };
+        }
+        function orgMove(e) {
+            if (!drag) { return; }
+            if (drag.k === 'pan') { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return; }
+            if (drag.k !== 'omove') { return; }
+            var dx = (e.clientX - drag.sx) / view.z, dy = (e.clientY - drag.sy) / view.z;
+            if (!drag.moved && Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) < 5) { return; }
+            drag.moved = true;
+            var b = drag.box, x = ORG_PAD + oOrigin.x + orgGrid(b.x + dx - ORG_PAD - oOrigin.x), y = ORG_PAD + oOrigin.y + orgGrid(b.y + dy - ORG_PAD - oOrigin.y);
+            drag.at = { x: x, y: y };
+            gGuides.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + b.w + '" height="' + b.h + '" rx="8" fill="#378ADD" fill-opacity="0.08" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" stroke-dasharray="' + (6 / view.z) + ' ' + (4 / view.z) + '" pointer-events="none"/>';
+        }
+        function orgUp() {
+            svg.classList.remove('is-panning');
+            var d = drag; drag = null; gGuides.innerHTML = '';
+            if (!d || d.k !== 'omove' || !d.moved || !d.at) { return; }
+            var n = orgNode(d.id); if (!n) { return; }
+            snap();
+            n.x = orgGrid(d.at.x - ORG_PAD - oOrigin.x); n.y = orgGrid(d.at.y - ORG_PAD - oOrigin.y);
+            render();
+        }
+
         /* ---------- vista ---------- */
         /* ---------- Q5h-4: minimapa (Claudio, 02/10/2026) ----------
            Canto de baixo à direita: a folha e o desenho em miniatura (raias,
@@ -2624,9 +2763,10 @@
             el.setAttribute('viewBox', B0.x + ' ' + B0.y + ' ' + B0.w + ' ' + B0.h);
             var h = '<rect x="0" y="0" width="' + D.w + '" height="' + D.h + '" fill="#fff" stroke="#D3D1C7" stroke-width="' + k + '"/>';
             D.items.forEach(function (it) {
-                if (it.t === 'link' || it.t === 'duct') { return; }
+                if (it.t === 'link' || it.t === 'duct' || it.t === 'orow') { return; }
                 var b = bbox(it), f = '#B4B2A9', o = 0.9;
-                if (it.t === 'lane') { f = pal(it.tone).f; o = 1; }
+                if (it.t === 'org') { f = it.color || f; o = 0.85; }
+                else if (it.t === 'lane') { f = pal(it.tone).f; o = 1; }
                 else if (it.t === 'shape') { f = it.shape === 'ico' ? pal(it.line).s : NO_FILL.indexOf(it.shape) >= 0 ? 'none' : pal(it.fill).s; o = 0.75; }
                 else if (it.t === 'zone') { f = 'none'; }
                 else if (it.t === 'text') { f = '#5F5E5A'; o = 0.5; }
@@ -2687,12 +2827,21 @@
         // Zonas embaixo, ligações no meio, ícones e textos por cima.
         function paint() {
             if (mmOn) { setTimeout(drawMM, 0); }
+            if (org) {
+                if (!oparts) { orgSync(); }
+                var tr = '<g transform="translate(' + ORG_PAD + ' ' + ORG_PAD + ')">';
+                gZones.innerHTML = ''; gDucts.innerHTML = '';
+                gLinks.innerHTML = tr + oparts.links + '</g>';
+                gItems.innerHTML = tr + oparts.cards + '</g>';
+                return;
+            }
             gZones.innerHTML = laneSvg(D.items) + D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
             gDucts.innerHTML = D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
             gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
         }
         function render() {
+            if (org) { orgSync(); }
             PXM = D.pxm || PXM_DEFAULT;
             var sc = root.querySelector('.cx-board-scale');
             if (sc) { sc.textContent = D.pxm ? '1 m = ' + (Math.round(D.pxm * 10) / 10).toString().replace('.', ',') + ' px' : 'sem escala'; }
@@ -2767,6 +2916,7 @@
            seleciona. Esc fecha. */
         var find = null;   // { q, hits: [id], i }
         function itemText(it) {
+            if (it.t === 'org' || it.t === 'orow') { var on = org && orgNode(it.id); return on ? OD().label(on) + ' ' + on.role + ' ' + on.note : ''; }
             if (it.t === 'shape') { return it.text; }
             if (it.t === 'lane') { return (it.title || '') + ' ' + (it.desc || ''); }
             if (it.t === 'text') { return it.text; }
@@ -2862,6 +3012,15 @@
             svg.focus && svg.focus();
         }
         function drawSelBody() {
+            if (org) {
+                gSel.innerHTML = sel.map(function (id) {
+                    var it = get(id); if (!it) { return ''; }
+                    var pd = it.t === 'orow' ? 0 : 3 / view.z;
+                    return '<rect x="' + (it.x - pd) + '" y="' + (it.y - pd) + '" width="' + (it.w + 2 * pd) + '" height="' + (it.h + 2 * pd) + '" rx="' + (it.t === 'orow' ? 2 : 9)
+                        + '" fill="' + (it.t === 'orow' ? '#378ADD' : 'none') + '" fill-opacity="0.1" stroke="#378ADD" stroke-width="' + (2 / view.z) + '" pointer-events="none"/>';
+                }).join('');
+                return;
+            }
             gSel.innerHTML = sel.map(function (id) {
                 var it = get(id); if (!it) { return ''; }
                 if (it.t === 'duct') {
@@ -3028,6 +3187,7 @@
             return '<label class="cx-board-f"><span>' + label + '</span><input type="text" data-k="' + key + '" value="' + esc(val) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '></label>';
         }
         function drawProps() {
+            if (org) { orgProps(); return; }
             if (!sel.length) {
                 // Q5a-2: fluxograma não tem lista de materiais (cabos, metros).
                 props.innerHTML = (flow ? '' : materialsHtml(materials(D, null), 'Materiais deste quadro'))
@@ -3635,6 +3795,7 @@
         /* ---------- quadro: ponteiro ---------- */
         var space = false, drag = null, scaleA = null, lastDown = { t: 0, x: 0, y: 0 };
         svg.addEventListener('pointerdown', function (e) {
+            if (org) { orgDown(e); return; }
             miniClose();
             var p = toBoard(e);
             // Duplo clique detectado aqui: com a captura do ponteiro, o dblclick
@@ -3795,6 +3956,7 @@
             render();
         });
         svg.addEventListener('pointermove', function (e) {
+            if (org) { orgMove(e); return; }
             if (tool === 'duct' && ductDraft && !drag) {
                 var pc = toBoard(e), qc = alignTo(pc, [ductDraft[ductDraft.length - 1]], e.altKey);
                 draftPreview(qc);
@@ -3956,6 +4118,7 @@
             }
         });
         svg.addEventListener('pointerup', function (e) {
+            if (org) { orgUp(e); return; }
             svg.classList.remove('is-panning');
             if (drag && drag.k === 'end') {
                 // Religar: outra borda do mesmo ícone ou outro ícone; no vazio, nada muda.
@@ -4101,6 +4264,7 @@
             drawSel();
         }, { passive: false });
         svg.addEventListener('dblclick', function (e) {
+            if (org) { return; }
             var id = hit(e.target); if (!id || ['link', 'duct'].indexOf((get(id) || {}).t) >= 0) { return; }
             if (get(id).t === 'shape') { sel = [id]; render(); editStart(get(id)); return; }
             sel = [id]; render();
@@ -4118,6 +4282,15 @@
             if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); findOpen(); return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
+            if (org) {
+                // Q6b-1: no organograma, só desfazer/refazer e Esc (edição pelo
+                // teclado chega com o painel de edição).
+                var oc = e.ctrlKey || e.metaKey, ok = e.key.toLowerCase();
+                if (ok === 'escape') { e.preventDefault(); if (sel.length) { sel = []; render(); } else { close(); } }
+                else if (oc && ok === 'z') { e.preventDefault(); if (e.shiftKey) { redoIt(); } else { undo(); } }
+                else if (oc && ok === 'y') { e.preventDefault(); redoIt(); }
+                return;
+            }
             if (tool === 'duct') {
                 if (e.key === 'Enter') { e.preventDefault(); finishDuct(); return; }
                 if (e.key === 'Escape') { e.preventDefault(); ductDraft = null; gGuides.innerHTML = ''; tool = 'select'; render(); return; }
@@ -4191,6 +4364,10 @@
 
         /* ---------- ações da barra ---------- */
         function act(a) {
+            if (org && a === 'arrumar') {
+                snap(); D.org.nodes.forEach(function (n) { delete n.x; delete n.y; }); render(); setTimeout(fit, 0); return;
+            }
+            if (org && ['group', 'ungroup', 'lock', 'del', 'rotate', 'smaller', 'bigger', 'png', 'imp', 'exp', 'expjson', 'expmd'].indexOf(a) >= 0) { return; }
             if (a === 'group' && sel.length > 1) { snap(); var g = uid(); sel.forEach(function (id) { if (get(id).t !== 'lane') { get(id).g = g; } }); render(); }
             else if (a === 'ungroup' && sel.length) { snap(); sel.forEach(function (id) { get(id).g = ''; }); render(); }
             else if (a === 'lock' && sel.length) {

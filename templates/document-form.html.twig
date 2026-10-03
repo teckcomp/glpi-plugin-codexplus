@@ -349,6 +349,17 @@
                         <div class="codexplus-form-hint">
                             {{ __('Clique numa pessoa para editar; arraste um cartão para onde quiser, ou sobre outro para mudar a quem responde. Para trazer o organograma do protótipo, use "Importar ou exportar". O organograma é gravado sozinho pouco depois de cada mudança; o resto do documento, ao clicar em Salvar.', 'codexplus') }}
                         </div>
+                        {# Q6b-1: organograma no motor de quadro, em teste ao lado do
+                           antigo até a troca definitiva (Q6d). #}
+                        {% if not is_new %}
+                            <div class="codexplus-actions" style="margin-top:8px" data-cx-orgtest data-source="cx-org-data"
+                                 data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php" data-title="{{ name }}">
+                                <button type="button" class="codexplus-btn" data-act="orgboard"
+                                        title="{{ __('Abre este organograma no motor de quadro novo, em tela cheia. Ao salvar lá, a página recarrega.', 'codexplus') }}">
+                                    <i class="ti ti-flask"></i> {{ __('Abrir no motor novo (teste)', 'codexplus') }}
+                                </button>
+                            </div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="codexplus-doc-edit-zone codexplus-doc-edit-body" id="cx-docform-body" data-cx-doctype="{{ doctype }}">

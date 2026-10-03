@@ -1,5 +1,6 @@
 /* =========================================================================
-   Codex+ — desenho do organograma em SVG (bloco Q6a-1, Claudio 03/10/2026; -2: ajuste à tela, zoom, tela cheia e busca)
+   Codex+ — desenho do organograma em SVG (bloco Q6a-1, Claudio 03/10/2026; -2: ajuste à tela, zoom, tela cheia e busca;
+   Q6b-1: partes do desenho para o motor de quadro e o botão de teste)
    -------------------------------------------------------------------------
    Primeiro passo do Q6 (organograma no motor de quadro). Desenha o JSON
    gravado do organograma (o MESMO formato de sempre: nodes, edges, levels,
@@ -336,8 +337,14 @@
         if (b.rows.length) {
             g += '<path d="M' + r1(bx) + ' ' + r1(top + 0.5) + 'H' + r1(x + w - C.bord) + '" stroke="' + BORDER + '"/>';
             top += 1 + C.rowsPadTop;
+            b.rowBoxes = [];
             b.rows.forEach(function (r) {
                 var k = r.n, kc = colorOf(k.lvl), kv = !k.name.trim(), cy = top + C.rowPadY + C.rowLh / 2;
+                // Q6b-1: cada pessoa da lista é clicável no quadro (data-id
+                // próprio; a área transparente pega o clique na linha toda).
+                var rb = { id: k.id, x: bx, y: top, w: x + w - C.bord - bx, h: r.h };
+                b.rowBoxes.push(rb);
+                g += '<g data-id="' + esc(k.id) + '"><rect x="' + r1(rb.x) + '" y="' + r1(rb.y) + '" width="' + r1(rb.w) + '" height="' + r1(rb.h) + '" fill="transparent"/>';
                 g += (kv || k.dashed)
                     ? '<circle cx="' + r1(tx + C.dot / 2) + '" cy="' + r1(cy) + '" r="' + r1(C.dot / 2 - 0.75) + '" fill="none" stroke="' + kc + '" stroke-width="1.5" stroke-dasharray="2 1.6"/>'
                     : '<circle cx="' + r1(tx + C.dot / 2) + '" cy="' + r1(cy) + '" r="' + (C.dot / 2) + '" fill="' + kc + '"/>';
@@ -351,22 +358,22 @@
                     var tw = r.tags.reduce(function (a, t) { return a + tagW(t) + 4; }, -4), qx = x + w - C.bord - C.padR - tw;
                     r.tags.forEach(function (t) { g += pill(qx, cy - C.tagH / 2, t); qx += tagW(t) + 4; });
                 }
+                g += '</g>';
                 top += r.h;
             });
         }
         return g + '</g>';
     }
 
-    // SVG completo. opts.pad = false tira a margem em volta (padrão: a do
-    // motor antigo, 28/24/40/24).
-    function svg(src, opts) {
-        opts = opts || {};
+    /* Partes do desenho, sem margem: ligações, cartões e as caixas (cartão e
+       cada pessoa listada dentro dele). O motor de quadro (Q6b) pinta as
+       partes e usa as caixas para clicar, selecionar e buscar. */
+    function parts(src) {
         var S = src && src.__norm ? src : normalize(src);
-        var L = layout(S), P = opts.pad === false ? { t: 0, r: 0, b: 0, l: 0 } : C.pad;
+        var L = layout(S);
         var lv = {};
         S.levels.forEach(function (l) { lv[l.key] = l.color; });
         var colorOf = function (k) { return lv[k] || S.levels[S.levels.length - 1].color; };
-        var W = Math.ceil(L.w + P.l + P.r), H = Math.ceil(L.h + P.t + P.b);
         var links = '';
         S.edges.forEach(function (e) {
             var b = L.boxOf(e.from), c = L.boxOf(e.to);
@@ -378,6 +385,22 @@
             }
         });
         var cards = L.list.map(function (n) { return cardSvg(L.box[n.id], colorOf); }).join('');
+        var boxes = [];
+        L.list.forEach(function (n) {
+            var b = L.box[n.id];
+            boxes.push({ id: n.id, t: 'card', x: b.x, y: b.y, w: b.w, h: b.h, color: colorOf(n.lvl) });
+            (b.rowBoxes || []).forEach(function (r) { boxes.push({ id: r.id, t: 'row', card: n.id, x: r.x, y: r.y, w: r.w, h: r.h }); });
+        });
+        return { S: S, L: L, links: links, cards: cards, boxes: boxes, colorOf: colorOf };
+    }
+
+    // SVG completo. opts.pad = false tira a margem em volta (padrão: a do
+    // motor antigo, 28/24/40/24).
+    function svg(src, opts) {
+        opts = opts || {};
+        var pt = parts(src), L = pt.L, P = opts.pad === false ? { t: 0, r: 0, b: 0, l: 0 } : C.pad;
+        var W = Math.ceil(L.w + P.l + P.r), H = Math.ceil(L.h + P.t + P.b);
+        var links = pt.links, cards = pt.cards;
         var out = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'
             + (opts.bg ? '<rect width="100%" height="100%" fill="' + opts.bg + '"/>' : '')
             + '<g transform="translate(' + P.l + ',' + P.t + ')">' + links + cards + '</g></svg>';
@@ -570,11 +593,54 @@
     }
     function ctxReset() { ctx = null; }
 
-    function boot() { document.querySelectorAll('[data-cx-orgview]').forEach(mount); }
+    /* ---------------- Q6b-1: abrir no motor de quadro (teste) ----------------
+       Botão "Abrir no motor novo (teste)" na edição do documento, ao lado do
+       organograma antigo. Abre com o estado atual do editor antigo (a API
+       dele) e grava pelo mesmo ajax/diagram.save.php; depois de gravar, a
+       página recarrega para o editor antigo não sobrescrever o que foi salvo. */
+    function openBoard(box) {
+        var B = window.CodexplusBoard;
+        if (!B) { return; }
+        var oldRoot = document.querySelector('[data-cx-org]'), api = oldRoot && oldRoot.__cxOrg, raw = null;
+        try { raw = api && api.getData ? api.getData() : null; } catch (e) { raw = null; }
+        if (!raw) {
+            var src = document.getElementById(box.getAttribute('data-source') || '');
+            try { raw = JSON.parse(src ? src.textContent : 'null'); } catch (e) { raw = null; }
+        }
+        var saveUrl = box.getAttribute('data-save') || '', docId = box.getAttribute('data-doc') || '';
+        function post(D) {
+            var f = box.closest('form'), tk = (f && f.querySelector('[name="_glpi_csrf_token"]')) || document.querySelector('[name="_glpi_csrf_token"]');
+            if (!tk || !saveUrl || !docId) { return Promise.reject(new Error('sem token')); }
+            var o = JSON.parse(JSON.stringify(D.org || {}));
+            delete o.__norm;
+            var corpo = new FormData();
+            corpo.append('id', docId);
+            corpo.append('_diagram', JSON.stringify(o));
+            corpo.append('_glpi_csrf_token', tk.value);
+            return fetch(saveUrl, { method: 'POST', body: corpo, credentials: 'same-origin' }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) {
+                    if (!r.ok || !j.ok) { throw new Error(j.erro || ('HTTP ' + r.status)); }
+                    if (j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = j.csrf; }); }
+                    setTimeout(function () { window.location.reload(); }, 50);
+                    return j;
+                });
+            });
+        }
+        B.open(null, null, 'organograma', { data: { mode: 'organograma', org: raw }, title: box.getAttribute('data-title') || '', save: post, self: docId });
+    }
+
+    function boot() {
+        document.querySelectorAll('[data-cx-orgview]').forEach(mount);
+        document.querySelectorAll('[data-cx-orgtest]').forEach(function (box) {
+            if (box.__cxOrgTest) { return; }
+            box.__cxOrgTest = true;
+            box.addEventListener('click', function (e) { if (e.target.closest('[data-act="orgboard"]')) { openBoard(box); } });
+        });
+    }
 
     window.CodexplusOrgDraw = {
         normalize: normalize, layout: function (s) { return layout(normalize(s)); }, svg: svg,
-        legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot,
+        legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot, openBoard: openBoard, parts: parts, tree: tree, label: label,
         measure: function (s) { var S = normalize(s), L = layout(S), o = {}; L.list.forEach(function (n) { var b = L.box[n.id]; o[n.id] = { x: b.x, y: b.y, w: b.w, h: b.h }; }); return o; },
         _reset: ctxReset, C: C
     };

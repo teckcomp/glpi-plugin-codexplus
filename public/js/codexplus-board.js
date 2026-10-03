@@ -2271,7 +2271,8 @@
             // Q6b-1: barra do organograma — sem formas, ícones, molduras,
             // agrupar ou PNG (chegam nos blocos seguintes o que fizer sentido).
             root.querySelector('.cx-board-tools').innerHTML =
-                '<button type="button" data-act="arrumar" title="Devolver todos os cartões ao arranjo automático">Arrumar</button>'
+                '<button type="button" data-act="onew" class="cx-board-ok" title="Nova pessoa, subordinada a quem estiver selecionado (sem seleção, ao topo)">Nova pessoa</button>'
+                + '<button type="button" data-act="arrumar" title="Devolver todos os cartões ao arranjo automático">Arrumar</button>'
                 + '<span class="cx-board-sep"></span>'
                 + '<button type="button" data-act="undo" title="Desfazer (Ctrl+Z)">↶</button>'
                 + '<button type="button" data-act="redo" title="Refazer (Ctrl+Y)">↷</button>'
@@ -2283,7 +2284,7 @@
                 + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>';
             ['[data-act="legend"]', '[data-act="png"]'].forEach(function (q) { var el = root.querySelector(q); if (el) { (el.closest('label') || el).remove(); } });
             root.querySelector('.cx-board-pal-top').style.display = 'none';
-            root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para ver os dados. Arraste um cartão para soltá-lo onde quiser (a equipe vai junto); arraste uma pessoa de dentro de um cartão para dar a ela um cartão próprio. “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
+            root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para editar no painel. Arraste um cartão para soltá-lo onde quiser (a equipe vai junto); arraste uma pessoa de dentro de um cartão para dar a ela um cartão próprio. “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
         }
 
         var svg = root.querySelector('.cx-board-svg'), vp = root.querySelector('.vp');
@@ -2665,39 +2666,176 @@
                 + row('<i style="width:18px;display:inline-block"></i>', 'Pessoas nomeadas', total)
                 + '<p class="cx-board-none" style="padding:8px 12px">Os elementos para arrastar (Cargo, Área, Vaga, Assessoria, Terceiro) e a edição dos níveis chegam nas próximas etapas.</p>';
         }
+        /* Q6b-2 (Claudio, 03/10/2026): edição pelo painel, com as regras do
+           motor antigo — nova pessoa entra no nível seguinte ao do chefe;
+           trocar o chefe leva a equipe junto (e não aceita alguém da própria
+           equipe como chefe); excluir pede confirmação e sobe os subordinados
+           para o chefe de quem saiu; o último elemento não sai. */
+        var oDelArm = null;
+        function orgLevels() { return D.org.levels; }
+        function orgNextLevel(k) {
+            var ks = orgLevels().map(function (l) { return l.key; }), i = ks.indexOf(k);
+            return ks[Math.min(i + 1, ks.length - 1)] || ks[0];
+        }
+        function orgNewId() {
+            var m = 0, ids = {};
+            D.org.nodes.forEach(function (n) { ids[n.id] = 1; var r = /^n(\d+)$/.exec(n.id); if (r) { m = Math.max(m, +r[1]); } });
+            var id = 'n' + (m + 1); while (ids[id]) { id = 'n' + (++m + 1); }
+            return id;
+        }
+        function orgEdgeId() { return 'e' + Date.now().toString(36) + D.org.edges.length; }
+        function orgBossOf(id) { return OD().tree(D.org).parentOf[id] || ''; }
+        function orgTeam(id) {
+            var T = OD().tree(D.org), out = {};
+            (function go(x) { (T.kids[x] || []).forEach(function (k) { if (!out[k.id]) { out[k.id] = 1; go(k.id); } }); })(id);
+            return out;
+        }
+        function orgAdd(pid) {
+            var p = pid && orgNode(pid), ks = orgLevels().map(function (l) { return l.key; });
+            snap();
+            var n = { id: orgNewId(), name: '', role: '', lvl: p ? orgNextLevel(p.lvl) : ks[ks.length - 1], note: '', pend: false, group: false };
+            D.org.nodes.push(n);
+            if (p) { D.org.edges.push({ id: orgEdgeId(), from: p.id, to: n.id, boss: true, style: 'solida', label: '' }); }
+            sel = [n.id]; oDelArm = null; render();
+            var f = props.querySelector('[data-of="name"]'); if (f) { f.focus(); }
+        }
+        // Troca o chefe: tira a chefia atual e liga ao novo (a equipe vem
+        // junto, porque é a árvore que decide quem está embaixo de quem).
+        // Reporte que já existia entre os dois sai, para não duplicar o par.
+        function orgSetBoss(id, pid) {
+            if (pid && (pid === id || orgTeam(id)[pid])) { return; }
+            snap();
+            D.org.edges = D.org.edges.filter(function (e) {
+                if (e.to === id && e.boss) { return false; }
+                if (pid && ((e.from === pid && e.to === id) || (e.from === id && e.to === pid))) { return false; }
+                return true;
+            });
+            if (pid) { D.org.edges.push({ id: orgEdgeId(), from: pid, to: id, boss: true, style: 'solida', label: '' }); }
+            render();
+        }
+        function orgRemove(id) {
+            if (D.org.nodes.length < 2 || !orgNode(id)) { return; }
+            snap();
+            var pid = orgBossOf(id), out = [], done = false;
+            D.org.edges.forEach(function (e) {
+                if (pid && e.to === id && e.from === pid && e.boss && !done) {
+                    D.org.edges.forEach(function (k) {
+                        if (k.from === id) { out.push({ id: k.id, from: pid, to: k.to, boss: k.boss, style: k.style, label: k.label }); }
+                    });
+                    done = true; return;
+                }
+                if (e.from === id || e.to === id) { return; }
+                out.push(e);
+            });
+            // Sem chefe (topo ou bloco solto): os subordinados viram blocos.
+            D.org.edges = out;
+            D.org.nodes = D.org.nodes.filter(function (n) { return n.id !== id; });
+            sel = []; oDelArm = null; render();
+        }
+        function orgAddRep(id, other) {
+            if (!other || other === id || !orgNode(other)) { return; }
+            var tem = D.org.edges.some(function (e) { return (e.from === other && e.to === id) || (e.from === id && e.to === other); });
+            if (tem) { return; }
+            snap();
+            D.org.edges.push({ id: orgEdgeId(), from: other, to: id, boss: false, style: 'tracejada', label: '' });
+            render();
+        }
+        function orgDelRep(eid) {
+            if (!D.org.edges.some(function (e) { return e.id === eid && !e.boss; })) { return; }
+            snap();
+            D.org.edges = D.org.edges.filter(function (e) { return e.id !== eid; });
+            render();
+        }
+        // Enquanto digita, redesenha o quadro sem refazer o painel (o campo
+        // perde o foco se o painel for refeito).
+        function orgRefresh() { orgSync(); paint(); drawSel(); orgPalette(); }
         function orgProps() {
             var n = sel.length === 1 && orgNode(sel[0]);
             if (!n) {
-                props.innerHTML = '<p class="cx-board-none">Clique num cartão ou numa pessoa para ver os dados.</p>'
-                    + '<p class="cx-board-none">Atalhos: Ctrl+Z desfaz · Ctrl+Y refaz · Ctrl+F busca · Esc limpa a seleção.</p>';
+                props.innerHTML = '<p class="cx-board-none">Clique num cartão ou numa pessoa para editar. “Nova pessoa”, na barra, cria alguém subordinado a quem estiver selecionado.</p>'
+                    + '<p class="cx-board-none">Atalhos: Ctrl+Z desfaz · Ctrl+Y refaz · Ctrl+F busca · Delete exclui (pede confirmação) · Esc limpa a seleção.</p>';
                 return;
             }
-            var T = OD().tree(D.org), chefe = T.parentOf[n.id] && orgNode(T.parentOf[n.id]);
-            var lv = null; D.org.levels.forEach(function (l) { if (l.key === n.lvl) { lv = l; } });
-            var reps = D.org.edges.filter(function (e) { return !e.boss && (e.from === n.id || e.to === n.id); }).map(function (e) {
-                var o = orgNode(e.from === n.id ? e.to : e.from); return o ? OD().label(o) : '';
-            }).filter(Boolean);
-            var free = typeof n.x === 'number', it = get(n.id);
-            var linha = function (k, v) { return v ? '<p style="margin:0 0 8px;font-size:13px"><span class="cx-board-none" style="display:block;margin:0;font-size:11.5px">' + k + '</span>' + v + '</p>' : ''; };
-            var marcas = [n.pend ? 'a confirmar' : '', n.dashed ? 'borda tracejada' : '', n.kind === 'assessoria' ? 'assessoria' : '', n.kind === 'terceiro' ? 'externo' : ''].filter(Boolean).join(' · ');
+            var T = OD().tree(D.org), pid = T.parentOf[n.id] || '', team = orgTeam(n.id), label = OD().label;
+            var opt = function (v, t, on) { return '<option value="' + esc(v) + '"' + (on ? ' selected' : '') + '>' + t + '</option>'; };
+            var lvls = orgLevels().map(function (l) { return opt(l.key, esc(l.label), l.key === n.lvl); }).join('');
+            // Chefe: todos na ordem da árvore, recuados, menos ele mesmo e a
+            // própria equipe.
+            var boss = opt('', pid ? 'Ninguém (bloco independente)' : 'Ninguém (topo)', !pid), vistos = {};
+            var walkT = function (x, d) {
+                if (vistos[x.id]) { return; } vistos[x.id] = 1;
+                if (x.id !== n.id && !team[x.id]) {
+                    boss += opt(x.id, '\u00A0\u00A0'.repeat(d) + esc(label(x) + (x.role && x.name.trim() ? ' — ' + x.role : '')), x.id === pid);
+                }
+                (T.kids[x.id] || []).forEach(function (k) { walkT(k, d + 1); });
+            };
+            D.org.nodes.forEach(function (x) { if (!T.parentOf[x.id]) { walkT(x, 0); } });
+            var reps = D.org.edges.filter(function (e) { return !e.boss && (e.from === n.id || e.to === n.id); });
+            var repIds = {}; reps.forEach(function (e) { repIds[e.from === n.id ? e.to : e.from] = 1; });
+            var repList = reps.map(function (e) {
+                var o = orgNode(e.from === n.id ? e.to : e.from); if (!o) { return ''; }
+                return '<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--cx-border);border-radius:12px;padding:1px 4px 1px 9px;margin:0 4px 4px 0;font-size:12px">'
+                    + esc(label(o)) + '<button type="button" class="cx-board-btn" data-orep-del="' + esc(e.id) + '" title="Tirar este reporte" style="border:0;padding:0 5px;line-height:1.2">×</button></span>';
+            }).join('');
+            var repAdd = opt('', '+ Acrescentar reporte…', true);
+            D.org.nodes.forEach(function (x) {
+                if (x.id === n.id || repIds[x.id] || x.id === pid) { return; }
+                repAdd += opt(x.id, esc(label(x) + (x.role && x.name.trim() ? ' — ' + x.role : '')), false);
+            });
+            var chk = function (k, t) { return '<label class="cx-board-chk"><input type="checkbox" data-of="' + k + '"' + (n[k] ? ' checked' : '') + '> ' + t + '</label>'; };
+            var free = typeof n.x === 'number', it = get(n.id), armed = oDelArm === n.id, ultimo = D.org.nodes.length < 2;
             props.innerHTML = '<p><strong>' + (n.group ? 'Área ou equipe' : !n.name.trim() ? 'Vaga em aberto' : 'Pessoa') + '</strong></p>'
-                + linha('Nome', esc(OD().label(n)))
-                + linha('Cargo ou função', esc(n.role))
-                + linha('Nível', lv ? '<i style="width:14px;height:6px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:middle;background:' + esc(lv.color) + '"></i>' + esc(lv.label) : '')
-                + linha('Responde a', chefe ? esc(OD().label(chefe) + (chefe.role ? ' — ' + chefe.role : '')) : 'Ninguém (topo)')
-                + linha('Equipe direta', String(T.kids[n.id].length))
-                + linha('Reportes (tracejado)', reps.length ? esc(reps.join(', ')) : '')
-                + linha('Observação', esc(n.note))
-                + linha('Marcações', esc(marcas))
-                + linha('Posição', free ? 'Solto: fica onde foi largado.' : it && it.t === 'orow' ? 'Na lista do cartão do chefe.' : 'No arranjo automático.')
-                + (free ? '<p><button type="button" class="cx-board-ok" data-oa="back">Devolver ao arranjo</button></p>' : '')
-                + '<p class="cx-board-none">Para editar os dados, use por enquanto o organograma da página.</p>';
+                + '<label class="cx-board-f"><span>' + (n.group ? 'Nome da área ou equipe' : 'Nome (vazio = vaga em aberto)') + '</span><input type="text" maxlength="120" style="box-sizing:border-box" data-of="name" value="' + esc(n.name) + '" autocomplete="off"></label>'
+                + '<label class="cx-board-f"><span>Cargo ou função</span><input type="text" maxlength="160" style="box-sizing:border-box" data-of="role" value="' + esc(n.role) + '" autocomplete="off"></label>'
+                + '<label class="cx-board-f"><span>Nível</span><select data-of="lvl">' + lvls + '</select></label>'
+                + '<label class="cx-board-f"><span>Responde a (chefia)</span><select data-of="boss">' + boss + '</select></label>'
+                + '<div class="cx-board-f"><span>Também reporta a (linha tracejada)</span>' + (repList ? '<div>' + repList + '</div>' : '')
+                + '<select data-of="rep">' + repAdd + '</select></div>'
+                + '<label class="cx-board-f"><span>Observação</span><textarea rows="2" maxlength="500" style="box-sizing:border-box;resize:vertical" data-of="note" placeholder="Turno, cliente, especialidade…">' + esc(n.note) + '</textarea></label>'
+                + chk('pend', 'A confirmar') + chk('group', 'É uma área ou equipe, não uma pessoa') + chk('dashed', 'Borda tracejada (externo ou temporário)')
+                + '<p style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px">'
+                + '<button type="button" class="cx-board-btn cx-board-ok" data-oa="sub">Adicionar subordinado</button>'
+                + (free ? '<button type="button" class="cx-board-btn" data-oa="back">Devolver ao arranjo</button>' : '')
+                + '<button type="button" class="cx-board-btn" data-oa="del"' + (ultimo ? ' disabled title="O organograma não pode ficar vazio."' : '')
+                + ' style="color:' + (armed ? '#fff;background:#b3261e;border-color:#b3261e' : '#b3261e;border-color:#e3b4b0') + '">' + (armed ? 'Confirmar exclusão' : 'Excluir') + '</button></p>'
+                + '<p class="cx-board-none" style="margin:4px 0">' + (armed ? 'Clique de novo para excluir. ' : '') + 'Ao excluir, os subordinados passam a responder ao chefe de quem saiu.</p>'
+                + '<p class="cx-board-none" style="margin:4px 0">Equipe direta: ' + (T.kids[n.id] || []).length + ' · '
+                + (free ? 'solto: fica onde foi largado.' : it && it.t === 'orow' ? 'na lista do cartão do chefe.' : 'no arranjo automático.') + '</p>';
         }
         props.addEventListener('click', function (e) {
-            var b = org && e.target.closest('[data-oa]');
-            if (!b) { return; }
+            if (!org) { return; }
             var n = sel.length === 1 && orgNode(sel[0]);
-            if (b.getAttribute('data-oa') === 'back' && n) { snap(); delete n.x; delete n.y; render(); }
+            var rd = e.target.closest('[data-orep-del]');
+            if (rd) { orgDelRep(rd.getAttribute('data-orep-del')); return; }
+            var b = e.target.closest('[data-oa]');
+            if (!b || !n || b.disabled) { return; }
+            var a = b.getAttribute('data-oa');
+            if (a === 'back') { snap(); delete n.x; delete n.y; render(); }
+            else if (a === 'sub') { orgAdd(n.id); }
+            else if (a === 'del') {
+                if (oDelArm !== n.id) { oDelArm = n.id; orgProps(); var bb = props.querySelector('[data-oa="del"]'); if (bb) { bb.focus(); } return; }
+                orgRemove(n.id);
+            }
+        });
+        props.addEventListener('input', function (e) {
+            var k = org && e.target.getAttribute('data-of'), n = sel.length === 1 && orgNode(sel[0]);
+            if (!k || !n || ['name', 'role', 'note'].indexOf(k) < 0) { return; }
+            if (!props.__snap) { snap(); props.__snap = true; }
+            n[k] = String(e.target.value).slice(0, k === 'name' ? 120 : k === 'role' ? 160 : 500);
+            var t = props.querySelector('p strong'); if (t && k === 'name' && !n.group) { t.textContent = n.name.trim() ? 'Pessoa' : 'Vaga em aberto'; }
+            orgRefresh();
+        });
+        props.addEventListener('change', function (e) {
+            var k = org && e.target.getAttribute('data-of'), n = sel.length === 1 && orgNode(sel[0]);
+            if (!k || !n) { return; }
+            if (k === 'lvl') { if (n.lvl !== e.target.value) { snap(); n.lvl = e.target.value; render(); } }
+            else if (k === 'boss') { orgSetBoss(n.id, e.target.value); }
+            else if (k === 'rep') { orgAddRep(n.id, e.target.value); }
+            else if (['pend', 'group', 'dashed'].indexOf(k) >= 0) {
+                snap();
+                if (e.target.checked) { n[k] = true; } else if (k === 'dashed') { delete n.dashed; } else { n[k] = false; }
+                render();
+            }
         });
         // Ponteiro no organograma: clique seleciona; arrastar cartão o solta
         // onde largar (a equipe ancorada vai junto); arrastar pessoa da lista
@@ -2712,6 +2850,7 @@
                 svg.classList.add('is-panning');
                 return;
             }
+            if (sel[0] !== it.id) { oDelArm = null; }
             sel = [it.id]; render();
             var row = it.t === 'orow';
             drag = { k: 'omove', id: it.id, sx: e.clientX, sy: e.clientY, moved: false,
@@ -4289,6 +4428,9 @@
                 if (ok === 'escape') { e.preventDefault(); if (sel.length) { sel = []; render(); } else { close(); } }
                 else if (oc && ok === 'z') { e.preventDefault(); if (e.shiftKey) { redoIt(); } else { undo(); } }
                 else if (oc && ok === 'y') { e.preventDefault(); redoIt(); }
+                else if ((ok === 'delete' || ok === 'backspace') && sel.length === 1) {
+                    e.preventDefault(); var db = props.querySelector('[data-oa="del"]'); if (db && !db.disabled) { db.click(); }
+                }
                 return;
             }
             if (tool === 'duct') {
@@ -4364,6 +4506,10 @@
 
         /* ---------- ações da barra ---------- */
         function act(a) {
+            if (org && a === 'onew') {
+                var T0 = OD().tree(D.org), s0 = sel.length === 1 && orgNode(sel[0]);
+                orgAdd(s0 ? s0.id : (T0.top && T0.top.id) || ''); return;
+            }
             if (org && a === 'arrumar') {
                 snap(); D.org.nodes.forEach(function (n) { delete n.x; delete n.y; }); render(); setTimeout(fit, 0); return;
             }

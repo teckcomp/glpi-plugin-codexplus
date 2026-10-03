@@ -109,7 +109,7 @@
                            organograma); este botão só o aciona, no mesmo lugar
                            do Exportar PDF dos documentos de texto. #}
                         <button type="button" class="codexplus-btn codexplus-btn-primary"
-                                onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-org] [data-act=print], #codexplus-doc [data-cx-flow] [data-act=pdf]'); if (b) { b.click(); }">
+                                onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-org] [data-act=print], #codexplus-doc [data-cx-orgview] [data-act=pdf], #codexplus-doc [data-cx-flow] [data-act=pdf]'); if (b) { b.click(); }">
                             <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
                         </button>
                     {% endif %}
@@ -480,8 +480,11 @@
                 <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-source="cx-grid-data"
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% elseif is_diagram %}
+                {# Q6a-1: leitura do organograma no desenho novo, em SVG
+                   (public/js/codexplus-orgdraw.js); a edição continua no motor
+                   antigo até o Q6b. #}
                 <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
-                <div class="cx-docform-diagram" data-cx-org data-editable="0" data-source="cx-org-data"
+                <div class="cx-docform-diagram" data-cx-orgview data-source="cx-org-data"
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% else %}
                 <div class="codexplus-content rich_text_container">{{ content_html|raw }}</div>

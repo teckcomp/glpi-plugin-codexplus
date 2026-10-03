@@ -1,11 +1,14 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.0`** + blocos de 02/10/2026 (último commit
-> `f0ad6ba`) · atualizado em **02/10/2026**: folha do fluxograma, ícones
-> Lucide (Q5j), **raias Q5g ✅** e **Q5h ✅** (CONTEXTO, seção 3.10).
-> **Escopo de "pronto" = roadmap inteiro; produção (Debian 13, SSH 2022)
-> é a etapa final.** Próximo: **reavaliar o escopo do Q5i** com Claudio,
-> depois Q6. Antes, na madrugada de
+> Estado em **`v0.7.0`** + blocos de 03/10/2026 (último commit
+> `1c71a21`) · atualizado em **03/10/2026**: **Q5i ✅** — importar e
+> exportar o fluxograma em arquivo: cópia `.json` (Q5i-1), **importar
+> Mermaid** com raias (Q5i-2) e **levar para uma IA** em `.md` (Q5i-3);
+> `.bpmn` no backlog (CONTEXTO, seção 3.11). Próximo: **Q6 — organograma
+> no motor**. **Escopo de "pronto" = roadmap inteiro; produção (Debian 13,
+> SSH 2022) é a etapa final.** Antes, em 02/10/2026: folha do fluxograma,
+> ícones Lucide (Q5j), raias Q5g e Q5h (CONTEXTO, seção 3.10). Antes, na
+> madrugada de
 > 28/09/2026: **SC1 Setor / Categorias** (`dfe0e58`), **0.7.0** (`29c5088`)
 > e **instalação do zero testada** (CONTEXTO, seção 3.9). **Produção
 > adiada por Claudio** até o escopo combinado ficar pronto (estimativa dele:
@@ -79,8 +82,8 @@ Vale sobre a lista acima quando houver conflito.
 > **Servidor de produção: Debian 13, SSH na porta 2022** (a homologação
 > segue no `177.87.230.179`). O primeiro passo da subida é o **bloco de
 > conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
-> GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → **Q5i (reavaliar)**
-> → Q6 → 3c → R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7
+> GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → ~~Q5i~~ ✅ (03/10)
+> → **Q6** → 3c → R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7
 > logo depois).
 >
 > **Atualização, 28/09/2026 (madrugada): produção adiada por Claudio.** A
@@ -456,7 +459,7 @@ seção 3.5.
 | Q2 | **Ligações e cabos**: alças nas bordas, a ligação acompanha os ícones; tipos (UTP Cat5e/6/6A, fibra, coaxial, elétrica, sem fio, lógica) com cor e traço; reto, cotovelo, curvo, dobras à mão; pontas; rótulo, identificação do cabo (P-001), portas, velocidade, VLAN; **metragem pela escala** com sobra (10%); eletrocalha e canaleta | ✅ 27/09 (Q2a a Q2e) |
 | Q3 | Legenda automática no documento (imagem); **lista de materiais** no painel. "Levar para a planilha" cancelado | ✅ 27/09 (Q3a, Q3b) |
 | Q4 | **"+ Ícone" a partir de imagem**, só o Super-Admin: recorte, tirar fundo, silhueta, 256 px; gerenciar (editar, excluir) | ✅ 27/09 (Q4a a Q4c) |
-| Q5 | **Fluxograma** sobre o motor (subtipo de DIA) — Q5a a Q5f ✅; faltam Q5g a Q5i (tabela abaixo) | em andamento |
+| Q5 | **Fluxograma** sobre o motor (subtipo de DIA) — Q5a a Q5j ✅ (tabela abaixo); Q5i-4 opcional | ✅ 03/10 |
 | Q6 | **Organograma migrado para o motor**, conferindo item por item com o atual (chefia, Arrumar, matriz, busca, modelos, PDF); só então o motor antigo sai | |
 
 Fora (Claudio, 26/09): caneta livre, marca-texto, reconhecimento de forma,
@@ -480,7 +483,10 @@ seus elementos (CONTEXTO, seção 3.7).
 | Q5j-2 | Paleta com os 56 ícones em subgrupos e busca "forma ou ícone" | ✅ `6601983` |
 | Q5g | **Raias com orientação por fluxograma** (horizontal ou vertical): cabeçalho com ícone, título, descrição e tom; reordenar, espessura, comprimento e tamanho do cabeçalho pelo arraste; excluir deixa as formas soltas | ✅ `ae802bc` (Q5g-1 a Q5g-3) |
 | Q5h | Trocar forma (`42a4954`); link para documento ou URL, leitura clicável e lista no PDF (`e441519`); busca Ctrl+F (`35d11e4`); minimapa (`f0ad6ba`). **Sem imagem nem tabela no fluxograma** (Claudio, 02/10) | ✅ |
-| Q5i | Importar e exportar `.bpmn` (BPMN 2.0 XML — Bizagi, Camunda, Signavio). **Reavaliar o escopo**: não há processos no Bizagi; o Miro não exporta (o fluxo da Ponto Telecom entrou pelo script do Console). Pontos levantados em 02/10: raias horizontais do Bizagi, as 9 formas clássicas sem equivalente BPMN, cores só pela extensão de cor | **próximo** (decidir escopo) |
+| Q5i-1 | Botões **Importar** e **Exportar** na barra do fluxograma; **cópia do fluxo** em `.json` (exportar e importar); escolher, arrastar ou colar (Ctrl+V); resumo com avisos; Ctrl+Z desfaz a importação | ✅ `63ef88e` |
+| Q5i-2 | **Importar Mermaid** (o formato que as IAs geram): leitor próprio; `subgraph` = raia, aninhado = moldura; colunas por raia, corredores nas trocas de raia e nas voltas; cor pelo matiz | ✅ `e9c1528` |
+| Q5i-3 | **Levar para uma IA**: exportar Mermaid em `.md` (instrução + bloco); ida e volta preserva tudo menos posições, ícones das raias, links e cores das ligações | ✅ `1c71a21` |
+| Q5i-4 | Imagem ou PDF direto, pela API de uma IA no servidor — **opcional** (chave, custo, dado saindo do servidor; Claudio, 03/10). Hoje a imagem passa pela IA do usuário | opcional |
 
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
@@ -497,6 +503,13 @@ seus elementos (CONTEXTO, seção 3.7).
 - Fluxograma: texto solto com largura e quebra de linha (hoje as alças do
   texto mudam a letra)
 - Fluxograma: mini-paleta com "mais formas" (hoje as 9 mais usadas)
+- Fluxograma: **importar e exportar `.bpmn`** (Bizagi, Camunda) — saiu do
+  caminho em 03/10 (não há processos no Bizagi); volta se aparecer cliente
+  com `.bpmn` real para testar
+- Fluxograma: **importar draw.io** (XML, com posições) — se fizer falta
+- Quadro: importar e exportar arquivo na **Planta e na Topologia** (o Q5i
+  é só do fluxograma; a planta de fundo fica no corpo do documento)
+- Mermaid: acompanhar fluxos de IAs reais e ajustar o leitor ao que vier
 
 - Tabelas `sectormembers` e `documenteditors` sem uso: apagar
 - Textos de ajuda dos comandos de console (ainda citam gestor do setor)
@@ -514,10 +527,18 @@ seus elementos (CONTEXTO, seção 3.7).
       texto branco e cortada. Pendência de Claudio; não bloqueia etapas
 - [x] **Self-Service vê o Codex+?** Sim, só leitura, condicionado à coluna
       Leitura do documento — Claudio, 26/09/2026 (S1)
-- [ ] **Tabela e imagem dentro do fluxograma** (estavam no escopo original
-      do Q5): fazer num bloco próprio ou cortar? Decidir antes do Q5h
+- [x] **Tabela e imagem dentro do fluxograma**: cortadas; em troca, link
+      na forma — Claudio, 02/10/2026 (Q5h)
+- [ ] **Documentos de homologação que vão para produção** (só os que
+      ficaram bons): levar por scripts nossos na etapa de produção, caso a
+      caso (Claudio, 03/10/2026). Listar quais antes da subida
 
 **Decididas:**
+
+- [x] **Q5i = importar e exportar para o uso real**: `.bpmn` no backlog;
+      formato de troca = **Mermaid** (o que as IAs geram); só arquivos e
+      botões, sem código à vista; PNG e PDF onde estão; imagem e PDF pela
+      IA do usuário — Claudio, 03/10/2026
 
 - [x] **Papéis pelo perfil** (Responsável/Aprovar, Auditor/Auditar,
       Revisor/Revisar e editar), sem gestor de setor nem editores; o

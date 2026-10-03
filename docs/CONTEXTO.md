@@ -2,9 +2,13 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.0`** + blocos de 02/10/2026 (último commit `f0ad6ba`;
-> versão não mudou, sem schema novo) · atualizado em **02/10/2026**:
-> **folha do fluxograma**, **ícones Lucide** (Q5j-1/2), **raias** (Q5g-1 a
+> Estado: **`v0.7.0`** + blocos de 03/10/2026 (último commit `1c71a21`;
+> versão não mudou, sem schema novo) · atualizado em **03/10/2026**:
+> **Q5i — importar e exportar o fluxograma em arquivo**: cópia do Codex+
+> (`.json`) e **Mermaid**, o formato que toda IA gera (importar com raias,
+> molduras e corredores; exportar em `.md` para levar a uma IA) — seção
+> 3.11; achados 100 a 106. O `.bpmn` foi para o backlog. Antes, em
+> 02/10/2026: **folha do fluxograma**, **ícones Lucide** (Q5j-1/2), **raias** (Q5g-1 a
 > Q5g-3) e **Q5h completo** (trocar forma, link, busca, minimapa) — seção
 > 3.10; achados 95 a 99. **Escopo de "pronto" = roadmap inteiro**;
 > **produção = Debian 13 (SSH 2022)**, etapa final. Antes, na
@@ -130,7 +134,9 @@ desta tabela sem alinhar antes.**
 > referência de escopo: o preço acima continua valendo.
 > **Referência de BPMN (Claudio, 27/09/2026): Bizagi Modeler** — só a
 > notação, com desenho próprio (seção 3.7). Importar e exportar `.bpmn`
-> (BPMN 2.0 XML, que o Bizagi exporta) está no roadmap (Q5i).
+> **foi para o backlog** (Claudio, 03/10/2026): não há processos no Bizagi.
+> **O formato de troca é o Mermaid** (seção 3.11): é o que as IAs geram sem
+> instrução, e o usuário só lida com arquivos, nunca com código.
 
 ---
 
@@ -1415,6 +1421,110 @@ o Q5g-2 não foram commitados à parte — achado 99), `42a4954` (Q5h-1),
 - O `ajax/document.search.php` passou no `php -l`; a consulta só roda no
   MariaDB do servidor (validada por Claudio).
 
+### 3.11 Sessão de 03/10/2026 — Q5i: importar e exportar o fluxograma
+
+Commits: `3ad7ef9` (docs de 02/10), `63ef88e` (Q5i-1), `e9c1528` (Q5i-2),
+`1c71a21` (Q5i-3). Versão segue `0.7.0`; nada no banco, no instalador nem
+no PHP: só `public/js/codexplus-board.js` e `public/css/codexplus.css`.
+Mockup das telas aprovado antes (montado sobre o print real da barra).
+
+#### Decisões de Claudio (03/10/2026)
+
+- **`.bpmn` para o backlog** (opção d): não há processos no Bizagi e o Miro
+  não exporta. O Q5i virou importar e exportar **para o uso real**: trazer
+  fluxos feitos por IA.
+- **Formato universal = um formato que as IAs já conhecem**, não um formato
+  inventado pelo Codex+ (esse exigiria ensinar a IA a cada vez). Escolhido o
+  **Mermaid `flowchart`**: toda IA gera sem instrução, tem grupos
+  (`subgraph`) que viram raias, e roda em GitHub, Notion e Confluence.
+  draw.io fica como opção futura (fidelidade maior, IAs erram mais).
+- **Só arquivos e botões, nunca código à vista.** Importar = escolher,
+  arrastar ou colar (Ctrl+V); o conteúdo não aparece, só um resumo.
+- **Botões Importar e Exportar na barra do fluxograma**, depois da Folha.
+  **Baixar PNG e Exportar PDF ficam onde estão** (outra rotina).
+- **Imagem e PDF passam pela IA do usuário** (pedir o fluxo em Mermaid);
+  perda de ~10 a 20% aceita por Claudio. Importar imagem direto pela API
+  (Q5i-4) fica opcional: chave, custo e dado saindo do servidor.
+- **Levar documentos de homologação para produção: por scripts nossos, na
+  hora** (só os que ficaram bons). Nenhuma rotina no plugin para isso.
+- O resultado visual da montagem em raias foi aprovado por Claudio sobre o
+  protótipo (imagem 01, "Fluxo Ideal — Comercial / Compras / Técnica /
+  Financeiro").
+
+#### Q5i-1 — cópia do fluxo em arquivo (`63ef88e`)
+
+- **Exportar → "Guardar uma cópia do fluxo"**: baixa
+  `fluxograma-<título>-AAAA-MM-DD.json` =
+  `{ formato: 'codexplus-quadro', versao: 1, origem, titulo, exportado,
+  quadro }` (quadro inteiro, com `lib`). Os links para documento já levam
+  código e título no `n`.
+- **Importar**: janela com área de soltar, "Escolher arquivo" e área "cole
+  com Ctrl+V". Aceita também o quadro puro (`{ mode, items }`) e o registro
+  do DIA (`{ kind, board }`); tolera texto em volta e BOM. Recusa: versão
+  mais nova do formato, outro tipo de quadro, imagem/PDF (orienta), mais de
+  1 MB. Arrastar o arquivo direto para o quadro abre a importação.
+- **Resumo** antes de aplicar: nome, origem, contagens (formas, áreas,
+  ligações) e avisos (itens que não entram, texto cortado em 500, links para
+  documento vindos de outro ambiente — compara `origem` com
+  `location.origin`). "Substituir desenho" grava um passo no histórico:
+  **Ctrl+Z desfaz só a importação**; nada é gravado até Salvar.
+- `readIo(txt, mode, here)` é pura (testável); tudo passa pelo `clean()`.
+
+#### Q5i-2 — importar Mermaid (`e9c1528`)
+
+- **Leitor próprio** (`parseMermaid`), sem a biblioteca do Mermaid (3 MB):
+  `flowchart`/`graph`, direção, `subgraph` (aninhado), nós em todas as
+  notações (`[ ]`, `( )`, `([ ])`, `{ }`, `[[ ]]`, `[( )]`, `(( ))`, `{{ }}`,
+  `[/ /]`, `[\ \]`, `[/ \]`, `[\ /]`, `>`, `@{ shape, label }`),
+  cadeias e `&`, rótulos (`|x|`, `-- x -->`, `-. x .->`, `== x ==>`),
+  traços (`-.->`, `==>`, `---`, `<-->`, `--o`, `~~~` invisível), `classDef`,
+  `class`, `:::`, `style`, `<br>`, entidades, comentários `%%` (o primeiro
+  vira título), front matter `title:`, bloco ```mermaid com texto em volta.
+  `click`, ícones `fa:`/`icon:` e formas sem par viram aviso; outros tipos
+  de diagrama (sequência, classes…) são recusados com orientação.
+- **Montagem** (`mermaidBoard`): `subgraph` de primeiro nível = **raia**
+  (`LR` horizontais, `TD` verticais; título `<br>` descrição); segundo
+  nível = **moldura** na raia (mais fundo achata, com aviso); formas fora de
+  grupo vão para a raia "Sem área". Por bloco (raia ou moldura): voltas
+  (ciclos) fora pela ordem do texto; coluna = caminho mais longo **dentro
+  da raia** (cada raia começa no início, como no original); linha herdada
+  de quem alimenta (a 1ª saída segue na mesma linha; Sim antes de Não);
+  raízes novas ganham linha nova. Coluna uniforme (forma mais larga + 50).
+- **Ligações**: cotovelo; troca de raia sai pelo lado da outra raia e corre
+  num **corredor** no fim da raia (14 px reservados); com forma embaixo na
+  mesma coluna, sai pela frente; volta corre num corredor logo abaixo das
+  linhas da raia. Círculo vira início/fim/conector pelo grau.
+- **Cor pelo matiz** (achado 104): `fill` vira o tom mais próximo; sem cor,
+  cinza/branco; fundo escuro, a variante forte. Tom exato da paleta volta
+  igual.
+- Janela: textos para IA e a dica "me entregue esse fluxo como arquivo
+  Mermaid, com um grupo (subgraph) para cada área".
+
+#### Q5i-3 — levar para uma IA (`1c71a21`)
+
+- **Exportar → "Levar para uma IA"**: baixa `...-ia.md` (achado 102) com
+  título, duas linhas de instrução para a IA e o bloco ```mermaid
+  (`boardToMermaid`): raias = `subgraph` com `style`, molduras = subgraph
+  interno, todas as formas (as sem par em `@{ shape }`), texto solto =
+  `text`, ligações com rótulo e traço, cores que diferem da padrão do tipo
+  em `classDef`. Não vão: posições (refeitas na volta), ícones das raias,
+  links das formas, cores das ligações.
+- Ida e volta sem IA preserva formas, cores, textos, raias, moldura,
+  ligações **e posições**; exportar de novo gera o mesmo arquivo. Tarefa,
+  gateways, objeto de dados, grupo e ícone voltam como a forma mais
+  próxima (Processo, Decisão, Documento).
+
+#### Testes
+
+- jsdom: 48 (Q5i-1), 35 (Q5i-2), 48 (Q5i-3) — 131 na sessão, 346 no
+  total do motor. Telas rasterizadas no Chromium (playwright) a 1915 px; o
+  desenho da imagem 01 importado no editor real. Arquivos gerados validados
+  pela **biblioteca oficial do Mermaid** (achado 106).
+- Claudio validou os três na homologação; o fluxo da imagem 01 entrou como
+  no teste. **Falta acompanhar no uso:** fluxos pedidos a IAs reais
+  (ChatGPT, Claude, Gemini), pelas duas portas (arquivo e Ctrl+V) — cada IA
+  escreve diferente; arquivo que der problema vira correção do leitor.
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -2088,6 +2198,37 @@ depender do comportamento errático de `position: fixed` na impressão.
     aprovado antes do pacote seguinte; o primeiro `git status` de cada
     pacote tem que sair vazio.
 
+100. **Ctrl+V com janela aberta sobre o quadro.** O `onKey` do quadro
+    (captura no `document`) faz `preventDefault` no Ctrl+V e mataria o
+    evento `paste`. Janela de importar aberta: o `onKey` sai antes. O
+    colar sem campo de texto é um ouvinte `paste` no `document` enquanto a
+    janela está aberta — funciona em HTTP (`navigator.clipboard.readText`
+    só em HTTPS, e a homologação é HTTP).
+101. **Arquivo solto fora da área certa abre no navegador** e o desenho não
+    salvo se perde. O quadro previne `dragover`/`drop` de arquivos em toda
+    a janela; só a área de soltar e o palco tratam o arquivo.
+102. **`.mmd` é extensão de outro formato** (karaokê,
+    `application/vnd.chipnuts.karaoke-mmd`): sistemas e IAs podem recusar o
+    anexo. O Mermaid sai em `.md`; a importação reconhece pelo conteúdo,
+    qualquer extensão.
+103. **O Mermaid sozinho põe os `subgraph` lado a lado**, pequenos (não são
+    raias). A dagre agrupa, mas não monta faixas alinhadas. O layout é
+    próprio: colunas por caminho mais longo **por raia**, voltas fora, linha
+    herdada de quem alimenta. Colunas globais (sem reiniciar por raia)
+    viram uma escada de 6000 px.
+104. **Cor de fundo se compara pelo matiz, não em RGB.** Fundos claros ficam
+    perto de tudo: em RGB o rosa `#fdd` caiu em âmbar. Pelo matiz (HSL),
+    com cinza/branco pela saturação e a variante forte pela claridade. O
+    tom exato da paleta é conferido antes (ida e volta sem perda).
+105. **Ligação entre raias entra pelo lado errado e parece seta dupla.**
+    Escolher os lados só pela posição horizontal fazia a seta de uma raia
+    entrar pela direita da forma de destino, colada na saída dela. Troca de
+    raia sai pelo lado da outra raia e corre por corredor no fim da raia;
+    com forma embaixo na mesma coluna, sai pela frente e desce ao lado.
+106. **Conferir Mermaid gerado com a biblioteca oficial:** `npm i
+    mermaid@11` e `mermaid.render()` no Chromium (playwright). O leitor
+    próprio é testado contra as mesmas amostras; os dois têm que concordar.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -2197,7 +2338,7 @@ codexplus/
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1)
 │   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1)
-│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f)
+│   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f); importar e exportar (cópia .json e Mermaid, Q5i)
 │   ├── js/codexplus-flow.js   fluxograma no documento DIA: leitura em SVG, abrir o motor, gravar, PNG e PDF (Q5a)
 │   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1) e os criados na instalação (Q4)
 │   ├── js/codexplus-export.js exportar Word (E3)

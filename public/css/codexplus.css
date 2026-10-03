@@ -2361,3 +2361,11 @@ html.cx-board-open { overflow: hidden; }
 .cx-mini button { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px; cursor: pointer; }
 .cx-mini button:hover { border-color: #d3d1c7; background: #f1efe8; }
 .cx-fbar-al { padding: 3px 5px; }
+
+/* Q5h-2: link na forma (painel do quadro e leitura). */
+.cx-board-lkq, .cx-board-lku { width: 100%; padding: 5px 8px; border: 1px solid var(--cx-border); border-radius: 6px; margin-bottom: 4px; }
+.cx-board-lkres { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.cx-board-lkdoc { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 4px 6px; font-size: .85em; cursor: pointer; }
+.cx-board-lkdoc:hover { background: var(--cx-hover, #f1efe8); border-color: var(--cx-border); }
+.cx-board-lkcur { font-size: .85em; font-weight: 600; margin: 0 0 4px; }
+.cx-flow-lk { cursor: pointer; }

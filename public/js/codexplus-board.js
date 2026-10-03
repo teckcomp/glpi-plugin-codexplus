@@ -145,6 +145,24 @@
         ico:     { label: 'Ícone',                w: 48,  h: 48,  color: 'azul' }
     };
     var ICO_DEFAULT = 'user';
+    /* Q5h-2 — link na forma (Claudio, 02/10/2026): documento do Codex+
+       { t: 'doc', id, n } (n = código e título no momento da escolha, para
+       mostrar sem consultar) ou endereço { t: 'url', u } (só http/https). */
+    var LINK_GLYPH = '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>';  // Lucide "link" (ISC)
+    var URL_OK = /^https?:\/\/[^\s<>"']+$/i;
+    function cleanLk(lk) {
+        if (!lk || typeof lk !== 'object') { return null; }
+        if (lk.t === 'doc' && (+lk.id | 0) > 0) { return { t: 'doc', id: +lk.id | 0, n: String(lk.n || '').slice(0, 200) }; }
+        if (lk.t === 'url' && URL_OK.test(String(lk.u || '')) && String(lk.u).length <= 500) { return { t: 'url', u: String(lk.u) }; }
+        return null;
+    }
+    // Destino e rótulo do link (null = sem link válido).
+    function linkOf(it) {
+        var lk = cleanLk(it && it.lk);
+        if (!lk) { return null; }
+        if (lk.t === 'doc') { return { href: BASE + '/front/document.form.php?id=' + lk.id, label: lk.n || ('Documento ' + lk.id), ext: false }; }
+        return { href: lk.u, label: lk.u, ext: true };
+    }
     /* Q5g — raias (Claudio, 02/10/2026). Orientação por fluxograma: a
        primeira raia decide (h = horizontais, empilhadas; v = verticais, lado
        a lado). Item `lane`: { dir, x, y, w, h, title, desc, ico, tone }. As
@@ -614,6 +632,18 @@
             g += '<text x="' + tx + '" y="' + y0.toFixed(1) + '" text-anchor="' + anc + '" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + ink + '">'
                 + txt.map(function (l, i) { return '<tspan x="' + tx + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>'; }).join('') + '</text>';
         }
+        var lko = linkOf(it);
+        if (lko) {
+            // Q5h-2: corrente no canto (o nome embaixo não tapa).
+            // Losango: no meio da aresta de cima à direita; círculo: a 45°; resto: no canto.
+            var lr = 9, lx = x + w - 4, ly = y + 4;
+            if (it.shape === 'dec' || /^gw/.test(it.shape)) { lx = x + w * 0.75 + 6; ly = y + h * 0.25 - 6; }
+            else if (/^ev/.test(it.shape) || it.shape === 'conn') { lx = x + w / 2 + w * 0.3536; ly = y + h / 2 - h * 0.3536; }
+            else if (it.shape === 'ico') { lx = x + w; ly = y; }
+            g += '<g class="cx-board-lkmark"><title>' + esc((lko.ext ? 'Abre: ' : 'Abre o documento: ') + lko.label) + '</title>'
+                + '<circle cx="' + lx + '" cy="' + ly + '" r="' + lr + '" fill="#fff" stroke="' + lc + '" stroke-width="1.2"/>'
+                + '<g transform="translate(' + (lx - 6) + ' ' + (ly - 6) + ') scale(0.5)" fill="none" stroke="' + lc + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' + LINK_GLYPH + '</g></g>';
+        }
         return '<g data-id="' + it.id + '">' + g + '</g>';
     }
 
@@ -747,6 +777,8 @@
                 // Q5j: a chave fica mesmo fora do catálogo (desenha "?"), para
                 // não perder o que outra versão gravou.
                 if (sh.shape === 'ico') { sh.ico = /^[a-z0-9-]{1,40}$/.test(String(it.ico || '')) ? String(it.ico) : ICO_DEFAULT; }
+                var lkc = cleanLk(it.lk);
+                if (lkc) { sh.lk = lkc; }
                 out.items.push(shapeFit(sh));
                 return;
             }
@@ -2276,6 +2308,7 @@
                     + '<label class="cx-board-f"><span>' + (it.shape === 'ico' ? 'Nome (embaixo)' : 'Texto') + '</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha.</p>'
                     + (MK_OPTS[it.shape] ? '<label class="cx-board-f"><span>' + (it.shape === 'task' ? 'Tipo de tarefa' : 'Tipo de evento') + '</span><select data-k="mk">' + optsOf(MK_OPTS[it.shape], it.mk || 'none') + '</select></label>' : '')
+                    + lkPanel(it)
                     + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="fs">' + FS_LIST.map(function (v) { return '<option value="' + v + '"' + (v === shapeFs(it) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
                     + '<p class="cx-board-none">Tamanho: puxe os quadradinhos brancos (Shift mantém a proporção; Alt solta da grade). A altura nunca fica menor que o texto. Cores, negrito, letra e camadas: na barra sobre a forma.</p>';
             } else if (it.t === 'link' && it.kind === 'fluxo') {
@@ -2351,6 +2384,68 @@
             h += '<p class="cx-board-none">' + (it.lock ? 'Travado: destrave para mover.' : '') + (it.g ? ' Em grupo.' : '') + '</p>';
             props.innerHTML = h;
         }
+        /* ---------- Q5h-2: link da forma ---------- */
+        function lkPanel(it) {
+            if (lkFor !== it.id) { lkFor = it.id; lkMode = ''; }
+            var lk = cleanLk(it.lk), t = lk ? lk.t : '', lo = linkOf(it);
+            var h = '<label class="cx-board-f"><span>Link</span><select data-lk="t">'
+                + [['', 'Nenhum'], ['doc', 'Documento do Codex+'], ['url', 'Endereço (URL)']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (lkMode || t) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+                + '</select></label>';
+            var mode = lkMode || t;
+            if (mode === 'doc') {
+                h += (lk && lk.t === 'doc' ? '<p class="cx-board-lkcur">' + esc(lk.n || ('Documento ' + lk.id)) + '</p>' : '')
+                    + '<input type="search" class="cx-board-lkq" placeholder="Buscar documento (título ou código)" autocomplete="off"><div class="cx-board-lkres"></div>';
+            } else if (mode === 'url') {
+                h += '<input type="url" class="cx-board-lku" data-lk="u" placeholder="https://..." value="' + esc(lk && lk.t === 'url' ? lk.u : '') + '">';
+            }
+            if (lo) { h += '<p class="cx-board-none"><a href="' + esc(lo.href) + '" target="_blank" rel="noopener noreferrer">Abrir o link ↗</a> · na leitura, clicar na forma abre.</p>'; }
+            return h;
+        }
+        var lkMode = '', lkFor = '', lkTimer = null, lkSeq = 0;
+        function lkSet(it, v) { snap(); if (v) { it.lk = v; } else { delete it.lk; } lkMode = ''; paint(); drawSel(); drawProps(); }
+        function lkSearch(q) {
+            var box = props.querySelector('.cx-board-lkres'); if (!box) { return; }
+            var my = ++lkSeq, self = host && host.self ? '&self=' + encodeURIComponent(host.self) : '';
+            box.innerHTML = '<p class="cx-board-none">Buscando…</p>';
+            fetch(BASE + '/ajax/document.search.php?q=' + encodeURIComponent(q) + self, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    box = props.querySelector('.cx-board-lkres');
+                    if (my !== lkSeq || !box) { return; }
+                    var ds = (j && j.docs) || [];
+                    box.innerHTML = ds.length ? ds.map(function (d) {
+                        var n = (d.code ? d.code + ' — ' : '') + d.name;
+                        return '<button type="button" class="cx-board-lkdoc" data-lkdoc="' + (+d.id | 0) + '" data-n="' + esc(n) + '">' + esc(n) + '</button>';
+                    }).join('') : '<p class="cx-board-none">Nenhum documento encontrado.</p>';
+                })
+                .catch(function () { if (my === lkSeq) { box.innerHTML = '<p class="cx-board-none">Não foi possível buscar agora.</p>'; } });
+        }
+        props.addEventListener('change', function (e) {
+            if (sel.length !== 1) { return; }
+            var it = get(sel[0]), a = e.target.getAttribute('data-lk'); if (!it || it.t !== 'shape' || !a) { return; }
+            if (a === 't') {
+                var v = e.target.value;
+                if (!v) { lkSet(it, null); return; }
+                lkMode = v; drawProps();
+                if (v === 'doc') { lkSearch(''); var q = props.querySelector('.cx-board-lkq'); if (q) { q.focus(); } }
+                else { var u = props.querySelector('.cx-board-lku'); if (u) { u.focus(); } }
+            } else if (a === 'u') {
+                var url = String(e.target.value || '').trim();
+                if (!url) { lkSet(it, null); return; }
+                if (!URL_OK.test(url) || url.length > 500) { notify(editor, 'Endereço inválido: use um link completo, começando por http:// ou https://.', 'error'); return; }
+                lkSet(it, { t: 'url', u: url });
+            }
+        });
+        props.addEventListener('input', function (e) {
+            if (!e.target.classList.contains('cx-board-lkq')) { return; }
+            var q = e.target.value;
+            clearTimeout(lkTimer); lkTimer = setTimeout(function () { lkSearch(q.trim()); }, 250);
+        });
+        props.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-lkdoc]'); if (!b || sel.length !== 1) { return; }
+            var it = get(sel[0]); if (!it || it.t !== 'shape') { return; }
+            lkSet(it, { t: 'doc', id: +b.getAttribute('data-lkdoc') | 0, n: b.getAttribute('data-n') || '' });
+        });
         props.addEventListener('input', function (e) {
             var k = e.target.getAttribute('data-k'); if (!k || sel.length !== 1) { return; }
             var it = get(sel[0]);
@@ -2379,7 +2474,7 @@
         });
         props.addEventListener('change', function (e) {
             props.__snap = false;
-            if (e.target.matches('select,[type=checkbox],[type=range]')) { drawProps(); }
+            if (e.target.matches('select,[type=checkbox],[type=range]') && !e.target.hasAttribute('data-lk')) { drawProps(); }
         });
         props.addEventListener('click', function (e) {
             var la = e.target.closest('[data-la]');
@@ -3548,5 +3643,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

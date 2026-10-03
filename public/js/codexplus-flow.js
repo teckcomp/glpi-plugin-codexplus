@@ -75,8 +75,29 @@
             view.innerHTML = r.svg;
             var el = view.querySelector('svg');
             if (el) { el.setAttribute('role', 'img'); el.setAttribute('aria-label', title || 'Fluxograma'); }
+            // Q5h-2: forma com link abre o destino (documento na mesma aba,
+            // endereço externo em aba nova).
+            d.items.forEach(function (it) {
+                var lo = it.t === 'shape' && B()._linkOf(it), g = lo && view.querySelector('[data-id="' + cssId(it.id) + '"]');
+                if (!g) { return; }
+                g.classList.add('cx-flow-lk');
+                g.addEventListener('click', function () {
+                    if (lo.ext) { window.open(lo.href, '_blank', 'noopener'); } else { window.location.href = lo.href; }
+                });
+            });
             root.querySelector('[data-act="png"]').hidden = false;
             if (editable) { root.querySelector('[data-act="pdf"]').hidden = false; }
+        }
+
+        function cssId(id) { return String(id).replace(/["\\]/g, '\\$&'); }
+        // Q5h-2: links do fluxograma, para a lista do PDF (lá o desenho é imagem).
+        function linksOf(d) {
+            var out = [];
+            d.items.forEach(function (it) {
+                var lo = it.t === 'shape' && B()._linkOf(it);
+                if (lo) { out.push({ step: String(it.text || '').trim().split('\n')[0] || '(sem texto)', lo: lo }); }
+            });
+            return out;
         }
 
         /* Folha A4 a 96 dpi, margem 10 mm; o cabeçalho ocupa ~14 mm. O
@@ -89,6 +110,15 @@
             var aw = (land ? 277 : 190) * MM, ah = ((land ? 190 : 277) - 14) * MM;
             var k = Math.min(aw / r.w, ah / r.h, 1.5);
             return { orient: land ? 'landscape' : 'portrait', svg: r.svg, w: Math.floor(r.w * k), h: Math.floor(r.h * k) };
+        }
+        function linksHtml(d) {
+            var ls = linksOf(d);
+            if (!ls.length) { return ''; }
+            return '<div class="lk" style="margin-top:8px;page-break-inside:avoid"><b style="font-size:12px">Links do fluxograma</b><ul style="margin:4px 0 0 16px;padding:0">'
+                + ls.map(function (l) {
+                    var href = l.lo.ext ? l.lo.href : new URL(l.lo.href, window.location.href).href;
+                    return '<li><b>' + esc(l.step) + ':</b> <a href="' + esc(href) + '">' + esc(l.lo.label) + '</a></li>';
+                }).join('') + '</ul></div>';
         }
         function pdf() {
             var d = data();
@@ -108,7 +138,7 @@
                 + '.h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1d2330;padding-bottom:4px;margin-bottom:8px}.h b{font-size:15px}'
                 + '.d{text-align:center}.d svg{display:inline-block}'
                 + '</style></head><body><div class="h"><b>' + esc(title) + '</b><span>' + esc(code) + '</span></div>'
-                + '<div class="d">' + svg + '</div></body></html>');
+                + '<div class="d">' + svg + '</div>' + linksHtml(d) + '</body></html>');
             doc.close();
             var old = document.title;
             document.title = nome; // achado 24: o nome sugerido vem da página principal
@@ -161,7 +191,7 @@
         }
 
         function edit() {
-            B().open(null, null, KIND, { data: board, title: title, save: post });
+            B().open(null, null, KIND, { data: board, title: title, save: post, self: docId });
         }
 
         function png() {

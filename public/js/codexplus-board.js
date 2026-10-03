@@ -1631,6 +1631,7 @@
             + '<button type="button" data-act="zin" title="Aproximar">+</button>'
             + '<button type="button" data-act="fit" title="Ajustar à tela">Ajustar</button>'
             + '<button type="button" data-act="find" title="Buscar no quadro (Ctrl+F)">Buscar</button>'
+            + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>'
             + (flow ? '<span class="cx-board-sep"></span><label class="cx-board-op cx-board-page" title="Tamanho da folha (cresce para a direita e para baixo)">Folha '
                 + '<select data-act="page">' + PAGE_SIZES.map(function (p) { return '<option value="' + p.v + '">' + p.l + '</option>'; }).join('')
                 + '<option value="custom">Personalizado</option></select>'
@@ -1657,6 +1658,7 @@
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
             + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-find"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
+            + '<div class="cx-board-mm" title="Minimapa: clique ou arraste para mover a vista"><svg xmlns="' + NS + '" preserveAspectRatio="xMidYMid meet"></svg></div>'
             + '<div class="cx-board-hint">' + (flow
                 ? 'Arraste uma forma da paleta para o quadro. Duplo clique na forma (ou comece a digitar) escreve nela. Com a forma selecionada, puxe uma alça azul até outra forma para ligar: a 1ª saída da decisão nasce Sim, a 2ª Não. Arraste o fundo para mover a vista; roda do mouse dá zoom.'
                 : 'Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.') + '</div></div>'
@@ -1671,6 +1673,13 @@
         var gLinks = root.querySelector('.cx-board-links'), gDucts = root.querySelector('.cx-board-ducts');
         var ductDraft = null;   // pontos da eletrocalha em desenho
         var gSel = root.querySelector('.cx-board-sel'), gGuides = root.querySelector('.cx-board-guides'), gFind = root.querySelector('.cx-board-find');
+        (function () {
+            var mm = root.querySelector('.cx-board-mm');
+            mm.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); mmDrag = true; try { mm.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } mmCenter(e); });
+            mm.addEventListener('pointermove', function (e) { if (mmDrag) { mmCenter(e); } });
+            mm.addEventListener('pointerup', function () { mmDrag = false; });
+            mm.addEventListener('wheel', function (e) { e.stopPropagation(); }, { passive: true });
+        })();
         var marq = root.querySelector('.cx-board-marq'), props = root.querySelector('.cx-board-props');
 
         /* ---------- paleta ---------- */
@@ -1998,8 +2007,61 @@
         function get(id) { for (var i = 0; i < D.items.length; i++) { if (D.items[i].id === id) { return D.items[i]; } } return null; }
 
         /* ---------- vista ---------- */
+        /* ---------- Q5h-4: minimapa (Claudio, 02/10/2026) ----------
+           Canto de baixo à direita: a folha e o desenho em miniatura (raias,
+           formas, ícones, textos e molduras como blocos de cor) e um retângulo
+           com o que está na tela. Clicar ou arrastar nele move a vista. O
+           botão "Mapa" mostra/esconde (vale até fechar o quadro). */
+        var mmOn = true, mmBox = null, mmDrag = false;
+        function mmBounds() {
+            var x1 = 0, y1 = 0, x2 = D.w, y2 = D.h;
+            D.items.forEach(function (it) {
+                if (it.t === 'link') { return; }
+                var b = bbox(it); x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
+            });
+            var p = Math.max(x2 - x1, y2 - y1) * 0.03;
+            return { x: x1 - p, y: y1 - p, w: x2 - x1 + 2 * p, h: y2 - y1 + 2 * p };
+        }
+        function drawMM() {
+            var wrap = root.querySelector('.cx-board-mm'); if (!wrap) { return; }
+            wrap.hidden = !mmOn;
+            if (!mmOn) { return; }
+            var el = wrap.querySelector('svg'), B0 = mmBounds(), r = svg.getBoundingClientRect(), k = Math.max(B0.w, B0.h) / 160;
+            mmBox = B0;
+            el.setAttribute('viewBox', B0.x + ' ' + B0.y + ' ' + B0.w + ' ' + B0.h);
+            var h = '<rect x="0" y="0" width="' + D.w + '" height="' + D.h + '" fill="#fff" stroke="#D3D1C7" stroke-width="' + k + '"/>';
+            D.items.forEach(function (it) {
+                if (it.t === 'link' || it.t === 'duct') { return; }
+                var b = bbox(it), f = '#B4B2A9', o = 0.9;
+                if (it.t === 'lane') { f = pal(it.tone).f; o = 1; }
+                else if (it.t === 'shape') { f = it.shape === 'ico' ? pal(it.line).s : NO_FILL.indexOf(it.shape) >= 0 ? 'none' : pal(it.fill).s; o = 0.75; }
+                else if (it.t === 'zone') { f = 'none'; }
+                else if (it.t === 'text') { f = '#5F5E5A'; o = 0.5; }
+                h += '<rect x="' + b.x + '" y="' + b.y + '" width="' + Math.max(b.w, k) + '" height="' + Math.max(b.h, k) + '" fill="' + f + '" fill-opacity="' + o + '"'
+                    + (f === 'none' ? ' stroke="#888780" stroke-width="' + k + '"' : '') + '/>';
+            });
+            if (r.width) {
+                h += '<rect class="cx-board-mmview" x="' + (-view.x / view.z) + '" y="' + (-view.y / view.z) + '" width="' + (r.width / view.z) + '" height="' + (r.height / view.z)
+                    + '" fill="#378ADD" fill-opacity="0.1" stroke="#378ADD" stroke-width="' + (k * 1.5) + '"/>';
+            }
+            el.innerHTML = h;
+        }
+        // Ponto do minimapa (clique) -> ponto do quadro.
+        function mmPoint(e) {
+            var el = root.querySelector('.cx-board-mm svg'), rr = el.getBoundingClientRect(), b = mmBox;
+            if (!b || !rr.width) { return null; }
+            var kk = Math.min(rr.width / b.w, rr.height / b.h), ox = (rr.width - b.w * kk) / 2, oy = (rr.height - b.h * kk) / 2;
+            return { x: b.x + (e.clientX - rr.left - ox) / kk, y: b.y + (e.clientY - rr.top - oy) / kk };
+        }
+        function mmCenter(e) {
+            var p = mmPoint(e), r = svg.getBoundingClientRect(); if (!p || !r.width) { return; }
+            view.x = r.width / 2 - p.x * view.z; view.y = r.height / 2 - p.y * view.z;
+            applyView();
+            if (typeof drawSel === 'function') { drawSel(); }
+        }
         function applyView() {
             vp.setAttribute('transform', 'translate(' + view.x + ' ' + view.y + ') scale(' + view.z + ')');
+            drawMM();
             if (typeof drawFbar === 'function' && fbar) { drawFbar(); }
             root.querySelector('.cx-board-zoom').textContent = Math.round(view.z * 100) + '%';
         }
@@ -2031,6 +2093,7 @@
         /* ---------- desenho ---------- */
         // Zonas embaixo, ligações no meio, ícones e textos por cima.
         function paint() {
+            if (mmOn) { setTimeout(drawMM, 0); }
             gZones.innerHTML = laneSvg(D.items) + D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
             gDucts.innerHTML = D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
@@ -3593,6 +3656,11 @@
             else if (a === 'zin' || a === 'zout') { var r = svg.getBoundingClientRect(); zoomAt(a === 'zin' ? 1.2 : 1 / 1.2, r.width / 2, r.height / 2); drawSel(); }
             else if (a === 'fit') { fit(); drawSel(); }
             else if (a === 'find') { findOpen(); }
+            else if (a === 'mm') {
+                mmOn = !mmOn;
+                var mb = root.querySelector('[data-act="mm"]'); mb.classList.toggle('is-on', mmOn); mb.setAttribute('aria-pressed', String(mmOn));
+                drawMM();
+            }
             else if (a === 'bg') { pickBg(); }
             else if (a === 'rot') { rotate(); }
             else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }

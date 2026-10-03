@@ -2846,7 +2846,27 @@
             D.w = Math.ceil(oparts.L.w + 2 * ORG_PAD); D.h = Math.ceil(oparts.L.h + 2 * ORG_PAD);
         }
         function orgNode(id) { var ns = D.org.nodes; for (var i = 0; i < ns.length; i++) { if (ns[i].id === id) { return ns[i]; } } return null; }
-        function orgGrid(v) { return Math.max(0, Math.round(v / GRID) * GRID); }
+        // Q6f-2: sem trava no zero durante a edição (dá para ir para a
+        // esquerda e para cima); orgNormPos() devolve tudo para >= 0 depois.
+        function orgGrid(v) { return Math.round(v / GRID) * GRID; }
+        /* Q6f-2 (Claudio, 03/10/2026): o servidor só grava posição >= 0.
+           Na edição, a posição pode ficar negativa (cartão levado para a
+           esquerda ou para cima da borda): o desenho compensa pela origem,
+           inclusive no desfazer. Ao gravar, o organograma inteiro anda até a
+           mais negativa virar 0; o topo ancorado é fixado onde está antes,
+           para andar junto com os soltos. */
+        function orgNormPos() {
+            var mx = 0, my = 0;
+            D.org.nodes.forEach(function (n) { if (typeof n.x === 'number') { mx = Math.min(mx, n.x); my = Math.min(my, n.y); } });
+            if (mx >= 0 && my >= 0) { return false; }
+            var T = OD().tree(D.org);
+            D.org.nodes.forEach(function (n) {
+                if (T.parentOf[n.id] || typeof n.x === 'number') { return; }
+                var it = get(n.id); if (it && it.t === 'org') { n.x = Math.round(it.x - ORG_PAD - oOrigin.x); n.y = Math.round(it.y - ORG_PAD - oOrigin.y); }
+            });
+            D.org.nodes.forEach(function (n) { if (typeof n.x === 'number') { n.x = Math.round(n.x - mx); n.y = Math.round(n.y - my); } });
+            return true;
+        }
         /* Q6b-3 (Claudio, 03/10/2026): os elementos da paleta, como no motor
            antigo. Arrastar para o quadro: em cima de um cartão, entra na
            equipe dele (centro), antes ou depois dele entre os colegas
@@ -3162,7 +3182,9 @@
         /* Q6f-1: quem se move leva junto os subordinados SOLTOS (os ancorados
            já vão pelo arranjo). Compara a caixa antes e depois do desenho e
            desloca os soltos na mesma medida (o mesmo passo do desfazer). */
-        function orgBoxNow(id) { var it = get(id); return it && it.t === 'org' ? { x: it.x, y: it.y } : null; }
+        // Posição no espaço gravado (sem a origem do desenho, que muda quando o
+        // organograma cresce para a esquerda ou para cima).
+        function orgBoxNow(id) { var it = get(id); return it && it.t === 'org' ? { x: it.x - ORG_PAD - oOrigin.x, y: it.y - ORG_PAD - oOrigin.y } : null; }
         function orgFollow(id, before) {
             var after = orgBoxNow(id); if (!before || !after) { return false; }
             var dx = Math.round(after.x - before.x), dy = Math.round(after.y - before.y);
@@ -3170,7 +3192,7 @@
             var team = orgTeam(id), mexeu = false;
             D.org.nodes.forEach(function (m) {
                 if (!team[m.id] || typeof m.x !== 'number') { return; }
-                m.x = Math.max(0, m.x + dx); m.y = Math.max(0, m.y + dy); mexeu = true;
+                m.x += dx; m.y += dy; mexeu = true;
             });
             return mexeu;
         }
@@ -3513,7 +3535,7 @@
             var before = orgBoxNow(d.id);
             // Com guia, a posição exata da guia; sem guia, a grade de 10.
             var fx = d.at.x - ORG_PAD - oOrigin.x, fy = d.at.y - ORG_PAD - oOrigin.y;
-            n.x = d.at.gx ? Math.max(0, Math.round(fx)) : orgGrid(fx); n.y = d.at.gy ? Math.max(0, Math.round(fy)) : orgGrid(fy);
+            n.x = d.at.gx ? Math.round(fx) : orgGrid(fx); n.y = d.at.gy ? Math.round(fy) : orgGrid(fy);
             render();
             if (orgFollow(d.id, before)) { render(); }
         }
@@ -5319,6 +5341,7 @@
             var btn = root.querySelector('[data-act="save"]');
             btn.disabled = true; btn.textContent = host ? 'Salvando…' : 'Gerando…';
             D.lib = libOf(D.items);
+            if (org) { orgNormPos(); }   // Q6f-2: nunca grava posição negativa
             if (host) {
                 // Q5a: quem grava é o documento DIA (ajax/diagram.save.php).
                 Promise.resolve().then(function () { return host.save(clone(D)); }).then(close).catch(function (err) {

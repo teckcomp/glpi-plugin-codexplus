@@ -2268,6 +2268,11 @@
                         + Lucide().CATS.map(function (c) {
                             return '<optgroup label="' + esc(c.label) + '">' + c.items.map(function (k) { return '<option value="' + k + '"' + (k === it.ico ? ' selected' : '') + '>' + esc(icoName(k)) + '</option>'; }).join('') + '</optgroup>';
                         }).join('') + '</select></label>' : '')
+                    + (SWAP_SKIP.indexOf(it.shape) < 0 ? '<label class="cx-board-f"><span>Tipo de forma</span><select data-k="shape">'
+                        + SHAPE_GROUPS.filter(function (gr) { return gr.k === 'flux' || gr.k === 'bpmn'; }).map(function (gr) {
+                            return '<optgroup label="' + esc(gr.label) + '">' + gr.items.filter(function (k) { return k.indexOf(':') < 0 && SWAP_SKIP.indexOf(k) < 0; })
+                                .map(function (k) { return '<option value="' + k + '"' + (k === it.shape ? ' selected' : '') + '>' + esc(SHAPES[k].label) + '</option>'; }).join('') + '</optgroup>';
+                        }).join('') + '</select></label>' : '')
                     + '<label class="cx-board-f"><span>' + (it.shape === 'ico' ? 'Nome (embaixo)' : 'Texto') + '</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<p class="cx-board-none">Duplo clique na forma (ou comece a digitar com ela selecionada) escreve no lugar; Enter termina, Shift+Enter quebra a linha.</p>'
                     + (MK_OPTS[it.shape] ? '<label class="cx-board-f"><span>' + (it.shape === 'task' ? 'Tipo de tarefa' : 'Tipo de evento') + '</span><select data-k="mk">' + optsOf(MK_OPTS[it.shape], it.mk || 'none') + '</select></label>' : '')
@@ -2356,6 +2361,7 @@
                 v = parseFloat(String(v).replace(',', '.')) || 0;
                 v = k === 'len.extra' ? Math.max(0, Math.min(100, Math.round(v))) : Math.max(0, Math.min(10000, Math.round(v * 10) / 10));
             }
+            if (k === 'shape' && it.t === 'shape') { changeShape(it, v); props.__snap = false; paint(); drawSel(); drawProps(); return; }
             var p = k.split('.');
             if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
             if (it.t === 'shape' && k === 'text') { it.text = String(it.text).slice(0, 500); shapeFit(it); }
@@ -2412,6 +2418,22 @@
             render();
         }
 
+        /* Q5h-1 — trocar a forma (Claudio, 02/10/2026): mantém texto, centro,
+           ligações e as cores que a pessoa escolheu; cor que era a padrão do
+           tipo antigo vira a padrão do novo. Tamanho: o que estava, menos
+           quando um dos dois tipos é quadrado/nome embaixo (aí o do tipo). */
+        var SWAP_SKIP = ['ico', 'group'];
+        function changeShape(it, v) {
+            if (!SHAPES[v] || SWAP_SKIP.indexOf(v) >= 0 || SWAP_SKIP.indexOf(it.shape) >= 0 || v === it.shape) { return; }
+            var od = SHAPES[it.shape].color, nd = SHAPES[v].color, cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+            var odd = function (k) { return SQUARE.indexOf(k) >= 0 || LABEL_BELOW.indexOf(k) >= 0 || k === 'note' || k === 'annot'; };
+            ['fill', 'line', 'ink'].forEach(function (k) { if (it[k] === od) { it[k] = nd; } });
+            if (odd(it.shape) || odd(v)) { it.w = 0; it.h = 0; }
+            it.shape = v;
+            if (MK_OPTS[v]) { it.mk = MK_OPTS[v][it.mk] ? it.mk : 'none'; } else { delete it.mk; }
+            shapeFit(it);
+            it.x = Math.round(cx - it.w / 2); it.y = Math.round(cy - it.h / 2);
+        }
         // Vários deslocamentos de uma vez ({ id: [dx, dy] }): a dobra de uma
         // ligação anda quando as duas pontas andaram igual.
         function moveMap(m) {

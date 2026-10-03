@@ -1834,7 +1834,7 @@
         });
         subs.forEach(function (g) { g.tone = mmTone(subStyle[g.id]); });
         if (bad) { skip.other += bad; }
-        return { dir: dir, nodes: nodes, order: order, edges: edges, subs: subs, title: title, skip: skip };
+        return { dir: dir, nodes: nodes, order: order, edges: edges, subs: subs, title: title, skip: skip, cls: nodeCls };
     }
 
     // Grafo lido -> quadro do fluxograma (antes do clean) + avisos.
@@ -2109,14 +2109,188 @@
         return head + '```mermaid\n' + out.join('\n') + '\n```\n';
     }
 
+    /* ======================================================================
+       Q6e — organograma em Mermaid, ida e volta (Claudio, 03/10/2026).
+       Cada caixa é "Nome<br>Cargo" (área = caixa dupla [[ ]]); --> é chefia,
+       -.-> é reporte; o nível vai como classe (classDef com a cor). A matriz
+       vai como tabela Markdown depois do diagrama. Um comentário no fim
+       (<!-- codexplus-org {...} -->) guarda os níveis exatos para a volta.
+       Sem as classes (Mermaid feito por uma IA do zero), o nível sai pela
+       profundidade na árvore. Funções puras: testáveis sem DOM.
+       ====================================================================== */
+    var ORG_VAGA = /^(vaga em aberto|vaga|coringa a definir|\(vaga\)|a definir)$/i;
+    function orgToMermaid(S, title, when) {
+        var T = OD().tree(S), order = [], seen = {};
+        (function walkAll() {
+            var go = function (n) { if (seen[n.id]) { return; } seen[n.id] = 1; order.push(n); (T.kids[n.id] || []).forEach(go); };
+            S.nodes.forEach(function (n) { if (!T.parentOf[n.id]) { go(n); } });
+            S.nodes.forEach(go);
+        })();
+        var id = {}; order.forEach(function (n, k) { id[n.id] = 'n' + (k + 1); });
+        var out = [];
+        if (title) { out.push('---', 'title: ' + String(title).replace(/[\r\n]+/g, ' '), '---'); }
+        out.push('flowchart TD');
+        order.forEach(function (n) {
+            var t = mmQuote(OD().label(n) + (n.role ? '\n' + n.role : ''));
+            out.push('    ' + id[n.id] + (n.group ? '[["' + t + '"]]' : '["' + t + '"]'));
+        });
+        S.edges.forEach(function (e) {
+            if (!id[e.from] || !id[e.to]) { return; }
+            var lab = String(e.label || '').trim();
+            out.push('    ' + id[e.from] + ' ' + (e.boss ? '-->' : '-.->') + (lab ? '|"' + mmQuote(lab) + '"|' : '') + ' ' + id[e.to]);
+        });
+        var by = {};
+        order.forEach(function (n) { (by[n.lvl] = by[n.lvl] || []).push(id[n.id]); });
+        S.levels.forEach(function (l) {
+            if (!by[l.key]) { return; }
+            out.push('    classDef ' + l.key + ' fill:#ffffff,stroke:' + l.color + ',stroke-width:2px,color:#17202d');
+            out.push('    class ' + by[l.key].join(',') + ' ' + l.key);
+        });
+        var marca = function (nome, estilo, f) {
+            var ids = order.filter(f).map(function (n) { return id[n.id]; });
+            if (ids.length) { out.push('    classDef ' + nome + ' ' + estilo); out.push('    class ' + ids.join(',') + ' ' + nome); }
+        };
+        marca('tracejado', 'stroke-dasharray:5 3', function (n) { return !!n.dashed; });
+        marca('aconfirmar', 'color:#8a5500', function (n) { return !!n.pend; });
+        marca('assessoria', 'font-style:italic', function (n) { return n.kind === 'assessoria'; });
+        marca('terceiro', 'font-style:italic', function (n) { return n.kind === 'terceiro'; });
+        var cell = function (t) { return String(t || '').replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' '); };
+        var tab = (S.esc || []).length ? '\n## Matriz de escalonamento\n\n| Nível | Papel | Escala para o próximo nível quando | Tempo alvo |\n|---|---|---|---|\n'
+            + S.esc.map(function (r) { return '| ' + r.c.map(cell).join(' | ') + ' |'; }).join('\n') + '\n' : '';
+        var meta = { levels: S.levels, escLvl: (S.esc || []).map(function (r) { return r.lvl; }) };
+        var head = '# ' + (title || 'Organograma') + '\n\n'
+            + 'Organograma exportado do Codex+' + (when ? ' em ' + when : '') + ', no formato Mermaid (flowchart).\n'
+            + 'Cada caixa é "Nome<br>Cargo" (caixa dupla = área ou equipe); seta cheia (-->) é chefia e tracejada (-.->) é reporte.\n'
+            + 'Para ajustar com uma IA: anexe este arquivo e peça as mudanças, pedindo a resposta no mesmo formato '
+            + '(Mermaid flowchart e, se houver, a tabela da matriz). Depois importe a resposta no Codex+.\n\n';
+        return head + '```mermaid\n' + out.join('\n') + '\n```\n' + tab + '\n<!-- codexplus-org ' + JSON.stringify(meta).replace(/--/g, '- -') + ' -->\n';
+    }
+    function orgNorm(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+    // Tabela Markdown "Nível | Papel | …" (a matriz), se houver.
+    function orgEscTable(txt) {
+        var lines = String(txt).replace(/\r\n?/g, '\n').split('\n'), rows = [], inTab = false;
+        lines.forEach(function (l) {
+            var t = l.trim();
+            if (!/^\|.*\|$/.test(t)) { if (inTab && rows.length) { inTab = 'fim'; } return; }
+            if (inTab === 'fim') { return; }
+            var cells = t.slice(1, -1).split(/(?<!\\)\|/).map(function (c) { return c.replace(/\\\|/g, '|').trim(); });
+            if (!inTab) { if (/n[ií]vel/i.test(cells[0] || '') && cells.length >= 2) { inTab = true; } return; }
+            if (cells.every(function (c) { return /^:?-{2,}:?$/.test(c); })) { return; }
+            rows.push([0, 1, 2, 3].map(function (i) { return (cells[i] || '').slice(0, 500); }));
+        });
+        return rows;
+    }
+    function mermaidOrg(G, txt, cur) {
+        var warn = [], meta = null, mm = /<!--\s*codexplus-org\s+(\{[\s\S]*?\})\s*-->/.exec(String(txt));
+        if (mm) { try { meta = JSON.parse(mm[1].replace(/- -/g, '--')); } catch (e) { meta = null; } }
+        var curS = OD().normalize(cur || null);
+        var levels = meta && Array.isArray(meta.levels) && meta.levels.length ? meta.levels : curS.levels;
+        levels = OD().normalize({ nodes: [{ id: 'x' }], levels: levels }).levels;
+        var keys = levels.map(function (l) { return l.key; });
+        var nid = {}, nodes = [], edges = [], hasBoss = {}, extra = 0;
+        G.order.forEach(function (gid, k) {
+            var g = G.nodes[gid], ls = String(g.text || '').split('\n'), cls = (G.cls && G.cls[gid]) || [];
+            var name = (ls[0] || '').slice(0, 120), n = { id: 'n' + (k + 1), name: ORG_VAGA.test(name.trim()) ? '' : name, role: ls.slice(1).join(' ').slice(0, 160), lvl: '', note: '', pend: false, group: g.shape === 'sub' };
+            cls.forEach(function (c) {
+                if (keys.indexOf(c) >= 0) { n.lvl = c; }
+                if (c === 'aconfirmar') { n.pend = true; }
+                if (c === 'tracejado') { n.dashed = true; }
+                if (c === 'assessoria' || c === 'terceiro') { n.kind = c; }
+            });
+            nid[gid] = n.id; nodes.push(n);
+        });
+        G.edges.forEach(function (e) {
+            var a = nid[e.a], b = nid[e.b]; if (!a || !b) { return; }
+            var boss = e.dash !== 'dash' && !hasBoss[b];
+            if (e.dash !== 'dash' && hasBoss[b]) { extra++; }
+            if (boss) { hasBoss[b] = a; }
+            edges.push({ id: 'e' + edges.length, from: a, to: b, boss: boss, style: boss ? 'solida' : 'tracejada', label: String(e.label || '').slice(0, 120) });
+        });
+        if (extra) { warn.push(extra === 1 ? '1 pessoa tinha duas chefias: a segunda entrou como reporte (linha tracejada).' : extra + ' pessoas tinham mais de uma chefia: as demais entraram como reporte (linha tracejada).'); }
+        // Sem classe de nível: pela profundidade na árvore (topo = 1º nível).
+        var semNivel = nodes.filter(function (n) { return !n.lvl; });
+        if (semNivel.length) {
+            var depth = {}, kids = {};
+            edges.forEach(function (e) { if (e.boss) { (kids[e.from] = kids[e.from] || []).push(e.to); } });
+            var fila = nodes.filter(function (n) { return !hasBoss[n.id]; }).map(function (n) { depth[n.id] = 0; return n.id; });
+            while (fila.length) { var x = fila.shift(); (kids[x] || []).forEach(function (y) { if (depth[y] === undefined) { depth[y] = depth[x] + 1; fila.push(y); } }); }
+            semNivel.forEach(function (n) { n.lvl = keys[Math.min(depth[n.id] || 0, keys.length - 1)]; });
+            if (semNivel.length === nodes.length) { warn.push('O arquivo não indica os níveis: eles foram dados pela posição na árvore (confira em Níveis e no painel).'); }
+        }
+        // Matriz: a da tabela do arquivo; sem tabela, fica a atual.
+        var rows = orgEscTable(txt), esc;
+        if (rows.length) {
+            var guess = function (t) {
+                var a = orgNorm(t), best = '', bs = 0;
+                levels.forEach(function (l) { var b = orgNorm(l.label), i = 0; while (i < a.length && i < b.length && a[i] === b[i]) { i++; } if (i > bs) { bs = i; best = l.key; } });
+                return bs >= 4 ? best : keys[keys.length - 1];
+            };
+            esc = rows.map(function (c, i) {
+                var k = meta && meta.escLvl && keys.indexOf(meta.escLvl[i]) >= 0 ? meta.escLvl[i] : guess(c[0]);
+                return { lvl: k, c: c };
+            });
+        } else {
+            esc = curS.esc;
+            if (esc.length) { warn.push('O arquivo não traz a matriz de escalonamento: a matriz atual foi mantida.'); }
+        }
+        if (G.subs && G.subs.length) { warn.push((G.subs.length === 1 ? '1 grupo (subgraph) foi ignorado' : G.subs.length + ' grupos (subgraph) foram ignorados') + ': no organograma, quem agrupa é a chefia. As pessoas entraram normalmente.'); }
+        return { org: { kind: 'organograma', levels: levels, nodes: nodes, edges: edges, esc: esc, elements: curS.elements || [] }, warn: warn };
+    }
+    // Leitura de um arquivo para o organograma: cópia do Codex+ (quadro ou o
+    // JSON do organograma, inclusive o do motor antigo e o do protótipo) ou
+    // Mermaid. Devolve { err } ou { data, kind, title, warn[] }.
+    function readOrgIo(txt, cur) {
+        var mode = 'organograma';
+        if (/^(```|---|%%|#|flowchart\b|graph\b)/i.test(txt) || /```\s*mermaid/i.test(txt)) {
+            var G = parseMermaid(txt);
+            if (!G.err && G.order.length) {
+                if (G.order.length > 2000) { return { err: 'O organograma tem elementos demais (mais de 2000). Divida em mais de um diagrama.' }; }
+                var r = mermaidOrg(G, txt, cur);
+                return { data: clean({ mode: mode, org: r.org }, mode), kind: /codexplus-org/.test(txt) ? 'Mermaid do Codex+' : 'Mermaid (gerado por IA)', title: G.title, warn: r.warn };
+            }
+            if (/(^|\n)\s*(sequenceDiagram|classDiagram|stateDiagram(-v2)?|erDiagram|gantt|pie|journey|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4\w+|sankey(-beta)?|xychart(-beta)?|block(-beta)?|packet(-beta)?|architecture(-beta)?|kanban)\b/.test(txt)) {
+                return { err: 'Este Mermaid não é do tipo flowchart. Peça à IA o organograma em Mermaid flowchart, com uma seta do chefe para cada subordinado.' };
+            }
+        }
+        var obj = null;
+        try { obj = JSON.parse(txt); } catch (e) {
+            var i = txt.indexOf('{'), j = txt.lastIndexOf('}');
+            if (i >= 0 && j > i) { try { obj = JSON.parse(txt.slice(i, j + 1)); } catch (e2) { obj = null; } }
+        }
+        var NAO = 'Este conteúdo não é um organograma do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do organograma, ou um Mermaid.';
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { return { err: NAO }; }
+        var org = null, kind = 'Cópia do Codex+', title = '';
+        if (obj.formato === IO_FORMAT) {
+            if ((+obj.versao || 0) > IO_VERSION) { return { err: 'Este arquivo é de uma versão mais nova do Codex+. Atualize o plugin para importar.' }; }
+            var q = obj.quadro || {};
+            if (q.mode && q.mode !== mode) {
+                var art = { planta: 'uma planta', topologia: 'uma topologia', fluxograma: 'um fluxograma' };
+                return { err: 'Este arquivo é de ' + (art[q.mode] || 'outro tipo de quadro') + ', não de um organograma.' };
+            }
+            org = q.org; title = String(obj.titulo || '').slice(0, 200);
+        } else if (Array.isArray(obj.nodes) || (obj.tree && typeof obj.tree === 'object')) {
+            org = obj; kind = 'Organograma do Codex+ (cópia do editor anterior)';
+        } else if (Array.isArray(obj.items) || obj.board) {
+            return { err: 'Este arquivo é de outro tipo de quadro, não de um organograma.' };
+        }
+        if (!org || typeof org !== 'object' || !((Array.isArray(org.nodes) && org.nodes.length) || org.tree)) { return { err: NAO }; }
+        var n0 = Array.isArray(org.nodes) ? org.nodes.length : 0;
+        if (n0 > 2000) { return { err: 'O organograma tem elementos demais (mais de 2000).' }; }
+        var data = clean({ mode: mode, org: org }, mode), warn = [];
+        var drop = n0 - data.org.nodes.length;
+        if (n0 && drop > 0) { warn.push(drop === 1 ? '1 elemento sem identificação não pôde ser trazido.' : drop + ' elementos sem identificação não puderam ser trazidos.'); }
+        return { data: data, kind: kind, title: title, warn: warn };
+    }
+
     /* Q5i-1 — leitura de um arquivo de fluxo (pura: testável sem DOM).
        Devolve { err } ou { data, kind, title, warn[] }. `data` já passou
        pelo clean() do motor. */
     var IO_FORMAT = 'codexplus-quadro', IO_VERSION = 1, IO_MAX = 1024 * 1024;
-    function readIo(txt, mode, here) {
+    function readIo(txt, mode, here, cur) {
         txt = String(txt || '').replace(/^\uFEFF/, '').trim();
         if (!txt) { return { err: 'Nada para importar: o conteúdo está vazio.' }; }
         if (txt.length > IO_MAX) { return { err: 'Conteúdo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.' }; }
+        if (mode === 'organograma') { return readOrgIo(txt, cur); }
         // Q5i-2: Mermaid (o que as IAs geram). Só o fluxograma.
         if (/^(```|---|%%|flowchart\b|graph\b)/i.test(txt) || /```\s*mermaid/i.test(txt)) {
             var G = parseMermaid(txt);
@@ -2283,7 +2457,14 @@
                 + '<button type="button" data-act="zin" title="Aproximar">+</button>'
                 + '<button type="button" data-act="fit" title="Ajustar à tela">Ajustar</button>'
                 + '<button type="button" data-act="find" title="Buscar pessoa ou cargo (Ctrl+F)">Buscar</button>'
-                + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>';
+                + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>'
+                // Q6e: importar e exportar (o mesmo diálogo e menu do fluxograma).
+                + '<span class="cx-board-sep"></span><button type="button" data-act="imp" title="Trazer um organograma de um arquivo (substitui o desenho; Ctrl+Z desfaz)">Importar</button>'
+                + '<span class="cx-board-xw"><button type="button" data-act="exp" aria-haspopup="true" aria-expanded="false" title="Levar este organograma para um arquivo">Exportar <span class="cx-board-car" aria-hidden="true">▾</span></button>'
+                + '<div class="cx-board-xm" role="menu" hidden>'
+                + '<button type="button" role="menuitem" data-act="expjson"><b>Guardar uma cópia do organograma</b><span>Arquivo do Codex+ com tudo: níveis, cores, marcações, posições e a matriz. Serve de backup ou para levar o organograma a outro documento.</span></button>'
+                + '<button type="button" role="menuitem" data-act="expmd"><b>Levar para uma IA</b><span>Arquivo que ChatGPT, Claude e Gemini entendem, com a matriz em tabela. Anexe na IA, peça os ajustes e importe a resposta de volta.</span></button>'
+                + '</div></span>';
             ['[data-act="legend"]', '[data-act="png"]'].forEach(function (q) { var el = root.querySelector(q); if (el) { (el.closest('label') || el).remove(); } });
             root.querySelector('.cx-board-pal-top').style.display = 'none';
             root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para editar no painel. Arraste um elemento da paleta ou um cartão: no centro de outro cartão entra na equipe dele; nas bordas, fica ao lado; no vazio, fica solto (a equipe vai junto). “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
@@ -4822,7 +5003,7 @@
             if (org && a === 'arrumar') {
                 snap(); D.org.nodes.forEach(function (n) { delete n.x; delete n.y; }); render(); setTimeout(fit, 0); return;
             }
-            if (org && ['group', 'ungroup', 'lock', 'del', 'rotate', 'smaller', 'bigger', 'png', 'imp', 'exp', 'expjson', 'expmd'].indexOf(a) >= 0) { return; }
+            if (org && ['group', 'ungroup', 'lock', 'del', 'rotate', 'smaller', 'bigger', 'png'].indexOf(a) >= 0) { return; }
             if (a === 'group' && sel.length > 1) { snap(); var g = uid(); sel.forEach(function (id) { if (get(id).t !== 'lane') { get(id).g = g; } }); render(); }
             else if (a === 'ungroup' && sel.length) { snap(); sel.forEach(function (id) { get(id).g = ''; }); render(); }
             else if (a === 'lock' && sel.length) {
@@ -5047,15 +5228,19 @@
         }
         function xmAway(e) { if (!e.target.closest || !e.target.closest('.cx-board-xw')) { xmShow(false); } }
 
+        function ioName(ext) {
+            // Título que já começa com o nome do modo não repete a palavra.
+            return pngName(D.mode, null, host && host.title).replace(/^organograma-organograma(?=[-.])/, 'organograma').replace(/\.png$/, ext);
+        }
         function exportJson() {
             var q = clone(D);
-            q.lib = libOf(q.items);
+            if (org) { q = { v: 1, mode: 'organograma', org: clone(D.org) }; delete q.org.__norm; } else { q.lib = libOf(q.items); }
             var pack = { formato: IO_FORMAT, versao: IO_VERSION, origem: location.origin, titulo: String(host && host.title || ''),
                 exportado: new Date().toISOString(), quadro: q };
             var blob = new Blob([JSON.stringify(pack, null, 1)], { type: 'application/json' });
             var a = document.createElement('a'), url = URL.createObjectURL(blob);
             a.href = url;
-            a.download = pngName(D.mode, null, host && host.title).replace(/\.png$/, '.json');
+            a.download = ioName('.json');
             a.style.display = 'none';
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
@@ -5064,11 +5249,12 @@
         // Q5i-3: Mermaid em .md, para levar a uma IA.
         function exportMd() {
             var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
-            var txt = boardToMermaid(D, String(host && host.title || ''), p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear());
+            var when = p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+            var txt = org ? orgToMermaid(D.org, String(host && host.title || ''), when) : boardToMermaid(D, String(host && host.title || ''), when);
             var blob = new Blob([txt], { type: 'text/markdown;charset=utf-8' });
             var a = document.createElement('a'), url = URL.createObjectURL(blob);
             a.href = url;
-            a.download = pngName(D.mode, null, host && host.title).replace(/\.png$/, '-ia.md');
+            a.download = ioName('-ia.md');
             a.style.display = 'none';
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
@@ -5093,16 +5279,19 @@
         }
         // Tela 1: escolher o arquivo, arrastar ou colar.
         function ioPick(err) {
-            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Importar fluxo">'
-                + '<h3>Importar fluxo</h3>'
-                + '<p class="cx-io-sub">Traga um fluxo feito por uma IA ou uma cópia guardada do Codex+. Nada é gravado até você clicar em Salvar fluxograma.</p>'
+            var oW = org ? 'organograma' : 'fluxo';
+            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Importar ' + oW + '">'
+                + '<h3>Importar ' + oW + '</h3>'
+                + '<p class="cx-io-sub">Traga ' + (org ? 'um organograma' : 'um fluxo') + ' feito por uma IA ou uma cópia guardada do Codex+. Nada é gravado até você clicar em ' + saveLabel + '.</p>'
                 + '<div class="cx-io-drop" data-io="drop"><div class="cx-io-big">Arraste o arquivo para cá</div>'
                 + '<div class="cx-io-sm">Arquivos do Codex+ e arquivos Mermaid gerados por IA</div>'
                 + '<button type="button" class="cx-io-btn" data-io="file">Escolher arquivo</button></div>'
                 + '<div class="cx-io-or">ou</div>'
                 + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> o que a IA gerou, depois de usar o botão Copiar dela.</div>'
                 + '<p class="cx-io-err" data-io="err"' + (err ? '' : ' hidden') + '>' + esc(err || '') + '</p>'
-                + '<div class="cx-io-tip">Para pedir à IA: “me entregue esse fluxo como arquivo Mermaid, com um grupo (subgraph) para cada área”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.</div>'
+                + '<div class="cx-io-tip">' + (org
+                    ? 'Para pedir à IA: “me entregue esse organograma como Mermaid flowchart, com cada caixa no formato Nome&lt;br&gt;Cargo e uma seta do chefe para cada subordinado”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.'
+                    : 'Para pedir à IA: “me entregue esse fluxo como arquivo Mermaid, com um grupo (subgraph) para cada área”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.') + '</div>'
                 + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="cancel">Cancelar</button></div>'
                 + '</div>';
             var q = function (k) { return io.el.querySelector('[data-io="' + k + '"]'); };
@@ -5136,7 +5325,8 @@
         function ioFile(f) {
             var name = String(f.name || '');
             if (/^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|bmp|svg|pdf)$/i.test(name) || f.type === 'application/pdf') {
-                ioPick('Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o fluxo em arquivo Mermaid, com um grupo (subgraph) para cada área; depois importe a resposta aqui.');
+                ioPick(org ? 'Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o organograma em Mermaid flowchart (cada caixa Nome<br>Cargo, seta do chefe para o subordinado); depois importe a resposta aqui.'
+                    : 'Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o fluxo em arquivo Mermaid, com um grupo (subgraph) para cada área; depois importe a resposta aqui.');
                 return;
             }
             if (f.size > IO_MAX) { ioPick('Arquivo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.'); return; }
@@ -5147,7 +5337,7 @@
         }
         function ioText(txt, name) {
             if (!io) { return; }
-            var r = readIo(txt, D.mode);
+            var r = readIo(txt, D.mode, undefined, org ? D.org : null);
             if (r.err) { ioPick(r.err); return; }
             io.got = r;
             ioSummary(name);
@@ -5157,16 +5347,21 @@
             var r = io.got, n = function (t) { return r.data.items.filter(function (i) { return i.t === t; }).length; };
             var cur = D.items.filter(function (i) { return i.t !== 'link'; }).length;
             var cards = [[n('shape'), n('shape') === 1 ? 'forma' : 'formas'], [n('lane'), n('lane') === 1 ? 'área (raia)' : 'áreas (raias)'], [n('link'), n('link') === 1 ? 'ligação' : 'ligações']];
+            if (org) {
+                var oo = r.data.org, pe = oo.nodes.filter(function (x) { return !x.group; }).length, li = oo.edges.length, ma = (oo.esc || []).length;
+                cards = [[pe, pe === 1 ? 'pessoa ou vaga' : 'pessoas e vagas'], [li, li === 1 ? 'ligação' : 'ligações'], [ma, ma === 1 ? 'linha da matriz' : 'linhas da matriz']];
+                cur = D.org.nodes.length;
+            }
             var warn = r.warn.length ? '<div class="cx-io-warn"><p>' + (r.warn.length === 1 ? '1 ponto para conferir' : r.warn.length + ' pontos para conferir') + '</p><ul>'
                 + r.warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>' : '';
-            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Fluxo encontrado">'
-                + '<h3>Fluxo encontrado</h3><p class="cx-io-sub">Confira antes de trazer para o quadro.</p>'
+            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="' + (org ? 'Organograma encontrado' : 'Fluxo encontrado') + '">'
+                + '<h3>' + (org ? 'Organograma encontrado' : 'Fluxo encontrado') + '</h3><p class="cx-io-sub">Confira antes de trazer para o quadro.</p>'
                 + '<div class="cx-io-file"><span class="cx-io-doc" aria-hidden="true"></span><div>' + esc(name || r.title || 'Conteúdo colado')
                 + '<small>' + esc(r.kind) + (r.title && name ? ' · ' + r.title : '') + '</small></div></div>'
                 + '<div class="cx-io-stats">' + cards.map(function (c) { return '<div><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('') + '</div>'
                 + warn
                 + '<p class="cx-io-note">' + (cur ? 'O desenho atual (' + cur + (cur === 1 ? ' item' : ' itens') + ') será substituído. Se não gostar, use Desfazer (Ctrl+Z) para voltar ao desenho anterior.'
-                    : 'O quadro está vazio: o fluxo entra nele. Desfazer (Ctrl+Z) volta ao quadro vazio.') + '</p>'
+                    : 'O quadro está vazio: o ' + (org ? 'organograma' : 'fluxo') + ' entra nele. Desfazer (Ctrl+Z) volta ao quadro vazio.') + '</p>'
                 + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="back">Voltar</button>'
                 + '<button type="button" class="cx-io-btn cx-io-pri" data-io="apply">' + (cur ? 'Substituir desenho' : 'Trazer para o quadro') + '</button></div>'
                 + '</div>';
@@ -5179,6 +5374,12 @@
             if (!io || !io.got) { return; }
             var nd = io.got.data;
             snap();
+            if (org) {
+                // Q6e: troca o organograma inteiro (a vista recomeça e ajusta).
+                D.org = nd.org; sel = []; oDelArm = null; oOrigin = null;
+                ioClose(); render(); paleta(); setTimeout(fit, 0);
+                return;
+            }
             nd.legend = false; nd.pxm = 0;
             D = nd;
             // A folha cresce se o desenho não couber (nunca corta).
@@ -5191,7 +5392,7 @@
 
         // Arrastar um arquivo direto para o quadro abre a importação com ele.
         (function () {
-            if (!flow) { return; }
+            if (!flow && !org) { return; }
             var st = root.querySelector('.cx-board-stage');
             var isFile = function (e) { var t = e.dataTransfer && e.dataTransfer.types; return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0; };
             root.addEventListener('dragover', function (e) { if (isFile(e)) { e.preventDefault(); } });
@@ -5226,5 +5427,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

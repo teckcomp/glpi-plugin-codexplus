@@ -1,6 +1,11 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.0`** (tag `v0.7.0`) · atualizado na madrugada de
+> Estado em **`v0.7.0`** + blocos de 02/10/2026 (último commit
+> `f0ad6ba`) · atualizado em **02/10/2026**: folha do fluxograma, ícones
+> Lucide (Q5j), **raias Q5g ✅** e **Q5h ✅** (CONTEXTO, seção 3.10).
+> **Escopo de "pronto" = roadmap inteiro; produção (Debian 13, SSH 2022)
+> é a etapa final.** Próximo: **reavaliar o escopo do Q5i** com Claudio,
+> depois Q6. Antes, na madrugada de
 > 28/09/2026: **SC1 Setor / Categorias** (`dfe0e58`), **0.7.0** (`29c5088`)
 > e **instalação do zero testada** (CONTEXTO, seção 3.9). **Produção
 > adiada por Claudio** até o escopo combinado ficar pronto (estimativa dele:
@@ -69,6 +74,15 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 
 Vale sobre a lista acima quando houver conflito.
 
+> **Decisão de Claudio, 02/10/2026: "pronto" = roadmap inteiro.** A
+> produção é a **etapa final**, depois de todas as fases (itens 7 e 11 a 15).
+> **Servidor de produção: Debian 13, SSH na porta 2022** (a homologação
+> segue no `177.87.230.179`). O primeiro passo da subida é o **bloco de
+> conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
+> GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → **Q5i (reavaliar)**
+> → Q6 → 3c → R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7
+> logo depois).
+>
 > **Atualização, 28/09/2026 (madrugada): produção adiada por Claudio.** A
 > subida de 28/09 não aconteceu; sobe "quando estiver tudo pronto"
 > (estimativa de Claudio: ~2 dias). **A decidir no começo da próxima
@@ -461,9 +475,12 @@ seus elementos (CONTEXTO, seção 3.7).
 | Q5e-1 | 9 formas de fluxograma clássico; paleta em seções recolhíveis | ✅ `6541123` |
 | Q5e-2 | BPMN: eventos (com tipos), tarefa (com tipos), subprocesso, gateways X/+/O, objeto de dados, anotação, grupo | ✅ `4ceb8d4` |
 | Q5f | "+" rápido, mini-paleta ao soltar no vazio, alinhar e distribuir | ✅ `e694ddd` |
-| Q5g | **Raias verticais** (decisão do mockup do Q5); arrastar a raia leva as formas | **próximo** (mockup antes) |
-| Q5h | Trocar forma sem perder ligações; minimapa; busca; link da forma para documento do Codex+ | |
-| Q5i | Importar e exportar `.bpmn` (BPMN 2.0 XML — Bizagi, Camunda, Signavio) | |
+| Folha | Seletor de tamanho da folha (Padrão, Médio, Grande, Máximo, Personalizado) | ✅ `da90cbc` |
+| Q5j-1 | Ícone genérico (Lucide ISC, 56 desenhos) como forma: traço no tom da borda, nome embaixo | ✅ `00249c1` |
+| Q5j-2 | Paleta com os 56 ícones em subgrupos e busca "forma ou ícone" | ✅ `6601983` |
+| Q5g | **Raias com orientação por fluxograma** (horizontal ou vertical): cabeçalho com ícone, título, descrição e tom; reordenar, espessura, comprimento e tamanho do cabeçalho pelo arraste; excluir deixa as formas soltas | ✅ `ae802bc` (Q5g-1 a Q5g-3) |
+| Q5h | Trocar forma (`42a4954`); link para documento ou URL, leitura clicável e lista no PDF (`e441519`); busca Ctrl+F (`35d11e4`); minimapa (`f0ad6ba`). **Sem imagem nem tabela no fluxograma** (Claudio, 02/10) | ✅ |
+| Q5i | Importar e exportar `.bpmn` (BPMN 2.0 XML — Bizagi, Camunda, Signavio). **Reavaliar o escopo**: não há processos no Bizagi; o Miro não exporta (o fluxo da Ponto Telecom entrou pelo script do Console). Pontos levantados em 02/10: raias horizontais do Bizagi, as 9 formas clássicas sem equivalente BPMN, cores só pela extensão de cor | **próximo** (decidir escopo) |
 
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)

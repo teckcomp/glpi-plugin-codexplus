@@ -2,7 +2,12 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.0`** (tag `v0.7.0`, commit `29c5088`) · atualizado na
+> Estado: **`v0.7.0`** + blocos de 02/10/2026 (último commit `f0ad6ba`;
+> versão não mudou, sem schema novo) · atualizado em **02/10/2026**:
+> **folha do fluxograma**, **ícones Lucide** (Q5j-1/2), **raias** (Q5g-1 a
+> Q5g-3) e **Q5h completo** (trocar forma, link, busca, minimapa) — seção
+> 3.10; achados 95 a 99. **Escopo de "pronto" = roadmap inteiro**;
+> **produção = Debian 13 (SSH 2022)**, etapa final. Antes, na
 > madrugada de 28/09/2026: **SC1 — Setor / Categorias no formulário**
 > (`dfe0e58`), **versão 0.7.0** e **instalação do zero testada** numa
 > instância limpa (banco idêntico ao da homologação) — seção 3.9; achados 92
@@ -1306,6 +1311,110 @@ R6-b, R7 e Etapa 5 seguem depois, já em produção.
   todos os direitos (23567), os outros perfis só com Ler. Tudo apagado
   depois. Critério do marco cumprido.
 
+### 3.10 Sessão de 02/10/2026 — folha, ícones, raias e Q5h
+
+Commits: `3ef507d` (docs de 28/09), `da90cbc` (folha), `00249c1` (Q5j-1),
+`6601983` (Q5j-2), `ae802bc` (**Q5g-1 a Q5g-3 num commit só**: o Q5g-1 e
+o Q5g-2 não foram commitados à parte — achado 99), `42a4954` (Q5h-1),
+`e441519` (Q5h-2), `35d11e4` (Q5h-3), `f0ad6ba` (Q5h-4). Versão segue
+`0.7.0`; nenhum bloco mexeu no banco. Só o Q5j-1 mexeu no `setup.php`
+(lista de scripts).
+
+#### Decisões de Claudio (02/10/2026)
+
+- **"Pronto para produção" = roadmap inteiro.** Produção é a **etapa
+  final**: só depois de todas as fases. **Servidor de produção: o Debian 13
+  com SSH na porta 2022**; o `177.87.230.179` segue como homologação. O
+  bloco de conferência do servidor (PHP, extensões, MariaDB, espaço,
+  GitHub) é o **primeiro passo da etapa de produção**, não antes.
+- Fluxo do Miro importado para validação pelo **script no Console** (outro
+  chat): grava pelo `ajax/diagram.save.php`, sem botão de importar e sem
+  depender do Q5i. Validado na homologação (fluxo da Ponto Telecom).
+- **Folha**: botão para escolher o tamanho (não crescer sozinha).
+- **Ícones genéricos: biblioteca Lucide (ISC)**, com 56 escolhidos.
+- **Raias: orientação escolhida por fluxograma** (horizontal ou vertical;
+  a primeira raia decide). Substitui "só verticais" do mockup do Q5.
+- **Excluir raia: as formas ficam no quadro, soltas.**
+- **Nem imagem nem tabela dentro do fluxograma**; em troca, **link** na
+  forma, para **documento do Codex+ e endereço externo** (os dois).
+- Q5i: **reavaliar o escopo antes de começar** (não há processos no Bizagi;
+  o Miro não exporta).
+
+#### Folha do fluxograma (`da90cbc`)
+
+- Seletor **Folha** na barra (só no fluxograma): Padrão 1400 × 900, Médio
+  2400 × 1500, Grande 3600 × 2200, Máximo 6000 × 4000 e Personalizado
+  (largura × altura). Cresce para a direita e para baixo; nunca fica menor
+  que o desenho (avisa e para no menor que cabe); entra no desfazer. O PNG,
+  a leitura e o PDF recortam pelo conteúdo: a folha só muda o editor.
+
+#### Ícones genéricos (Q5j-1 `00249c1`, Q5j-2 `6601983`)
+
+- Catálogo `public/js/codexplus-lucide.js` (`window.CodexplusLucide`:
+  `CATS`, `NAME`, `SVG`), gerado do pacote `lucide-static` 1.50.0 e saneado
+  (só `path`, `circle`, `rect`, `line`, `polyline`, com números). Licença em
+  `LICENSES/lucide-ISC.txt`; aviso no README. Carregado pelo `setup.php`
+  antes do motor. Nada vem da internet.
+- Forma `shape: 'ico'` com `ico: '<chave>'`: quadrada, sem fundo, nome
+  embaixo; traço no tom da **Borda**, nome no tom do **Texto**; traço de no
+  máximo 4 px na tela. Chave fora do catálogo é preservada e desenha "?".
+  Painel: seletor **Desenho**. Planta e Topologia descartam.
+- Paleta: seção **Ícones** com 7 subgrupos; busca **"Buscar forma ou
+  ícone"** (sem acento; nome, chave em inglês ou grupo).
+
+#### Raias (Q5g-1 a Q5g-3, `ae802bc`)
+
+- Item `lane` nos `items` (o servidor só guarda `v`, `mode`, `w`, `h`,
+  `items` e `lib` — achado 97): `{ dir: 'h'|'v', x, y, w, h, hd, title,
+  desc, ico, tone }`. `laneLayout()` mantém as raias encostadas, com o
+  comprimento e o cabeçalho (`hd`) da primeira; `clean()` força a
+  orientação da primeira gravada. Desenhadas por `laneSvg()` no fundo
+  (antes das molduras), recortadas pela moldura arredondada (`clipPath`
+  com id novo a cada desenho — achado 96).
+- Paleta **Raias**: "Raia horizontal"/"Raia vertical" (clique inclui; a
+  outra orientação fica apagada). A primeira ocupa a folha.
+- Seleção **pelo cabeçalho**; o corpo deixa o clique passar. Painel:
+  título, descrição, ícone (um dos 56 ou nenhum) e cor (12 tons). Duplo
+  clique no cabeçalho vai ao título.
+- Pertencer: forma ou texto com o **centro** dentro da raia.
+- Arrastar o **cabeçalho** reordena (linha azul de destino); a **linha
+  entre raias** muda a espessura (as seguintes andam com as formas); a
+  **ponta do conjunto** muda o comprimento; a **linha do cabeçalho** muda o
+  tamanho dele (80–600 nas horizontais, 50–400 nas verticais; o conjunto
+  estica e as formas de dentro andam junto). Mínimos de espessura: 90 / 160.
+  Dobras de ligação andam quando as duas pontas andam igual (`moveMap`).
+- Excluir: as raias seguintes sobem com as formas; as da excluída ficam
+  soltas logo depois do conjunto. Raia não copia, não duplica, não agrupa,
+  não anda pelas setas.
+
+#### Q5h (`42a4954`, `e441519`, `35d11e4`, `f0ad6ba`)
+
+- **Q5h-1 Trocar forma:** campo **Tipo de forma** no painel (Fluxograma e
+  BPMN; não para Ícone e Grupo). Mantém texto, centro, ligações, link e as
+  cores escolhidas; cor que era a padrão do tipo antigo vira a do novo;
+  tamanho do tipo quando um dos dois é quadrado/nome embaixo/nota/anotação.
+- **Q5h-2 Link:** `lk: { t: 'doc', id, n }` ou `{ t: 'url', u }` (só
+  `http`/`https`, sem aspas nem `<>`; `cleanLk`). Busca em
+  `ajax/document.search.php` (GET, até 20, **mesma visibilidade das
+  listagens**, título ou código `POP0012`/`pop 12`/`12`, sem o próprio
+  documento). Corrente no canto da forma (meio da aresta no losango, 45° no
+  círculo). Leitura: clique abre (documento na mesma aba, URL em aba nova).
+  PDF: lista **"Links do fluxograma"** abaixo do desenho.
+- **Q5h-3 Busca:** botão **Buscar** e **Ctrl+F** no quadro; caixa no canto,
+  sem acento, contorna todos os achados (formas, raias, textos, molduras,
+  rótulos), Enter/Shift+Enter centraliza e seleciona; Esc fecha só a busca.
+- **Q5h-4 Minimapa:** canto de baixo à direita, folha e desenho em blocos de
+  cor, retângulo da vista; clicar ou arrastar move a vista; botão **Mapa**.
+  Busca e minimapa valem também na Planta e na Topologia.
+
+#### Testes
+
+- Cada bloco com testes em jsdom (ponteiro simulado com `clientX/Y` a partir
+  de `view`, exposto em `root.__cx.view()` só para teste) — 215 no total ao
+  fim da sessão — e o desenho conferido rasterizando com `cairosvg`.
+- O `ajax/document.search.php` passou no `php -l`; a consulta só roda no
+  MariaDB do servidor (validada por Claudio).
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -1956,6 +2065,28 @@ depender do comportamento errático de `position: fixed` na impressão.
 94. **O GLPI estiliza todo `<select>`** (borda, altura, padding): um select
     dentro de outra caixa (os chips do SC1) precisa zerar isso com
     `!important`, senão vira caixa dentro de caixa e corta o texto.
+95. **Painel do quadro redesenhado no meio de um `input`.** O `change` que
+    o navegador dispara depois cai num elemento já fora da página e não
+    chega ao `props`: o `props.__snap` não volta a `false` e as alterações
+    seguintes viram um passo só do Ctrl+Z. Quem chama `drawProps()` dentro
+    do `input` zera `__snap` na hora. O `change` genérico redesenha o painel
+    em todo `select`: campos com vida própria (`data-lk`) ficam fora, senão
+    o resultado de uma busca assíncrona some.
+96. **`clipPath` com id novo a cada desenho.** O mesmo quadro aparece na
+    página (leitura) e no editor ao mesmo tempo, e ids repetidos fazem o
+    navegador usar o recorte do primeiro, com a geometria antiga.
+97. **O servidor só guarda `v`, `mode`, `w`, `h`, `items` e `lib` do
+    quadro** (`Diagram::validate`). Dado novo do fluxograma mora num item
+    (raia como item `lane`; o tamanho do cabeçalho repetido em cada raia).
+98. **Downloads do Claudio:** no PC "Analista Resolutto" o navegador salva
+    em **Documentos**; no PC "Pc", em **Downloads**. O comando de envio
+    traz as duas linhas. Para achar um pacote: `dir /s /b
+    "%USERPROFILE%\<nome>*"`.
+99. **Commit pulado junta blocos.** Q5g-1 e Q5g-2 foram aplicados sem
+    commit e entraram no commit do Q5g-3 (`ae802bc`). O código está certo,
+    mas o histórico perde a divisão. Reforça o achado 75: commit do bloco
+    aprovado antes do pacote seguinte; o primeiro `git status` de cada
+    pacote tem que sair vazio.
 
 ## 6. Contrato de código — não quebrar
 
@@ -2004,12 +2135,13 @@ contêiner inteiro.
 | Item | Valor |
 |---|---|
 | Homologação | `177.87.230.179`, SSH na porta **2078** (Debian, GLPI 11.0.6) |
+| Produção (futura) | **Debian 13, SSH na porta 2022** (decisão de 02/10/2026); recebe o Codex+ só na etapa final, depois da conferência do servidor |
 | Usuário de acesso | `resolutto` (sem sudo); **todo o trabalho é feito como root** (`su -`) |
 | Caminho do GLPI | `/var/www/html/glpi` |
 | Dono dos arquivos do plugin | `www-data:www-data` |
 | Repositório no servidor | **a própria pasta do plugin**, `plugins/codexplus` (desde 19/09/2026, igual aos demais plugins da Teckcomp) |
 | Repositório remoto | `github.com/teckcomp/glpi-plugin-codexplus` (público) |
-| PC de desenvolvimento | Windows, sem Git local; transferência por `scp` (OpenSSH do Windows) |
+| PC de desenvolvimento | Windows, sem Git local; transferência por `scp` (OpenSSH do Windows). Dois PCs: "Analista Resolutto" salva em `Documents`, "Pc" em `Downloads` (achado 98) |
 | Ferramentas no servidor | `git` sim; `zip`/`unzip` **não** — pacotes em `.tar.gz` |
 | Produção | **Codex+ não instalado.** Só sobe ao atingir o marco "Pronto para produção" (ver `ROADMAP.md`) |
 

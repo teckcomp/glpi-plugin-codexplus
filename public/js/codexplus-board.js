@@ -2284,7 +2284,7 @@
                 + '<button type="button" data-act="mm" class="is-on" aria-pressed="true" title="Mostrar ou esconder o minimapa">Mapa</button>';
             ['[data-act="legend"]', '[data-act="png"]'].forEach(function (q) { var el = root.querySelector(q); if (el) { (el.closest('label') || el).remove(); } });
             root.querySelector('.cx-board-pal-top').style.display = 'none';
-            root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para editar no painel. Arraste um cartão para soltá-lo onde quiser (a equipe vai junto); arraste uma pessoa de dentro de um cartão para dar a ela um cartão próprio. “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
+            root.querySelector('.cx-board-hint').textContent = 'Clique num cartão ou numa pessoa para editar no painel. Arraste um elemento da paleta ou um cartão: no centro de outro cartão entra na equipe dele; nas bordas, fica ao lado; no vazio, fica solto (a equipe vai junto). “Arrumar” devolve tudo ao arranjo automático. Arraste o fundo para mover a vista; roda do mouse dá zoom.';
         }
 
         var svg = root.querySelector('.cx-board-svg'), vp = root.querySelector('.vp');
@@ -2650,6 +2650,18 @@
         }
         function orgNode(id) { var ns = D.org.nodes; for (var i = 0; i < ns.length; i++) { if (ns[i].id === id) { return ns[i]; } } return null; }
         function orgGrid(v) { return Math.max(0, Math.round(v / GRID) * GRID); }
+        /* Q6b-3 (Claudio, 03/10/2026): os elementos da paleta, como no motor
+           antigo. Arrastar para o quadro: em cima de um cartão, entra na
+           equipe dele (centro), antes ou depois dele entre os colegas
+           (bordas); no vazio, fica solto. Clique: entra embaixo de quem
+           estiver selecionado (ou do topo). */
+        var ORG_PAL = [
+            { kind: 'cargo', label: 'Cargo', icon: 'ti-user' },
+            { kind: 'area', label: 'Área ou equipe', icon: 'ti-users-group' },
+            { kind: 'vaga', label: 'Vaga em aberto', icon: 'ti-user-question', dashed: true },
+            { kind: 'assessoria', label: 'Assessoria', icon: 'ti-user-star' },
+            { kind: 'terceiro', label: 'Terceiro ou consultor', icon: 'ti-user-share', dashed: true }
+        ];
         function orgPalette() {
             var c = {}, vagas = 0, total = 0;
             D.org.nodes.forEach(function (n) {
@@ -2660,11 +2672,24 @@
             var row = function (sw, txt, num) {
                 return '<div class="cx-board-olv" style="display:flex;align-items:center;gap:8px;padding:4px 12px;font-size:12.5px">' + sw + '<span>' + esc(txt) + '</span><b style="margin-left:auto">' + num + '</b></div>';
             };
-            root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Níveis</div>'
+            var chip = function (key, label, icon, dashed, color, del) {
+                return '<div style="display:flex;align-items:center;margin:0 8px 6px">'
+                    + '<button type="button" data-onew="' + esc(key) + '" title="Arraste para o quadro (centro do cartão: entra na equipe; bordas: ao lado; vazio: solto). Clique: entra embaixo de quem estiver selecionado."'
+                    + ' style="flex:1;display:flex;align-items:center;gap:8px;text-align:left;padding:5px 8px;border:1px ' + (dashed ? 'dashed' : 'solid') + ' var(--cx-border);border-left:4px solid ' + (color || '#3e6aa8') + ';border-radius:6px;background:#fff;cursor:grab;font:inherit;font-size:12.5px;color:var(--cx-text)">'
+                    + '<i class="ti ' + icon + '" aria-hidden="true"></i><span>' + esc(label) + '</span></button>'
+                    + (del ? '<button type="button" class="cx-board-btn" data-oeldel="' + esc(del) + '" title="Excluir este elemento da paleta (quem já está no quadro continua)" style="margin-left:4px;padding:2px 7px">×</button>' : '')
+                    + '</div>';
+            };
+            var lvColor = function (k) { var x = ''; D.org.levels.forEach(function (l) { if (l.key === k) { x = l.color; } }); return x; };
+            root.querySelector('.cx-board-icons').innerHTML = '<div class="cx-board-cat">Elementos</div>'
+                + ORG_PAL.map(function (e) { return chip(e.kind, e.label, e.icon, e.dashed, '', ''); }).join('')
+                + (D.org.elements || []).map(function (e) { return chip('el:' + e.id, e.label, e.base === 'equipe' ? 'ti-users-group' : 'ti-user', e.dashed, lvColor(e.lvl), e.id); }).join('')
+                + '<div style="margin:0 8px 10px"><button type="button" class="cx-board-btn" data-oelnew style="width:100%;border-style:dashed;color:var(--cx-accent)">+ Criar elemento</button></div>'
+                + '<div class="cx-board-cat">Níveis</div>'
                 + D.org.levels.map(function (l) { return row('<i style="width:18px;height:6px;border-radius:2px;display:inline-block;background:' + esc(l.color) + '"></i>', l.label, c[l.key] || 0); }).join('')
                 + row('<i style="width:18px;height:8px;border:1px dashed #888;border-radius:2px;display:inline-block;box-sizing:border-box"></i>', 'Vagas em aberto', vagas)
                 + row('<i style="width:18px;display:inline-block"></i>', 'Pessoas nomeadas', total)
-                + '<p class="cx-board-none" style="padding:8px 12px">Os elementos para arrastar (Cargo, Área, Vaga, Assessoria, Terceiro) e a edição dos níveis chegam nas próximas etapas.</p>';
+                + '<p class="cx-board-none" style="padding:8px 12px">A edição dos níveis chega na próxima etapa.</p>';
         }
         /* Q6b-2 (Claudio, 03/10/2026): edição pelo painel, com as regras do
            motor antigo — nova pessoa entra no nível seguinte ao do chefe;
@@ -2837,6 +2862,201 @@
                 render();
             }
         });
+        /* ---------- Q6b-3: colocar, mover para outra equipe, diálogos ---------- */
+        function orgNewNode(kind, lvl) {
+            var n = { id: orgNewId(), name: '', role: '', lvl: lvl, note: '', pend: false, group: false };
+            if (kind.indexOf('el:') === 0) {
+                var el = (D.org.elements || []).filter(function (x) { return 'el:' + x.id === kind; })[0];
+                if (!el) { return n; }
+                if (el.lvl && D.org.levels.some(function (l) { return l.key === el.lvl; })) { n.lvl = el.lvl; }
+                if (el.base === 'equipe') { n.name = el.label; n.group = true; } else { n.role = el.label; }
+                if (el.dashed) { n.dashed = true; }
+                n.kind = kind;
+                return n;
+            }
+            if (kind === 'area') { n.name = 'Nova área'; n.group = true; }
+            if (kind === 'vaga') { n.kind = 'vaga'; n.note = 'Vaga em aberto'; }
+            if (kind === 'assessoria') { n.kind = 'assessoria'; n.role = 'Assessoria'; }
+            if (kind === 'terceiro') { n.kind = 'terceiro'; n.role = 'Consultor externo'; n.dashed = true; }
+            return n;
+        }
+        // Zona de soltura sobre um cartão (bordas = antes/depois entre os
+        // colegas; centro = na equipe) ou sobre uma pessoa da lista (em cima/
+        // embaixo = antes/depois; meio = na equipe dela). Topo: só "na equipe".
+        function orgZone(it, p) {
+            var T = OD().tree(D.org);
+            if (!T.parentOf[it.id]) { return 'in'; }
+            if (it.t === 'orow') { var fy = (p.y - it.y) / (it.h || 1); return fy < 0.3 ? 'before' : fy > 0.7 ? 'after' : 'in'; }
+            var fx = (p.x - it.x) / (it.w || 1);
+            return fx < 0.25 ? 'before' : fx > 0.75 ? 'after' : 'in';
+        }
+        function orgZoneSvg(it, zone) {
+            var k = 1 / view.z, c = '#1D9E75';
+            if (zone === 'in') {
+                return '<rect x="' + (it.x - 4 * k) + '" y="' + (it.y - 4 * k) + '" width="' + (it.w + 8 * k) + '" height="' + (it.h + 8 * k) + '" rx="10" fill="' + c + '" fill-opacity="0.1" stroke="' + c + '" stroke-width="' + (2.5 * k) + '" pointer-events="none"/>';
+            }
+            if (it.t === 'orow') {
+                var y = zone === 'before' ? it.y : it.y + it.h;
+                return '<rect x="' + it.x + '" y="' + (y - 2 * k) + '" width="' + it.w + '" height="' + (4 * k) + '" fill="' + c + '" pointer-events="none"/>';
+            }
+            var x = zone === 'before' ? it.x - 9 * k : it.x + it.w + 5 * k;
+            return '<rect x="' + x + '" y="' + it.y + '" width="' + (4 * k) + '" height="' + it.h + '" rx="2" fill="' + c + '" pointer-events="none"/>';
+        }
+        // Alvo sob o ponteiro (cartão ou pessoa da lista), menos o próprio e a
+        // equipe dele (não dá para pôr alguém embaixo de si mesmo).
+        function orgTarget(ev, movingId) {
+            var el = document.elementFromPoint(ev.clientX, ev.clientY), id = el && svg.contains(el) ? hit(el) : null, it = id && get(id);
+            if (!it || it.t === 'link') { return null; }
+            if (movingId && (it.id === movingId || orgTeam(movingId)[it.id])) { return null; }
+            return it;
+        }
+        // Põe `n` (novo ou existente) junto de `tid`. Existente perde a chefia
+        // antiga e a posição solta (passa a seguir o arranjo da nova equipe).
+        function orgPlace(n, tid, zone, novo) {
+            var T = OD().tree(D.org), pid = zone === 'in' ? tid : (T.parentOf[tid] || '');
+            if (!pid) { return false; }
+            if (novo) { D.org.nodes.push(n); }
+            else {
+                D.org.edges = D.org.edges.filter(function (e) {
+                    if (e.to === n.id && e.boss) { return false; }
+                    if ((e.from === pid && e.to === n.id) || (e.from === n.id && e.to === pid)) { return false; }
+                    return true;
+                });
+                delete n.x; delete n.y;
+            }
+            var e = { id: orgEdgeId(), from: pid, to: n.id, boss: true, style: 'solida', label: '' };
+            if (zone === 'in') { D.org.edges.push(e); }
+            else {
+                var i = -1;
+                D.org.edges.forEach(function (x, j) { if (i < 0 && x.boss && x.to === tid) { i = j; } });
+                D.org.edges.splice(i < 0 ? D.org.edges.length : i + (zone === 'after' ? 1 : 0), 0, e);
+            }
+            return true;
+        }
+        // "Deixar a equipe": os subordinados diretos passam ao chefe atual,
+        // no lugar de quem sai (como no motor antigo).
+        function orgLeaveTeam(id) {
+            var pid = orgBossOf(id); if (!pid) { return; }
+            var out = [], done = false;
+            D.org.edges.forEach(function (e) {
+                if (e.from === id && e.boss) { return; }
+                out.push(e);
+                if (!done && e.to === id && e.from === pid && e.boss) {
+                    D.org.edges.forEach(function (k) { if (k.from === id && k.boss) { out.push({ id: k.id, from: pid, to: k.to, boss: true, style: k.style, label: k.label }); } });
+                    done = true;
+                }
+            });
+            D.org.edges = out;
+        }
+        var odlg = null;
+        function orgDlgClose() { if (odlg) { odlg.remove(); odlg = null; } }
+        function orgDlg(html, onClick) {
+            orgDlgClose();
+            odlg = document.createElement('div');
+            odlg.className = 'cx-io-back';
+            odlg.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true">' + html + '</div>';
+            root.appendChild(odlg);
+            odlg.addEventListener('pointerdown', function (e) { if (e.target === odlg) { orgDlgClose(); } });
+            odlg.addEventListener('click', function (e) { var b = e.target.closest('[data-od]'); if (b) { onClick(b.getAttribute('data-od')); } });
+            var f = odlg.querySelector('input,[data-od]'); if (f) { f.focus(); }
+        }
+        // Mover alguém que tem equipe para dentro de uma lista ou equipe:
+        // pergunta se a equipe vai junto (motor antigo, 0.6.7-6).
+        function orgMoveTo(id, tid, zone, row) {
+            var n = orgNode(id), T = OD().tree(D.org), kids = (T.kids[id] || []).length, pid = T.parentOf[id];
+            var go = function (leave) {
+                snap();
+                if (leave) { orgLeaveTeam(id); }
+                if (orgPlace(n, tid, zone, false)) { sel = [id]; }
+                render();
+            };
+            if (!kids || !pid || !(zone === 'in' || row)) { go(false); return; }
+            var all = Object.keys(orgTeam(id)).length, who = OD().label(n), boss = OD().label(orgNode(pid));
+            orgDlg('<h3>Mover ' + esc(who) + '</h3><p class="cx-io-sub">' + esc(who) + ' tem ' + kids + (kids === 1 ? ' subordinado direto' : ' subordinados diretos')
+                + (all > kids ? ' (' + all + ' pessoas na equipe toda)' : '') + '. Quem tem equipe aparece como cartão próprio.</p>'
+                + '<div class="cx-io-foot" style="flex-wrap:wrap"><button type="button" class="cx-io-btn" data-od="cancel">Cancelar</button>'
+                + '<button type="button" class="cx-io-btn" data-od="with">Levar a equipe junto (vira cartão)</button>'
+                + '<button type="button" class="cx-io-btn cx-io-pri" data-od="leave">Deixar a equipe com ' + esc(boss) + ' e entrar na lista</button></div>',
+                function (a) { orgDlgClose(); if (a === 'with') { go(false); } else if (a === 'leave') { go(true); } });
+        }
+        function orgDropNew(kind, ev) {
+            var r = svg.getBoundingClientRect(), dentro = ev && ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+            var last = D.org.levels[D.org.levels.length - 1].key, n, it = dentro ? orgTarget(ev, null) : null;
+            snap();
+            if (it) {
+                var z = orgZone(it, toBoard(ev)), t = orgNode(it.id);
+                n = orgNewNode(kind, z === 'in' ? orgNextLevel(t.lvl) : t.lvl);
+                orgPlace(n, it.id, z, true);
+            } else if (dentro) {
+                n = orgNewNode(kind, last);
+                var p = toBoard(ev);
+                D.org.nodes.push(n);
+                n.x = orgGrid(p.x - 90 - ORG_PAD - oOrigin.x); n.y = orgGrid(p.y - 20 - ORG_PAD - oOrigin.y);
+            } else {
+                // Clique na paleta: embaixo de quem estiver selecionado (ou do topo).
+                var T = OD().tree(D.org), s0 = sel.length === 1 && orgNode(sel[0]), base = s0 || T.top;
+                n = orgNewNode(kind, base ? orgNextLevel(base.lvl) : last);
+                D.org.nodes.push(n);
+                if (base) { D.org.edges.push({ id: orgEdgeId(), from: base.id, to: n.id, boss: true, style: 'solida', label: '' }); }
+            }
+            sel = [n.id]; oDelArm = null; render();
+            var f = props.querySelector('[data-of="name"]'); if (f) { f.focus(); f.select(); }
+        }
+        function orgElNew() {
+            var opts = '<option value="">Conforme a posição</option>' + D.org.levels.map(function (l) { return '<option value="' + esc(l.key) + '">' + esc(l.label) + '</option>'; }).join('');
+            orgDlg('<h3>Criar elemento</h3><p class="cx-io-sub">O elemento entra na paleta deste organograma, ao lado dos padrão. Ex.: "Coringa NOC", "Plantonista", "Estagiário".</p>'
+                + '<label class="cx-board-f"><span>Nome</span><input type="text" maxlength="40" data-oel="name" autocomplete="off" style="box-sizing:border-box"></label>'
+                + '<label class="cx-board-f"><span>É</span><select data-oel="base"><option value="pessoa">uma pessoa (cargo)</option><option value="equipe">uma área ou equipe</option></select></label>'
+                + '<label class="cx-board-f"><span>Nível</span><select data-oel="lvl">' + opts + '</select></label>'
+                + '<label class="cx-board-chk"><input type="checkbox" data-oel="dashed"> Borda tracejada (externo ou temporário)</label>'
+                + '<p class="cx-io-err" data-oel="err" hidden></p>'
+                + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-od="cancel">Cancelar</button><button type="button" class="cx-io-btn cx-io-pri" data-od="save">Criar</button></div>',
+                function (a) {
+                    if (a === 'cancel') { orgDlgClose(); return; }
+                    var q = function (k) { return odlg.querySelector('[data-oel="' + k + '"]'); }, nm = q('name').value.trim();
+                    if (!nm) { q('err').textContent = 'Informe o nome do elemento.'; q('err').hidden = false; q('name').focus(); return; }
+                    if ((D.org.elements || []).length >= 40) { q('err').textContent = 'Este organograma já tem 40 elementos criados (o máximo).'; q('err').hidden = false; return; }
+                    snap();
+                    D.org.elements = D.org.elements || [];
+                    D.org.elements.push({ id: 'e' + Date.now().toString(36), label: nm.slice(0, 40), base: q('base').value === 'equipe' ? 'equipe' : 'pessoa', lvl: q('lvl').value, dashed: q('dashed').checked });
+                    orgDlgClose(); render(); paleta();
+                });
+            var nmIn = odlg.querySelector('[data-oel="name"]');
+            nmIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); odlg.querySelector('[data-od="save"]').click(); } });
+            nmIn.focus();
+        }
+        if (org) {
+            var palEl = root.querySelector('.cx-board-icons');
+            palEl.addEventListener('click', function (e) {
+                if (e.target.closest('[data-oelnew]')) { orgElNew(); return; }
+                var d = e.target.closest('[data-oeldel]');
+                if (d) { snap(); D.org.elements = (D.org.elements || []).filter(function (x) { return x.id !== d.getAttribute('data-oeldel'); }); render(); paleta(); }
+            });
+            palEl.addEventListener('pointerdown', function (e) {
+                var b = e.target.closest('[data-onew]'); if (!b || e.button !== 0) { return; }
+                e.preventDefault();
+                var kind = b.getAttribute('data-onew'), sx = e.clientX, sy = e.clientY, moved = false;
+                var ghost = document.createElement('div');
+                ghost.className = 'cx-board-ghost';
+                ghost.style.cssText = 'padding:5px 10px;background:#fff;border:1px solid var(--cx-border);border-radius:6px;font-size:12.5px;box-shadow:0 4px 12px rgba(0,0,0,.15);white-space:nowrap';
+                ghost.textContent = b.textContent;
+                function mv(ev) {
+                    if (!moved && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) { return; }
+                    if (!moved) { moved = true; document.body.appendChild(ghost); }
+                    ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 8) + 'px';
+                    var it = orgTarget(ev, null);
+                    gGuides.innerHTML = it ? orgZoneSvg(it, orgZone(it, toBoard(ev))) : '';
+                }
+                function up(ev) {
+                    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+                    if (ghost.parentNode) { ghost.remove(); }
+                    gGuides.innerHTML = '';
+                    orgDropNew(kind, moved ? ev : null);
+                }
+                document.addEventListener('pointermove', mv);
+                document.addEventListener('pointerup', up);
+            });
+        }
         // Ponteiro no organograma: clique seleciona; arrastar cartão o solta
         // onde largar (a equipe ancorada vai junto); arrastar pessoa da lista
         // dá a ela um cartão próprio; arrastar o fundo move a vista.
@@ -2865,13 +3085,18 @@
             drag.moved = true;
             var b = drag.box, x = ORG_PAD + oOrigin.x + orgGrid(b.x + dx - ORG_PAD - oOrigin.x), y = ORG_PAD + oOrigin.y + orgGrid(b.y + dy - ORG_PAD - oOrigin.y);
             drag.at = { x: x, y: y };
+            var tg = orgTarget(e, drag.id);
+            drag.tg = tg ? { id: tg.id, row: tg.t === 'orow', zone: orgZone(tg, toBoard(e)) } : null;
+            if (tg) { gGuides.innerHTML = orgZoneSvg(tg, drag.tg.zone); return; }
             gGuides.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + b.w + '" height="' + b.h + '" rx="8" fill="#378ADD" fill-opacity="0.08" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" stroke-dasharray="' + (6 / view.z) + ' ' + (4 / view.z) + '" pointer-events="none"/>';
         }
-        function orgUp() {
+        function orgUp(e) {
             svg.classList.remove('is-panning');
             var d = drag; drag = null; gGuides.innerHTML = '';
             if (!d || d.k !== 'omove' || !d.moved || !d.at) { return; }
             var n = orgNode(d.id); if (!n) { return; }
+            // Q6b-3: largou em cima de um cartão ou pessoa: muda de equipe.
+            if (d.tg) { orgMoveTo(d.id, d.tg.id, d.tg.zone, d.tg.row); return; }
             snap();
             n.x = orgGrid(d.at.x - ORG_PAD - oOrigin.x); n.y = orgGrid(d.at.y - ORG_PAD - oOrigin.y);
             render();
@@ -4421,6 +4646,7 @@
             if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); findOpen(); return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
+            if (org && odlg) { if (e.key === 'Escape') { e.preventDefault(); orgDlgClose(); } return; }
             if (org) {
                 // Q6b-1: no organograma, só desfazer/refazer e Esc (edição pelo
                 // teclado chega com o painel de edição).

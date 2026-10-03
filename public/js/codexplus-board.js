@@ -145,6 +145,99 @@
         ico:     { label: 'Ícone',                w: 48,  h: 48,  color: 'azul' }
     };
     var ICO_DEFAULT = 'user';
+    /* Q5g — raias (Claudio, 02/10/2026). Orientação por fluxograma: a
+       primeira raia decide (h = horizontais, empilhadas; v = verticais, lado
+       a lado). Item `lane`: { dir, x, y, w, h, title, desc, ico, tone }. As
+       raias ficam sempre encostadas, com o mesmo comprimento (o da primeira),
+       e sempre atrás de tudo. Uma forma pertence à raia onde está o centro
+       dela. Excluir a raia: as formas dela ficam no quadro, soltas, logo
+       depois do conjunto (Claudio, 02/10/2026). */
+    var LANE = { h: { hd: 190, th: 150, min: 90, hmin: 80, hmax: 600 }, v: { hd: 110, th: 260, min: 160, hmin: 50, hmax: 400 } };
+    // Q5g-3: tamanho do cabeçalho (largura nas horizontais, altura nas
+    // verticais), o mesmo em todas as raias; gravado em cada uma (`hd`).
+    function laneHd(l) { var m = LANE[l.dir] || LANE.h; return Math.max(m.hmin, Math.min(m.hmax, Math.round(+l.hd || m.hd))); }
+    var LANE_TONES = ['azul', 'verde', 'roxo', 'ambar', 'coral', 'cinza'];
+    var LANE_DIR = { h: 'Raia horizontal', v: 'Raia vertical' };
+    function lanesOf(items) {
+        return items.filter(function (i) { return i.t === 'lane'; })
+            .sort(function (a, b) { return a.dir === 'h' ? a.y - b.y : a.x - b.x; });
+    }
+    // Encosta as raias umas nas outras, a partir da primeira, com o
+    // comprimento dela. Devolve a ordem final.
+    function laneLayout(items) {
+        var ls = lanesOf(items);
+        if (!ls.length) { return ls; }
+        var f = ls[0], dir = f.dir, hd = laneHd(f), len = Math.max(hd + 100, dir === 'h' ? f.w : f.h), pos = dir === 'h' ? f.y : f.x;
+        ls.forEach(function (l) {
+            l.dir = dir; l.hd = hd;
+            if (dir === 'h') { l.x = f.x; l.w = len; l.y = pos; pos += l.h; }
+            else { l.y = f.y; l.h = len; l.x = pos; pos += l.w; }
+        });
+        return ls;
+    }
+    function inLane(l, it) {
+        var b = it.t === 'shape' ? { x: it.x, y: it.y, w: it.w, h: it.h } : bbox(it), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+        return cx >= l.x && cx < l.x + l.w && cy >= l.y && cy < l.y + l.h;
+    }
+    // Formas e textos com o centro dentro da raia.
+    function laneMembers(items, l) {
+        return items.filter(function (i) { return (i.t === 'shape' || i.t === 'text') && inLane(l, i); }).map(function (i) { return i.id; });
+    }
+    function laneSvg(items, forExport) {
+        var ls = lanesOf(items);
+        if (!ls.length) { return ''; }
+        // Cantos arredondados: tudo dentro da moldura é recortado por ela (o
+        // cabeçalho não passa do canto). Id novo a cada desenho: o mesmo
+        // quadro pode estar na página e no editor ao mesmo tempo.
+        var f = ls[0], z = ls[ls.length - 1], fw = z.x + z.w - f.x, fh = z.y + z.h - f.y, cid = 'cxl' + uid();
+        var out = '<defs><clipPath id="' + cid + '"><rect x="' + f.x + '" y="' + f.y + '" width="' + fw + '" height="' + fh + '" rx="10"/></clipPath></defs><g clip-path="url(#' + cid + ')">';
+        ls.forEach(function (l, i) {
+            var c = pal(l.tone), x = l.x, y = l.y, w = l.w, h = l.h, H = l.dir === 'h', hd = laneHd(l), g = '';
+            // Corpo: só pinta; o clique passa para o quadro (seleciona formas).
+            g += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + c.f + '" fill-opacity="0.35" pointer-events="none"/>';
+            if (i) { g += '<path d="' + (H ? 'M' + x + ' ' + y + 'H' + (x + w) : 'M' + x + ' ' + y + 'V' + (y + h)) + '" stroke="#B4B2A9" stroke-width="1.2" pointer-events="none"/>'; }
+            // Cabeçalho: é por ele que a raia é selecionada.
+            var hw = H ? hd : w, hh = H ? h : hd;
+            g += '<g data-id="' + l.id + '"' + (forExport ? '' : ' class="cx-board-lanehd"') + '><rect x="' + x + '" y="' + y + '" width="' + hw + '" height="' + hh + '" fill="' + c.f + '"/>';
+            g += '<path d="' + (H ? 'M' + (x + hd) + ' ' + y + 'V' + (y + h) : 'M' + x + ' ' + (y + hd) + 'H' + (x + w)) + '" stroke="' + c.s + '" stroke-opacity="0.35" stroke-width="1.2"/>';
+            var body = l.ico && Lucide().SVG[l.ico], isz = H ? 30 : 28, tx = H ? x + 16 : x + w / 2, anc = H ? 'start' : 'middle';
+            var ty = y + (body ? (H ? 18 + isz + 28 : 12 + isz + 22) : (H ? 34 : 34));
+            if (body) {
+                var ix = H ? x + 16 : x + w / 2 - isz / 2, iy = y + (H ? 18 : 12), k = isz / 24;
+                g += '<g transform="translate(' + ix + ' ' + iy + ') scale(' + k.toFixed(4) + ')" fill="none" stroke="' + c.s + '" stroke-width="' + Math.min(2, 4 / k).toFixed(3) + '" stroke-linecap="round" stroke-linejoin="round">' + body + '</g>';
+            }
+            var tw = H ? hd - 32 : w - 24;
+            var tl = wrapText(l.title, tw, H ? 17 : 16).slice(0, 2), dl = String(l.desc || '').trim() ? wrapText(l.desc, tw, 12.5).slice(0, H ? Math.max(1, Math.floor((h - (ty - y) - 10) / 16) - tl.length + 1) : 3) : [];
+            if (String(l.title || '').trim()) {
+                g += '<text x="' + tx + '" y="' + ty + '" text-anchor="' + anc + '" font-family="Arial,sans-serif" font-size="' + (H ? 17 : 16) + '" font-weight="bold" fill="' + c.t + '">'
+                    + tl.map(function (t, j) { return '<tspan x="' + tx + '" dy="' + (j ? 20 : 0) + '">' + esc(t) + '</tspan>'; }).join('') + '</text>';
+            }
+            var dy0 = ty + (String(l.title || '').trim() ? (tl.length - 1) * 20 + 20 : 0);
+            if (dl.length) {
+                g += '<text x="' + tx + '" y="' + dy0 + '" text-anchor="' + anc + '" font-family="Arial,sans-serif" font-size="12.5" fill="' + c.t + '">'
+                    + dl.map(function (t, j) { return '<tspan x="' + tx + '" dy="' + (j ? 16 : 0) + '">' + esc(t) + '</tspan>'; }).join('') + '</text>';
+            }
+            out += g + '</g>';
+        });
+        out += '</g><rect x="' + f.x + '" y="' + f.y + '" width="' + fw + '" height="' + fh + '" rx="10" fill="none" stroke="#888780" stroke-width="1.4" pointer-events="none"/>';
+        if (!forExport) {
+            // Q5g-2: faixas invisíveis para puxar. Fim de cada raia = espessura
+            // dela (a linha entre duas raias e a borda de fora); ponta do
+            // conjunto = comprimento de todas. Ficam sob as formas.
+            var hz = f.dir === 'h', hit = ' fill="#fff" fill-opacity="0"';
+            ls.forEach(function (l) {
+                out += hz ? '<rect class="cx-board-lrz-h" data-lrz="' + l.id + '" x="' + l.x + '" y="' + (l.y + l.h - 5) + '" width="' + l.w + '" height="10"' + hit + '/>'
+                    : '<rect class="cx-board-lrz-v" data-lrz="' + l.id + '" x="' + (l.x + l.w - 5) + '" y="' + l.y + '" width="10" height="' + l.h + '"' + hit + '/>';
+            });
+            out += hz ? '<rect class="cx-board-lrz-v" data-llen="1" x="' + (f.x + fw - 5) + '" y="' + f.y + '" width="10" height="' + fh + '"' + hit + '/>'
+                : '<rect class="cx-board-lrz-h" data-llen="1" x="' + f.x + '" y="' + (f.y + fh - 5) + '" width="' + fw + '" height="10"' + hit + '/>';
+            // Q5g-3: linha do cabeçalho (vale para todas as raias).
+            var hdF = laneHd(f);
+            out += hz ? '<rect class="cx-board-lrz-v" data-lhd="1" x="' + (f.x + hdF - 5) + '" y="' + f.y + '" width="10" height="' + fh + '"' + hit + '/>'
+                : '<rect class="cx-board-lrz-h" data-lhd="1" x="' + f.x + '" y="' + (f.y + hdF - 5) + '" width="' + fw + '" height="10"' + hit + '/>';
+        }
+        return out;
+    }
     function Lucide() { return window.CodexplusLucide || { CATS: [], NAME: {}, SVG: {} }; }
     function icoName(k) { return Lucide().NAME[k] || 'Ícone'; }
     // Nome embaixo da forma (BPMN); formas sempre redondas/quadradas; sem fundo.
@@ -173,6 +266,8 @@
     var SHAPE_GROUPS = [
         { k: 'flux', label: 'Fluxograma', items: ['term', 'proc', 'dec', 'doc', 'data', 'conn', 'sub', 'db', 'manin', 'manop', 'prep', 'delay', 'docs', 'offpage', 'note'] },
         { k: 'bpmn', label: 'BPMN', items: ['evstart', 'evmid', 'evend', 'evmid:msg', 'evmid:timer', 'task', 'bsub', 'gwx', 'gwp', 'gwi', 'dataobj', 'annot', 'group'] },
+        // Q5g: raias (botões próprios, montados na paleta).
+        { k: 'lane', label: 'Raias', items: [] },
         // Q5j-2: todos os desenhos do catálogo, em subgrupos (montados na paleta).
         { k: 'ico', label: 'Ícones', items: [] }
     ];
@@ -665,6 +760,15 @@
                     fs: LINK_FS[it.fs] ? it.fs : 'm', lock: !!it.lock, g: it.g ? String(it.g) : '' });
                 return;
             }
+            if (it && it.t === 'lane') {
+                if (!flowMode) { return; }
+                var dl = it.dir === 'v' ? 'v' : 'h', lm = LANE[dl];
+                out.items.push({ id: String(it.id || uid()), t: 'lane', dir: dl, x: +it.x || 0, y: +it.y || 0, lock: false, g: '',
+                    w: Math.max(dl === 'v' ? lm.min : lm.hd + 100, Math.min(6000, +it.w || 0)), h: Math.max(dl === 'h' ? lm.min : lm.hd + 100, Math.min(6000, +it.h || 0)),
+                    hd: +it.hd || 0, title: String(it.title || '').slice(0, 80), desc: String(it.desc || '').slice(0, 200),
+                    ico: /^[a-z0-9-]{1,40}$/.test(String(it.ico || '')) ? String(it.ico) : '', tone: FLOW_COLORS[it.tone] ? it.tone : 'azul' });
+                return;
+            }
             if (!it || ['icon', 'zone', 'text'].indexOf(it.t) < 0) { return; }
             var n = { id: String(it.id || uid()), t: it.t, x: +it.x || 0, y: +it.y || 0, lock: !!it.lock, g: it.g ? String(it.g) : '' };
             if (it.t === 'icon') {
@@ -695,6 +799,10 @@
             }
             out.items.push(n);
         });
+        // Q5g: uma orientação por fluxograma (a da primeira raia gravada) e
+        // raias sempre encostadas.
+        var l0 = out.items.filter(function (i) { return i.t === 'lane'; })[0];
+        if (l0) { out.items.forEach(function (i) { if (i.t === 'lane') { i.dir = l0.dir; } }); laneLayout(out.items); }
         // Ligações: só entre dois ícones (ou formas) que existem; apagar leva a ligação junto.
         var icons = {};
         out.items.forEach(function (i) { if (i.t === 'icon' || i.t === 'shape') { icons[i.id] = true; } });
@@ -997,6 +1105,7 @@
     /* ---------------- desenho de um item (tela e PNG) ---------------- */
     function itemSvg(it, forExport) {
         if (it.t === 'shape') { return shapeSvg(it, forExport); }
+        if (it.t === 'lane') { return ''; }   // laneSvg(), no fundo
         if (it.t === 'zone') {
             return '<g data-id="' + it.id + '"><rect x="' + it.x + '" y="' + it.y + '" width="' + it.w + '" height="' + it.h
                 + '" rx="10" fill="' + it.color + '" fill-opacity="0.05" stroke="' + it.color + '" stroke-width="2" stroke-dasharray="8 5"/>'
@@ -1126,7 +1235,7 @@
             }
             return { x: it.x, y: it.y, w: it.w, h: it.h };
         }
-        if (it.t === 'zone') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
+        if (it.t === 'zone' || it.t === 'lane') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
         if (it.t === 'duct') {
             var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }), pd = (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w / 2 + 2;
             var bx = Math.min.apply(null, xs) - pd, by = Math.min.apply(null, ys) - pd;
@@ -1174,6 +1283,7 @@
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="' + box.x + ' ' + box.y + ' ' + box.w + ' ' + box.h + '">'
             + '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w + '" height="' + box.h + '" fill="#ffffff"/>'
             + (bgImg ? '<image href="' + bgImg + '" x="0" y="0" width="' + data.w + '" height="' + data.h + '" opacity="' + data.bgOpacity + '"/>' : '')
+            + laneSvg(data.items, true)
             + data.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i, true); }).join('')
             + data.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, data.items, true); }).join('')
             + data.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, find, true); }).join('')
@@ -1531,7 +1641,7 @@
         var marq = root.querySelector('.cx-board-marq'), props = root.querySelector('.cx-board-props');
 
         /* ---------- paleta ---------- */
-        var palShut = {};
+        var palShut = {}, laneDirPal = null;
         function paleta() {
             if (flow) {
                 // Q5b: só formas (os ícones de rede são da Planta e da Topologia).
@@ -1550,7 +1660,17 @@
                 };
                 var html = SHAPE_GROUPS.map(function (gr) {
                     var shut = !fq && !!palShut[gr.k], body = '';
-                    if (gr.k === 'ico') {
+                    if (gr.k === 'lane') {
+                        var ld = (lanesOf(D.items)[0] || {}).dir;
+                        body = ['h', 'v'].filter(function (dk) { return hit(LANE_DIR[dk] + ' raias swimlane'); }).map(function (dk) {
+                            var off = ld && ld !== dk, ic = dk === 'h'
+                                ? '<rect x="2" y="2" width="40" height="26" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/><path d="M12 2V28M2 10.7H42M2 19.3H42" stroke="#185FA5" stroke-width="1.2" fill="none"/>'
+                                : '<rect x="2" y="2" width="40" height="26" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/><path d="M2 9H42M15.3 2V28M28.7 2V28" stroke="#185FA5" stroke-width="1.2" fill="none"/>';
+                            return '<button type="button" class="cx-board-ic" data-lane="' + dk + '"' + (off ? ' disabled title="Este fluxograma usa raias ' + (ld === 'h' ? 'horizontais' : 'verticais') + '"' : ' title="' + LANE_DIR[dk] + ' (clique para incluir)"') + '>'
+                                + '<svg viewBox="0 0 44 30" width="44" height="30">' + ic + '</svg><span>' + LANE_DIR[dk] + '</span></button>';
+                        }).join('');
+                        body = body ? '<div class="cx-board-grid">' + body + '</div>' : '';
+                    } else if (gr.k === 'ico') {
                         body = Lucide().CATS.map(function (c) {
                             var ks = c.items.filter(function (k) { return hit(icoName(k) + ' ' + k + ' ' + c.label); });
                             return ks.length ? '<div class="cx-board-cat cx-board-subcat">' + esc(c.label) + '</div><div class="cx-board-grid">' + ks.map(function (k) { return btn('ico:' + k); }).join('') + '</div>' : '';
@@ -1878,7 +1998,7 @@
         /* ---------- desenho ---------- */
         // Zonas embaixo, ligações no meio, ícones e textos por cima.
         function paint() {
-            gZones.innerHTML = D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
+            gZones.innerHTML = laneSvg(D.items) + D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
             gDucts.innerHTML = D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
             gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
@@ -1897,6 +2017,9 @@
             } else {
                 bgImgEl.setAttribute('display', 'none');
             }
+            // Q5g: a seção Raias da paleta acompanha a orientação em uso.
+            var ldNow = (lanesOf(D.items)[0] || {}).dir || '';
+            if (flow && ldNow !== laneDirPal) { laneDirPal = ldNow; paleta(); }
             paint();
             drawSel();
             drawProps();
@@ -1974,7 +2097,7 @@
                     + (it.t === 'icon' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rzi="' + it.id + '" x="' + (it.x + it.size - 4 / view.z) + '" y="' + (it.y + it.size - 4 / view.z)
                         + '" width="' + (9 / view.z) + '" height="' + (9 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '')
                     + ((it.t === 'icon' || it.t === 'shape') && sel.length === 1 ? handles(it) : '')
-                    + (flow && sel.length === 1 && !it.lock ? sizeHandles(it, b) : '')
+                    + (flow && sel.length === 1 && !it.lock && it.t !== 'lane' ? sizeHandles(it, b) : '')
                     + (!flow && it.t === 'zone' && sel.length === 1 && !it.lock ? '<rect class="cx-board-rz" data-rz="' + it.id + '" x="' + (b.x + b.w - 5 / view.z) + '" y="' + (b.y + b.h - 5 / view.z)
                         + '" width="' + (10 / view.z) + '" height="' + (10 / view.z) + '" fill="#fff" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '"/>' : '');
             }).join('');
@@ -2127,7 +2250,18 @@
             }
             var it = get(sel[0]), h = '';
             var optsOf = function (o, v) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + esc(o[k]) + '</option>'; }).join(''); };
-            if (it.t === 'shape') {
+            if (it.t === 'lane') {
+                h += '<p><strong>' + esc(LANE_DIR[it.dir]) + '</strong></p>'
+                    + field('Título', 'title', it.title, 'Comercial')
+                    + '<label class="cx-board-f"><span>Descrição</span><textarea data-k="desc" rows="2" maxlength="200">' + esc(it.desc) + '</textarea></label>'
+                    + '<label class="cx-board-f"><span>Ícone</span><select data-k="ico"><option value="">Nenhum</option>'
+                    + (it.ico && !Lucide().SVG[it.ico] ? '<option value="' + esc(it.ico) + '" selected>(desconhecido: ' + esc(it.ico) + ')</option>' : '')
+                    + Lucide().CATS.map(function (c) {
+                        return '<optgroup label="' + esc(c.label) + '">' + c.items.map(function (k) { return '<option value="' + k + '"' + (k === it.ico ? ' selected' : '') + '>' + esc(icoName(k)) + '</option>'; }).join('') + '</optgroup>';
+                    }).join('') + '</select></label>'
+                    + '<label class="cx-board-f"><span>Cor</span><select data-k="tone">' + Object.keys(FLOW_COLORS).map(function (k) { return '<option value="' + k + '"' + (k === it.tone ? ' selected' : '') + '>' + esc(FLOW_COLORS[k].label) + '</option>'; }).join('') + '</select></label>'
+                    + '<p class="cx-board-none">A raia é selecionada pelo cabeçalho. As formas pertencem à raia onde está o centro delas. Excluir a raia não apaga as formas: elas ficam soltas, depois das raias.</p>';
+            } else if (it.t === 'shape') {
                 h += '<p><strong>' + esc(it.shape === 'ico' ? 'Ícone: ' + icoName(it.ico) : SHAPES[it.shape].label) + '</strong></p>'
                     + (it.shape === 'ico' ? '<label class="cx-board-f"><span>Desenho</span><select data-k="ico">'
                         + (Lucide().SVG[it.ico] ? '' : '<option value="' + esc(it.ico) + '" selected>(desconhecido: ' + esc(it.ico) + ')</option>')
@@ -2276,6 +2410,35 @@
             D.items.push(it);
             sel = [it.id];
             render();
+        }
+
+        // Vários deslocamentos de uma vez ({ id: [dx, dy] }): a dobra de uma
+        // ligação anda quando as duas pontas andaram igual.
+        function moveMap(m) {
+            Object.keys(m).forEach(function (id) { var it = get(id); if (it) { it.x += m[id][0]; it.y += m[id][1]; } });
+            D.items.forEach(function (l) {
+                var a = l.t === 'link' && l.wp && l.wp.length && m[l.a.id], b = a && m[l.b.id];
+                if (b && a[0] === b[0] && a[1] === b[1] && (a[0] || a[1])) { l.wp.forEach(function (q) { q.x += a[0]; q.y += a[1]; }); }
+            });
+        }
+        // Q5g: raia nova no fim do conjunto; a primeira ocupa a folha.
+        function addLane(dir) {
+            var ls = lanesOf(D.items);
+            if (ls.length && ls[0].dir !== dir) {
+                notify(editor, 'Este fluxograma usa raias ' + (ls[0].dir === 'h' ? 'horizontais' : 'verticais') + '.');
+                return null;
+            }
+            snap();
+            var m = LANE[dir], n = ls.length, z = ls[n - 1];
+            var it = { id: uid(), t: 'lane', dir: dir, hd: z ? laneHd(z) : m.hd, title: 'Raia ' + (n + 1), desc: '', ico: '', tone: LANE_TONES[n % LANE_TONES.length], lock: false, g: '' };
+            if (dir === 'h') { it.x = z ? z.x : 20; it.y = z ? z.y + z.h : 20; it.w = z ? z.w : Math.max(it.hd + 100, D.w - 40); it.h = m.th; }
+            else { it.y = z ? z.y : 20; it.x = z ? z.x + z.w : 20; it.h = z ? z.h : Math.max(it.hd + 100, D.h - 40); it.w = m.th; }
+            D.items.unshift(it);
+            laneLayout(D.items);
+            sel = [it.id];
+            paleta();
+            render();
+            return it;
         }
 
         function addShape(shape, x, y, mk) {
@@ -2557,6 +2720,8 @@
 
         /* ---------- arraste da paleta ---------- */
         root.querySelector('.cx-board-icons').addEventListener('click', function (e) {
+            var lb = e.target.closest('[data-lane]');
+            if (lb) { if (!lb.disabled) { addLane(lb.getAttribute('data-lane')); } return; }
             var gb = e.target.closest('[data-grp]'); if (!gb) { return; }
             palShut[gb.getAttribute('data-grp')] = !palShut[gb.getAttribute('data-grp')];
             paleta();
@@ -2665,6 +2830,30 @@
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
                 var from = get(sel[0]), sd = e.target.getAttribute('data-lh');
                 drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd), cx0: e.clientX, cy0: e.clientY };
+            } else if (flow && tool === 'select' && e.target.getAttribute('data-lhd')) {
+                // Q5g-3: cabeçalho maior ou menor; o corpo das raias anda junto
+                // (o comprimento cresce o mesmo tanto) e as formas acompanham.
+                var lsH = lanesOf(D.items), mvH = [];
+                lsH.forEach(function (l) { mvH = mvH.concat(laneMembers(D.items, l)); });
+                drag = { k: 'lhd', p: p, hd0: laneHd(lsH[0]), len0: lsH[0].dir === 'h' ? lsH[0].w : lsH[0].h, moved: false,
+                    st: mvH.map(function (id) { var o = get(id); return { id: id, x: o.x, y: o.y }; }),
+                    lw: D.items.filter(function (l) { return l.t === 'link' && l.wp && l.wp.length && mvH.indexOf(l.a.id) >= 0 && mvH.indexOf(l.b.id) >= 0; })
+                        .map(function (l) { return { id: l.id, wp: clone(l.wp) }; }) };
+            } else if (flow && tool === 'select' && (e.target.getAttribute('data-lrz') || e.target.getAttribute('data-llen'))) {
+                // Q5g-2: espessura de uma raia (as seguintes andam com as formas
+                // delas) ou comprimento de todas.
+                var lsD = lanesOf(D.items), l0 = lsD[0], hzD = l0.dir === 'h';
+                if (e.target.getAttribute('data-llen')) {
+                    drag = { k: 'llen', p: p, len0: hzD ? l0.w : l0.h, moved: false };
+                } else {
+                    var lr = get(e.target.getAttribute('data-lrz')), ix = lsD.indexOf(lr), mv0 = [];
+                    lsD.slice(ix + 1).forEach(function (l) { mv0 = mv0.concat(laneMembers(D.items, l)); });
+                    drag = { k: 'lrz', id: lr.id, p: p, th0: hzD ? lr.h : lr.w, moved: false,
+                        st: mv0.map(function (id) { var o = get(id); return { id: id, x: o.x, y: o.y }; }),
+                        lw: D.items.filter(function (l) { return l.t === 'link' && l.wp && l.wp.length && mv0.indexOf(l.a.id) >= 0 && mv0.indexOf(l.b.id) >= 0; })
+                            .map(function (l) { return { id: l.id, wp: clone(l.wp) }; }) };
+                    sel = [lr.id];
+                }
             } else if (e.target.getAttribute('data-rzi')) {
                 snap();
                 drag = { k: 'rzi', id: e.target.getAttribute('data-rzi') };
@@ -2698,7 +2887,16 @@
                     } else if (sel.indexOf(id) < 0) {
                         sel = grp;
                     }
-                    var movable = sel.filter(function (s) { var it = get(s); return it && !it.lock && it.t !== 'link'; });
+                    var hitL = get(id);
+                    if (hitL && hitL.t === 'lane' && !e.shiftKey && tool === 'select') {
+                        // Q5g-2: arrastar o cabeçalho troca a ordem das raias.
+                        sel = [id];
+                        drag = { k: 'lreord', id: id, p: p, moved: false, to: -1 };
+                        try { svg.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ }
+                        render();
+                        return;
+                    }
+                    var movable = sel.filter(function (s) { var it = get(s); return it && !it.lock && it.t !== 'link' && it.t !== 'lane'; });
                     drag = { k: 'move', p: p, start: movable.map(function (s) {
                             var it = get(s);
                             if (it.t === 'duct') { var bb = bbox(it); return { id: s, x: bb.x, y: bb.y, pts: clone(it.pts) }; }
@@ -2790,6 +2988,49 @@
                 paint();
                 drawSel(); return;
             }
+            if (drag.k === 'lhd') {
+                var lsH2 = lanesOf(D.items), f2 = lsH2[0], hz2 = f2.dir === 'h', m2 = LANE[f2.dir], d2 = hz2 ? p.x - drag.p.x : p.y - drag.p.y;
+                if (!drag.moved) { if (Math.abs(d2) < 2) { return; } snap(); drag.moved = true; }
+                var nh = Math.max(m2.hmin, Math.min(m2.hmax, Math.round((drag.hd0 + d2) / GRID) * GRID)), sh2 = nh - drag.hd0;
+                f2.hd = nh;
+                if (hz2) { f2.w = Math.min(6000, drag.len0 + sh2); } else { f2.h = Math.min(6000, drag.len0 + sh2); }
+                laneLayout(D.items);
+                drag.st.forEach(function (s) { var o = get(s.id); if (hz2) { o.x = s.x + sh2; } else { o.y = s.y + sh2; } });
+                drag.lw.forEach(function (s) { get(s.id).wp = s.wp.map(function (q) { return hz2 ? { x: q.x + sh2, y: q.y } : { x: q.x, y: q.y + sh2 }; }); });
+                paint();
+                drawSel(); return;
+            }
+            if (drag.k === 'lrz' || drag.k === 'llen') {
+                var lsM = lanesOf(D.items), hzM = lsM[0].dir === 'h', dd = hzM ? (drag.k === 'lrz' ? p.y - drag.p.y : p.x - drag.p.x) : (drag.k === 'lrz' ? p.x - drag.p.x : p.y - drag.p.y);
+                if (!drag.moved) { if (Math.abs(dd) < 2) { return; } snap(); drag.moved = true; }
+                if (drag.k === 'llen') {
+                    var len = Math.max(laneHd(lsM[0]) + 100, Math.min(6000, Math.round((drag.len0 + dd) / GRID) * GRID));
+                    if (hzM) { lsM[0].w = len; } else { lsM[0].h = len; }
+                    laneLayout(D.items);
+                } else {
+                    var lr2 = get(drag.id), th = Math.max(LANE[lr2.dir].min, Math.min(3000, Math.round((drag.th0 + dd) / GRID) * GRID)), sh = th - drag.th0;
+                    if (hzM) { lr2.h = th; } else { lr2.w = th; }
+                    laneLayout(D.items);
+                    drag.st.forEach(function (s) { var o = get(s.id); if (hzM) { o.y = s.y + sh; } else { o.x = s.x + sh; } });
+                    drag.lw.forEach(function (s) { get(s.id).wp = s.wp.map(function (q) { return hzM ? { x: q.x, y: q.y + sh } : { x: q.x + sh, y: q.y }; }); });
+                }
+                paint();
+                drawSel(); return;
+            }
+            if (drag.k === 'lreord') {
+                var lsR = lanesOf(D.items), hzR = lsR[0].dir === 'h', me = get(drag.id);
+                if (!drag.moved && Math.abs(hzR ? p.y - drag.p.y : p.x - drag.p.x) < 6) { return; }
+                drag.moved = true;
+                var rest = lsR.filter(function (l) { return l !== me; }), c = hzR ? p.y : p.x;
+                drag.to = rest.filter(function (l) { return (hzR ? l.y + l.h / 2 : l.x + l.w / 2) < c; }).length;
+                // Linha de onde a raia vai entrar.
+                var pos = rest.length ? (drag.to < rest.length ? (hzR ? rest[drag.to].y : rest[drag.to].x) : (hzR ? rest[rest.length - 1].y + rest[rest.length - 1].h : rest[rest.length - 1].x + rest[rest.length - 1].w)) : 0;
+                var a0 = lsR[0], sw = 4 / view.z;
+                gGuides.innerHTML = hzR
+                    ? '<line x1="' + a0.x + '" y1="' + pos + '" x2="' + (a0.x + a0.w) + '" y2="' + pos + '" stroke="#378ADD" stroke-width="' + sw + '"/>'
+                    : '<line x1="' + pos + '" y1="' + a0.y + '" x2="' + pos + '" y2="' + (a0.y + a0.h) + '" stroke="#378ADD" stroke-width="' + sw + '"/>';
+                return;
+            }
             if (drag.k === 'zone' || drag.k === 'rz') {
                 var z = get(drag.id);
                 if (drag.k === 'zone') {
@@ -2805,7 +3046,7 @@
                 var x = Math.min(p.x, drag.p.x), y = Math.min(p.y, drag.p.y), w = Math.abs(p.x - drag.p.x), h = Math.abs(p.y - drag.p.y);
                 marq.removeAttribute('hidden');
                 marq.setAttribute('x', x); marq.setAttribute('y', y); marq.setAttribute('width', w); marq.setAttribute('height', h);
-                var dentro = D.items.filter(function (it) { if (it.t === 'link') { return false; } var b = bbox(it); return b.x >= x && b.y >= y && b.x + b.w <= x + w && b.y + b.h <= y + h; })
+                var dentro = D.items.filter(function (it) { if (it.t === 'link' || it.t === 'lane') { return false; } var b = bbox(it); return b.x >= x && b.y >= y && b.x + b.w <= x + w && b.y + b.h <= y + h; })
                     .map(function (it) { return it.id; });
                 sel = drag.base.concat(expand(dentro).filter(function (i) { return drag.base.indexOf(i) < 0; }));
                 drawSel(); return;
@@ -2818,7 +3059,7 @@
                 var cx = drag.start[0].x + dx + b0.w / 2, cy = drag.start[0].y + dy + b0.h / 2;
                 var gx = null, gy = null;
                 D.items.forEach(function (o) {
-                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || o.t === 'duct') { return; }
+                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || o.t === 'duct' || o.t === 'lane') { return; }
                     var b = coreBox(o), ox = b.x + b.w / 2, oy = b.y + b.h / 2;
                     if (gx === null && Math.abs(ox - cx) < SNAP / view.z) { gx = ox; }
                     if (gy === null && Math.abs(oy - cy) < SNAP / view.z) { gy = oy; }
@@ -2858,6 +3099,25 @@
                     // Q5f: clique na bolinha = "+" rápido; soltar no vazio = mini-paleta.
                     if (still) { quickAdd(get(drag.from), drag.side); }
                     else if (!tgt) { miniOpen(drag.from, drag.side, pUp); }
+                }
+            }
+            if (drag && drag.k === 'lreord' && drag.moved) {
+                // Q5g-2: nova ordem; cada raia leva as formas dela.
+                var lsU = lanesOf(D.items), meU = get(drag.id);
+                var ord = lsU.filter(function (l) { return l !== meU; });
+                ord.splice(Math.max(0, drag.to), 0, meU);
+                if (ord.some(function (l, i) { return l !== lsU[i]; })) {
+                    snap();
+                    var hzU = lsU[0].dir === 'h', memU = {}, cur = hzU ? lsU[0].y : lsU[0].x;
+                    lsU.forEach(function (l) { memU[l.id] = laneMembers(D.items, l); });
+                    var mm = {};
+                    ord.forEach(function (l) {
+                        var d0 = cur - (hzU ? l.y : l.x);
+                        if (hzU) { l.y = cur; cur += l.h; } else { l.x = cur; cur += l.w; }
+                        memU[l.id].forEach(function (id) { mm[id] = hzU ? [0, d0] : [d0, 0]; });
+                    });
+                    moveMap(mm);
+                    laneLayout(D.items);
                 }
             }
             if (drag && drag.k === 'zone') { tool = 'select'; }
@@ -2967,7 +3227,7 @@
             var id = hit(e.target); if (!id || ['link', 'duct'].indexOf((get(id) || {}).t) >= 0) { return; }
             if (get(id).t === 'shape') { sel = [id]; render(); editStart(get(id)); return; }
             sel = [id]; render();
-            var f = props.querySelector('[data-k="label"],[data-k="text"]'); if (f) { f.focus(); f.select(); }
+            var f = props.querySelector('[data-k="label"],[data-k="text"],[data-k="title"]'); if (f) { f.focus(); f.select(); }
         });
 
         /* ---------- teclado ---------- */
@@ -3030,7 +3290,7 @@
                 e.preventDefault(); snap();
                 var step = e.shiftKey ? GRID : 1;
                 sel.forEach(function (id) {
-                    var it = get(id); if (it.lock || it.t === 'link') { return; }
+                    var it = get(id); if (it.lock || it.t === 'link' || it.t === 'lane') { return; }
                     if (it.t === 'duct') { it.pts.forEach(function (q) { q.x += mv[0] * step; q.y += mv[1] * step; }); return; }
                     it.x += mv[0] * step; it.y += mv[1] * step;
                 });
@@ -3039,7 +3299,7 @@
         }
         // Selecionados + ligações cujos dois ícones estão na seleção.
         function withLinks(ids) {
-            var out = ids.map(get).filter(Boolean);
+            var out = ids.map(get).filter(function (i) { return i && i.t !== 'lane'; });
             D.items.forEach(function (i) {
                 if (i.t === 'link' && ids.indexOf(i.id) < 0 && ids.indexOf(i.a.id) >= 0 && ids.indexOf(i.b.id) >= 0) { out.push(i); }
             });
@@ -3051,7 +3311,7 @@
 
         /* ---------- ações da barra ---------- */
         function act(a) {
-            if (a === 'group' && sel.length > 1) { snap(); var g = uid(); sel.forEach(function (id) { get(id).g = g; }); render(); }
+            if (a === 'group' && sel.length > 1) { snap(); var g = uid(); sel.forEach(function (id) { if (get(id).t !== 'lane') { get(id).g = g; } }); render(); }
             else if (a === 'ungroup' && sel.length) { snap(); sel.forEach(function (id) { get(id).g = ''; }); render(); }
             else if (a === 'lock' && sel.length) {
                 snap(); var trava = !sel.every(function (id) { return get(id).lock; });
@@ -3078,7 +3338,22 @@
             }
             else if (a === 'del' && sel.length) {
                 snap();
+                var lsB = lanesOf(D.items), lPos = {}, lMem = {};
+                lsB.forEach(function (l) { lPos[l.id] = { x: l.x, y: l.y, w: l.w, h: l.h }; lMem[l.id] = laneMembers(D.items, l).filter(function (m) { return sel.indexOf(m) < 0; }); });
                 D.items = D.items.filter(function (i) { return sel.indexOf(i.id) < 0; });
+                if (lsB.some(function (l) { return sel.indexOf(l.id) >= 0; })) {
+                    var lsA = laneLayout(D.items), dm = {};
+                    lsA.forEach(function (l) { lMem[l.id].forEach(function (id) { dm[id] = [l.x - lPos[l.id].x, l.y - lPos[l.id].y]; }); });
+                    if (lsA.length) {
+                        var lz = lsA[lsA.length - 1], cur = lz.dir === 'h' ? lz.y + lz.h + 40 : lz.x + lz.w + 40;
+                        lsB.filter(function (l) { return sel.indexOf(l.id) >= 0; }).forEach(function (l) {
+                            var o = lPos[l.id], v = lz.dir === 'h' ? [0, cur - o.y] : [cur - o.x, 0];
+                            lMem[l.id].forEach(function (id) { dm[id] = v; });
+                            cur += lz.dir === 'h' ? o.h : o.w;
+                        });
+                    }
+                    moveMap(dm);
+                }
                 // Ligação sem um dos ícones sai junto.
                 D.items = D.items.filter(function (i) { return i.t !== 'link' || (get(i.a.id) && get(i.b.id)); });
                 sel = []; render();
@@ -3248,7 +3523,7 @@
 
         // Exposto para os testes (jsdom).
         root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
-            setSel: function (ids) { sel = ids; render(); }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
+            setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
     window.CodexplusBoard = { open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };

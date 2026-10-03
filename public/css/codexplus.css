@@ -2262,6 +2262,11 @@ html.cx-board-open { overflow: hidden; }
 .cx-board-cat { font-size: .74em; text-transform: uppercase; letter-spacing: .04em; color: var(--cx-muted); margin: 10px 0 4px; font-weight: 600; }
 .cx-board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 /* Q5j-2: subgrupos dos ícones genéricos dentro da seção "Ícones". */
+/* Q5g: raias. */
+.cx-board-lanehd { cursor: grab; }
+.cx-board-lrz-h { cursor: ns-resize; }
+.cx-board-lrz-v { cursor: ew-resize; }
+.cx-board-ic[disabled] { opacity: .35; cursor: not-allowed; }
 .cx-board-subcat { font-size: .68em; font-weight: 500; margin: 8px 0 2px 2px; }
 .cx-board-ic { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 2px; cursor: grab;
     display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .7em; line-height: 1.15; color: var(--cx-text, #1d2330); touch-action: none; }

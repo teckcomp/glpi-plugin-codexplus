@@ -16,10 +16,12 @@
    (`waypoints`) saem — eram testes; a ligação é traçada sempre pelo
    cotovelo automático.
 
-   Neste bloco só a LEITURA do documento usa este desenho (legenda, SVG,
-   matriz e PDF); a edição continua no motor antigo até o Q6b.
+   Desde o Q6d é o único desenho do organograma: leitura e edição do
+   documento (a edição abre o motor de quadro, codexplus-board.js); o motor
+   antigo (codexplus-org.js) saiu.
 
-   Uso: <div data-cx-orgview data-source="id-do-json" data-title data-code>
+   Uso: <div data-cx-orgview data-source="id-do-json" data-title data-code
+        [data-editable="1" data-input data-doc data-save]>
    API: window.CodexplusOrgDraw = { normalize, layout, svg, legendHtml,
         escHtml, mount, measure }  (funções puras testáveis em jsdom).
    ========================================================================= */
@@ -541,12 +543,26 @@
         var S = normalize(raw);
         S.__norm = true;
         var title = root.getAttribute('data-title') || '', code = root.getAttribute('data-code') || '';
+        // Q6d: com data-editable="1" (página de edição do documento DIA), a
+        // mesma tela ganha "Abrir o organograma" (motor de quadro), a matriz
+        // editável e a gravação por AJAX (ajax/diagram.save.php).
+        var editable = root.getAttribute('data-editable') === '1';
+        var input = document.getElementById(root.getAttribute('data-input') || '');
+        var saveUrl = root.getAttribute('data-save') || '', docId = root.getAttribute('data-doc') || '';
 
         root.classList.add('cx-org', 'cx-orgview');
         // Barra da leitura: a mesma do motor antigo (classes cx-org-*), sem a
         // edição — tela cheia, zoom, ajustar à tela e busca. O botão de PDF
         // fica escondido: quem aciona é o "Exportar PDF" do topo da página.
-        root.innerHTML = '<div class="cx-org-tools">'
+        root.innerHTML = '<div class="cx-flow-bar">'
+            + (editable && saveUrl && docId
+                ? '<button type="button" class="codexplus-btn codexplus-btn-primary" data-act="edit"><i class="ti ti-pencil"></i> Abrir o organograma</button>'
+                  + '<span class="cx-flow-state" aria-live="polite"></span>'
+                : '')
+            + '<button type="button" class="codexplus-btn" data-act="png" title="Baixar o organograma como imagem PNG (o que está salvo)"><i class="ti ti-photo-down"></i> Baixar PNG</button>'
+            + '<button type="button" class="codexplus-btn" data-act="pdf"' + (editable ? '' : ' hidden style="display:none"') + ' title="Exportar o organograma em PDF (o que está salvo)"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>'
+            + '</div>'
+            + '<div class="cx-org-tools">'
             + '<button type="button" class="cx-org-btn cx-org-btn--full" data-act="full" data-el="fullBtn"><i class="ti ti-maximize"></i> Tela cheia</button>'
             + '<span class="cx-org-zoom"><button type="button" class="cx-org-btn" data-act="zout" aria-label="Diminuir zoom">−</button>'
             + '<output data-el="zlbl">100%</output>'
@@ -555,12 +571,11 @@
             + '<label class="cx-org-search"><span class="cx-org-sr">Buscar pessoa</span>'
             + '<input type="search" data-el="q" placeholder="Buscar pessoa ou cargo…" autocomplete="off">'
             + '<span data-el="qcount" class="cx-org-qcount"></span></label>'
-            + '<button type="button" class="codexplus-btn" data-act="pdf" hidden style="display:none"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>'
             + '</div>'
-            + '<div class="cx-org-legend">' + legendHtml(S) + '</div>'
+            + '<div class="cx-org-legend" data-el="legend">' + legendHtml(S) + '</div>'
             + '<div class="cx-org-stagewrap"><div class="cx-org-stage cx-orgview-stage"></div>'
             + '<button type="button" class="cx-org-corner" data-act="full" data-el="fullCorner" title="Tela cheia" aria-label="Tela cheia"><i class="ti ti-maximize"></i></button></div>'
-            + escTableHtml(S);
+            + '<div data-el="escwrap"></div>';
         var stage = root.querySelector('.cx-orgview-stage');
         function $(n) { return root.querySelector('[data-el="' + n + '"]'); }
 
@@ -609,6 +624,137 @@
         }
         draw();
         fit();
+
+        /* ---------- Q6d: matriz na página (editável na edição) ---------- */
+        function escEditHtml() {
+            var lv = {};
+            S.levels.forEach(function (l) { lv[l.key] = l.color; });
+            var rows = S.esc.length ? S.esc.map(function (r, i) {
+                return '<tr style="--lc:' + (lv[r.lvl] || '#5a6575') + '">' + r.c.map(function (t, j) {
+                    return '<td contenteditable="true" data-r="' + i + '" data-c="' + j + '">' + esc(t) + '</td>';
+                }).join('') + '<td class="x"><button type="button" class="cx-org-btn" data-escdel="' + i + '">Remover</button></td></tr>';
+            }).join('') : '<tr><td colspan="5" class="cx-org-empty">Nenhuma linha ainda. Use "Adicionar linha".</td></tr>';
+            return '<section class="cx-org-esc"><h3>Matriz de escalonamento</h3><div class="cx-org-tablewrap"><table><thead><tr>'
+                + '<th>Nível</th><th>Papel</th><th>Escala para o próximo nível quando</th><th>Tempo alvo</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                + '<div class="cx-org-btns" style="margin-top:8px"><button type="button" class="cx-org-btn" data-escadd="1">Adicionar linha</button></div></section>';
+        }
+        function drawEsc() { $('escwrap').innerHTML = editable ? escEditHtml() : escTableHtml(S); }
+        function drawAll() { $('legend').innerHTML = legendHtml(S); draw(); drawEsc(); }
+        drawEsc();
+
+        /* ---------- Q6d: gravação (matriz sozinha; quadro pelo Salvar dele) ---------- */
+        function ser() { return JSON.stringify(S, function (k, v) { return k === '__norm' ? undefined : v; }); }
+        if (input) { input.value = ser(); }
+        function estado(t, cls) {
+            var el = root.querySelector('.cx-flow-state');
+            if (el) { el.textContent = t; el.className = 'cx-flow-state' + (cls ? ' is-' + cls : ''); }
+        }
+        function hora() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return p(d.getHours()) + ':' + p(d.getMinutes()); }
+        function post(json) {
+            var f = root.closest('form'), tk = (f && f.querySelector('[name="_glpi_csrf_token"]')) || document.querySelector('[name="_glpi_csrf_token"]');
+            if (!tk || !saveUrl || !docId) { return Promise.reject(new Error('sem token')); }
+            var corpo = new FormData();
+            corpo.append('id', docId);
+            corpo.append('_diagram', json);
+            corpo.append('_glpi_csrf_token', tk.value);
+            estado('salvando…', 'salvando');
+            return fetch(saveUrl, { method: 'POST', body: corpo, credentials: 'same-origin' }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) {
+                    if (!r.ok || !j.ok) { throw new Error(j.erro || ('HTTP ' + r.status)); }
+                    // Token consumido a cada POST (achado 43): o novo vai para todos.
+                    if (j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = j.csrf; }); }
+                    if (input) { input.value = json; }
+                    estado('salvo às ' + (j.hora || hora()), 'ok');
+                    return j;
+                });
+            }).catch(function (err) { estado('não foi salvo', 'erro'); throw err; });
+        }
+        var autoT = null, fila = Promise.resolve();
+        function autosave() {
+            if (input) { input.value = ser(); }
+            if (!saveUrl || !docId) { return; }
+            clearTimeout(autoT);
+            estado('alterado', '');
+            autoT = setTimeout(function () { var j = ser(); fila = fila.then(function () { return post(j); }).catch(function () {}); }, 900);
+        }
+        if (editable) {
+            $('escwrap').addEventListener('input', function (e) {
+                var r = e.target.getAttribute('data-r'), c = e.target.getAttribute('data-c');
+                if (r === null || !S.esc[r]) { return; }
+                S.esc[r].c[c] = e.target.innerText.trim().slice(0, 500);
+                autosave();
+            });
+            $('escwrap').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey && e.target.hasAttribute('contenteditable')) { e.preventDefault(); }
+            });
+            $('escwrap').addEventListener('click', function (e) {
+                var d = e.target.closest('[data-escdel]'), a = e.target.closest('[data-escadd]');
+                if (d) { S.esc.splice(+d.getAttribute('data-escdel'), 1); drawEsc(); autosave(); }
+                else if (a) {
+                    S.esc.push({ lvl: S.levels[S.levels.length - 1].key, c: ['Novo nível', '', '', ''] });
+                    drawEsc(); autosave();
+                    // O texto inicial vem selecionado: digitar substitui.
+                    var cells = $('escwrap').querySelectorAll('[data-c="0"]'), last = cells[cells.length - 1];
+                    if (last) {
+                        last.focus();
+                        try { var rg = document.createRange(); rg.selectNodeContents(last); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } catch (err) { /* sem seleção */ }
+                    }
+                }
+            });
+        }
+
+        /* ---------- Q6d: abrir no motor de quadro ---------- */
+        function edit() {
+            var B = window.CodexplusBoard; if (!B) { return; }
+            clearTimeout(autoT);
+            B.open(null, null, 'organograma', { data: { mode: 'organograma', org: JSON.parse(ser()) }, title: title, self: docId,
+                save: function (D) {
+                    var o = JSON.parse(JSON.stringify(D.org || {}));
+                    delete o.__norm;
+                    var j = JSON.stringify(o);
+                    return fila.then(function () { return post(j); }).then(function (r) {
+                        S = normalize(o); S.__norm = true;
+                        drawAll(); fit();
+                        return r;
+                    });
+                } });
+        }
+
+        /* ---------- Q6d: PNG, com as fontes IBM Plex embutidas ----------
+           Imagem de SVG não enxerga as fontes da página: vão dentro dela, como
+           data URL (as mesmas usadas para medir os textos). */
+        function png() {
+            var btn = root.querySelector('[data-act="png"]');
+            if (btn.disabled) { return; }
+            btn.disabled = true;
+            fontCss().then(function (css) {
+                var r = svg(S, { bg: '#ffffff' }), k = 2;
+                var s2 = r.svg.replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1 width="' + r.w * k + '" height="' + r.h * k + '"')
+                    .replace(/(<svg[^>]*>)/, '$1<defs><style>' + css + '</style></defs>');
+                return new Promise(function (ok, fail) {
+                    var im = new Image(), url = URL.createObjectURL(new Blob([s2], { type: 'image/svg+xml' }));
+                    im.onload = function () {
+                        var cv = document.createElement('canvas'); cv.width = r.w * k; cv.height = r.h * k;
+                        var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(im, 0, 0);
+                        URL.revokeObjectURL(url);
+                        cv.toBlob(function (b) { if (b) { ok(b); } else { fail(new Error('png')); } }, 'image/png');
+                    };
+                    im.onerror = function () { URL.revokeObjectURL(url); fail(new Error('svg')); };
+                    im.src = url;
+                });
+            }).then(function (blob) {
+                var a = document.createElement('a'), url = URL.createObjectURL(blob), B = window.CodexplusBoard;
+                a.href = url;
+                // Título que já começa com "Organograma" não repete a palavra.
+                a.download = (B && B._pngName ? B._pngName('organograma', null, title) : 'organograma.png').replace(/^organograma-organograma(?=[-.])/, 'organograma');
+                a.style.display = 'none';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+            }).catch(function () {
+                window.alert('Não foi possível gerar a imagem do organograma.');
+            }).then(function () { btn.disabled = false; });
+        }
+
         // A medida só vale com a fonte carregada: redesenha quando chegar.
         fontsReady().then(function () { ctxReset(); draw(); fit(); });
 
@@ -677,64 +823,49 @@
             if (!b || !root.contains(b)) { return; }
             var a = b.getAttribute('data-act');
             if (a === 'pdf') { pdf(); }
+            else if (a === 'edit') { edit(); }
+            else if (a === 'png') { png(); }
             else if (a === 'full') { toggleFull(); }
             else if (a === 'zin') { setZ(z + 0.1); }
             else if (a === 'zout') { setZ(z - 0.1); }
             else if (a === 'fit') { fit(); }
         });
-        root.__cxOrgView = { draw: draw, pdf: pdf, fit: fit, setZoom: setZ, zoom: function () { return z; }, data: function () { return S; } };
+        root.__cxOrgView = { draw: draw, pdf: pdf, png: png, edit: edit, fit: fit, setZoom: setZ, zoom: function () { return z; }, data: function () { return S; }, flush: function () { clearTimeout(autoT); return fila.then(function () { return post(ser()); }); } };
         return root.__cxOrgView;
     }
     function ctxReset() { ctx = null; }
 
-    /* ---------------- Q6b-1: abrir no motor de quadro (teste) ----------------
-       Botão "Abrir no motor novo (teste)" na edição do documento, ao lado do
-       organograma antigo. Abre com o estado atual do editor antigo (a API
-       dele) e grava pelo mesmo ajax/diagram.save.php; depois de gravar, a
-       página recarrega para o editor antigo não sobrescrever o que foi salvo. */
-    function openBoard(box) {
-        var B = window.CodexplusBoard;
-        if (!B) { return; }
-        var oldRoot = document.querySelector('[data-cx-org]'), api = oldRoot && oldRoot.__cxOrg, raw = null;
-        try { raw = api && api.getData ? api.getData() : null; } catch (e) { raw = null; }
-        if (!raw) {
-            var src = document.getElementById(box.getAttribute('data-source') || '');
-            try { raw = JSON.parse(src ? src.textContent : 'null'); } catch (e) { raw = null; }
-        }
-        var saveUrl = box.getAttribute('data-save') || '', docId = box.getAttribute('data-doc') || '';
-        function post(D) {
-            var f = box.closest('form'), tk = (f && f.querySelector('[name="_glpi_csrf_token"]')) || document.querySelector('[name="_glpi_csrf_token"]');
-            if (!tk || !saveUrl || !docId) { return Promise.reject(new Error('sem token')); }
-            var o = JSON.parse(JSON.stringify(D.org || {}));
-            delete o.__norm;
-            var corpo = new FormData();
-            corpo.append('id', docId);
-            corpo.append('_diagram', JSON.stringify(o));
-            corpo.append('_glpi_csrf_token', tk.value);
-            return fetch(saveUrl, { method: 'POST', body: corpo, credentials: 'same-origin' }).then(function (r) {
-                return r.json().catch(function () { return {}; }).then(function (j) {
-                    if (!r.ok || !j.ok) { throw new Error(j.erro || ('HTTP ' + r.status)); }
-                    if (j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = j.csrf; }); }
-                    setTimeout(function () { window.location.reload(); }, 50);
-                    return j;
+    /* Fontes IBM Plex como @font-face em data URL (para o PNG). Uma vez só. */
+    var fontCache = null;
+    var FONT_FILES = [
+        ['IBM Plex Sans', 400, 'ibm-plex-sans-latin-400-normal.woff2'],
+        ['IBM Plex Sans', 500, 'ibm-plex-sans-latin-500-normal.woff2'],
+        ['IBM Plex Sans', 600, 'ibm-plex-sans-latin-600-normal.woff2'],
+        ['IBM Plex Sans Condensed', 600, 'ibm-plex-sans-condensed-latin-600-normal.woff2']
+    ];
+    function fontCss() {
+        if (fontCache) { return fontCache; }
+        var link = document.querySelector('link[href*="codexplus.css"]');
+        if (!link || !window.fetch || !window.FileReader) { return (fontCache = Promise.resolve('')); }
+        fontCache = Promise.all(FONT_FILES.map(function (f) {
+            return fetch(new URL('../fonts/' + f[2], link.href).href).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+                if (!b) { return ''; }
+                return new Promise(function (ok) {
+                    var fr = new FileReader();
+                    fr.onload = function () { ok("@font-face{font-family:'" + f[0] + "';font-style:normal;font-weight:" + f[1] + ";src:url(" + fr.result + ") format('woff2')}"); };
+                    fr.onerror = function () { ok(''); };
+                    fr.readAsDataURL(b);
                 });
-            });
-        }
-        B.open(null, null, 'organograma', { data: { mode: 'organograma', org: raw }, title: box.getAttribute('data-title') || '', save: post, self: docId });
+            }).catch(function () { return ''; });
+        })).then(function (a) { return a.join(''); });
+        return fontCache;
     }
 
-    function boot() {
-        document.querySelectorAll('[data-cx-orgview]').forEach(mount);
-        document.querySelectorAll('[data-cx-orgtest]').forEach(function (box) {
-            if (box.__cxOrgTest) { return; }
-            box.__cxOrgTest = true;
-            box.addEventListener('click', function (e) { if (e.target.closest('[data-act="orgboard"]')) { openBoard(box); } });
-        });
-    }
+    function boot() { document.querySelectorAll('[data-cx-orgview]').forEach(mount); }
 
     window.CodexplusOrgDraw = {
         normalize: normalize, layout: function (s) { return layout(normalize(s)); }, svg: svg,
-        legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot, openBoard: openBoard, parts: parts, tree: tree, label: label,
+        legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot, fontCss: fontCss, parts: parts, tree: tree, label: label,
         templates: function () { return TEMPLATES.map(function (t) { return { key: t.key, name: t.name, desc: t.desc }; }); },
         fromTemplate: fromTemplate, levelUsed: levelUsed, SWATCHES: SWATCHES,
         measure: function (s) { var S = normalize(s), L = layout(S), o = {}; L.list.forEach(function (n) { var b = L.box[n.id]; o[n.id] = { x: b.x, y: b.y, w: b.w, h: b.h }; }); return o; },

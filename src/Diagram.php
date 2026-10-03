@@ -10,7 +10,8 @@ namespace GlpiPlugin\Codexplus;
  * (can($id, READ) / can($id, UPDATE)), sempre checado ANTES de chamar esta
  * classe, em front/document.form.php. Aqui só se lê e grava a linha.
  *
- * `data` é o JSON do motor (public/js/codexplus-org.js). Desde o bloco 2a o
+ * `data` é o JSON do organograma (desenhado por public/js/codexplus-orgdraw.js e
+ * editado no motor de quadro, codexplus-board.js, desde o Q6d). Desde o bloco 2a o
  * formato é grafo, não árvore (Claudio, 20/09/2026 — posição livre e ligações
  * próprias vêm nos blocos seguintes):
  *   { "kind": "organograma",

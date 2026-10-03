@@ -109,7 +109,7 @@
                            organograma); este botão só o aciona, no mesmo lugar
                            do Exportar PDF dos documentos de texto. #}
                         <button type="button" class="codexplus-btn codexplus-btn-primary"
-                                onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-org] [data-act=print], #codexplus-doc [data-cx-orgview] [data-act=pdf], #codexplus-doc [data-cx-flow] [data-act=pdf]'); if (b) { b.click(); }">
+                                onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-orgview] [data-act=pdf], #codexplus-doc [data-cx-flow] [data-act=pdf]'); if (b) { b.click(); }">
                             <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
                         </button>
                     {% endif %}
@@ -335,31 +335,23 @@
                         </div>
                     </div>
                 {% elseif is_diagram %}
-                    {# Etapa 9: organograma no lugar do corpo. O motor grava o
-                       JSON em _diagram a cada mudança; vai no Salvar. #}
+                    {# Q6d (Claudio, 03/10/2026): organograma no motor de quadro.
+                       A página mostra legenda, desenho e a matriz (editável aqui,
+                       gravada sozinha); "Abrir o organograma" edita em tela cheia
+                       (codexplus-orgdraw.js + codexplus-board.js). O hidden
+                       _diagram acompanha o Salvar do formulário. #}
                     <div class="codexplus-doc-edit-zone cx-docform-diagram">
                         <label class="codexplus-doc-edit-zone-label">
                             <i class="ti ti-sitemap"></i> {{ __('Organograma', 'codexplus') }}
                         </label>
                         <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
-                        <input type="hidden" name="_diagram" id="cx-org-input" value="">
-                        <div data-cx-org data-editable="1" data-source="cx-org-data" data-input="cx-org-input"
+                        <input type="hidden" name="_diagram" id="cx-org-input" value="{{ diagram_json }}">
+                        <div data-cx-orgview data-editable="1" data-source="cx-org-data" data-input="cx-org-input"
                              data-title="{{ name }}" data-code="{{ code }}"
-                             {% if not is_new %}data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"{% endif %}></div>
+                             data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
                         <div class="codexplus-form-hint">
-                            {{ __('Clique numa pessoa para editar; arraste um cartão para onde quiser, ou sobre outro para mudar a quem responde. Para trazer o organograma do protótipo, use "Importar ou exportar". O organograma é gravado sozinho pouco depois de cada mudança; o resto do documento, ao clicar em Salvar.', 'codexplus') }}
+                            {{ __('Clique em "Abrir o organograma" para editar em tela cheia; "Salvar organograma", dentro dele, grava na hora. A matriz de escalonamento se edita aqui e é gravada sozinha pouco depois de cada mudança; o resto do documento, ao clicar em Salvar.', 'codexplus') }}
                         </div>
-                        {# Q6b-1: organograma no motor de quadro, em teste ao lado do
-                           antigo até a troca definitiva (Q6d). #}
-                        {% if not is_new %}
-                            <div class="codexplus-actions" style="margin-top:8px" data-cx-orgtest data-source="cx-org-data"
-                                 data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php" data-title="{{ name }}">
-                                <button type="button" class="codexplus-btn" data-act="orgboard"
-                                        title="{{ __('Abre este organograma no motor de quadro novo, em tela cheia. Ao salvar lá, a página recarrega.', 'codexplus') }}">
-                                    <i class="ti ti-flask"></i> {{ __('Abrir no motor novo (teste)', 'codexplus') }}
-                                </button>
-                            </div>
-                        {% endif %}
                     </div>
                 {% else %}
                     <div class="codexplus-doc-edit-zone codexplus-doc-edit-body" id="cx-docform-body" data-cx-doctype="{{ doctype }}">

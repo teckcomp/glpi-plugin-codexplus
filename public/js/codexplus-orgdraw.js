@@ -1,6 +1,7 @@
 /* =========================================================================
    Codex+ — desenho do organograma em SVG (bloco Q6a-1, Claudio 03/10/2026; -2: ajuste à tela, zoom, tela cheia e busca;
-   Q6b-1: partes do desenho para o motor de quadro e o botão de teste)
+   Q6b-1: partes do desenho para o motor de quadro e o botão de teste;
+   Q6c: modelos e níveis para o motor de quadro)
    -------------------------------------------------------------------------
    Primeiro passo do Q6 (organograma no motor de quadro). Desenha o JSON
    gravado do organograma (o MESMO formato de sempre: nodes, edges, levels,
@@ -430,6 +431,99 @@
             }).join('') + '</tbody></table></div></section>';
     }
 
+    /* ---------------- Q6c: modelos e níveis (Claudio, 03/10/2026) ----------------
+       Os mesmos do motor antigo (codexplus-org.js), que sai no Q6d; aqui ficam
+       para o motor de quadro. Genéricos de propósito: sem nomes de pessoas
+       (o repositório é público). */
+    var STD_LEVELS = [
+        { key: 'conselho', label: 'Conselho', color: '#22314f' },
+        { key: 'diretoria', label: 'Diretoria', color: '#3e6aa8' },
+        { key: 'gerencia', label: 'Gerência', color: '#1f5fbf' },
+        { key: 'coordenacao', label: 'Coordenação', color: '#1f7f6c' },
+        { key: 'supervisao', label: 'Supervisão', color: '#c4860e' },
+        { key: 'especialista', label: 'Especialista', color: '#7a4fb5' },
+        { key: 'operacional', label: 'Operacional', color: '#2e86d1' }
+    ];
+    var SWATCHES = ['#22314f', '#3e6aa8', '#1f5fbf', '#1f7f6c', '#c4860e', '#7a4fb5', '#2e86d1', '#cf4b66', '#5a6575', '#b3261e'];
+    function copyLevels(a) { return a.map(function (l) { return { key: l.key, label: l.label, color: l.color }; }); }
+    function T(name, role, lvl, kids, o) {
+        var n = { name: name || '', role: role || '', lvl: lvl, kids: kids || [], note: '' };
+        if (o) { for (var k in o) { n[k] = o[k]; } }
+        return n;
+    }
+    function vagas(role, lvl, qt) { var a = []; for (var i = 0; i < qt; i++) { a.push(T('', role, lvl)); } return a; }
+    var ESC_TI = [
+        { lvl: 'noc', c: ['NOC (nível 0)', 'Monitora 24x7, detecta alertas, abre o chamado e executa o procedimento padrão (runbook).', 'Não existe runbook para o alerta ou o runbook não resolveu.', 'Abrir chamado em até 5 min do alerta; escalar em até 15 min.'] },
+        { lvl: 'n1', c: ['Técnico N1', 'Porta de entrada: registra, classifica a prioridade e resolve o que está na base de conhecimento.', 'Sem solução em 30 min, exige competência de N2 ou prioridade P1.', 'Primeira resposta em até 15 min.'] },
+        { lvl: 'n2', c: ['Técnico N2', 'Incidentes complexos, remoto avançado e campo; orienta os N1.', 'Sem solução em 2 h ou suspeita de causa raiz recorrente.', 'Assumir em até 30 min.'] },
+        { lvl: 'n3', c: ['Analista N3', 'Causa raiz, mudanças planejadas e contato técnico com fabricantes.', 'Impacto em vários clientes ou decisão de risco.', 'Assumir em até 1 h; P1 imediato.'] },
+        { lvl: 'supervisao', c: ['Supervisor', 'Dono da fila e do SLA; comunica o cliente em P1 e P2.', 'SLA acima de 80% ou P1 aberto há mais de 1 h.', 'Acompanha P1 desde a abertura.'] },
+        { lvl: 'gestao', c: ['Coordenação', 'Gestão de crise, prioridade entre equipes e mudanças emergenciais.', 'Impacto contratual, cliente estratégico ou incidente de segurança.', 'Acionada em até 1 h de P1 sem previsão.'] }
+    ];
+    var TEMPLATES = [
+        { key: 'funcional', name: 'Estrutura funcional', desc: 'Diretoria e departamentos clássicos (administrativo, comercial, operações, TI), cada um com coordenação e equipe.',
+          make: function () {
+              var dep = function (nome) { return T('', 'Gerente ' + nome, 'gerencia', [T('', 'Coordenador', 'coordenacao', vagas('Analista', 'operacional', 2))]); };
+              return { levels: copyLevels(STD_LEVELS), tree: T('', 'Diretor-geral', 'diretoria', [dep('Administrativo e financeiro'), dep('Comercial'), dep('Operações'), dep('TI')]), esc: [] };
+          } },
+        { key: 'ti', name: 'Suporte de TI (N1, N2, N3 e NOC)', desc: 'Service desk em níveis, com squads, especialistas, NOC como coringa e matriz de escalonamento ITIL.',
+          make: function () {
+              var squad = function (n) { return T('', 'Técnico N2, líder do squad ' + n, 'n2', vagas('Técnico N1', 'n1', 4)); };
+              return { tree: T('', 'Gerente de TI', 'diretoria', [T('', 'Coordenador técnico', 'gestao', [
+                  T('', 'Supervisor dos squads', 'supervisao', [squad(1), squad(2)]),
+                  T('', 'Supervisor de especialistas e NOC', 'supervisao', [
+                      T('Analistas N3', 'Causa raiz e mudanças', 'n3', vagas('Analista', 'n3', 2), { group: true }),
+                      T('NOC', 'Monitoramento 24x7, coringa entre squads', 'noc', vagas('Operador NOC', 'noc', 2), { group: true, dashed: true })
+                  ])
+              ])]), esc: ESC_TI.map(function (r) { return { lvl: r.lvl, c: r.c.slice() }; }),
+                  levels: copyLevels(LEGACY_LEVELS).map(function (l) { if (l.key === 'noc') { l.label = 'NOC'; } return l; }) };
+          } },
+        { key: 'projetos', name: 'Escritório de projetos', desc: 'Sócios, coordenação de projetos, projetistas por disciplina e apoio administrativo (arquitetura, engenharia).',
+          make: function () {
+              return { levels: copyLevels(STD_LEVELS), tree: T('Sócios', 'Direção do escritório', 'conselho', [
+                  T('', 'Coordenador de projetos', 'coordenacao', [
+                      T('Arquitetura', 'Projetos e compatibilização', 'especialista', vagas('Projetista', 'especialista', 2).concat(vagas('Estagiário', 'operacional', 1)), { group: true }),
+                      T('Engenharia', 'Estrutural e instalações', 'especialista', vagas('Projetista', 'especialista', 2), { group: true })
+                  ]),
+                  T('', 'Administrativo e financeiro', 'gerencia', vagas('Assistente', 'operacional', 1)),
+                  T('', 'Consultoria jurídica', 'especialista', [], { kind: 'terceiro', dashed: true })
+              ], { group: true }), esc: [] };
+          } },
+        { key: 'clinica', name: 'Clínica', desc: 'Direção, responsável técnico, corpo clínico, recepção e administrativo.',
+          make: function () {
+              return { levels: copyLevels(STD_LEVELS), tree: T('', 'Direção', 'diretoria', [
+                  T('', 'Secretaria executiva', 'operacional', [], { kind: 'assessoria' }),
+                  T('', 'Responsável técnico', 'gerencia', [T('Corpo clínico', 'Profissionais de saúde', 'especialista', vagas('Profissional', 'especialista', 3), { group: true })]),
+                  T('', 'Gerente administrativo', 'gerencia', [
+                      T('Recepção', 'Agenda e atendimento', 'supervisao', vagas('Recepcionista', 'operacional', 2), { group: true }),
+                      T('', 'Financeiro e faturamento', 'coordenacao')
+                  ])
+              ]), esc: [] };
+          } },
+        { key: 'vazio', name: 'Em branco', desc: 'Só o topo, para montar do zero.',
+          make: function () { return { levels: copyLevels(STD_LEVELS), tree: T('', 'Direção', 'diretoria'), esc: [] }; } }
+    ];
+    // Organograma pronto de um modelo, já normalizado, com ids n1, n2… e as
+    // ligações de chefia na ordem da árvore.
+    function fromTemplate(key) {
+        var tp = TEMPLATES.filter(function (t) { return t.key === key; })[0];
+        if (!tp) { return null; }
+        var m = tp.make(), k = 0, nodes = [], edges = [];
+        (function go(n, pid) {
+            var c = {}, f;
+            for (f in n) { if (f !== 'kids' && Object.prototype.hasOwnProperty.call(n, f)) { c[f] = n[f]; } }
+            c.id = 'n' + (++k);
+            nodes.push(c);
+            if (pid) { edges.push({ id: 'e' + edges.length, from: pid, to: c.id, boss: true, style: 'solida', label: '' }); }
+            (n.kids || []).forEach(function (x) { go(x, c.id); });
+        })(m.tree, null);
+        return normalize({ kind: 'organograma', levels: m.levels, nodes: nodes, edges: edges, esc: m.esc || [], elements: [] });
+    }
+    // Nível em uso (por alguém ou por uma linha da matriz) não pode sair.
+    function levelUsed(S, key) {
+        return S.nodes.some(function (n) { return n.lvl === key; }) || (S.esc || []).some(function (r) { return r.lvl === key; });
+    }
+
     /* ---------------- leitura no documento ---------------- */
     function fontsReady() {
         if (!document.fonts || !document.fonts.load) { return Promise.resolve(); }
@@ -641,6 +735,8 @@
     window.CodexplusOrgDraw = {
         normalize: normalize, layout: function (s) { return layout(normalize(s)); }, svg: svg,
         legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot, openBoard: openBoard, parts: parts, tree: tree, label: label,
+        templates: function () { return TEMPLATES.map(function (t) { return { key: t.key, name: t.name, desc: t.desc }; }); },
+        fromTemplate: fromTemplate, levelUsed: levelUsed, SWATCHES: SWATCHES,
         measure: function (s) { var S = normalize(s), L = layout(S), o = {}; L.list.forEach(function (n) { var b = L.box[n.id]; o[n.id] = { x: b.x, y: b.y, w: b.w, h: b.h }; }); return o; },
         _reset: ctxReset, C: C
     };

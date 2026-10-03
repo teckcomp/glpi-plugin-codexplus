@@ -2273,6 +2273,8 @@
             root.querySelector('.cx-board-tools').innerHTML =
                 '<button type="button" data-act="onew" class="cx-board-ok" title="Nova pessoa, subordinada a quem estiver selecionado (sem seleção, ao topo)">Nova pessoa</button>'
                 + '<button type="button" data-act="arrumar" title="Devolver todos os cartões ao arranjo automático">Arrumar</button>'
+                + '<button type="button" data-act="omodelos" title="Começar de um modelo pronto (substitui o organograma)">Modelos</button>'
+                + '<button type="button" data-act="oniveis" title="Nome, cor e ordem dos níveis deste organograma">Níveis</button>'
                 + '<span class="cx-board-sep"></span>'
                 + '<button type="button" data-act="undo" title="Desfazer (Ctrl+Z)">↶</button>'
                 + '<button type="button" data-act="redo" title="Refazer (Ctrl+Y)">↷</button>'
@@ -2689,7 +2691,7 @@
                 + D.org.levels.map(function (l) { return row('<i style="width:18px;height:6px;border-radius:2px;display:inline-block;background:' + esc(l.color) + '"></i>', l.label, c[l.key] || 0); }).join('')
                 + row('<i style="width:18px;height:8px;border:1px dashed #888;border-radius:2px;display:inline-block;box-sizing:border-box"></i>', 'Vagas em aberto', vagas)
                 + row('<i style="width:18px;display:inline-block"></i>', 'Pessoas nomeadas', total)
-                + '<p class="cx-board-none" style="padding:8px 12px">A edição dos níveis chega na próxima etapa.</p>';
+                + '<div style="margin:6px 8px 10px"><button type="button" class="cx-board-btn" data-act="oniveis" style="width:100%">Editar níveis</button></div>';
         }
         /* Q6b-2 (Claudio, 03/10/2026): edição pelo painel, com as regras do
            motor antigo — nova pessoa entra no nível seguinte ao do chefe;
@@ -3025,10 +3027,87 @@
             nmIn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); odlg.querySelector('[data-od="save"]').click(); } });
             nmIn.focus();
         }
+        /* Q6c (Claudio, 03/10/2026): níveis e modelos, como no motor antigo.
+           Níveis: cor, nome, subir, excluir (só sem uso: ninguém nem linha da
+           matriz nele) e "Novo nível"; muda ao vivo. Modelos: dois cliques,
+           porque o modelo substitui o organograma (Ctrl+Z desfaz). */
+        var lvSnap = false;
+        function orgLevelsHtml() {
+            var L = D.org.levels;
+            return L.map(function (l, i) {
+                var used = OD().levelUsed(D.org, l.key);
+                return '<div style="display:flex;align-items:center;gap:6px;margin:0 0 6px">'
+                    + '<input type="color" value="' + esc(l.color) + '" data-olv-color="' + i + '" aria-label="Cor do nível ' + esc(l.label) + '" style="width:34px;height:28px;padding:0;border:1px solid var(--cx-border);border-radius:5px">'
+                    + '<input type="text" value="' + esc(l.label) + '" data-olv-label="' + i + '" maxlength="40" aria-label="Nome do nível" style="flex:1;box-sizing:border-box;border:1px solid var(--cx-border);border-radius:6px;padding:4px 6px;font:inherit">'
+                    + '<button type="button" class="cx-io-btn" data-od="up:' + i + '"' + (i === 0 ? ' disabled' : '') + ' aria-label="Subir" title="Subir">↑</button>'
+                    + '<button type="button" class="cx-io-btn" data-od="del:' + i + '"' + (used || L.length < 2 ? ' disabled title="' + (used ? 'Nível em uso: mude antes as pessoas ou as linhas da matriz dele' : 'O organograma precisa de ao menos um nível') + '"' : '') + ' style="color:#b3261e">Excluir</button>'
+                    + '</div>';
+            }).join('');
+        }
+        function orgLevelsDlg() {
+            orgDlg('<h3>Níveis deste organograma</h3><p class="cx-io-sub">Nome e cor de cada nível, de cima para baixo. Um nível em uso não pode ser excluído: mude antes as pessoas dele (ou as linhas da matriz).</p>'
+                + '<div data-olv-list style="max-height:50vh;overflow:auto">' + orgLevelsHtml() + '</div>'
+                + '<div class="cx-io-foot" style="justify-content:space-between"><button type="button" class="cx-io-btn" data-od="add">+ Novo nível</button>'
+                + '<button type="button" class="cx-io-btn cx-io-pri" data-od="close">Pronto</button></div>',
+                function (a) {
+                    var L = D.org.levels, i = +String(a).split(':')[1], list = odlg.querySelector('[data-olv-list]');
+                    if (a === 'close') { orgDlgClose(); render(); return; }
+                    if (a === 'add') {
+                        snap();
+                        L.push({ key: 'nv' + Date.now().toString(36), label: 'Novo nível', color: OD().SWATCHES[L.length % OD().SWATCHES.length] });
+                        list.innerHTML = orgLevelsHtml(); orgRefresh();
+                        var ins = list.querySelectorAll('[data-olv-label]'), li = ins[ins.length - 1]; if (li) { li.focus(); li.select(); }
+                        return;
+                    }
+                    if (/^up:/.test(a) && i > 0) { snap(); var t = L[i - 1]; L[i - 1] = L[i]; L[i] = t; }
+                    else if (/^del:/.test(a) && L[i] && L.length > 1 && !OD().levelUsed(D.org, L[i].key)) {
+                        snap();
+                        var gone = L[i].key; L.splice(i, 1);
+                        (D.org.elements || []).forEach(function (el) { if (el.lvl === gone) { el.lvl = ''; } });
+                    } else { return; }
+                    list.innerHTML = orgLevelsHtml(); orgRefresh();
+                });
+            odlg.addEventListener('input', function (e) {
+                var i = e.target.getAttribute('data-olv-label'), j = e.target.getAttribute('data-olv-color'), L = D.org.levels;
+                if (i === null && j === null) { return; }
+                if (!lvSnap) { snap(); lvSnap = true; }
+                if (i !== null && L[i]) { L[i].label = String(e.target.value).slice(0, 40) || '—'; }
+                else if (j !== null && L[j] && /^#[0-9a-f]{6}$/i.test(e.target.value)) { L[j].color = e.target.value; }
+                orgRefresh();
+            });
+            odlg.addEventListener('change', function () { lvSnap = false; });
+        }
+        function orgModelsDlg() {
+            var armed = '';
+            var html = function () {
+                return '<h3>Começar de um modelo</h3><p class="cx-io-sub">O modelo substitui o organograma atual (a matriz também, se o modelo trouxer uma). Clique duas vezes no modelo para usar. Nada fica gravado até clicar em Salvar organograma, e Ctrl+Z desfaz.</p>'
+                    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'
+                    + OD().templates().map(function (t) {
+                        var on = armed === t.key;
+                        return '<button type="button" data-od="tpl:' + esc(t.key) + '" style="display:flex;flex-direction:column;gap:4px;text-align:left;padding:12px 14px;font:inherit;background:' + (on ? 'var(--cx-accent-soft, #eef4fc)' : '#fff')
+                            + ';border:1px solid ' + (on ? 'var(--cx-accent)' : 'var(--cx-border)') + ';border-radius:8px;cursor:pointer;color:var(--cx-text)">'
+                            + '<strong style="font-size:14.5px">' + esc(t.name) + (on ? ' <span style="font-weight:500;color:var(--cx-accent);font-size:12.5px">· clique de novo para usar</span>' : '') + '</strong>'
+                            + '<span style="font-size:12.5px;color:var(--cx-muted);line-height:1.4">' + esc(t.desc) + '</span></button>';
+                    }).join('') + '</div>'
+                    + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-od="close">Cancelar</button></div>';
+            };
+            var onClick = function (a) {
+                if (a === 'close') { orgDlgClose(); return; }
+                var k = String(a).replace(/^tpl:/, '');
+                if (armed !== k) { armed = k; odlg.querySelector('.cx-io').innerHTML = html(); return; }
+                var S2 = OD().fromTemplate(k); if (!S2) { return; }
+                snap();
+                D.org = S2; sel = []; oDelArm = null; oOrigin = null;
+                orgDlgClose(); render(); paleta(); setTimeout(fit, 0);
+            };
+            orgDlg(html(), onClick);
+            odlg.querySelector('.cx-io').style.width = '760px';
+        }
         if (org) {
             var palEl = root.querySelector('.cx-board-icons');
             palEl.addEventListener('click', function (e) {
                 if (e.target.closest('[data-oelnew]')) { orgElNew(); return; }
+                if (e.target.closest('[data-act="oniveis"]')) { orgLevelsDlg(); return; }
                 var d = e.target.closest('[data-oeldel]');
                 if (d) { snap(); D.org.elements = (D.org.elements || []).filter(function (x) { return x.id !== d.getAttribute('data-oeldel'); }); render(); paleta(); }
             });
@@ -4640,13 +4719,15 @@
         function onKey(e) {
             if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
             if (io) { if (e.key === 'Escape') { e.preventDefault(); ioClose(); } return; }
+            // Q6c: diálogo do organograma aberto: Esc fecha (mesmo com o cursor
+            // num campo dele); as outras teclas ficam com o diálogo.
+            if (org && odlg) { if (e.key === 'Escape') { e.preventDefault(); orgDlgClose(); } return; }
             if (xmOpen() && e.key === 'Escape') { e.preventDefault(); xmShow(false); return; }
             if (ed) { return; }
             if (mini && e.key === 'Escape') { e.preventDefault(); miniClose(); return; }
             if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); findOpen(); return; }
             if (e.key === ' ' && !typing()) { space = true; e.preventDefault(); return; }
             if (typing()) { if (e.key === 'Escape') { document.activeElement.blur(); } return; }
-            if (org && odlg) { if (e.key === 'Escape') { e.preventDefault(); orgDlgClose(); } return; }
             if (org) {
                 // Q6b-1: no organograma, só desfazer/refazer e Esc (edição pelo
                 // teclado chega com o painel de edição).
@@ -4736,6 +4817,8 @@
                 var T0 = OD().tree(D.org), s0 = sel.length === 1 && orgNode(sel[0]);
                 orgAdd(s0 ? s0.id : (T0.top && T0.top.id) || ''); return;
             }
+            if (org && a === 'oniveis') { orgLevelsDlg(); return; }
+            if (org && a === 'omodelos') { orgModelsDlg(); return; }
             if (org && a === 'arrumar') {
                 snap(); D.org.nodes.forEach(function (n) { delete n.x; delete n.y; }); render(); setTimeout(fit, 0); return;
             }

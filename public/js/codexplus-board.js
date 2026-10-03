@@ -1597,7 +1597,7 @@
         delay: 'delay', 'half-rounded-rectangle': 'delay', circle: 'circ', circ: 'circ', 'sm-circ': 'evstart', start: 'evstart', 'small-circle': 'evstart',
         'fr-circ': 'evend', stop: 'evend', 'framed-circle': 'evend', 'dbl-circ': 'evend', 'double-circle': 'evend',
         'f-circ': 'conn', junction: 'conn', 'filled-circle': 'conn', 'notch-pent': 'offpage', 'loop-limit': 'offpage', 'odd': 'proc',
-        'braces': 'annot', comment: 'annot', 'brace-r': 'annot', text: 'annot', 'tag-doc': 'doc', 'tag-rect': 'proc', card: 'proc', 'notch-rect': 'proc' };
+        'braces': 'annot', comment: 'annot', 'brace-r': 'annot', text: 'annot', 'tag-doc': 'doc', 'tag-rect': 'proc', card: 'note', 'notch-rect': 'proc' };
     var MM_DIRS = { LR: 'h', RL: 'h', TB: 'v', TD: 'v', BT: 'v' };
     var MM_MAX_NODES = 1500;
 
@@ -1629,6 +1629,8 @@
         var m = /fill\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)\b/i.exec(String(style || ''));
         if (!m) { return ''; }
         var hx = m[1].length === 4 ? '#' + m[1][1] + m[1][1] + m[1][2] + m[1][2] + m[1][3] + m[1][3] : m[1];
+        var exact = Object.keys(FLOW_COLORS).filter(function (k) { return FLOW_COLORS[k].f.toLowerCase() === hx.toLowerCase(); })[0];
+        if (exact) { return exact; }
         var c = mmHsl(hx);
         if (c.s < 0.15 || (c.l > 0.97 && c.s < 0.5)) { return c.l > 0.97 ? 'branco' : 'cinza'; }
         var best = 'azul', bd = 999;
@@ -2005,6 +2007,101 @@
         return { data: { v: 1, mode: 'fluxograma', w: Math.max(400, Math.min(6000, Math.ceil(W))), h: Math.max(300, Math.min(6000, Math.ceil(Hh))), items: all }, warn: warn };
     }
 
+    /* Q5i-3 — exportar em Mermaid ("Levar para uma IA", Claudio, 03/10/2026).
+       Arquivo .md (a extensão .mmd é de outro formato e algumas IAs recusam):
+       instrução curta + bloco ```mermaid. Raias = subgraph (título<br>descrição,
+       cor por style); moldura dentro da raia = subgraph interno; texto solto =
+       forma "text". Cores das formas por classDef (o tom exato volta na
+       importação). Não vão: posições (refeitas na volta), ícones, cores das
+       ligações. Função pura. */
+    var MM_OUT = {
+        proc: ['["', '"]'], task: ['["', '"]'], ico: ['["', '"]'], term: ['(["', '"])'], dec: ['{"', '"}'], gwx: ['{"', '"}'], gwp: ['{"', '"}'], gwi: ['{"', '"}'],
+        sub: ['[["', '"]]'], bsub: ['[["', '"]]'], db: ['[("', '")]'], prep: ['{{"', '"}}'], data: ['[/"', '"/]'], manop: ['[/"', '"\\]'], manin: ['[\\"', '"/]'],
+        evmid: ['(("', '"))']
+    };
+    var MM_OUT_AT = { doc: 'doc', dataobj: 'doc', docs: 'docs', delay: 'delay', evstart: 'sm-circ', evend: 'fr-circ', conn: 'f-circ', offpage: 'notch-pent', note: 'card', annot: 'braces', group: 'rect' };
+    function mmQuote(t) {
+        return String(t || '').replace(/"/g, '#quot;').replace(/\r?\n/g, '<br>');
+    }
+    function boardToMermaid(D, title, when) {
+        var items = D.items || [], lanes = lanesOf(items), H = !lanes.length || lanes[0].dir === 'h';
+        var nodes = items.filter(function (i) { return i.t === 'shape' || (i.t === 'text' && String(i.text || '').trim()); });
+        var zones = items.filter(function (i) { return i.t === 'zone'; });
+        var center = function (i) { var b = i.t === 'shape' ? { x: i.x, y: i.y, w: i.w, h: i.h } : bbox(i); return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; };
+        var inside = function (z, c) { return c.x >= z.x && c.x < z.x + z.w && c.y >= z.y && c.y < z.y + z.h; };
+        // Ordem de leitura: na direção das raias, linha a linha.
+        var key = function (i) { var c = center(i); return H ? [c.y, c.x] : [c.x, c.y]; };
+        nodes.sort(function (a, b) { var ka = key(a), kb = key(b); return Math.abs(ka[0] - kb[0]) > 30 ? ka[0] - kb[0] : ka[1] - kb[1]; });
+        var id = {}; nodes.forEach(function (n, k) { id[n.id] = 'n' + (k + 1); });
+        var used = {};
+        function nodeLine(n, ind) {
+            used[n.id] = true;
+            var t = mmQuote(n.text), nid = id[n.id];
+            if (n.t === 'text') { return ind + nid + '@{ shape: text, label: "' + t + '" }'; }
+            var br = MM_OUT[n.shape];
+            if (br) { return ind + nid + br[0] + t + br[1]; }
+            return ind + nid + '@{ shape: ' + (MM_OUT_AT[n.shape] || 'rect') + ', label: "' + t + '" }';
+        }
+        var out = [];
+        if (title) { out.push('---', 'title: ' + String(title).replace(/[\r\n]+/g, ' '), '---'); }
+        out.push('flowchart ' + (H ? 'LR' : 'TD'));
+        var laneOfNode = {}, zoneOfNode = {};
+        nodes.forEach(function (n) {
+            var c = center(n);
+            lanes.forEach(function (l, li) { if (laneOfNode[n.id] === undefined && inLane(l, n)) { laneOfNode[n.id] = li; } });
+            zones.forEach(function (z, zi) { if (zoneOfNode[n.id] === undefined && inside(z, c)) { zoneOfNode[n.id] = zi; } });
+        });
+        // Moldura fica na raia onde está o centro dela (sem raias: grupo próprio).
+        var zoneLane = zones.map(function (z) { var c = { x: z.x + z.w / 2, y: z.y + z.h / 2 }, r = -1; lanes.forEach(function (l, li) { if (r < 0 && c.x >= l.x && c.x < l.x + l.w && c.y >= l.y && c.y < l.y + l.h) { r = li; } }); return r; });
+        function zoneBlock(zi, ind) {
+            var inZ = nodes.filter(function (n) { return zoneOfNode[n.id] === zi && !used[n.id]; });
+            if (!inZ.length) { return; }
+            out.push(ind + 'subgraph Z' + (zi + 1) + '["' + mmQuote(zones[zi].label || 'Grupo') + '"]');
+            out.push(ind + '    direction ' + (H ? 'LR' : 'TB'));
+            inZ.forEach(function (n) { out.push(nodeLine(n, ind + '    ')); });
+            out.push(ind + 'end');
+        }
+        lanes.forEach(function (l, li) {
+            var t = mmQuote(l.title || ('Área ' + (li + 1))) + (l.desc ? '<br>' + mmQuote(l.desc) : '');
+            out.push('    subgraph L' + (li + 1) + '["' + t + '"]');
+            out.push('        direction ' + (H ? 'LR' : 'TB'));
+            nodes.forEach(function (n) { if (laneOfNode[n.id] === li && (zoneOfNode[n.id] === undefined || zoneLane[zoneOfNode[n.id]] !== li)) { out.push(nodeLine(n, '        ')); } });
+            zones.forEach(function (z, zi) { if (zoneLane[zi] === li) { zoneBlock(zi, '        '); } });
+            out.push('    end');
+        });
+        if (!lanes.length) { zones.forEach(function (z, zi) { zoneBlock(zi, '    '); }); }
+        nodes.forEach(function (n) { if (!used[n.id]) { out.push(nodeLine(n, '    ')); } });
+        // Ligações: pela posição da origem e, entre irmãs, de cima para baixo
+        // (a primeira saída segue na mesma linha quando volta para o Codex+).
+        var pos = {}; nodes.forEach(function (n, k) { pos[n.id] = k; });
+        var links = items.filter(function (i) { return i.t === 'link' && id[i.a.id] && id[i.b.id]; });
+        links.sort(function (a, b) { return pos[a.a.id] - pos[b.a.id] || pos[a.b.id] - pos[b.b.id]; });
+        links.forEach(function (L) {
+            var thick = L.lw === 'm' || L.lw === 'g', dash = L.dash === 'dash' || L.dash === 'dot';
+            var end = L.eb && L.eb !== 'none', start = L.ea && L.ea !== 'none';
+            var op = dash ? (end ? '-.->' : '-.-') : thick ? (end ? '==>' : '===') : (end ? '-->' : '---');
+            if (end && L.eb === 'circle' && !dash && !thick) { op = '--o'; }
+            if (start && end && !dash && !thick && L.eb !== 'circle') { op = '<-->'; }
+            var lab = String(L.label || '').trim();
+            out.push('    ' + id[L.a.id] + ' ' + op + (lab ? '|"' + mmQuote(lab) + '"|' : '') + ' ' + id[L.b.id]);
+        });
+        // Cores: só o que difere da cor padrão do tipo de forma.
+        var byTone = {};
+        nodes.forEach(function (n) {
+            if (n.t !== 'shape') { return; }
+            var def = (SHAPES[n.shape] || SHAPES.proc).color;
+            if (n.fill && n.fill !== def && FLOW_COLORS[n.fill]) { (byTone[n.fill] = byTone[n.fill] || []).push(id[n.id]); }
+        });
+        Object.keys(byTone).forEach(function (k) { var c = FLOW_COLORS[k]; out.push('    classDef ' + k + ' fill:' + c.f + ',stroke:' + c.s + ',color:' + c.t); });
+        Object.keys(byTone).forEach(function (k) { out.push('    class ' + byTone[k].join(',') + ' ' + k); });
+        lanes.forEach(function (l, li) { var c = FLOW_COLORS[l.tone]; if (c) { out.push('    style L' + (li + 1) + ' fill:' + c.f + ',stroke:' + c.s); } });
+        var head = '# ' + (title || 'Fluxograma') + '\n\n'
+            + 'Fluxograma exportado do Codex+' + (when ? ' em ' + when : '') + ', no formato Mermaid (flowchart).\n'
+            + 'Para ajustar com uma IA: anexe este arquivo e peça as mudanças, pedindo a resposta no mesmo formato: '
+            + 'um arquivo Mermaid do tipo flowchart, com um grupo (subgraph) para cada área. Depois importe a resposta no Codex+.\n\n';
+        return head + '```mermaid\n' + out.join('\n') + '\n```\n';
+    }
+
     /* Q5i-1 — leitura de um arquivo de fluxo (pura: testável sem DOM).
        Devolve { err } ou { data, kind, title, warn[] }. `data` já passou
        pelo clean() do motor. */
@@ -2131,6 +2228,7 @@
                 + '<span class="cx-board-xw"><button type="button" data-act="exp" aria-haspopup="true" aria-expanded="false" title="Levar este fluxo para um arquivo">Exportar <span class="cx-board-car" aria-hidden="true">▾</span></button>'
                 + '<div class="cx-board-xm" role="menu" hidden>'
                 + '<button type="button" role="menuitem" data-act="expjson"><b>Guardar uma cópia do fluxo</b><span>Arquivo do Codex+ com tudo: cores, links e ícones. Serve de backup ou para levar o fluxo a outro documento.</span></button>'
+                + '<button type="button" role="menuitem" data-act="expmd"><b>Levar para uma IA</b><span>Arquivo que ChatGPT, Claude e Gemini entendem. Anexe na IA, peça os ajustes e importe a resposta de volta (o Codex+ refaz as posições).</span></button>'
                 + '</div></span>' : '')
             + (D.mode === 'planta'
                 ? '<span class="cx-board-sep"></span><button type="button" data-act="bg">' + (bgUrl ? 'Trocar planta' : 'Enviar planta') + '</button>'
@@ -4165,6 +4263,7 @@
             else if (a === 'imp') { xmShow(false); ioOpen(); }
             else if (a === 'exp') { xmShow(!xmOpen()); }
             else if (a === 'expjson') { xmShow(false); exportJson(); }
+            else if (a === 'expmd') { xmShow(false); exportMd(); }
             else if (a === 'cancel') { close(); }
             else if (a === 'save') { save(); }
         }
@@ -4330,6 +4429,19 @@
             setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
         }
 
+        // Q5i-3: Mermaid em .md, para levar a uma IA.
+        function exportMd() {
+            var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+            var txt = boardToMermaid(D, String(host && host.title || ''), p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear());
+            var blob = new Blob([txt], { type: 'text/markdown;charset=utf-8' });
+            var a = document.createElement('a'), url = URL.createObjectURL(blob);
+            a.href = url;
+            a.download = pngName(D.mode, null, host && host.title).replace(/\.png$/, '-ia.md');
+            a.style.display = 'none';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        }
+
         function ioClose() {
             if (!io) { return; }
             document.removeEventListener('paste', ioPaste, true);
@@ -4482,5 +4594,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _mermaidBoard: mermaidBoard, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

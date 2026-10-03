@@ -1575,6 +1575,54 @@
         ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged, host || null); });
     }
 
+    /* Q5i-1 — leitura de um arquivo de fluxo (pura: testável sem DOM).
+       Devolve { err } ou { data, kind, title, warn[] }. `data` já passou
+       pelo clean() do motor. */
+    var IO_FORMAT = 'codexplus-quadro', IO_VERSION = 1, IO_MAX = 1024 * 1024;
+    function readIo(txt, mode, here) {
+        txt = String(txt || '').replace(/^\uFEFF/, '').trim();
+        if (!txt) { return { err: 'Nada para importar: o conteúdo está vazio.' }; }
+        if (txt.length > IO_MAX) { return { err: 'Conteúdo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.' }; }
+        if (/^(flowchart|graph)\b/i.test(txt.replace(/^```\s*mermaid\s*/i, ''))) {
+            return { err: 'Este conteúdo é Mermaid (de IA). A importação de Mermaid chega numa próxima versão; por enquanto, só arquivos do Codex+.' };
+        }
+        var obj = null;
+        try { obj = JSON.parse(txt); } catch (e) {
+            // Tolerância: texto em volta do JSON (bloco de código, comentário).
+            var i = txt.indexOf('{'), j = txt.lastIndexOf('}');
+            if (i >= 0 && j > i) { try { obj = JSON.parse(txt.slice(i, j + 1)); } catch (e2) { obj = null; } }
+        }
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { return { err: 'Este conteúdo não é um fluxo do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do fluxo.' }; }
+        var q = null, kind = 'Cópia do Codex+', title = '', origin = '';
+        if (obj.formato === IO_FORMAT) {
+            if ((+obj.versao || 0) > IO_VERSION) { return { err: 'Este arquivo é de uma versão mais nova do Codex+. Atualize o plugin para importar.' }; }
+            q = obj.quadro; title = String(obj.titulo || '').slice(0, 200); origin = String(obj.origem || '');
+        } else if (obj.board && typeof obj.board === 'object') {
+            q = obj.board; kind = 'Quadro do Codex+';
+        } else if (Array.isArray(obj.items)) {
+            q = obj; kind = 'Quadro do Codex+';
+        }
+        if (!q || typeof q !== 'object' || !Array.isArray(q.items)) { return { err: 'Este conteúdo não é um fluxo do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do fluxo.' }; }
+        if (q.mode && q.mode !== mode) {
+            var art = { planta: 'uma planta', topologia: 'uma topologia', fluxograma: 'um fluxograma' };
+            return { err: 'Este arquivo é de ' + (art[q.mode] || 'outro tipo de quadro') + ', não de ' + (art[mode] || mode) + '.' };
+        }
+        var data = clean(Object.assign({}, q, { mode: mode }), mode);
+        var warn = [];
+        var src = q.items.filter(function (it) { return it && typeof it === 'object'; });
+        var lost = src.length - data.items.length;
+        if (lost > 0) { warn.push(lost === 1 ? '1 item não pôde ser trazido (tipo que o ' + MODES[mode].toLowerCase() + ' não usa ou ligação sem as duas pontas).' : lost + ' itens não puderam ser trazidos (tipos que o ' + MODES[mode].toLowerCase() + ' não usa ou ligações sem as duas pontas).'); }
+        var cut = src.filter(function (it) { return it.t === 'shape' && String(it.text || '').length > 500; }).length;
+        if (cut) { warn.push(cut === 1 ? '1 forma tinha texto com mais de 500 letras e foi cortada.' : cut + ' formas tinham texto com mais de 500 letras e foram cortadas.'); }
+        var docs = data.items.filter(function (it) { return it.lk && it.lk.t === 'doc'; }).length;
+        here = here === undefined ? (typeof location !== 'undefined' ? location.origin : '') : here;
+        if (docs && origin && here && origin !== here) {
+            warn.push((docs === 1 ? '1 forma tem link' : docs + ' formas têm link') + ' para documento do Codex+ de outro ambiente (' + origin + '). Confira se ' + (docs === 1 ? 'aponta' : 'apontam') + ' para o documento certo.');
+        }
+        if (!data.items.length) { return { err: 'O arquivo não tem nada que o ' + MODES[mode].toLowerCase() + ' consiga desenhar.' }; }
+        return { data: data, kind: kind, title: title, warn: warn };
+    }
+
     function pngName(mode, now, title) {
         var t = document.querySelector('input[name="name"]');
         var slug = String(title || (t && t.value) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -1636,7 +1684,13 @@
                 + '<select data-act="page">' + PAGE_SIZES.map(function (p) { return '<option value="' + p.v + '">' + p.l + '</option>'; }).join('')
                 + '<option value="custom">Personalizado</option></select>'
                 + '<span class="cx-board-pagec" hidden><input type="number" min="400" max="6000" step="100" data-pg="w" title="Largura (px)"> × '
-                + '<input type="number" min="300" max="6000" step="100" data-pg="h" title="Altura (px)"></span></label>' : '')
+                + '<input type="number" min="300" max="6000" step="100" data-pg="h" title="Altura (px)"></span></label>'
+                // Q5i-1 (Claudio, 03/10/2026): importar e exportar o fluxo em arquivo.
+                + '<span class="cx-board-sep"></span><button type="button" data-act="imp" title="Trazer um fluxo de um arquivo (substitui o desenho; Ctrl+Z desfaz)">Importar</button>'
+                + '<span class="cx-board-xw"><button type="button" data-act="exp" aria-haspopup="true" aria-expanded="false" title="Levar este fluxo para um arquivo">Exportar <span class="cx-board-car" aria-hidden="true">▾</span></button>'
+                + '<div class="cx-board-xm" role="menu" hidden>'
+                + '<button type="button" role="menuitem" data-act="expjson"><b>Guardar uma cópia do fluxo</b><span>Arquivo do Codex+ com tudo: cores, links e ícones. Serve de backup ou para levar o fluxo a outro documento.</span></button>'
+                + '</div></span>' : '')
             + (D.mode === 'planta'
                 ? '<span class="cx-board-sep"></span><button type="button" data-act="bg">' + (bgUrl ? 'Trocar planta' : 'Enviar planta') + '</button>'
                   + '<label class="cx-board-op" title="Transparência da planta">Planta <input type="range" min="10" max="100" step="5" data-act="op" value="' + Math.round(D.bgOpacity * 100) + '"></label>'
@@ -3518,6 +3572,8 @@
         function typing() { var a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && root.contains(a); }
         function onKey(e) {
             if (ni) { if (e.key === 'Escape') { e.preventDefault(); niClose(); } return; }
+            if (io) { if (e.key === 'Escape') { e.preventDefault(); ioClose(); } return; }
+            if (xmOpen() && e.key === 'Escape') { e.preventDefault(); xmShow(false); return; }
             if (ed) { return; }
             if (mini && e.key === 'Escape') { e.preventDefault(); miniClose(); return; }
             if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); findOpen(); return; }
@@ -3665,6 +3721,9 @@
             else if (a === 'rot') { rotate(); }
             else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }
             else if (a === 'png') { downloadPng(); }
+            else if (a === 'imp') { xmShow(false); ioOpen(); }
+            else if (a === 'exp') { xmShow(!xmOpen()); }
+            else if (a === 'expjson') { xmShow(false); exportJson(); }
             else if (a === 'cancel') { close(); }
             else if (a === 'save') { save(); }
         }
@@ -3798,7 +3857,171 @@
             });
         }
 
+        /* ---------- Q5i-1: importar e exportar o fluxo em arquivo ----------
+           (Claudio, 03/10/2026). Tudo no navegador: nada vai ao servidor até
+           \"Salvar fluxograma\". Arquivo do Codex+ = { formato, versao, origem,
+           titulo, exportado, quadro }. Importar aceita também o quadro puro
+           ({ mode, items }) e o registro do DIA ({ kind, board }). O que entra
+           passa pelo clean() do motor; substituir grava um passo no histórico,
+           então Ctrl+Z desfaz só a importação. */
+        var io = null;   // janela de importar aberta
+        function xmOpen() { var m = root.querySelector('.cx-board-xm'); return !!(m && !m.hidden); }
+        function xmShow(on) {
+            var m = root.querySelector('.cx-board-xm'), b = root.querySelector('[data-act="exp"]');
+            if (!m) { return; }
+            m.hidden = !on;
+            b.classList.toggle('is-on', !!on); b.setAttribute('aria-expanded', String(!!on));
+            if (on) { document.addEventListener('pointerdown', xmAway, true); } else { document.removeEventListener('pointerdown', xmAway, true); }
+        }
+        function xmAway(e) { if (!e.target.closest || !e.target.closest('.cx-board-xw')) { xmShow(false); } }
+
+        function exportJson() {
+            var q = clone(D);
+            q.lib = libOf(q.items);
+            var pack = { formato: IO_FORMAT, versao: IO_VERSION, origem: location.origin, titulo: String(host && host.title || ''),
+                exportado: new Date().toISOString(), quadro: q };
+            var blob = new Blob([JSON.stringify(pack, null, 1)], { type: 'application/json' });
+            var a = document.createElement('a'), url = URL.createObjectURL(blob);
+            a.href = url;
+            a.download = pngName(D.mode, null, host && host.title).replace(/\.png$/, '.json');
+            a.style.display = 'none';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        }
+
+        function ioClose() {
+            if (!io) { return; }
+            document.removeEventListener('paste', ioPaste, true);
+            io.el.remove(); io = null;
+        }
+        function ioOpen(file) {
+            if (io) { return; }
+            var el = document.createElement('div');
+            el.className = 'cx-io-back';
+            root.appendChild(el);
+            io = { el: el, got: null };
+            // Clique fora da caixa fecha (como o Cancelar).
+            el.addEventListener('pointerdown', function (e) { if (e.target === el) { ioClose(); } });
+            document.addEventListener('paste', ioPaste, true);
+            ioPick();
+            if (file) { ioFile(file); }
+        }
+        // Tela 1: escolher o arquivo, arrastar ou colar.
+        function ioPick(err) {
+            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Importar fluxo">'
+                + '<h3>Importar fluxo</h3>'
+                + '<p class="cx-io-sub">Traga uma cópia guardada de um fluxo do Codex+. Nada é gravado até você clicar em Salvar fluxograma.</p>'
+                + '<div class="cx-io-drop" data-io="drop"><div class="cx-io-big">Arraste o arquivo para cá</div>'
+                + '<div class="cx-io-sm">Arquivos do Codex+ (.json)</div>'
+                + '<button type="button" class="cx-io-btn" data-io="file">Escolher arquivo</button></div>'
+                + '<div class="cx-io-or">ou</div>'
+                + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> o conteúdo copiado.</div>'
+                + '<p class="cx-io-err" data-io="err"' + (err ? '' : ' hidden') + '>' + esc(err || '') + '</p>'
+                + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="cancel">Cancelar</button></div>'
+                + '</div>';
+            var q = function (k) { return io.el.querySelector('[data-io="' + k + '"]'); };
+            q('cancel').addEventListener('click', ioClose);
+            q('file').addEventListener('click', function () {
+                var inp = document.createElement('input');
+                inp.type = 'file'; inp.accept = '.json,.txt,application/json,text/plain';
+                inp.addEventListener('change', function () { if (inp.files && inp.files[0]) { ioFile(inp.files[0]); } });
+                inp.click();
+            });
+            var dz = q('drop');
+            dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('is-over'); });
+            dz.addEventListener('dragleave', function () { dz.classList.remove('is-over'); });
+            dz.addEventListener('drop', function (e) {
+                e.preventDefault(); e.stopPropagation(); dz.classList.remove('is-over');
+                var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (f) { ioFile(f); }
+            });
+            var pz = q('paste');
+            if (pz.focus) { pz.focus(); }
+        }
+        function ioPaste(e) {
+            if (!io) { return; }
+            var cd = e.clipboardData;
+            if (!cd) { return; }
+            e.preventDefault(); e.stopPropagation();
+            var f = cd.files && cd.files[0];
+            if (f) { ioFile(f); return; }
+            ioText(cd.getData('text/plain') || cd.getData('text') || '', '');
+        }
+        function ioFile(f) {
+            var name = String(f.name || '');
+            if (/^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|bmp|svg|pdf)$/i.test(name) || f.type === 'application/pdf') {
+                ioPick('Imagem e PDF ainda não são importados diretamente. Escolha um arquivo do Codex+ (.json).');
+                return;
+            }
+            if (f.size > IO_MAX) { ioPick('Arquivo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.'); return; }
+            var rd = new FileReader();
+            rd.onload = function () { ioText(String(rd.result || ''), name); };
+            rd.onerror = function () { ioPick('Não foi possível ler esse arquivo.'); };
+            rd.readAsText(f);
+        }
+        function ioText(txt, name) {
+            if (!io) { return; }
+            var r = readIo(txt, D.mode);
+            if (r.err) { ioPick(r.err); return; }
+            io.got = r;
+            ioSummary(name);
+        }
+        // Tela 2: resumo e confirmação.
+        function ioSummary(name) {
+            var r = io.got, n = function (t) { return r.data.items.filter(function (i) { return i.t === t; }).length; };
+            var cur = D.items.filter(function (i) { return i.t !== 'link'; }).length;
+            var cards = [[n('shape'), n('shape') === 1 ? 'forma' : 'formas'], [n('lane'), n('lane') === 1 ? 'área (raia)' : 'áreas (raias)'], [n('link'), n('link') === 1 ? 'ligação' : 'ligações']];
+            var warn = r.warn.length ? '<div class="cx-io-warn"><p>' + (r.warn.length === 1 ? '1 ponto para conferir' : r.warn.length + ' pontos para conferir') + '</p><ul>'
+                + r.warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>' : '';
+            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Fluxo encontrado">'
+                + '<h3>Fluxo encontrado</h3><p class="cx-io-sub">Confira antes de trazer para o quadro.</p>'
+                + '<div class="cx-io-file"><span class="cx-io-doc" aria-hidden="true"></span><div>' + esc(name || r.title || 'Conteúdo colado')
+                + '<small>' + esc(r.kind) + (r.title && name ? ' · ' + r.title : '') + '</small></div></div>'
+                + '<div class="cx-io-stats">' + cards.map(function (c) { return '<div><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('') + '</div>'
+                + warn
+                + '<p class="cx-io-note">' + (cur ? 'O desenho atual (' + cur + (cur === 1 ? ' item' : ' itens') + ') será substituído. Se não gostar, use Desfazer (Ctrl+Z) para voltar ao desenho anterior.'
+                    : 'O quadro está vazio: o fluxo entra nele. Desfazer (Ctrl+Z) volta ao quadro vazio.') + '</p>'
+                + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="back">Voltar</button>'
+                + '<button type="button" class="cx-io-btn cx-io-pri" data-io="apply">' + (cur ? 'Substituir desenho' : 'Trazer para o quadro') + '</button></div>'
+                + '</div>';
+            io.el.querySelector('[data-io="back"]').addEventListener('click', function () { ioPick(); });
+            var ap = io.el.querySelector('[data-io="apply"]');
+            ap.addEventListener('click', ioApply);
+            if (ap.focus) { ap.focus(); }
+        }
+        function ioApply() {
+            if (!io || !io.got) { return; }
+            var nd = io.got.data;
+            snap();
+            nd.legend = false; nd.pxm = 0;
+            D = nd;
+            // A folha cresce se o desenho não couber (nunca corta).
+            var m = pageMin();
+            D.w = Math.min(6000, Math.max(D.w, m.w)); D.h = Math.min(6000, Math.max(D.h, m.h));
+            sel = [];
+            ioClose();
+            render(); fit(); drawSel();
+        }
+
+        // Arrastar um arquivo direto para o quadro abre a importação com ele.
+        (function () {
+            if (!flow) { return; }
+            var st = root.querySelector('.cx-board-stage');
+            var isFile = function (e) { var t = e.dataTransfer && e.dataTransfer.types; return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0; };
+            root.addEventListener('dragover', function (e) { if (isFile(e)) { e.preventDefault(); } });
+            root.addEventListener('drop', function (e) { if (isFile(e)) { e.preventDefault(); } });
+            st.addEventListener('dragover', function (e) { if (isFile(e)) { e.preventDefault(); st.classList.add('is-filedrop'); } });
+            st.addEventListener('dragleave', function (e) { if (e.target === st || !st.contains(e.relatedTarget)) { st.classList.remove('is-filedrop'); } });
+            st.addEventListener('drop', function (e) {
+                if (!isFile(e)) { return; }
+                e.preventDefault(); st.classList.remove('is-filedrop');
+                var f = e.dataTransfer.files && e.dataTransfer.files[0];
+                if (f) { if (io) { ioFile(f); } else { ioOpen(f); } }
+            });
+        })();
+
         function close() {
+            ioClose(); xmShow(false);
             document.removeEventListener('keydown', onKey, true);
             document.removeEventListener('keyup', onKeyUp, true);
             document.documentElement.classList.remove('cx-board-open');
@@ -3817,5 +4040,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

@@ -2383,3 +2383,45 @@ html.cx-board-open { overflow: hidden; }
 .cx-board-mm { position: absolute; right: 10px; bottom: 44px; z-index: 4; width: 200px; height: 130px; background: #F7F6F2; border: 1px solid var(--cx-border); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.12); overflow: hidden; cursor: pointer; }
 .cx-board-mm[hidden] { display: none; }
 .cx-board-mm svg { width: 100%; height: 100%; display: block; }
+
+/* Q5i-1: importar e exportar o fluxo em arquivo (barra do fluxograma). */
+.cx-board-xw { position: relative; display: inline-flex; }
+.cx-board-car { font-size: .8em; margin-left: 2px; }
+.cx-board-xm { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 330px; background: #fff; border: 1px solid var(--cx-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(23, 32, 45, .16); padding: 6px; }
+.cx-board-xm[hidden] { display: none; }
+.cx-board-top .cx-board-xm button { display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 10px 12px; background: #fff; font-size: 14px; line-height: 1.4; white-space: normal; }
+.cx-board-top .cx-board-xm button:hover, .cx-board-top .cx-board-xm button:focus-visible { background: var(--cx-surface-1); }
+.cx-board-xm b { display: block; font-weight: 600; color: var(--cx-text); }
+.cx-board-xm span { display: block; font-size: 12.5px; color: var(--cx-muted); margin-top: 3px; }
+.cx-board-stage.is-filedrop { outline: 3px dashed var(--cx-accent); outline-offset: -6px; }
+.cx-io-back { position: absolute; inset: 0; z-index: 30; background: rgba(23, 32, 45, .38); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+.cx-io { width: 560px; max-width: 94vw; background: #fff; border-radius: 10px; box-shadow: 0 16px 48px rgba(23, 32, 45, .28); padding: 22px 24px 18px; color: var(--cx-text); font-size: 14px; }
+.cx-io h3 { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
+.cx-io-sub { margin: 0 0 16px; color: var(--cx-muted); font-size: 13.5px; line-height: 1.45; }
+.cx-io-drop { border: 2px dashed #9db8e0; background: #f3f7fd; border-radius: 8px; padding: 26px 16px; text-align: center; }
+.cx-io-drop.is-over { border-color: var(--cx-accent); background: #e6f1fb; }
+.cx-io-big { font-size: 15px; font-weight: 600; }
+.cx-io-sm { font-size: 12.5px; color: var(--cx-muted); margin-top: 6px; }
+.cx-io-btn { border: 1px solid var(--cx-border); background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 14px; cursor: pointer; color: var(--cx-text); }
+.cx-io-btn:hover { background: var(--cx-surface-1); }
+.cx-io-drop .cx-io-btn { margin-top: 12px; }
+.cx-io-pri, .cx-io-pri:hover { background: var(--cx-accent); border-color: var(--cx-accent); color: #fff; }
+.cx-io-or { display: flex; align-items: center; gap: 10px; color: var(--cx-muted); font-size: 12.5px; margin: 14px 0; }
+.cx-io-or::before, .cx-io-or::after { content: ""; flex: 1; height: 1px; background: var(--cx-border); }
+.cx-io-paste { border: 1px solid var(--cx-border); border-radius: 8px; padding: 14px 16px; color: var(--cx-muted); cursor: text; }
+.cx-io-paste:focus { outline: 2px solid var(--cx-accent); outline-offset: 1px; border-color: var(--cx-accent); }
+.cx-io-paste b { color: var(--cx-text); font-weight: 600; }
+.cx-io-err { margin: 12px 0 0; color: #b42318; font-size: 13px; line-height: 1.45; }
+.cx-io-err[hidden] { display: none; }
+.cx-io-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.cx-io-file { display: flex; align-items: center; gap: 10px; background: var(--cx-surface-1); border-radius: 8px; padding: 10px 12px; word-break: break-all; }
+.cx-io-file small { display: block; color: var(--cx-muted); font-size: 12.5px; margin-top: 2px; word-break: normal; }
+.cx-io-doc { flex: none; width: 26px; height: 32px; border: 1.5px solid #9db8e0; border-radius: 3px; background: #fff; }
+.cx-io-stats { display: flex; gap: 10px; margin: 14px 0; }
+.cx-io-stats > div { flex: 1; border: 1px solid var(--cx-border); border-radius: 8px; padding: 10px 12px; }
+.cx-io-stats b { display: block; font-size: 22px; font-weight: 600; }
+.cx-io-stats span { font-size: 12.5px; color: var(--cx-muted); }
+.cx-io-warn { border-left: 3px solid #d99a1e; background: #fdf7ea; border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+.cx-io-warn p { margin: 0 0 4px; font-weight: 600; }
+.cx-io-warn ul { margin: 0; padding-left: 18px; }
+.cx-io-note { margin: 12px 0 0; font-size: 13px; color: var(--cx-muted); line-height: 1.45; }

@@ -2286,10 +2286,16 @@
        Devolve { err } ou { data, kind, title, warn[] }. `data` já passou
        pelo clean() do motor. */
     var IO_FORMAT = 'codexplus-quadro', IO_VERSION = 1, IO_MAX = 1024 * 1024;
+    // Q7a (Claudio, 03/10/2026): a cópia da planta leva a imagem (data URL),
+    // então o limite dela é maior.
+    var IO_MAX_BG = 12 * 1024 * 1024;
+    function ioMax(mode) { return mode === 'planta' ? IO_MAX_BG : IO_MAX; }
+    var IO_NOUN = { fluxograma: 'fluxo', organograma: 'organograma', planta: 'planta', topologia: 'topologia' };
+    var BG_OK = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
     function readIo(txt, mode, here, cur) {
         txt = String(txt || '').replace(/^\uFEFF/, '').trim();
         if (!txt) { return { err: 'Nada para importar: o conteúdo está vazio.' }; }
-        if (txt.length > IO_MAX) { return { err: 'Conteúdo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.' }; }
+        if (txt.length > ioMax(mode)) { return { err: mode === 'planta' ? 'Conteúdo grande demais (mais de 12 MB), mesmo contando a imagem da planta.' : 'Conteúdo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.' }; }
         if (mode === 'organograma') { return readOrgIo(txt, cur); }
         // Q5i-2: Mermaid (o que as IAs geram). Só o fluxograma.
         if (/^(```|---|%%|flowchart\b|graph\b)/i.test(txt) || /```\s*mermaid/i.test(txt)) {
@@ -2311,19 +2317,22 @@
             var i = txt.indexOf('{'), j = txt.lastIndexOf('}');
             if (i >= 0 && j > i) { try { obj = JSON.parse(txt.slice(i, j + 1)); } catch (e2) { obj = null; } }
         }
-        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { return { err: 'Este conteúdo não é um fluxo do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do fluxo.' }; }
-        var q = null, kind = 'Cópia do Codex+', title = '', origin = '';
+        var NAO = mode === 'fluxograma' ? 'Este conteúdo não é um fluxo do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do fluxo.'
+            : 'Este conteúdo não é uma cópia de ' + (mode === 'planta' ? 'planta' : 'topologia') + ' do Codex+. Use o arquivo gerado por Exportar cópia.';
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { return { err: NAO }; }
+        var q = null, kind = 'Cópia do Codex+', title = '', origin = '', bgIn = '';
         if (obj.formato === IO_FORMAT) {
             if ((+obj.versao || 0) > IO_VERSION) { return { err: 'Este arquivo é de uma versão mais nova do Codex+. Atualize o plugin para importar.' }; }
             q = obj.quadro; title = String(obj.titulo || '').slice(0, 200); origin = String(obj.origem || '');
+            if (mode === 'planta' && typeof obj.planta === 'string' && BG_OK.test(obj.planta)) { bgIn = obj.planta; }
         } else if (obj.board && typeof obj.board === 'object') {
             q = obj.board; kind = 'Quadro do Codex+';
         } else if (Array.isArray(obj.items)) {
             q = obj; kind = 'Quadro do Codex+';
         }
-        if (!q || typeof q !== 'object' || !Array.isArray(q.items)) { return { err: 'Este conteúdo não é um fluxo do Codex+. Use o arquivo gerado por Exportar > Guardar uma cópia do fluxo.' }; }
+        if (!q || typeof q !== 'object' || !Array.isArray(q.items)) { return { err: q && q.mode === 'organograma' ? 'Este arquivo é de um organograma, não de ' + ({ planta: 'uma planta', topologia: 'uma topologia', fluxograma: 'um fluxograma' }[mode] || mode) + '.' : NAO }; }
         if (q.mode && q.mode !== mode) {
-            var art = { planta: 'uma planta', topologia: 'uma topologia', fluxograma: 'um fluxograma' };
+            var art = { planta: 'uma planta', topologia: 'uma topologia', fluxograma: 'um fluxograma', organograma: 'um organograma' };
             return { err: 'Este arquivo é de ' + (art[q.mode] || 'outro tipo de quadro') + ', não de ' + (art[mode] || mode) + '.' };
         }
         var data = clean(Object.assign({}, q, { mode: mode }), mode);
@@ -2338,8 +2347,8 @@
         if (docs && origin && here && origin !== here) {
             warn.push((docs === 1 ? '1 forma tem link' : docs + ' formas têm link') + ' para documento do Codex+ de outro ambiente (' + origin + '). Confira se ' + (docs === 1 ? 'aponta' : 'apontam') + ' para o documento certo.');
         }
-        if (!data.items.length) { return { err: 'O arquivo não tem nada que o ' + MODES[mode].toLowerCase() + ' consiga desenhar.' }; }
-        return { data: data, kind: kind, title: title, warn: warn };
+        if (!data.items.length && !bgIn) { return { err: 'O arquivo não tem nada que ' + (mode === 'planta' ? 'a planta' : mode === 'topologia' ? 'a topologia' : 'o ' + MODES[mode].toLowerCase()) + ' consiga desenhar.' }; }
+        return { data: data, kind: kind, title: title, warn: warn, bg: bgIn };
     }
 
     function pngName(mode, now, title) {
@@ -2417,6 +2426,11 @@
                   + '<label class="cx-board-op" title="Transparência da planta">Planta <input type="range" min="10" max="100" step="5" data-act="op" value="' + Math.round(D.bgOpacity * 100) + '"></label>'
                   + '<button type="button" data-act="rot" title="Girar a planta 90° (os itens giram junto)"' + (bgUrl ? '' : ' hidden') + '>Girar planta</button>'
                   + '<button type="button" data-act="bgdel"' + (bgUrl ? '' : ' hidden') + '>Tirar planta</button>'
+                : '')
+            // Q7a: cópia do quadro em arquivo (backup ou levar a outro documento).
+            + (D.mode === 'planta' || D.mode === 'topologia'
+                ? '<span class="cx-board-sep"></span><button type="button" data-act="imp" title="Trazer uma cópia guardada do Codex+ (substitui o desenho; Ctrl+Z desfaz)">Importar</button>'
+                  + '<button type="button" data-act="expjson" title="Guardar uma cópia ' + (D.mode === 'planta' ? 'da planta (com a imagem)' : 'da topologia') + ' em arquivo">Exportar cópia</button>'
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
@@ -3145,13 +3159,80 @@
         }
         // Mover alguém que tem equipe para dentro de uma lista ou equipe:
         // pergunta se a equipe vai junto (motor antigo, 0.6.7-6).
+        /* Q6f-1: quem se move leva junto os subordinados SOLTOS (os ancorados
+           já vão pelo arranjo). Compara a caixa antes e depois do desenho e
+           desloca os soltos na mesma medida (o mesmo passo do desfazer). */
+        function orgBoxNow(id) { var it = get(id); return it && it.t === 'org' ? { x: it.x, y: it.y } : null; }
+        function orgFollow(id, before) {
+            var after = orgBoxNow(id); if (!before || !after) { return false; }
+            var dx = Math.round(after.x - before.x), dy = Math.round(after.y - before.y);
+            if (!dx && !dy) { return false; }
+            var team = orgTeam(id), mexeu = false;
+            D.org.nodes.forEach(function (m) {
+                if (!team[m.id] || typeof m.x !== 'number') { return; }
+                m.x = Math.max(0, m.x + dx); m.y = Math.max(0, m.y + dy); mexeu = true;
+            });
+            return mexeu;
+        }
+        /* Q6f-1: entrar numa equipe de colegas SOLTOS (cartões com posição
+           própria) cai na mesma linha deles, com o mesmo espaçamento: no centro
+           do chefe, no fim da fileira; na borda de um colega, ao lado dele,
+           empurrando os seguintes. Colegas ancorados: o arranjo já alinha. */
+        function orgAlignInTeam(n, pid, zone, tid) {
+            var T = OD().tree(D.org);
+            if (!(T.kids[n.id] || []).length) { return; }          // sem equipe vira linha da lista
+            var sib = (T.kids[pid] || []).filter(function (m) { var it = get(m.id); return m.id !== n.id && it && it.t === 'org' && typeof m.x === 'number'; });
+            if (!sib.length) { return; }
+            var W = function (m) { var it = get(m.id); return it ? it.w : 185; };
+            var ys = {}; sib.forEach(function (m) { ys[m.y] = (ys[m.y] || 0) + 1; });
+            var rowY = +Object.keys(ys).sort(function (a, b) { return ys[b] - ys[a]; })[0];
+            var fila = sib.filter(function (m) { return m.y === rowY; }).sort(function (a, b) { return a.x - b.x; });
+            var gaps = [];
+            fila.forEach(function (m, i) { var nx = fila[i + 1]; if (nx) { var g = nx.x - (m.x + W(m)); if (g > 0) { gaps.push(g); } } });
+            gaps.sort(function (a, b) { return a - b; });
+            var gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 14;
+            var me = get(n.id), w = me && me.t === 'org' ? me.w : 185, hN = me && me.t === 'org' ? me.h : 56, t = null;
+            fila.forEach(function (m) { if (m.id === tid) { t = m; } });
+            if (t && zone === 'after') { n.x = Math.round(t.x + W(t) + gap); }
+            else if (t && zone === 'before') { n.x = Math.round(t.x); }
+            else { var last = fila[fila.length - 1]; n.x = Math.round(last ? last.x + W(last) + gap : sib[0].x); }
+            n.y = rowY;
+            // Abre espaço: da esquerda para a direita, a partir de quem entrou,
+            // cartão solto que ficaria encavalado anda para a direita (com o
+            // mesmo espaçamento), levando os subordinados soltos dele.
+            var team = orgTeam(n.id), pos = function (m) {
+                var it = get(m.id);
+                return typeof m.x === 'number' ? { x: m.x, y: m.y } : { x: it.x - ORG_PAD - oOrigin.x, y: it.y - ORG_PAD - oOrigin.y };
+            };
+            var linha = D.org.nodes.filter(function (m) {
+                var it = get(m.id); if (!it || it.t !== 'org' || m.id === n.id || team[m.id]) { return false; }
+                var p0 = pos(m); return p0.y < rowY + hN && p0.y + it.h > rowY && p0.x + it.w > n.x;
+            }).sort(function (a, b) { return pos(a).x - pos(b).x; });
+            var cursor = n.x + w + gap;
+            linha.forEach(function (m) {
+                var p0 = pos(m);
+                if (p0.x < cursor && typeof m.x === 'number') {
+                    var dlt = Math.round(cursor - p0.x), tm = orgTeam(m.id);
+                    m.x += dlt;
+                    D.org.nodes.forEach(function (q) { if (tm[q.id] && typeof q.x === 'number') { q.x += dlt; } });
+                    p0 = pos(m);
+                }
+                cursor = Math.max(cursor, p0.x + W(m) + gap);
+            });
+        }
         function orgMoveTo(id, tid, zone, row) {
             var n = orgNode(id), T = OD().tree(D.org), kids = (T.kids[id] || []).length, pid = T.parentOf[id];
             var go = function (leave) {
                 snap();
+                var before = orgBoxNow(id);
                 if (leave) { orgLeaveTeam(id); }
-                if (orgPlace(n, tid, zone, false)) { sel = [id]; }
+                if (orgPlace(n, tid, zone, false)) {
+                    sel = [id];
+                    var T2 = OD().tree(D.org);
+                    orgAlignInTeam(n, zone === 'in' ? tid : T2.parentOf[tid], zone, tid);
+                }
                 render();
+                if (orgFollow(id, before)) { render(); }
             };
             if (!kids || !pid || !(zone === 'in' || row)) { go(false); return; }
             var all = Object.keys(orgTeam(id)).length, who = OD().label(n), boss = OD().label(orgNode(pid));
@@ -3336,6 +3417,72 @@
             drag = { k: 'omove', id: it.id, sx: e.clientX, sy: e.clientY, moved: false,
                 box: { x: it.x, y: it.y, w: row ? 185 : it.w, h: row ? 56 : it.h } };
         }
+        /* Q6f-1 (Claudio, 03/10/2026): guias ao arrastar um cartão, como no
+           motor antigo e nos editores de desenho. Alinha pela esquerda, centro
+           ou direita (e topo, meio ou base) de outro cartão; na mesma fileira,
+           gruda no meio exato entre dois vizinhos ou na mesma distância de um
+           par que já existe. Sem guia por perto, vale a grade de 10. Alt
+           desliga. Devolve a posição e o desenho das guias. */
+        function orgGuides(b, x, y, moving, alt) {
+            var tol = 8 / view.z, out = { x: x, y: y, gx: false, gy: false, svg: '' };
+            if (alt) { return out; }
+            var team = orgTeam(moving), others = D.items.filter(function (it) { return it.t === 'org' && it.id !== moving && !team[it.id]; });
+            if (!others.length) { return out; }
+            var best = function (mine, keys) {
+                var r = null;
+                others.forEach(function (o) {
+                    keys(o).forEach(function (v) {
+                        mine.forEach(function (m) {
+                            var d = v - m.v;
+                            if (Math.abs(d) <= tol && (!r || Math.abs(d) < Math.abs(r.d))) { r = { d: d, v: v, o: o }; }
+                        });
+                    });
+                });
+                return r;
+            };
+            var w = b.w, h = b.h;
+            var ax = best([{ v: x }, { v: x + w / 2 }, { v: x + w }], function (o) { return [o.x, o.x + o.w / 2, o.x + o.w]; });
+            var ay = best([{ v: y }, { v: y + h / 2 }, { v: y + h }], function (o) { return [o.y, o.y + o.h / 2, o.y + o.h]; });
+            // Espaçamento igual na fileira (cartões que cruzam a mesma faixa).
+            var cy = (ay ? y + ay.d : y) + h / 2;
+            var row = others.filter(function (o) { return o.y < cy && o.y + o.h > cy; }).sort(function (a, c) { return a.x - c.x; });
+            var L = null, R = null;
+            row.forEach(function (o) { if (o.x + o.w <= x + w / 2) { L = o; } else if (!R && o.x >= x + w / 2) { R = o; } });
+            var eq = null, cands = [];
+            if (L && R && R.x - (L.x + L.w) > w) { cands.push({ x: (L.x + L.w + R.x - w) / 2, mk: [[L.x + L.w, null], [null, R.x]] }); }
+            var gapOf = function (a, c) { return c.x - (a.x + a.w); };
+            row.forEach(function (o, i) {
+                var nx = row[i + 1]; if (!nx) { return; }
+                var g = gapOf(o, nx); if (g <= 0) { return; }
+                if (L) { cands.push({ x: L.x + L.w + g, mk: [[L.x + L.w, null]], ref: [o, nx] }); }
+                if (R) { cands.push({ x: R.x - g - w, mk: [[null, R.x]], ref: [o, nx] }); }
+            });
+            cands.forEach(function (c) { var d = c.x - x; if (Math.abs(d) <= tol * 1.5 && (!eq || Math.abs(d) < Math.abs(eq.d))) { eq = { d: d, c: c }; } });
+            var k = 1 / view.z, P = '#D4537E', lines = '';
+            if (eq && (!ax || Math.abs(eq.d) <= Math.abs(ax.d) + 0.5)) {
+                out.x = Math.round(eq.c.x); out.gx = true;
+                var gy0 = cy, gap = function (x1, x2) {
+                    return '<line x1="' + x1 + '" y1="' + gy0 + '" x2="' + x2 + '" y2="' + gy0 + '" stroke="' + P + '" stroke-width="' + (1.5 * k) + '"/>'
+                        + '<line x1="' + x1 + '" y1="' + (gy0 - 5 * k) + '" x2="' + x1 + '" y2="' + (gy0 + 5 * k) + '" stroke="' + P + '" stroke-width="' + (1.5 * k) + '"/>'
+                        + '<line x1="' + x2 + '" y1="' + (gy0 - 5 * k) + '" x2="' + x2 + '" y2="' + (gy0 + 5 * k) + '" stroke="' + P + '" stroke-width="' + (1.5 * k) + '"/>'
+                        + '<text x="' + ((x1 + x2) / 2) + '" y="' + (gy0 - 7 * k) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + (11 * k) + '" fill="' + P + '">' + Math.round(x2 - x1) + '</text>';
+                };
+                if (L) { lines += gap(L.x + L.w, out.x); }
+                if (R) { lines += gap(out.x + w, R.x); }
+                if (eq.c.ref) { var o1 = eq.c.ref[0], o2 = eq.c.ref[1]; if (o1 !== L && o2 !== R) { gy0 = o1.y + o1.h / 2; lines += gap(o1.x + o1.w, o2.x); } }
+            } else if (ax) {
+                out.x = Math.round(x + ax.d); out.gx = true;
+                var y1 = Math.min(ax.o.y, out.y), y2 = Math.max(ax.o.y + ax.o.h, out.y + h);
+                lines += '<line x1="' + ax.v + '" y1="' + (y1 - 10 * k) + '" x2="' + ax.v + '" y2="' + (y2 + 10 * k) + '" stroke="' + P + '" stroke-width="' + k + '" stroke-dasharray="' + (4 * k) + ' ' + (3 * k) + '"/>';
+            }
+            if (ay) {
+                out.y = Math.round(y + ay.d); out.gy = true;
+                var x1 = Math.min(ay.o.x, out.x), x2 = Math.max(ay.o.x + ay.o.w, out.x + w);
+                lines += '<line x1="' + (x1 - 10 * k) + '" y1="' + ay.v + '" x2="' + (x2 + 10 * k) + '" y2="' + ay.v + '" stroke="' + P + '" stroke-width="' + k + '" stroke-dasharray="' + (4 * k) + ' ' + (3 * k) + '"/>';
+            }
+            out.svg = '<g pointer-events="none">' + lines + '</g>';
+            return out;
+        }
         function orgMove(e) {
             if (!drag) { return; }
             if (drag.k === 'pan') { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return; }
@@ -3348,7 +3495,12 @@
             var tg = orgTarget(e, drag.id);
             drag.tg = tg ? { id: tg.id, row: tg.t === 'orow', zone: orgZone(tg, toBoard(e)) } : null;
             if (tg) { gGuides.innerHTML = orgZoneSvg(tg, drag.tg.zone); return; }
-            gGuides.innerHTML = '<rect x="' + x + '" y="' + y + '" width="' + b.w + '" height="' + b.h + '" rx="8" fill="#378ADD" fill-opacity="0.08" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" stroke-dasharray="' + (6 / view.z) + ' ' + (4 / view.z) + '" pointer-events="none"/>';
+            // Q6f-1: guias de alinhamento e espaçamento (a posição sem grade).
+            var gd = orgGuides(b, b.x + dx, b.y + dy, drag.id, e.altKey);
+            if (!gd.gx) { gd.x = x; } if (!gd.gy) { gd.y = y; }
+            x = gd.x; y = gd.y;
+            drag.at = { x: x, y: y, gx: gd.gx, gy: gd.gy };
+            gGuides.innerHTML = gd.svg + '<rect x="' + x + '" y="' + y + '" width="' + b.w + '" height="' + b.h + '" rx="8" fill="#378ADD" fill-opacity="0.08" stroke="#378ADD" stroke-width="' + (1.5 / view.z) + '" stroke-dasharray="' + (6 / view.z) + ' ' + (4 / view.z) + '" pointer-events="none"/>';
         }
         function orgUp(e) {
             svg.classList.remove('is-panning');
@@ -3358,8 +3510,12 @@
             // Q6b-3: largou em cima de um cartão ou pessoa: muda de equipe.
             if (d.tg) { orgMoveTo(d.id, d.tg.id, d.tg.zone, d.tg.row); return; }
             snap();
-            n.x = orgGrid(d.at.x - ORG_PAD - oOrigin.x); n.y = orgGrid(d.at.y - ORG_PAD - oOrigin.y);
+            var before = orgBoxNow(d.id);
+            // Com guia, a posição exata da guia; sem guia, a grade de 10.
+            var fx = d.at.x - ORG_PAD - oOrigin.x, fy = d.at.y - ORG_PAD - oOrigin.y;
+            n.x = d.at.gx ? Math.max(0, Math.round(fx)) : orgGrid(fx); n.y = d.at.gy ? Math.max(0, Math.round(fy)) : orgGrid(fy);
             render();
+            if (orgFollow(d.id, before)) { render(); }
         }
 
         /* ---------- vista ---------- */
@@ -5237,6 +5393,7 @@
             if (org) { q = { v: 1, mode: 'organograma', org: clone(D.org) }; delete q.org.__norm; } else { q.lib = libOf(q.items); }
             var pack = { formato: IO_FORMAT, versao: IO_VERSION, origem: location.origin, titulo: String(host && host.title || ''),
                 exportado: new Date().toISOString(), quadro: q };
+            if (D.mode === 'planta' && bgUrl && BG_OK.test(bgUrl)) { pack.planta = bgUrl; }
             var blob = new Blob([JSON.stringify(pack, null, 1)], { type: 'application/json' });
             var a = document.createElement('a'), url = URL.createObjectURL(blob);
             a.href = url;
@@ -5279,19 +5436,19 @@
         }
         // Tela 1: escolher o arquivo, arrastar ou colar.
         function ioPick(err) {
-            var oW = org ? 'organograma' : 'fluxo';
+            var oW = IO_NOUN[D.mode] || 'fluxo', copia = !flow && !org;
             io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Importar ' + oW + '">'
                 + '<h3>Importar ' + oW + '</h3>'
-                + '<p class="cx-io-sub">Traga ' + (org ? 'um organograma' : 'um fluxo') + ' feito por uma IA ou uma cópia guardada do Codex+. Nada é gravado até você clicar em ' + saveLabel + '.</p>'
+                + '<p class="cx-io-sub">' + (copia ? 'Traga uma cópia guardada do Codex+ (Exportar cópia).' : 'Traga ' + (org ? 'um organograma' : 'um fluxo') + ' feito por uma IA ou uma cópia guardada do Codex+.') + ' Nada é gravado até você clicar em ' + saveLabel + '.</p>'
                 + '<div class="cx-io-drop" data-io="drop"><div class="cx-io-big">Arraste o arquivo para cá</div>'
-                + '<div class="cx-io-sm">Arquivos do Codex+ e arquivos Mermaid gerados por IA</div>'
+                + '<div class="cx-io-sm">' + (copia ? 'Cópias do Codex+ (.json)' : 'Arquivos do Codex+ e arquivos Mermaid gerados por IA') + '</div>'
                 + '<button type="button" class="cx-io-btn" data-io="file">Escolher arquivo</button></div>'
                 + '<div class="cx-io-or">ou</div>'
-                + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> o que a IA gerou, depois de usar o botão Copiar dela.</div>'
+                + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> ' + (copia ? 'o conteúdo de uma cópia do Codex+.' : 'o que a IA gerou, depois de usar o botão Copiar dela.') + '</div>'
                 + '<p class="cx-io-err" data-io="err"' + (err ? '' : ' hidden') + '>' + esc(err || '') + '</p>'
-                + '<div class="cx-io-tip">' + (org
+                + (copia ? '' : '<div class="cx-io-tip">' + (org
                     ? 'Para pedir à IA: “me entregue esse organograma como Mermaid flowchart, com cada caixa no formato Nome&lt;br&gt;Cargo e uma seta do chefe para cada subordinado”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.'
-                    : 'Para pedir à IA: “me entregue esse fluxo como arquivo Mermaid, com um grupo (subgraph) para cada área”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.') + '</div>'
+                    : 'Para pedir à IA: “me entregue esse fluxo como arquivo Mermaid, com um grupo (subgraph) para cada área”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.') + '</div>')
                 + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="cancel">Cancelar</button></div>'
                 + '</div>';
             var q = function (k) { return io.el.querySelector('[data-io="' + k + '"]'); };
@@ -5325,11 +5482,12 @@
         function ioFile(f) {
             var name = String(f.name || '');
             if (/^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|bmp|svg|pdf)$/i.test(name) || f.type === 'application/pdf') {
+                if (!flow && !org) { ioPick(D.mode === 'planta' ? 'Uma imagem vira a planta pelo botão Enviar planta. Aqui entram só cópias do Codex+ (.json).' : 'Aqui entram só cópias do Codex+ (.json).'); return; }
                 ioPick(org ? 'Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o organograma em Mermaid flowchart (cada caixa Nome<br>Cargo, seta do chefe para o subordinado); depois importe a resposta aqui.'
                     : 'Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o fluxo em arquivo Mermaid, com um grupo (subgraph) para cada área; depois importe a resposta aqui.');
                 return;
             }
-            if (f.size > IO_MAX) { ioPick('Arquivo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.'); return; }
+            if (f.size > ioMax(D.mode)) { ioPick(D.mode === 'planta' ? 'Arquivo grande demais (mais de 12 MB), mesmo contando a imagem da planta.' : 'Arquivo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.'); return; }
             var rd = new FileReader();
             rd.onload = function () { ioText(String(rd.result || ''), name); };
             rd.onerror = function () { ioPick('Não foi possível ler esse arquivo.'); };
@@ -5347,6 +5505,10 @@
             var r = io.got, n = function (t) { return r.data.items.filter(function (i) { return i.t === t; }).length; };
             var cur = D.items.filter(function (i) { return i.t !== 'link'; }).length;
             var cards = [[n('shape'), n('shape') === 1 ? 'forma' : 'formas'], [n('lane'), n('lane') === 1 ? 'área (raia)' : 'áreas (raias)'], [n('link'), n('link') === 1 ? 'ligação' : 'ligações']];
+            if (!flow && !org) {
+                cards = [[n('icon'), n('icon') === 1 ? 'ícone' : 'ícones'], [n('link'), n('link') === 1 ? 'cabo' : 'cabos'],
+                    [n('zone') + n('duct'), D.mode === 'planta' ? 'áreas e eletrocalhas' : 'zonas e eletrocalhas']];
+            }
             if (org) {
                 var oo = r.data.org, pe = oo.nodes.filter(function (x) { return !x.group; }).length, li = oo.edges.length, ma = (oo.esc || []).length;
                 cards = [[pe, pe === 1 ? 'pessoa ou vaga' : 'pessoas e vagas'], [li, li === 1 ? 'ligação' : 'ligações'], [ma, ma === 1 ? 'linha da matriz' : 'linhas da matriz']];
@@ -5354,14 +5516,17 @@
             }
             var warn = r.warn.length ? '<div class="cx-io-warn"><p>' + (r.warn.length === 1 ? '1 ponto para conferir' : r.warn.length + ' pontos para conferir') + '</p><ul>'
                 + r.warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>' : '';
-            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="' + (org ? 'Organograma encontrado' : 'Fluxo encontrado') + '">'
-                + '<h3>' + (org ? 'Organograma encontrado' : 'Fluxo encontrado') + '</h3><p class="cx-io-sub">Confira antes de trazer para o quadro.</p>'
+            var achou = { organograma: 'Organograma encontrado', planta: 'Planta encontrada', topologia: 'Topologia encontrada' }[D.mode] || 'Fluxo encontrado';
+            io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="' + achou + '">'
+                + '<h3>' + achou + '</h3><p class="cx-io-sub">Confira antes de trazer para o quadro.</p>'
                 + '<div class="cx-io-file"><span class="cx-io-doc" aria-hidden="true"></span><div>' + esc(name || r.title || 'Conteúdo colado')
                 + '<small>' + esc(r.kind) + (r.title && name ? ' · ' + r.title : '') + '</small></div></div>'
                 + '<div class="cx-io-stats">' + cards.map(function (c) { return '<div><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('') + '</div>'
                 + warn
                 + '<p class="cx-io-note">' + (cur ? 'O desenho atual (' + cur + (cur === 1 ? ' item' : ' itens') + ') será substituído. Se não gostar, use Desfazer (Ctrl+Z) para voltar ao desenho anterior.'
-                    : 'O quadro está vazio: o ' + (org ? 'organograma' : 'fluxo') + ' entra nele. Desfazer (Ctrl+Z) volta ao quadro vazio.') + '</p>'
+                    : 'O quadro está vazio: ' + (D.mode === 'planta' ? 'a planta entra' : D.mode === 'topologia' ? 'a topologia entra' : 'o ' + (org ? 'organograma' : 'fluxo') + ' entra') + ' nele. Desfazer (Ctrl+Z) volta ao quadro vazio.') + '</p>'
+                + (r.bg ? '<p class="cx-io-note">A imagem da planta vem junto e substitui a atual. O Desfazer volta o desenho, mas não a imagem anterior.</p>'
+                    : D.mode === 'planta' && bgUrl ? '<p class="cx-io-note">O arquivo não traz imagem de planta: a imagem atual fica.</p>' : '')
                 + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="back">Voltar</button>'
                 + '<button type="button" class="cx-io-btn cx-io-pri" data-io="apply">' + (cur ? 'Substituir desenho' : 'Trazer para o quadro') + '</button></div>'
                 + '</div>';
@@ -5380,7 +5545,12 @@
                 ioClose(); render(); paleta(); setTimeout(fit, 0);
                 return;
             }
-            nd.legend = false; nd.pxm = 0;
+            if (flow) { nd.legend = false; nd.pxm = 0; }
+            if (io.got.bg) {
+                bgUrl = io.got.bg; bgChanged = true;
+                var bb = root.querySelector('[data-act="bg"]'); if (bb) { bb.textContent = 'Trocar planta'; }
+                ['bgdel', 'rot'].forEach(function (k) { var x = root.querySelector('[data-act="' + k + '"]'); if (x) { x.hidden = false; } });
+            }
             D = nd;
             // A folha cresce se o desenho não couber (nunca corta).
             var m = pageMin();
@@ -5392,7 +5562,6 @@
 
         // Arrastar um arquivo direto para o quadro abre a importação com ele.
         (function () {
-            if (!flow && !org) { return; }
             var st = root.querySelector('.cx-board-stage');
             var isFile = function (e) { var t = e.dataTransfer && e.dataTransfer.types; return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0; };
             root.addEventListener('dragover', function (e) { if (isFile(e)) { e.preventDefault(); } });

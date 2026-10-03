@@ -1575,6 +1575,436 @@
         ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged, host || null); });
     }
 
+    /* ======================================================================
+       Q5i-2 — importar Mermaid (Claudio, 03/10/2026). O formato que toda IA
+       gera. Leitor próprio, só do subconjunto `flowchart`/`graph` (sem a
+       biblioteca do Mermaid). Montagem em raias: cada `subgraph` de primeiro
+       nível vira raia (LR = horizontais; TD/TB = verticais); subgraph dentro
+       de subgraph vira moldura na raia. Cada raia começa no início; colunas
+       pela ordem do fluxo (as voltas não empurram); formas na mesma coluna
+       ganham linhas diferentes, e cada caminho tenta seguir na linha de quem
+       o alimenta. Funções puras: testáveis sem DOM.
+       ====================================================================== */
+    // Formas do Mermaid -> formas do Codex+ (o que não tem par vira processo).
+    var MM_BRK = { '[': 'proc', '(': 'proc', '([': 'term', '[[': 'sub', '[(': 'db', '((': 'circ', '(((': 'circ', '{': 'dec', '{{': 'prep',
+        '[/': 'data', '[\\': 'data', '/\\': 'manop', '\\/': 'manin', '>': 'proc' };
+    var MM_AT = { rect: 'proc', proc: 'proc', process: 'proc', rounded: 'proc', event: 'proc', 'sl-rect': 'manin', 'manual-input': 'manin',
+        stadium: 'term', pill: 'term', terminal: 'term', diam: 'dec', diamond: 'dec', decision: 'dec', question: 'dec',
+        hex: 'prep', hexagon: 'prep', prepare: 'prep', 'lean-r': 'data', 'lean-right': 'data', 'in-out': 'data', 'lean-l': 'data', 'lean-left': 'data', 'out-in': 'data',
+        'trap-t': 'manop', 'inv-trapezoid': 'manop', manual: 'manop', 'trap-b': 'manin', trapezoid: 'manin', priority: 'manin',
+        'fr-rect': 'sub', subprocess: 'sub', subproc: 'sub', subroutine: 'sub', cyl: 'db', cylinder: 'db', database: 'db', db: 'db',
+        doc: 'doc', document: 'doc', 'lin-doc': 'doc', 'lined-document': 'doc', docs: 'docs', documents: 'docs', 'st-doc': 'docs', 'stacked-document': 'docs',
+        delay: 'delay', 'half-rounded-rectangle': 'delay', circle: 'circ', circ: 'circ', 'sm-circ': 'evstart', start: 'evstart', 'small-circle': 'evstart',
+        'fr-circ': 'evend', stop: 'evend', 'framed-circle': 'evend', 'dbl-circ': 'evend', 'double-circle': 'evend',
+        'f-circ': 'conn', junction: 'conn', 'filled-circle': 'conn', 'notch-pent': 'offpage', 'loop-limit': 'offpage', 'odd': 'proc',
+        'braces': 'annot', comment: 'annot', 'brace-r': 'annot', text: 'annot', 'tag-doc': 'doc', 'tag-rect': 'proc', card: 'proc', 'notch-rect': 'proc' };
+    var MM_DIRS = { LR: 'h', RL: 'h', TB: 'v', TD: 'v', BT: 'v' };
+    var MM_MAX_NODES = 1500;
+
+    function mmText(t) {
+        t = String(t === undefined || t === null ? '' : t);
+        t = t.replace(/^"([\s\S]*)"$/, '$1').replace(/^`([\s\S]*)`$/, '$1');
+        t = t.replace(/<br\s*\/?>/gi, '\n').replace(/\\n/g, '\n');
+        t = t.replace(/#quot;/g, '"').replace(/#amp;/g, '&').replace(/#lt;/g, '<').replace(/#gt;/g, '>').replace(/#(\d+);/g, function (m, n) { return String.fromCharCode(+n); });
+        t = t.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); }).replace(/&amp;/g, '&');
+        t = t.replace(/<\/?[a-z][^>]*>/gi, '');                 // outras marcações HTML
+        t = t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/__([^_]+)__/g, '$1');
+        return t.split('\n').map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).join('\n').replace(/^\n+|\n+$/g, '');
+    }
+    // Estilo do Mermaid ("fill:#E8F5E9,stroke:#2E7D32") -> tom da paleta.
+    // Pelo matiz (os fundos são claros: a distância em RGB confunde rosa
+    // com âmbar); sem cor (cinza/branco) pela claridade; fundo mais escuro
+    // leva a variante "forte" quando o tom tem.
+    function mmHsl(h) {
+        var r = parseInt(h.substr(1, 2), 16) / 255, g = parseInt(h.substr(3, 2), 16) / 255, b = parseInt(h.substr(5, 2), 16) / 255;
+        var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, hue = 0, sat = 0;
+        if (d) {
+            sat = d / (1 - Math.abs(2 * l - 1));
+            hue = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+            hue = (hue * 60 + 360) % 360;
+        }
+        return { h: hue, s: sat, l: l };
+    }
+    function mmTone(style) {
+        var m = /fill\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)\b/i.exec(String(style || ''));
+        if (!m) { return ''; }
+        var hx = m[1].length === 4 ? '#' + m[1][1] + m[1][1] + m[1][2] + m[1][2] + m[1][3] + m[1][3] : m[1];
+        var c = mmHsl(hx);
+        if (c.s < 0.15 || (c.l > 0.97 && c.s < 0.5)) { return c.l > 0.97 ? 'branco' : 'cinza'; }
+        var best = 'azul', bd = 999;
+        ['verde', 'azul', 'ambar', 'roxo', 'coral', 'vermelho'].forEach(function (k) {
+            var d = Math.abs(mmHsl(FLOW_COLORS[k].s).h - c.h); d = Math.min(d, 360 - d);
+            if (d < bd) { bd = d; best = k; }
+        });
+        return c.l < 0.8 && FLOW_COLORS[best + '2'] ? best + '2' : best;
+    }
+
+    // Texto do Mermaid -> { dir, nodes, order, edges, subs, title, skip } ou { err }.
+    function parseMermaid(src) {
+        var txt = String(src || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+        var fence = /```\s*mermaid[^\n]*\n([\s\S]*?)```/i.exec(txt);
+        if (fence) { txt = fence[1]; }
+        txt = txt.replace(/^\s*```[^\n]*\n?/, '').replace(/\n?```\s*$/, '');
+        var title = '';
+        var fm = /^\s*---\n([\s\S]*?)\n---\s*\n/.exec(txt);
+        if (fm) { var tm = /^\s*title\s*:\s*(.+)$/m.exec(fm[1]); if (tm) { title = mmText(tm[1].replace(/^['"]|['"]$/g, '')); } txt = txt.slice(fm[0].length); }
+        var lines = txt.split('\n'), skip = { click: 0, icon: 0, shape: 0, deep: 0, other: 0 };
+        // Comentários: o primeiro %% (antes do cabeçalho) vira título, se não houver.
+        var stm = [], head = null;
+        lines.forEach(function (raw) {
+            var l = raw.trim();
+            if (!l) { return; }
+            if (/^%%\{.*\}%%$/.test(l)) { return; }
+            if (/^%%/.test(l)) { if (!head && !title) { title = mmText(l.replace(/^%%\s*/, '')); } return; }
+            if (!head) {
+                var hm = /^(flowchart|graph)(?:\s+([A-Za-z]{2}))?\s*;?\s*(.*)$/i.exec(l);
+                if (!hm) { head = false; return; }
+                head = { dir: (hm[2] || 'TD').toUpperCase() };
+                if (hm[3]) { stm.push(hm[3]); }
+                return;
+            }
+            // `;` separa comandos (fora de aspas e de colchetes).
+            var cur = '', q = false, dep = 0;
+            for (var i = 0; i < l.length; i++) {
+                var ch = l[i];
+                if (ch === '"') { q = !q; }
+                else if (!q && '[({'.indexOf(ch) >= 0) { dep++; }
+                else if (!q && '])}'.indexOf(ch) >= 0) { dep = Math.max(0, dep - 1); }
+                if (ch === ';' && !q && !dep) { if (cur.trim()) { stm.push(cur.trim()); } cur = ''; continue; }
+                cur += ch;
+            }
+            if (cur.trim()) { stm.push(cur.trim()); }
+        });
+        if (!head) { return { err: 'mermaid' }; }
+        var dir = MM_DIRS[head.dir] ? head.dir : 'TD';
+        var nodes = {}, order = [], edges = [], subs = [], subById = {}, stack = [], classDefs = {}, nodeCls = {}, nodeStyle = {}, subStyle = {};
+        var ID = /^[A-Za-z0-9_\u00C0-\u024F]+(?:-[A-Za-z0-9_\u00C0-\u024F]+)*/;
+        function touch(id, decl) {
+            var n = nodes[id];
+            if (!n) { n = nodes[id] = { id: id, text: id, shape: 'proc', sub: '', decl: false, at: order.length }; order.push(id); }
+            var here = stack.length ? stack[stack.length - 1].id : '';
+            // Pertence ao subgraph onde foi DECLARADO (com forma); sem isso, ao primeiro onde apareceu.
+            if (here && (!n.sub || (decl && !n.decl))) { n.sub = here; }
+            if (decl) { n.decl = true; }
+            return n;
+        }
+        // Lê um nó a partir de s[p]: devolve { id, p } ou null.
+        function readNode(s, p) {
+            var m = ID.exec(s.slice(p));
+            if (!m) { return null; }
+            var id = m[0];
+            if (subById[id] && !nodes[id]) { p += id.length; return { id: id, p: p, sub: true }; }
+            p += id.length;
+            var shape = null, text = null, r = s.slice(p);
+            if (r[0] === '@' && r[1] === '{') {
+                var close = r.indexOf('}');
+                if (close < 0) { return null; }
+                var body = r.slice(2, close), sm = /shape\s*:\s*["']?([\w-]+)/.exec(body), lm = /label\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(body) || /label\s*:\s*'((?:[^'\\]|\\.)*)'/.exec(body);
+                if (sm) { shape = MM_AT[sm[1].toLowerCase()] || (skip.shape++, 'proc'); }
+                if (/\b(icon|img)\s*:/.test(body)) { skip.icon++; }
+                if (lm) { text = lm[1].replace(/\\"/g, '"'); }
+                p += close + 1;
+            } else {
+                var opens = [['(((', ')))'], ['([', '])'], ['[[', ']]'], ['[(', ')]'], ['((', '))'], ['{{', '}}'], ['[/', null], ['[\\', null], ['[', ']'], ['(', ')'], ['{', '}'], ['>', ']']];
+                for (var k = 0; k < opens.length; k++) {
+                    var o = opens[k][0];
+                    if (r.slice(0, o.length) !== o) { continue; }
+                    // `>` só abre forma colado ao id (A>texto]); senão é ligação.
+                    if (o === '>' && !/^>[^\]]*\]/.test(r)) { break; }
+                    var rest = r.slice(o.length), cl = opens[k][1], t, used;
+                    if (rest[0] === '"') {
+                        var qe = rest.indexOf('"', 1);
+                        while (qe > 0 && rest[qe - 1] === '\\') { qe = rest.indexOf('"', qe + 1); }
+                        if (qe < 0) { return null; }
+                        t = rest.slice(1, qe); used = qe + 1;
+                        var after = rest.slice(used);
+                        if (cl === null) { var c2 = /^[/\\]\]/.exec(after); if (!c2) { return null; } cl = c2[0]; }
+                        if (after.slice(0, cl.length) !== cl) { return null; }
+                    } else {
+                        if (cl === null) { var c3 = /[/\\]\]/.exec(rest); if (!c3) { return null; } cl = c3[0]; used = c3.index; }
+                        else { used = rest.indexOf(cl); if (used < 0) { return null; } }
+                        t = rest.slice(0, used);
+                    }
+                    var key = o;
+                    if (o === '[/' || o === '[\\') { key = (o === '[/' ? '/' : '\\') + cl[0]; key = key === '//' ? '[/' : key === '\\\\' ? '[\\' : key; }
+                    shape = MM_BRK[key] || 'proc'; text = t;
+                    p += o.length + used + cl.length;
+                    break;
+                }
+            }
+            var n = touch(id, shape !== null);
+            if (shape !== null) { n.shape = shape; }
+            if (text !== null) { n.text = text; }
+            var cm = /^:::([\w-]+)/.exec(s.slice(p));
+            if (cm) { (nodeCls[id] = nodeCls[id] || []).push(cm[1]); p += cm[0].length; }
+            return { id: id, p: p };
+        }
+        function readGroup(s, p) {
+            var out = [];
+            for (;;) {
+                while (s[p] === ' ' || s[p] === '\t') { p++; }
+                var n = readNode(s, p);
+                if (!n) { return out.length ? { ids: out, p: p } : null; }
+                out.push(n); p = n.p;
+                var am = /^\s*&\s*/.exec(s.slice(p));
+                if (!am) { return { ids: out, p: p }; }
+                p += am[0].length;
+            }
+        }
+        // Ligação a partir de s[p] (já sem espaços): { p, label, dash, w, eb, ea } ou null.
+        function readLink(s, p) {
+            var r = s.slice(p), m, label = '';
+            var lab = /^(<)?(--|==|-\.)\s+(?![->=.])([^|]*?)\s+(-{2,}>|-{3,}|={2,}>|={3,}|\.-+>|\.-+|-{2,}[ox]|={2,}[ox])/.exec(r);
+            if (lab) { m = { all: lab[0], lt: lab[1], op: lab[2] + lab[4] }; label = lab[3]; }
+            else {
+                var pl = /^(<|o|x)?(-{2,}>|-{3,}|={2,}>|={3,}|-\.+->|-\.+-|~{3,}|-{2,}[ox](?=\s)|={2,}[ox](?=\s))/.exec(r);
+                if (!pl) { return null; }
+                m = { all: pl[0], lt: pl[1], op: pl[2] };
+                var pm = /^\s*\|([^|]*)\|/.exec(r.slice(pl[0].length));
+                if (pm) { label = pm[1]; m.all += pm[0]; }
+            }
+            var op = m.op, invis = /^~/.test(op);
+            var last = op[op.length - 1];
+            var eb = last === '>' ? 'arrow' : last === 'o' ? 'circle' : last === 'x' ? 'arrow' : 'none';
+            var ea = m.lt === '<' ? 'arrow' : m.lt === 'o' ? 'circle' : m.lt === 'x' ? 'arrow' : 'none';
+            return { p: p + m.all.length, label: mmText(label), dash: /\./.test(op) ? 'dash' : 'solid', w: /=/.test(op) ? 'm' : 'f', eb: eb, ea: ea, invis: invis };
+        }
+        var bad = 0;
+        stm.forEach(function (s) {
+            var sm;
+            if ((sm = /^subgraph\s+(.*)$/i.exec(s))) {
+                var body = sm[1].trim(), id, t;
+                var a = /^([A-Za-z0-9_\u00C0-\u024F\-]+)\s*\[\s*"?([\s\S]*?)"?\s*\]$/.exec(body);
+                if (a) { id = a[1]; t = a[2]; }
+                else if (/^".*"$/.test(body)) { t = body; id = 'sg' + subs.length; }
+                else if (/^[A-Za-z0-9_\u00C0-\u024F\-]+$/.test(body)) { id = body; t = body; }
+                else { t = body; id = 'sg' + subs.length; }
+                var g = { id: id, title: mmText(t), parent: stack.length ? stack[stack.length - 1].id : '', at: subs.length };
+                if (subById[id]) { g.id = id = id + '_' + subs.length; }
+                subs.push(g); subById[id] = g; stack.push(g);
+                return;
+            }
+            if (/^end$/i.test(s)) { stack.pop(); return; }
+            if (/^direction\s+/i.test(s)) { return; }
+            if ((sm = /^classDef\s+([\w,-]+)\s+(.+)$/i.exec(s))) { sm[1].split(',').forEach(function (c) { classDefs[c.trim()] = sm[2]; }); return; }
+            if ((sm = /^class\s+([^\s]+)\s+([\w-]+)\s*$/i.exec(s))) { sm[1].split(',').forEach(function (n) { n = n.trim(); if (n) { (nodeCls[n] = nodeCls[n] || []).push(sm[2]); } }); return; }
+            if ((sm = /^style\s+([^\s]+)\s+(.+)$/i.exec(s))) { if (subById[sm[1]]) { subStyle[sm[1]] = sm[2]; } else { nodeStyle[sm[1]] = sm[2]; } return; }
+            if (/^linkStyle\s/i.test(s)) { return; }
+            if (/^(click|callback|href)\s/i.test(s)) { skip.click++; return; }
+            var g1 = readGroup(s, 0);
+            if (!g1) { bad++; return; }
+            var p = g1.p, from = g1.ids;
+            for (;;) {
+                while (s[p] === ' ' || s[p] === '\t') { p++; }
+                if (p >= s.length) { break; }
+                // Id de ligação (e1@-->): ignorado.
+                var eid = /^[\w-]+@(?=[-=.~<])/.exec(s.slice(p)); if (eid) { p += eid[0].length; }
+                var L = readLink(s, p);
+                if (!L) { bad++; break; }
+                p = L.p;
+                while (s[p] === ' ' || s[p] === '\t') { p++; }
+                var g2 = readGroup(s, p);
+                if (!g2) { bad++; break; }
+                from.forEach(function (f) { g2.ids.forEach(function (t) { if (!L.invis) { edges.push({ a: f.id, b: t.id, label: L.label, dash: L.dash, w: L.w, eb: L.eb, ea: L.ea, sa: !!f.sub, sb: !!t.sub }); } }); });
+                from = g2.ids; p = g2.p;
+            }
+        });
+        // Ligação para um subgraph: entra no primeiro nó dele; sai do último.
+        var subNodes = function (sid) { return order.filter(function (id) { var g = subById[nodes[id].sub]; while (g) { if (g.id === sid) { return true; } g = subById[g.parent]; } return false; }); };
+        edges = edges.filter(function (e) {
+            if (e.sa) { var la = subNodes(e.a); if (!la.length) { return false; } e.a = la[la.length - 1]; }
+            if (e.sb) { var lb = subNodes(e.b); if (!lb.length) { return false; } e.b = lb[0]; }
+            return e.a !== e.b && nodes[e.a] && nodes[e.b];
+        });
+        order.forEach(function (id) {
+            var n = nodes[id];
+            n.text = mmText(n.text);
+            if (/\bfa:fa-[\w-]+/.test(n.text)) { skip.icon++; n.text = n.text.replace(/\s*fa:fa-[\w-]+\s*/g, ' ').trim(); }
+            var st = (nodeCls[id] || []).map(function (c) { return classDefs[c] || ''; }).join(',') + ',' + (nodeStyle[id] || '');
+            n.tone = mmTone(st);
+        });
+        subs.forEach(function (g) { g.tone = mmTone(subStyle[g.id]); });
+        if (bad) { skip.other += bad; }
+        return { dir: dir, nodes: nodes, order: order, edges: edges, subs: subs, title: title, skip: skip };
+    }
+
+    // Grafo lido -> quadro do fluxograma (antes do clean) + avisos.
+    function mermaidBoard(G) {
+        var H = MM_DIRS[G.dir] === 'h', warn = [];
+        var subById = {}; G.subs.forEach(function (g) { subById[g.id] = g; });
+        // Raia = subgraph de primeiro nível; moldura = o segundo nível (mais fundo achata).
+        var laneOfSub = function (sid) { var g = subById[sid]; while (g && g.parent) { g = subById[g.parent]; } return g ? g.id : ''; };
+        var zoneOfSub = function (sid) {
+            var g = subById[sid], path = [];
+            while (g) { path.unshift(g.id); g = subById[g.parent]; }
+            if (path.length > 2) { G.skip.deep++; }
+            return path.length >= 2 ? path[1] : '';
+        };
+        var tops = G.subs.filter(function (g) { return !g.parent; });
+        var useLanes = tops.length > 0;
+        var nodeLane = {}, nodeZone = {};
+        G.order.forEach(function (id) { var s = G.nodes[id].sub; nodeLane[id] = useLanes ? (laneOfSub(s) || '_') : ''; nodeZone[id] = s ? zoneOfSub(s) : ''; });
+        var lanes = tops.map(function (g) { return { id: g.id, title: g.title, tone: g.tone }; });
+        if (useLanes && G.order.some(function (id) { return nodeLane[id] === '_'; })) {
+            lanes.push({ id: '_', title: 'Sem área', tone: '' });
+            warn.push('Algumas formas não estavam em nenhum grupo (subgraph) e foram para a raia "Sem área".');
+        }
+        if (!useLanes) { lanes = [{ id: '', title: '', tone: '' }]; }
+        // Formas com o tamanho final (texto quebrado), antes de posicionar.
+        var ins = {}, outs = {};
+        G.edges.forEach(function (e) { outs[e.a] = (outs[e.a] || 0) + 1; ins[e.b] = (ins[e.b] || 0) + 1; });
+        var sh = {};
+        G.order.forEach(function (id) {
+            var n = G.nodes[id], k = n.shape;
+            if (k === 'circ') { k = !ins[id] ? 'evstart' : !outs[id] ? 'evend' : 'conn'; }
+            var base = SHAPES[k] || SHAPES.proc, wide = SQUARE.indexOf(k) < 0 && ['dataobj', 'offpage'].indexOf(k) < 0;
+            var it = { id: 'm' + n.at, t: 'shape', shape: k, x: 0, y: 0, text: String(n.text).slice(0, 500), fs: SHAPE_FS,
+                w: wide ? (k === 'dec' ? 180 : Math.max(base.w, 190)) : base.w, h: 0 };
+            var tone = n.tone || base.color;
+            it.fill = tone; it.line = tone; it.ink = tone;
+            if (MK_OPTS[k]) { it.mk = 'none'; }
+            if (k === 'ico') { it.ico = ICO_DEFAULT; }
+            sh[id] = shapeFit(it);
+        });
+        // Bloco = raia (parte principal) ou moldura. Colunas e linhas por bloco.
+        var blockOf = function (id) { return nodeLane[id] + '|' + nodeZone[id]; };
+        var adj = {};
+        G.edges.forEach(function (e, i) { if (blockOf(e.a) === blockOf(e.b)) { (adj[e.a] = adj[e.a] || []).push({ b: e.b, i: i }); } });
+        // Voltas (ciclos) pela ordem do texto: não contam para as colunas.
+        var back = {}, st = {};
+        var dfs = function (u) { st[u] = 1; (adj[u] || []).forEach(function (x) { if (st[x.b] === 1) { back[x.i] = true; } else if (!st[x.b]) { dfs(x.b); } }); st[u] = 2; };
+        G.order.forEach(function (id) { if (!st[id]) { dfs(id); } });
+        var rank = {}; G.order.forEach(function (id) { rank[id] = 0; });
+        for (var it = 0; it < G.order.length; it++) {
+            var ch = false;
+            G.edges.forEach(function (e, i) { if (back[i] || blockOf(e.a) !== blockOf(e.b)) { return; } if (rank[e.b] < rank[e.a] + 1) { rank[e.b] = rank[e.a] + 1; ch = true; } });
+            if (!ch) { break; }
+        }
+        // Medidas: coluna uniforme (a forma mais larga + vão); linha pela mais alta.
+        var GAP_C = 50, GAP_R = 40, PAD = 30;
+        var maxMain = 0;
+        G.order.forEach(function (id) { maxMain = Math.max(maxMain, H ? sh[id].w : sh[id].h); });
+        var COL = maxMain + (H ? GAP_C : GAP_R + 10);
+        var hd = H ? LANE.h.hd : LANE.v.hd;
+        var items = [], cursor = 0, maxEnd = 0, info = {};
+        // Coloca um bloco: devolve a extensão ocupada no eixo transversal.
+        function place(ids, cross0) {
+            if (!ids.length) { return 0; }
+            var cell = {}, rowOf = {}, rows = 0, kids = {};
+            G.edges.forEach(function (e, i) { if (!back[i] && ids.indexOf(e.a) >= 0 && ids.indexOf(e.b) >= 0) { (kids[e.a] = kids[e.a] || []).push(e.b); } });
+            var sorted = ids.slice().sort(function (a, b) { return rank[a] - rank[b] || G.nodes[a].at - G.nodes[b].at; });
+            sorted.forEach(function (id) {
+                // Linha desejada: a de quem alimenta (o 1º filho segue na mesma linha).
+                var want = null;
+                G.edges.forEach(function (e, i) {
+                    if (back[i] || e.b !== id || rowOf[e.a] === undefined) { return; }
+                    var w = rowOf[e.a] + Math.max(0, (kids[e.a] || []).indexOf(id));
+                    if (want === null || w < want) { want = w; }
+                });
+                if (want === null) { want = rank[id] === 0 && rows ? rows : 0; }
+                var r = want;
+                while (cell[rank[id] + ':' + r]) { r++; }
+                cell[rank[id] + ':' + r] = true; rowOf[id] = r; rows = Math.max(rows, r + 1);
+            });
+            var size = []; // tamanho transversal de cada linha
+            ids.forEach(function (id) { var r = rowOf[id], s = H ? sh[id].h : sh[id].w; size[r] = Math.max(size[r] || 0, s); });
+            var at = [], c = cross0;
+            for (var r = 0; r < rows; r++) { at[r] = c; c += (size[r] || 0) + (H ? GAP_R : GAP_C); }
+            ids.forEach(function (id) {
+                var s = sh[id], r = rowOf[id], m0 = hd + PAD + rank[id] * COL;
+                var mainLen = H ? s.w : s.h, crossLen = H ? s.h : s.w;
+                var mpos = m0 + (COL - (H ? GAP_C : GAP_R + 10) - mainLen) / 2, cpos = at[r] + ((size[r] || 0) - crossLen) / 2;
+                if (H) { s.x = Math.round(mpos); s.y = Math.round(cpos); } else { s.y = Math.round(mpos); s.x = Math.round(cpos); }
+                maxEnd = Math.max(maxEnd, H ? s.x + s.w : s.y + s.h);
+            });
+            return c - cross0 - (H ? GAP_R : GAP_C);
+        }
+        lanes.forEach(function (L, li) {
+            var mine = G.order.filter(function (id) { return nodeLane[id] === L.id; });
+            var start = cursor, c = cursor + PAD;
+            var main = mine.filter(function (id) { return !nodeZone[id]; });
+            if (main.length) { c += place(main, c) + PAD; }
+            var mainEnd = c - PAD;
+            // Molduras da raia, uma depois da outra.
+            var zs = [];
+            mine.forEach(function (id) { if (nodeZone[id] && zs.indexOf(nodeZone[id]) < 0) { zs.push(nodeZone[id]); } });
+            zs.forEach(function (z) {
+                var zi = mine.filter(function (id) { return nodeZone[id] === z; });
+                var top = c + (main.length || zs.indexOf(z) ? 20 : 0), used = place(zi, top + 34);
+                var b = zi.map(function (id) { return sh[id]; });
+                var m1 = Math.min.apply(null, b.map(function (s) { return H ? s.x : s.y; })) - 20, m2 = Math.max.apply(null, b.map(function (s) { return H ? s.x + s.w : s.y + s.h; })) + 20;
+                var zg = subById[z];
+                items.push(H ? { id: 'z' + zg.at, t: 'zone', x: m1, y: top, w: m2 - m1, h: used + 34 + 20, label: zg.title.split('\n')[0], color: COLORS[1] }
+                    : { id: 'z' + zg.at, t: 'zone', y: m1, x: top, h: m2 - m1, w: used + 34 + 20, label: zg.title.split('\n')[0], color: COLORS[1] });
+                c = top + used + 34 + 20 + PAD;
+            });
+            if (!mine.length) { c += 60; }
+            c += 14;   // corredor das ligações que trocam de raia
+            if (L.id || useLanes) {
+                var lt = String(L.title || '').split('\n'), lh = Math.max(H ? LANE.h.min : LANE.v.min, c - start);
+                var lane = { id: 'l' + li, t: 'lane', dir: H ? 'h' : 'v', title: lt[0].slice(0, 80), desc: lt.slice(1).join(' ').slice(0, 200), tone: L.tone || LANE_TONES[li % LANE_TONES.length], hd: hd, ico: '' };
+                if (H) { lane.x = 0; lane.y = start; lane.h = lh; } else { lane.y = 0; lane.x = start; lane.w = lh; }
+                items.push(lane);
+                cursor = start + lh;
+                info[L.id] = { back: mainEnd + 12, cross: cursor - 14 };
+            } else { cursor = c; }
+        });
+        var len = maxEnd + PAD + 10;
+        items.forEach(function (i) { if (i.t === 'lane') { if (H) { i.w = len; } else { i.h = len; } } });
+        // Lados das ligações pela posição relativa (no eixo do fluxo).
+        var F = H ? { fwd: 'l', bwd: 'o', down: 's', up: 'n' } : { fwd: 's', bwd: 'n', down: 'l', up: 'o' };
+        var OPPS = { n: 's', s: 'n', l: 'o', o: 'l' };
+        var links = [];
+        G.edges.forEach(function (e, i) {
+            var a = sh[e.a], b = sh[e.b], wp = [];
+            var am = H ? a.x : a.y, al = H ? a.w : a.h, bm = H ? b.x : b.y, bl = H ? b.w : b.h;
+            var ac = H ? a.y + a.h / 2 : a.x + a.w / 2, bc = H ? b.y + b.h / 2 : b.x + b.w / 2;
+            var amid = am + al / 2, bmid = bm + bl / 2;
+            var pt = function (m, c) { return H ? { x: Math.round(m), y: Math.round(c) } : { x: Math.round(c), y: Math.round(m) }; };
+            var same = Math.abs(ac - bc) < 2, column = bm + bl > am && bm < am + al, sa, sb;
+            var la = info[nodeLane[e.a]], lb = info[nodeLane[e.b]];
+            if (nodeLane[e.a] !== nodeLane[e.b]) {
+                // Troca de raia: sai pelo lado da outra raia e, fora da mesma
+                // coluna, corre pelo corredor no fim da raia (não cruza formas).
+                sa = bc > ac ? F.down : F.up; sb = OPPS[sa];
+                if (!column && la && lb) {
+                    var cr = bc > ac ? la.cross : lb.cross;
+                    // Forma no caminho (mesma coluna, mesma raia, entre a saída e o
+                    // corredor): sai pela frente e desce ao lado dela.
+                    var dn = bc > ac, blocked = G.order.some(function (id) {
+                        var o = sh[id]; if (o === a || nodeLane[id] !== nodeLane[e.a]) { return false; }
+                        var om = H ? o.x : o.y, ol = H ? o.w : o.h, oc = H ? o.y + o.h / 2 : o.x + o.w / 2;
+                        return om < amid && om + ol > amid && (dn ? oc > ac : oc < ac);
+                    });
+                    if (blocked) { var side = am + al + 22; sa = F.fwd; wp = [pt(side, ac), pt(side, cr), pt(bmid, cr)]; }
+                    else { wp = [pt(amid, cr), pt(bmid, cr)]; }
+                }
+            } else if (column && !same) {
+                sa = bc > ac ? F.down : F.up; sb = OPPS[sa];
+            } else if (bm >= am + al) {
+                sa = same ? F.fwd : (bc > ac ? F.down : F.up); sb = F.bwd;
+            } else if (la && !nodeZone[e.a] && !nodeZone[e.b]) {
+                // Volta: por baixo, no corredor logo depois das linhas da raia.
+                sa = F.down; sb = F.down; wp = [pt(amid, la.back), pt(bmid, la.back)];
+            } else {
+                sa = F.up; sb = F.up;
+            }
+            links.push({ id: 'k' + i, t: 'link', a: { id: a.id, side: sa }, b: { id: b.id, side: sb }, route: 'elbow', wp: wp,
+                label: String(e.label || '').slice(0, 80), dash: e.dash, lw: e.w, eb: e.eb, ea: e.ea });
+        });
+        var shapes = G.order.map(function (id) { return sh[id]; });
+        var all = items.filter(function (i) { return i.t === 'lane'; }).concat(items.filter(function (i) { return i.t === 'zone'; }), shapes, links);
+        var W = H ? len + 40 : cursor + 40, Hh = H ? cursor + 40 : len + 40;
+        if (W > 6000 || Hh > 6000) { warn.push('O fluxo passou do tamanho máximo da folha (6000 px); confira as bordas depois de importar.'); }
+        var sk = G.skip;
+        if (sk.shape) { warn.push(sk.shape === 1 ? '1 forma sem equivalente no Codex+ virou Processo.' : sk.shape + ' formas sem equivalente no Codex+ viraram Processo.'); }
+        if (sk.icon) { warn.push('Ícones e imagens do Mermaid não vêm junto; escolha no quadro, se quiser.'); }
+        if (sk.click) { warn.push(sk.click === 1 ? '1 link de clique (click) foi ignorado; use o link da forma no Codex+.' : sk.click + ' links de clique (click) foram ignorados; use o link da forma no Codex+.'); }
+        if (sk.deep) { warn.push('Grupos dentro de grupos com mais de dois níveis viraram uma moldura só.'); }
+        if (sk.other) { warn.push(sk.other === 1 ? '1 linha do arquivo não foi entendida e ficou de fora.' : sk.other + ' linhas do arquivo não foram entendidas e ficaram de fora.'); }
+        return { data: { v: 1, mode: 'fluxograma', w: Math.max(400, Math.min(6000, Math.ceil(W))), h: Math.max(300, Math.min(6000, Math.ceil(Hh))), items: all }, warn: warn };
+    }
+
     /* Q5i-1 — leitura de um arquivo de fluxo (pura: testável sem DOM).
        Devolve { err } ou { data, kind, title, warn[] }. `data` já passou
        pelo clean() do motor. */
@@ -1583,8 +2013,19 @@
         txt = String(txt || '').replace(/^\uFEFF/, '').trim();
         if (!txt) { return { err: 'Nada para importar: o conteúdo está vazio.' }; }
         if (txt.length > IO_MAX) { return { err: 'Conteúdo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.' }; }
-        if (/^(flowchart|graph)\b/i.test(txt.replace(/^```\s*mermaid\s*/i, ''))) {
-            return { err: 'Este conteúdo é Mermaid (de IA). A importação de Mermaid chega numa próxima versão; por enquanto, só arquivos do Codex+.' };
+        // Q5i-2: Mermaid (o que as IAs geram). Só o fluxograma.
+        if (/^(```|---|%%|flowchart\b|graph\b)/i.test(txt) || /```\s*mermaid/i.test(txt)) {
+            var G = parseMermaid(txt);
+            if (!G.err) {
+                if (mode !== 'fluxograma') { return { err: 'Mermaid só entra no fluxograma.' }; }
+                if (!G.order.length) { return { err: 'O arquivo Mermaid não tem nenhuma forma para desenhar.' }; }
+                if (G.order.length > MM_MAX_NODES) { return { err: 'O fluxo tem formas demais (mais de ' + MM_MAX_NODES + '). Divida em mais de um diagrama.' }; }
+                var mb = mermaidBoard(G);
+                return { data: clean(mb.data, mode), kind: 'Mermaid (gerado por IA)', title: G.title, warn: mb.warn };
+            }
+            if (/(^|\n)\s*(sequenceDiagram|classDiagram|stateDiagram(-v2)?|erDiagram|gantt|pie|journey|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4\w+|sankey(-beta)?|xychart(-beta)?|block(-beta)?|packet(-beta)?|architecture(-beta)?|kanban)\b/.test(txt)) {
+                return { err: 'Este Mermaid não é um fluxograma. Peça à IA o fluxo em Mermaid do tipo flowchart, com um grupo (subgraph) para cada área.' };
+            }
         }
         var obj = null;
         try { obj = JSON.parse(txt); } catch (e) {
@@ -3910,20 +4351,21 @@
         function ioPick(err) {
             io.el.innerHTML = '<div class="cx-io" role="dialog" aria-modal="true" aria-label="Importar fluxo">'
                 + '<h3>Importar fluxo</h3>'
-                + '<p class="cx-io-sub">Traga uma cópia guardada de um fluxo do Codex+. Nada é gravado até você clicar em Salvar fluxograma.</p>'
+                + '<p class="cx-io-sub">Traga um fluxo feito por uma IA ou uma cópia guardada do Codex+. Nada é gravado até você clicar em Salvar fluxograma.</p>'
                 + '<div class="cx-io-drop" data-io="drop"><div class="cx-io-big">Arraste o arquivo para cá</div>'
-                + '<div class="cx-io-sm">Arquivos do Codex+ (.json)</div>'
+                + '<div class="cx-io-sm">Arquivos do Codex+ e arquivos Mermaid gerados por IA</div>'
                 + '<button type="button" class="cx-io-btn" data-io="file">Escolher arquivo</button></div>'
                 + '<div class="cx-io-or">ou</div>'
-                + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> o conteúdo copiado.</div>'
+                + '<div class="cx-io-paste" data-io="paste" tabindex="0"><b>Clique aqui e cole com Ctrl+V</b> o que a IA gerou, depois de usar o botão Copiar dela.</div>'
                 + '<p class="cx-io-err" data-io="err"' + (err ? '' : ' hidden') + '>' + esc(err || '') + '</p>'
+                + '<div class="cx-io-tip">Para pedir à IA: “me entregue esse fluxo como arquivo Mermaid, com um grupo (subgraph) para cada área”. Para uma imagem ou PDF, envie o arquivo à IA com esse mesmo pedido.</div>'
                 + '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-io="cancel">Cancelar</button></div>'
                 + '</div>';
             var q = function (k) { return io.el.querySelector('[data-io="' + k + '"]'); };
             q('cancel').addEventListener('click', ioClose);
             q('file').addEventListener('click', function () {
                 var inp = document.createElement('input');
-                inp.type = 'file'; inp.accept = '.json,.txt,application/json,text/plain';
+                inp.type = 'file'; inp.accept = '.json,.mmd,.mermaid,.md,.txt,application/json,text/plain,text/markdown';
                 inp.addEventListener('change', function () { if (inp.files && inp.files[0]) { ioFile(inp.files[0]); } });
                 inp.click();
             });
@@ -3950,7 +4392,7 @@
         function ioFile(f) {
             var name = String(f.name || '');
             if (/^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|bmp|svg|pdf)$/i.test(name) || f.type === 'application/pdf') {
-                ioPick('Imagem e PDF ainda não são importados diretamente. Escolha um arquivo do Codex+ (.json).');
+                ioPick('Imagem e PDF não são importados diretamente. Envie o arquivo à sua IA e peça o fluxo em arquivo Mermaid, com um grupo (subgraph) para cada área; depois importe a resposta aqui.');
                 return;
             }
             if (f.size > IO_MAX) { ioPick('Arquivo grande demais (mais de 1 MB). O quadro inteiro do Codex+ tem até 1 MB.'); return; }
@@ -4040,5 +4482,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _mermaidBoard: mermaidBoard, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

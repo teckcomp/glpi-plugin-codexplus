@@ -2425,3 +2425,6 @@ html.cx-board-open { overflow: hidden; }
 .cx-io-warn p { margin: 0 0 4px; font-weight: 600; }
 .cx-io-warn ul { margin: 0; padding-left: 18px; }
 .cx-io-note { margin: 12px 0 0; font-size: 13px; color: var(--cx-muted); line-height: 1.45; }
+
+/* Q5i-2: dica de como pedir o fluxo à IA. */
+.cx-io-tip { margin-top: 14px; font-size: 12.5px; color: var(--cx-muted); background: var(--cx-surface-1); border-radius: 6px; padding: 9px 12px; line-height: 1.45; }

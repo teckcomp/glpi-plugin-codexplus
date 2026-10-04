@@ -2808,3 +2808,8 @@ html.cx-board-open { overflow: hidden; }
 .cx-docref-list small { color: var(--cx-muted); }
 .cx-docref-list .is-empty { padding: 7px 8px; color: var(--cx-muted); }
 .cx-docref-hint { font-size: 12px; color: var(--cx-muted); }
+
+/* 5c: "Faz parte de" */
+.cx-partof { max-width: 900px; margin: 0 auto 14px; font-size: .92em; color: var(--cx-muted); }
+.cx-partof a { text-decoration: none; }
+.cx-partof em { font-style: normal; }

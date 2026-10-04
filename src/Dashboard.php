@@ -386,7 +386,10 @@ class Dashboard
         $a = [
             'revisao_vencida' => 0,
             'revisao_vencida_docs' => [],   // R6-b: a lista que abre na linha
-            'psg_sem_pop'     => null,
+            'psg_sem_pop'     => 0,    // Etapa 5: PSG (fora de obsoleto) sem POP vinculado
+            'psg_sem_pop_docs' => [],
+            'vinculo_problema' => 0,   // 5c: documento com vinculado obsoleto ou vencido
+            'vinculo_problema_docs' => [],
             'sem_codigo'      => 0,
             'sem_categoria'   => 0,
             'sem_responsavel' => 0,   // 0.6.6, só o modelo novo informa owner_id
@@ -420,7 +423,60 @@ class Dashboard
             }
         }
 
+        // Etapa 5 (5c): vínculos — PSG sem POP e vinculado obsoleto/vencido.
+        $links = self::linkAttention($docs);
+        $a['psg_sem_pop_docs']      = $links['psg'];
+        $a['psg_sem_pop']           = count($links['psg']);
+        $a['vinculo_problema_docs'] = $links['prob'];
+        $a['vinculo_problema']      = count($links['prob']);
+
         return $a;
+    }
+
+    /**
+     * 5c: PSG fora de obsoleto sem POP vinculado; documento (fora de
+     * obsoleto) com vinculado direto obsoleto ou vencido.
+     *
+     * @param array<int, array<string, mixed>> $docs
+     * @return array{psg: array<int, array<string, mixed>>, prob: array<int, array<string, mixed>>}
+     */
+    private static function linkAttention(array $docs): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $vivos = array_filter($docs, static fn ($d) => ($d['status'] ?? '') !== Document::STATUS_OBSOLETE
+            && DocumentLink::canHaveChildren((string) ($d['doctype'] ?? '')));
+        $out = ['psg' => [], 'prob' => []];
+        if (!$vivos || !$DB->tableExists(DocumentLink::getTable())) {
+            return $out;
+        }
+        $filhos = [];
+        foreach ($DB->request([
+            'SELECT' => ['l.parent_documents_id AS p', 'd.doctype AS t', 'd.id AS c'],
+            'FROM'   => DocumentLink::getTable() . ' AS l',
+            'INNER JOIN' => [Document::getTable() . ' AS d' => ['ON' => ['l' => 'child_documents_id', 'd' => 'id']]],
+            'WHERE'  => ['l.parent_documents_id' => array_map(static fn ($d) => (int) $d['id'], array_values($vivos)), 'd.is_deleted' => 0],
+        ]) as $r) {
+            $filhos[(int) $r['p']][] = ['id' => (int) $r['c'], 'type' => (string) $r['t']];
+        }
+        foreach ($vivos as $d) {
+            $id = (int) $d['id'];
+            $base = ['id' => $id, 'code' => (string) $d['code'], 'name' => (string) $d['name']];
+            if ($d['doctype'] === 'PSG' && !in_array('POP', array_column($filhos[$id] ?? [], 'type'), true)) {
+                $out['psg'][] = $base;
+            }
+            if (!empty($filhos[$id])) {
+                $ruins = DocumentLink::problems($id);
+                if ($ruins) {
+                    $out['prob'][] = $base + ['why' => implode(', ', array_map(
+                        static fn ($p) => $p['code'] . ' ' . ($p['state'] === 'obsoleto' ? __('obsoleto', 'codexplus') : __('vencido', 'codexplus')),
+                        $ruins
+                    ))];
+                }
+            }
+        }
+        return $out;
     }
 
     /**

@@ -470,6 +470,49 @@ class DocumentLink
         return implode(' · ', $n);
     }
 
+    // ---------------------------------------------------------------------
+    // 5c — "Faz parte de" e aviso ao pai
+    // ---------------------------------------------------------------------
+
+    /**
+     * Pais diretos, para a linha "Faz parte de" (fora da lixeira).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function parents(int $childId): array
+    {
+        $out = [];
+        foreach (self::parentIds($childId) as $pid) {
+            $d = new Document();
+            if ($d->getFromDB($pid) && empty($d->fields['is_deleted'])) {
+                $out[] = self::describe($d);
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Vinculados diretos obsoletos ou vencidos (Claudio, 04/10/2026: o pai
+     * é avisado — cabe revisão dele).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function problems(int $parentId): array
+    {
+        $out = [];
+        foreach (self::childIds($parentId) as $cid) {
+            $d = new Document();
+            if (!$d->getFromDB($cid) || !empty($d->fields['is_deleted'])) {
+                continue;
+            }
+            $info = self::describe($d);
+            if (in_array($info['state'], ['obsoleto', 'vencido'], true)) {
+                $out[] = $info;
+            }
+        }
+        return $out;
+    }
+
     /** Documento apagado de vez: some como pai e como filho. */
     public static function purgeDocument(int $docId): void
     {

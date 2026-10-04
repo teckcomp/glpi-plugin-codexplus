@@ -197,6 +197,29 @@
         </div>
     {% endif %}
 
+    {# 5c: vinculado obsoleto ou vencido — cabe revisão deste documento. #}
+    {% if link_problems is not empty %}
+        <div class="cx-notice cx-notice--warn">
+            <i class="ti ti-link-off"></i>
+            <div>
+                <strong>{{ __('Documento vinculado precisa de atenção', 'codexplus') }}</strong> —
+                {% for p in link_problems %}{{ loop.first ? '' : ', ' }}<a href="?id={{ p.id }}">{{ p.code }}</a> {{ p.name }} ({{ p.state == 'obsoleto' ? __('obsoleto', 'codexplus') : __('vencido', 'codexplus') }}){% endfor %}.
+                {{ __('Cabe revisar este documento: trocar a referência ou desvincular.', 'codexplus') }}
+            </div>
+        </div>
+    {% endif %}
+    {# 5c: de quais documentos este faz parte. #}
+    {% if part_of is not empty %}
+        <div class="cx-partof">
+            <i class="ti ti-hierarchy-2"></i> <span>{{ __('Faz parte de', 'codexplus') }}:</span>
+            {% for p in part_of %}
+                {%- if not loop.first %} · {% endif -%}
+                {% if p.can_view %}<a href="?id={{ p.id }}"><span class="cx-link-code">{{ p.code }}</span> {{ p.name }}</a>
+                {% else %}<span class="cx-link-code">{{ p.code }}</span> {{ p.name }} <em>({{ __('sem acesso', 'codexplus') }})</em>{% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
     {# ---------------- Avisos do fluxo ---------------- #}
     {% if not is_new and not version.on and status == 'rascunho' and validation_comment %}
         <div class="cx-notice cx-notice--warn">

@@ -1082,6 +1082,11 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     ), ['text_maxsize' => 0]),
     // 5b: Documentos complementares (fim do documento).
     'complements'  => $complements,
+    // 5c: "Faz parte de" (pais) e aviso de vinculado obsoleto/vencido (só
+    // para quem tem papel; fora do Visualizar e da versão publicada).
+    'part_of'      => ($isNew || $preview || $version['on']) ? [] : \GlpiPlugin\Codexplus\DocumentLink::parents($id),
+    'link_problems' => ($isNew || $preview || $version['on'] || !($doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL)))
+        ? [] : \GlpiPlugin\Codexplus\DocumentLink::problems($id),
     // 5b: botão Referência do editor (só em quem aceita vinculados e já existe).
     'docref_url'   => (!$isNew && \GlpiPlugin\Codexplus\DocumentLink::canManage($doc)) ? $self . '?id=' . $id . '&link_search=1&all=1' : '',
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),

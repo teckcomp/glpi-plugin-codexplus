@@ -311,14 +311,37 @@
                             <span class="cx-card-item-count cx-count-warn">{{ attention.sem_responsavel }}</span>
                         </span>
                     </li>
-                    <li class="is-disabled"
-                        title="{{ __('Disponível a partir da Etapa 5 (relação PSG → POPs)', 'codexplus') }}">
-                        <span>
-                            <i class="ti ti-unlink"></i>
-                            <span class="cx-card-item-name">{{ __('PSG sem POP vinculado', 'codexplus') }}</span>
-                            <span class="cx-count-soon">{{ __('etapa 5', 'codexplus') }}</span>
-                        </span>
-                    </li>
+                    {# Etapa 5 (5c): vínculos. Mesma linha com lista que abre. #}
+                    {% for item in [
+                        {k: 'vinculo_problema', ico: 'ti-link-off', label: __('Vinculado obsoleto ou vencido', 'codexplus'), cls: 'danger'},
+                        {k: 'psg_sem_pop', ico: 'ti-unlink', label: __('PSG sem POP vinculado', 'codexplus'), cls: 'warn'}
+                    ] %}
+                        <li>
+                            {% if attention[item.k] > 0 %}
+                                <details class="cx-overdue">
+                                    <summary>
+                                        <i class="ti {{ item.ico }} cx-ico-{{ item.cls }}"></i>
+                                        <span class="cx-card-item-name">{{ item.label }}</span>
+                                        <span class="cx-card-item-count cx-count-{{ item.cls }}">{{ attention[item.k] }}</span>
+                                    </summary>
+                                    <ul class="cx-overdue-list">
+                                        {% for o in attention[item.k ~ '_docs'] %}
+                                            <li>
+                                                <a href="{{ form_url }}?id={{ o.id }}"><span class="cx-overdue-code">{{ o.code }}</span> {{ o.name }}</a>
+                                                {% if o.why is defined %}<span class="cx-overdue-why">{{ o.why }}</span>{% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                            {% else %}
+                                <span>
+                                    <i class="ti {{ item.ico }} cx-ico-{{ item.cls }}"></i>
+                                    <span class="cx-card-item-name">{{ item.label }}</span>
+                                    <span class="cx-card-item-count cx-count-{{ item.cls }}">0</span>
+                                </span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
                 </ul>
             </section>
 

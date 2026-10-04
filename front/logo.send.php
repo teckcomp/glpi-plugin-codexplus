@@ -24,6 +24,7 @@
  */
 
 use Glpi\Exception\Http\NotFoundHttpException;
+use GlpiPlugin\Codexplus\Brand;
 use GlpiPlugin\Codexplus\Branding;
 
 include('../../../inc/includes.php');
@@ -32,7 +33,17 @@ include('../../../inc/includes.php');
 // cabeçalho desses mesmos documentos.
 Session::checkRight('plugin_codexplus_wiki', READ);
 
-$path = Branding::getLogoPath();
+// M-1: ?brand=ID entrega a logo daquela marca; sem parâmetro, a da marca
+// padrão; sem marca nenhuma (antes de reinstalar), a logo antiga. O caminho
+// continua vindo só do banco/configuração, nunca da requisição.
+$brand = isset($_GET['brand']) ? Brand::get((int) $_GET['brand']) : Brand::getDefault();
+if ($brand !== null) {
+    $path = Brand::logoPath($brand);
+    $mime = Brand::logoMime($brand);
+} else {
+    $path = Branding::getLogoPath();
+    $mime = Branding::getLogoMime();
+}
 
 if ($path === null) {
     throw new NotFoundHttpException();
@@ -41,6 +52,6 @@ if ($path === null) {
 return Toolbox::getFileAsResponse(
     $path,
     'logo.' . pathinfo($path, PATHINFO_EXTENSION),
-    Branding::getLogoMime(),
+    $mime,
     true // cabeçalhos de expiração: o ?v=filemtime já invalida na troca
 );

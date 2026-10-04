@@ -153,6 +153,8 @@
         var cfg = {
             brand: {
                 company: '', logo_url: '', show_logo: false, repeat_logo: true,
+                // M-1: cor principal da marca (título, filete, títulos)
+                color: '#0c447c',
                 logo_pos: 'right', logo_mm: 14, title_upper: false,
                 footer_show: false, footer_text: '', footer_pages: false
             },
@@ -220,6 +222,9 @@
         // valor salvo entre 31 e 40mm passaria pela config mas seria
         // encolhido de volta na exportação em PDF, silenciosamente.
         cfg.brand.logo_mm = isNaN(mm) ? 14 : Math.max(6, Math.min(40, mm));
+        // M-1: mesma regra de Brand::normalizeColor (só #rrggbb; o valor
+        // vai para dentro de um <style>).
+        cfg.brand.color = /^#[0-9a-fA-F]{6}$/.test(String(cfg.brand.color)) ? cfg.brand.color : '#0c447c';
 
         return cfg;
     }
@@ -264,6 +269,15 @@
     function editorSizeCss() {
         return (window.CodexplusEditor && typeof window.CodexplusEditor.sizeCss === 'function')
             ? window.CodexplusEditor.sizeCss() : '';
+    }
+
+    /* M-1: o que era o azul fixo do PDF passa a ser a cor da marca. */
+    function brandCss(cfg) {
+        var c = cfg.brand.color;
+        return '.cx-print-title{color:' + c + ';}'
+            + '.cx-print-meta{border-bottom-color:' + c + ';}'
+            + 'h1,h2,h3,h4{color:' + c + ';}'
+            + '.cx-step-number{background:' + c + ';}';
     }
 
     function buildPageCss(geo) {
@@ -728,7 +742,7 @@
         var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
             + '<base href="' + window.location.origin + '/">'
             + '<title>' + fileTitle(cfg, title).replace(/</g, '&lt;') + '</title>'
-            + '<style>' + PRINT_CSS + editorSizeCss() + buildPageCss(geo) + '</style></head><body>'
+            + '<style>' + PRINT_CSS + brandCss(cfg) + editorSizeCss() + buildPageCss(geo) + '</style></head><body>'
             + '<div id="cx-stage">' + heading + clone.innerHTML + '</div>'
             + '</body></html>';
 

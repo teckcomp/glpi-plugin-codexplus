@@ -50,6 +50,8 @@ class Install
     public const ICONS_TABLE          = 'glpi_plugin_codexplus_icons';
     /** Q7b-4: situação das tarefas do cronograma (ScheduleStatus). */
     public const SCHEDULE_TABLE       = 'glpi_plugin_codexplus_schedulestatus';
+    /** M-1: marcas (logo, nome, cor) usadas no cabeçalho do PDF e do Word. */
+    public const BRANDS_TABLE         = 'glpi_plugin_codexplus_brands';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -59,6 +61,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::BRANDS_TABLE,
             self::SCHEDULE_TABLE,
             self::ICONS_TABLE,
             self::DIAGRAMS_TABLE,
@@ -188,6 +191,9 @@ class Install
 
         // --- Bloco Q7b-4: situação das tarefas do cronograma ---
         self::installQ7b4();
+
+        // --- Bloco M-1: marcas ---
+        self::installM1();
 
         $migration->executeMigration();
         return true;
@@ -493,6 +499,43 @@ class Install
                 UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `row_key`),
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q7b-4): erro ao criar $t");
+        }
+    }
+
+    /**
+     * M-1 (Claudio, 04/10/2026): várias marcas na mesma instalação (grupo de
+     * empresas de um mesmo dono, numa entidade só). Cada marca tem nome da
+     * empresa, logo, altura da logo e cor principal; uma é a padrão.
+     *
+     * A primeira marca nasce da configuração que já existia (nome da empresa,
+     * logo e altura), uma vez só: com a tabela vazia. É a mesma lógica das
+     * sementes de modelos (tabela nova recebe o dado de partida); a logo
+     * antiga continua no lugar, sem uso, para nada se perder.
+     */
+    private static function installM1(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::BRANDS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `name` varchar(255) NOT NULL DEFAULT '',
+                `logo_filename` varchar(255) NOT NULL DEFAULT '',
+                `logo_mm` int unsigned NOT NULL DEFAULT '14',
+                `color` varchar(7) NOT NULL DEFAULT '#0c447c',
+                `is_default` tinyint NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `is_default` (`is_default`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (M-1): erro ao criar $t");
+        }
+
+        $row = $DB->request(['COUNT' => 'cpt', 'FROM' => $t])->current();
+        if ((int) ($row['cpt'] ?? 0) === 0) {
+            Brand::seedFromConfig();
         }
     }
 

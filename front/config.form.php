@@ -14,6 +14,7 @@
  */
 
 use Glpi\Application\View\TemplateRenderer;
+use GlpiPlugin\Codexplus\Brand;
 use GlpiPlugin\Codexplus\Branding;
 
 include('../../../inc/includes.php');
@@ -31,21 +32,39 @@ if (isset($_POST['update'])) {
         false,
         INFO
     );
-
-    // Upload é opcional: o campo pode vir vazio numa gravação que só mexeu
-    // nos toggles.
-    if (isset($_FILES['logo']) && ($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        [$ok, $msg] = Branding::storeLogo($_FILES['logo']);
-        Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
-    }
-
     Html::back();
     exit;
 }
 
-if (isset($_POST['delete_logo'])) {
-    Branding::deleteLogo();
-    Session::addMessageAfterRedirect(__('Logo removido.', 'codexplus'), false, INFO);
+// --- M-1: marcas (nome da empresa, logo, altura, cor; uma é a padrão) ---
+if (isset($_POST['brand_save'])) {
+    [$ok, $msg, $id] = Brand::save($_POST);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
+    if ($ok && isset($_FILES['brand_logo']) && ($_FILES['brand_logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        [$ok2, $msg2] = Brand::storeLogo($id, $_FILES['brand_logo']);
+        Session::addMessageAfterRedirect($msg2, false, $ok2 ? INFO : ERROR);
+    }
+    Html::back();
+    exit;
+}
+
+if (isset($_POST['brand_logo_delete'])) {
+    Brand::deleteLogo((int) $_POST['id']);
+    Session::addMessageAfterRedirect(__('Logo removida.', 'codexplus'), false, INFO);
+    Html::back();
+    exit;
+}
+
+if (isset($_POST['brand_default'])) {
+    Brand::setDefault((int) $_POST['id']);
+    Session::addMessageAfterRedirect(__('Marca padrão alterada.', 'codexplus'), false, INFO);
+    Html::back();
+    exit;
+}
+
+if (isset($_POST['brand_delete'])) {
+    [$ok, $msg] = Brand::delete((int) $_POST['id']);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
     Html::back();
     exit;
 }
@@ -61,8 +80,11 @@ TemplateRenderer::getInstance()->display('@codexplus/config.html.twig', [
     'glpi_root'      => $CFG_GLPI['root_doc'],
     'csrf'           => Session::getNewCSRFToken(),
     'cfg'            => Branding::getAll(),
-    'has_logo'       => Branding::hasLogo(),
-    'logo_url'       => Branding::getLogoUrl(),
+    'brands'         => Brand::all(),
+    'brand_edit'     => (int) ($_GET['brand'] ?? 0),
+    'brand_editing'  => Brand::get((int) ($_GET['brand'] ?? 0)),
+    'mm_min'         => Brand::MIN_MM,
+    'mm_max'         => Brand::MAX_MM,
     'logo_positions' => Branding::getLogoPositions(),
     'markers'        => Branding::getMarkers(),
     'client_sources' => Branding::getClientSources(),

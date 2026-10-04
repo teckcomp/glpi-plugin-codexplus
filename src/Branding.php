@@ -152,17 +152,21 @@ class Branding
      * draft (aviso na linha de identificação quando não é a versão vigente).
      * As flags JSON_HEX_* não são opcionais (achado 14).
      */
-    public static function printConfig(array $document): string
+    public static function printConfig(array $document, int $brandId = 0): string
     {
+        // M-1: nome, logo, altura e cor vêm da MARCA (Brand::forPrint); o
+        // resto (posição, repetição, caixa alta, rodapé) continua global.
+        $brand = Brand::forPrint($brandId);
         $json = json_encode(
             [
                 'brand'    => [
-                    'company'      => self::get('company_name'),
-                    'logo_url'     => self::getLogoUrl(),
+                    'company'      => $brand['company'],
+                    'logo_url'     => $brand['logo_url'],
+                    'color'        => $brand['color'],
                     'show_logo'    => self::get('header_show_logo') === '1',
                     'repeat_logo'  => self::get('header_repeat') === '1',
                     'logo_pos'     => self::get('header_logo_position'),
-                    'logo_mm'      => (int) self::get('header_logo_height'),
+                    'logo_mm'      => $brand['logo_mm'],
                     'title_upper'  => self::get('title_uppercase') === '1',
                     'footer_show'  => self::get('footer_show') === '1',
                     'footer_text'  => self::get('footer_text'),
@@ -194,7 +198,7 @@ class Branding
 
         foreach (self::DEFAULTS as $key => $default) {
             if ($key === 'logo_filename') {
-                continue; // gerenciado só por storeLogo()/deleteLogo()
+                continue; // M-1: a logo é da marca (Brand)
             }
 
             if (in_array($key, $booleans, true)) {
@@ -305,88 +309,9 @@ class Branding
         return self::LOGO_TYPES[$ext] ?? 'application/octet-stream';
     }
 
-    /**
-     * Recebe o $_FILES['logo'] e grava. Devolve [bool ok, string mensagem].
-     *
-     * A validação NÃO confia na extensão nem no MIME declarado pelo
-     * navegador: getimagesize() lê o cabeçalho binário do arquivo. Um .php
-     * renomeado para .png não passa.
-     */
-    public static function storeLogo(array $file): array
-    {
-        if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
-            return [false, __('Nenhum arquivo enviado.', 'codexplus')];
-        }
-
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            return [false, __('Falha no envio do arquivo.', 'codexplus')];
-        }
-
-        if (($file['size'] ?? 0) > self::LOGO_MAX_BYTES) {
-            return [false, __('O arquivo passa de 2 MB.', 'codexplus')];
-        }
-
-        $info = @getimagesize($file['tmp_name']);
-        if ($info === false) {
-            return [false, __('O arquivo não é uma imagem válida.', 'codexplus')];
-        }
-
-        $ext = match ($info[2]) {
-            IMAGETYPE_PNG  => 'png',
-            IMAGETYPE_JPEG => 'jpg',
-            default        => null,
-        };
-
-        if ($ext === null) {
-            return [false, __('Formato não aceito. Use PNG (de preferência com fundo transparente) ou JPG.', 'codexplus')];
-        }
-
-        $dir = self::getLogoDir();
-        if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
-            return [false, sprintf(__('Não foi possível criar a pasta %s.', 'codexplus'), $dir)];
-        }
-
-        // Remove um logo anterior de extensão diferente, senão ficariam
-        // logo.png e logo.jpg convivendo e o antigo virava lixo órfão.
-        self::purgeLogoFiles();
-
-        $filename = 'logo.' . $ext;
-        $dest     = $dir . '/' . $filename;
-
-        if (!@move_uploaded_file($file['tmp_name'], $dest)) {
-            return [false, __('Não foi possível gravar o arquivo no servidor.', 'codexplus')];
-        }
-
-        @chmod($dest, 0o664);
-
-        GlpiConfig::setConfigurationValues(self::CONTEXT, ['logo_filename' => $filename]);
-
-        return [
-            true,
-            sprintf(
-                __('Logo enviado (%1$s × %2$s px).', 'codexplus'),
-                (int) $info[0],
-                (int) $info[1]
-            ),
-        ];
-    }
-
-    public static function deleteLogo(): void
-    {
-        self::purgeLogoFiles();
-        GlpiConfig::setConfigurationValues(self::CONTEXT, ['logo_filename' => '']);
-    }
-
-    private static function purgeLogoFiles(): void
-    {
-        $dir = self::getLogoDir();
-        foreach (array_keys(self::LOGO_TYPES) as $ext) {
-            $f = $dir . '/logo.' . $ext;
-            if (is_file($f)) {
-                @unlink($f);
-            }
-        }
-    }
+    // M-1: o envio e a remoção de logo passaram para Brand (uma logo por
+    // marca). A logo antiga (logo.png/jpg) só é lida pela semente da 1ª marca
+    // (Brand::seedFromConfig) e como reserva sem marca nenhuma.
 
     // ---------------------------------------------------------------------
     // Cabeçalho estruturado por documento (Etapa 4f)

@@ -8,51 +8,127 @@
         subtitle: __('Marca aplicada ao PDF dos documentos', 'codexplus'),
     } only %}
 
-    <form method="post" action="config.form.php" enctype="multipart/form-data" class="codexplus-form cx-cfg">
-        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+    {# M-1 (Claudio, 04/10/2026): marcas. Nome da empresa, logo, altura e
+       cor são da marca; o documento sai com a marca padrão (no M-2, com a
+       marca escolhida nele). Fora do formulário geral: formulário não
+       aninha. #}
+    <section class="cx-cfg-block cx-brands" id="marcas">
+        <div class="cx-brands-head">
+            <h3>{{ __('Marcas', 'codexplus') }} ({{ brands|length }})</h3>
+            <a href="config.form.php?brand=-1#marcas" class="cx-btn cx-btn-primary cx-btn-sm">
+                <i class="ti ti-plus"></i> {{ __('Nova marca', 'codexplus') }}
+            </a>
+        </div>
+        <p class="codexplus-form-hint">
+            {{ __('Cada marca leva o nome da empresa, a logo, a altura da logo e a cor principal do PDF e do Word. O documento novo nasce com a marca padrão.', 'codexplus') }}
+        </p>
 
-        {# ---------------------------------------------------------------- #}
-        <fieldset class="cx-cfg-block">
-            <legend>{{ __('Identificação', 'codexplus') }}</legend>
+        {% if brands is empty %}
+            <p class="codexplus-form-hint">{{ __('Nenhuma marca ainda. Reinstale o plugin para criar a primeira a partir da logo atual, ou crie uma nova.', 'codexplus') }}</p>
+        {% else %}
+        <table class="cx-brands-table">
+            <thead><tr>
+                <th>{{ __('Logo', 'codexplus') }}</th>
+                <th>{{ __('Nome da empresa', 'codexplus') }}</th>
+                <th>{{ __('Cor principal', 'codexplus') }}</th>
+                <th>{{ __('Altura da logo', 'codexplus') }}</th>
+                <th></th>
+            </tr></thead>
+            <tbody>
+            {% for b in brands %}
+                <tr class="{{ brand_edit == b.id ? 'is-editing' : '' }}">
+                    <td class="cx-brands-logo">
+                        {% if b.has_logo %}<img src="{{ b.logo_url }}" alt="">{% else %}<span class="cx-brands-nologo">{{ __('sem logo', 'codexplus') }}</span>{% endif %}
+                    </td>
+                    <td><strong>{{ b.name }}</strong>
+                        {% if b.is_default %}<span class="cx-brands-tag">{{ __('padrão', 'codexplus') }}</span>{% endif %}</td>
+                    <td><span class="cx-brands-sw" style="background: {{ b.color }}"></span><code>{{ b.color }}</code></td>
+                    <td>{{ b.logo_mm }} mm</td>
+                    <td class="cx-brands-actions">
+                        <a href="config.form.php?brand={{ b.id }}#marcas" class="cx-btn cx-btn-ghost cx-btn-sm">{{ __('Editar', 'codexplus') }}</a>
+                        {% if not b.is_default %}
+                        <form method="post" action="config.form.php">
+                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                            <input type="hidden" name="id" value="{{ b.id }}">
+                            <button type="submit" name="brand_default" value="1" class="cx-btn cx-btn-ghost cx-btn-sm">{{ __('Tornar padrão', 'codexplus') }}</button>
+                            <button type="submit" name="brand_delete" value="1" class="cx-btn cx-btn-mini cx-btn-mini-danger"
+                                    onclick="return confirm('{{ __('Excluir a marca', 'codexplus')|e('js') }} {{ b.name|e('js') }}?');" title="{{ __('Excluir', 'codexplus') }}">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
-            <div class="codexplus-form-row">
-                <label for="cx-company">{{ __('Nome da empresa', 'codexplus') }}</label>
-                <input type="text" id="cx-company" name="company_name"
-                       value="{{ cfg.company_name }}"
-                       placeholder="{{ __('Ex.: Resolutto IT Solutions', 'codexplus') }}">
-                <p class="codexplus-form-hint">
-                    {{ __('Disponível no rodapé pelo marcador {empresa}.', 'codexplus') }}
-                </p>
-            </div>
-
-            <div class="codexplus-form-row">
-                <label>{{ __('Logo', 'codexplus') }}</label>
-
-                <div class="cx-cfg-logo">
-                    <div class="cx-cfg-logo-preview {{ has_logo ? '' : 'is-empty' }}">
-                        {% if has_logo %}
-                            <img src="{{ logo_url }}" alt="{{ __('Logo atual', 'codexplus') }}">
+        {% set editing = brand_editing %}
+        {% if editing is not null or brand_edit == -1 %}
+        <form method="post" action="config.form.php" enctype="multipart/form-data" class="cx-brand-edit" data-cx-brand-form>
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+            <input type="hidden" name="id" value="{{ editing is not null ? editing.id : 0 }}">
+            <h4>{{ editing is not null ? __('Editar marca', 'codexplus') ~ ' — ' ~ editing.name : __('Nova marca', 'codexplus') }}</h4>
+            <div class="cx-brand-grid">
+                <div>
+                    <div class="cx-cfg-logo-preview {{ editing is not null and editing.has_logo ? '' : 'is-empty' }}" data-cx-brand-preview>
+                        {% if editing is not null and editing.has_logo %}
+                            <img src="{{ editing.logo_url }}" alt="">
                         {% else %}
-                            <span><i class="ti ti-photo-off"></i> {{ __('Nenhum logo enviado', 'codexplus') }}</span>
+                            <span><i class="ti ti-photo-off"></i> {{ __('Nenhuma logo', 'codexplus') }}</span>
                         {% endif %}
                     </div>
-
-                    <div class="cx-cfg-logo-actions">
-                        <input type="file" name="logo" accept="image/png,image/jpeg">
-                        <p class="codexplus-form-hint">
-                            {{ __('PNG com fundo transparente é o ideal. JPG também serve. Até', 'codexplus') }}
-                            {{ max_mb }} MB.
-                        </p>
-                        {% if has_logo %}
-                            <button type="submit" name="delete_logo" value="1"
-                                    class="cx-btn cx-btn-mini cx-btn-mini-danger">
-                                <i class="ti ti-trash"></i> {{ __('Remover logo', 'codexplus') }}
-                            </button>
-                        {% endif %}
+                    <input type="file" name="brand_logo" accept="image/png,image/jpeg" data-cx-brand-file>
+                    <p class="codexplus-form-hint">{{ __('PNG com fundo transparente é o ideal. JPG também serve. Até', 'codexplus') }} {{ max_mb }} MB.</p>
+                    {% if editing is not null and editing.has_logo %}
+                        <button type="submit" name="brand_logo_delete" value="1" class="cx-btn cx-btn-mini cx-btn-mini-danger">
+                            <i class="ti ti-trash"></i> {{ __('Remover logo', 'codexplus') }}
+                        </button>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="codexplus-form-row">
+                        <label for="cx-brand-name">{{ __('Nome da empresa', 'codexplus') }}</label>
+                        <input type="text" id="cx-brand-name" name="name" required maxlength="255"
+                               value="{{ editing is not null ? editing.name : '' }}">
+                        <p class="codexplus-form-hint">{{ __('Sai onde o marcador {empresa} for usado.', 'codexplus') }}</p>
+                    </div>
+                    <div class="codexplus-form-row">
+                        <label for="cx-brand-color">{{ __('Cor principal', 'codexplus') }}</label>
+                        <div class="cx-brand-color">
+                            <input type="color" id="cx-brand-color" name="color" data-cx-brand-color
+                                   value="{{ editing is not null ? editing.color : '#0c447c' }}">
+                            <code data-cx-brand-hex>{{ editing is not null ? editing.color : '#0c447c' }}</code>
+                            <button type="button" class="cx-btn cx-btn-ghost cx-btn-sm" data-cx-brand-pick>{{ __('Usar a cor da logo', 'codexplus') }}</button>
+                        </div>
+                        <p class="codexplus-form-hint" data-cx-brand-hint>{{ __('Título, filete e títulos do PDF e do Word saem nesta cor. Ao enviar a logo, a cor é sugerida a partir dela.', 'codexplus') }}</p>
+                    </div>
+                    <div class="codexplus-form-row">
+                        <label for="cx-brand-mm">{{ __('Altura da logo no cabeçalho (mm)', 'codexplus') }}</label>
+                        <input type="number" id="cx-brand-mm" name="logo_mm" min="{{ mm_min }}" max="{{ mm_max }}" step="1"
+                               value="{{ editing is not null ? editing.logo_mm : 14 }}">
+                        <p class="codexplus-form-hint">{{ __('Entre 6 e 40 mm.', 'codexplus') }}</p>
+                    </div>
+                    {% if editing is null or not editing.is_default %}
+                    <div class="codexplus-form-row cx-cfg-check">
+                        <label><input type="checkbox" name="is_default" value="1"> {{ __('Marca padrão (documento novo nasce com ela)', 'codexplus') }}</label>
+                    </div>
+                    {% endif %}
+                    <div class="codexplus-form-actions">
+                        <button type="submit" name="brand_save" value="1" class="cx-btn cx-btn-primary">
+                            <i class="ti ti-device-floppy"></i> {{ __('Salvar marca', 'codexplus') }}
+                        </button>
+                        <a href="config.form.php#marcas" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
                     </div>
                 </div>
             </div>
-        </fieldset>
+        </form>
+        {% endif %}
+    </section>
+
+    <form method="post" action="config.form.php" class="codexplus-form cx-cfg">
+        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
 
         {# ---------------------------------------------------------------- #}
         <fieldset class="cx-cfg-block">
@@ -86,15 +162,6 @@
                         </option>
                     {% endfor %}
                 </select>
-            </div>
-
-            <div class="codexplus-form-row">
-                <label for="cx-logoh">{{ __('Altura do logo (mm)', 'codexplus') }}</label>
-                <input type="number" id="cx-logoh" name="header_logo_height"
-                       value="{{ cfg.header_logo_height }}" min="6" max="40" step="1">
-                <p class="codexplus-form-hint">
-                    {{ __('Entre 6 e 40 mm. Acima disso o cabeçalho invade o texto.', 'codexplus') }}
-                </p>
             </div>
 
             <div class="codexplus-form-row cx-cfg-check">
@@ -175,9 +242,5 @@
         </div>
     </form>
 
-    <p class="codexplus-form-hint cx-cfg-note">
-        <i class="ti ti-info-circle"></i>
-        {{ __('Esta configuração ainda não afeta o PDF — o cabeçalho e o rodapé passam a ser aplicados na Etapa 4b.', 'codexplus') }}
-    </p>
 
 </div>

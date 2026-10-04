@@ -51,7 +51,7 @@
                  bottom: Math.round(22 * MM), header: Math.round(9 * MM), footer: Math.round(9 * MM) };
     var CONTENT_PX = Math.round((210 - 32) * 96 / 25.4);   // largura útil em px (96 dpi)
     var BASE_HALF_PT = 22;                                  // 11 pt
-    var INK = '0C447C';                                     // cor dos títulos no PDF
+    var INK = '0C447C';                                     // cor dos títulos no PDF (M-1: a da marca, a cada exportação)
 
     var BLOCK = /^(P|DIV|H[1-6]|UL|OL|LI|TABLE|PRE|BLOCKQUOTE|HR|SECTION|ARTICLE|FIGURE|FIGCAPTION|HEADER|FOOTER|ASIDE|DL|DT|DD|ADDRESS)$/;
 
@@ -531,6 +531,7 @@
         var content = root && root.querySelector('.codexplus-content');
         if (!P || !content) { return Promise.reject(new Error('pagina')); }
         var cfg = P.config();
+        INK = String(cfg.brand.color || '#0c447c').replace('#', '').toUpperCase();
         var titleEl = root.querySelector('.codexplus-doc-title');
         var titleText = (cfg.document.title || (titleEl ? titleEl.textContent : '') || '').trim();
         return loadDocx().then(function (D) {

@@ -1251,6 +1251,31 @@
     color: var(--cx-accent);
 }
 
+/* --- M-1: marcas (cadastro na configuração) --- */
+.cx-cfg-block.cx-brands { max-width: 980px; padding-bottom: 16px; }
+.cx-brands-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cx-brands-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--cx-accent); text-transform: uppercase; letter-spacing: .03em; }
+.cx-brands .cx-btn-sm { padding: 4px 10px; font-size: 12px; }
+.cx-brands-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.cx-brands-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--cx-muted); text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--cx-border); }
+.cx-brands-table td { padding: 10px; border-bottom: 1px solid var(--cx-surface-2); vertical-align: middle; }
+.cx-brands-table tr.is-editing td { background: var(--cx-accent-soft); }
+.cx-brands-logo img { height: 34px; max-width: 170px; object-fit: contain; display: block; }
+.cx-brands-nologo { color: var(--cx-faint); font-size: 12px; }
+.cx-brands-tag { display: inline-block; margin-left: 6px; font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--cx-accent-soft); color: var(--cx-accent); font-weight: 600; }
+.cx-brands-sw { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 6px; border: 1px solid rgba(0,0,0,.15); }
+.cx-brands-actions { white-space: nowrap; text-align: right; }
+.cx-brands-actions form { display: inline-flex; gap: 6px; margin: 0 0 0 6px; }
+.cx-brand-edit { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--cx-border); }
+.cx-brand-edit h4 { margin: 0 0 12px; font-size: 14px; }
+.cx-brand-grid { display: grid; grid-template-columns: 260px 1fr; gap: 22px; }
+.cx-brand-grid > div { min-width: 0; }
+.cx-brand-edit input[type="text"] { width: 100%; box-sizing: border-box; }
+.cx-brand-grid input[type="file"] { margin-top: 8px; font-size: 13px; max-width: 100%; }
+.cx-brand-color { display: flex; align-items: center; gap: 10px; }
+.cx-brand-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--cx-border); border-radius: 6px; background: #fff; }
+@media (max-width: 760px) { .cx-brand-grid { grid-template-columns: 1fr; } }
+
 /* =========================================================================
    13. IDENTIFICAÇÃO DO DOCUMENTO NA LEITURA (Etapa 4b)
    ========================================================================= */

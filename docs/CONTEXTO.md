@@ -2,6 +2,13 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.11`** · último commit de código **`1f46cb7`** ·
+> atualizado em **04/10/2026 (noite)**: **MO-1 ✅** — modelos por **setor e
+> categoria** (ambos opcionais; sem setor = Geral, vale para todos), tela
+> **Modelos agrupada** e criação de documento oferecendo só os modelos que
+> cabem no setor/categorias escolhidos, o mais específico primeiro. Seção
+> 3.21; achados 156 e 157. Próximo: **MO-2** (imagens dentro de modelos).
+> Antes:
 > Estado: **`v0.7.10`** · último commit de código **`42a84c0`** ·
 > atualizado em **04/10/2026 (noite)**: **AP-1 ✅** — cada versão publicada
 > guarda **quem a aprovou** (coluna `approvers` em `documentversions`; a
@@ -2398,6 +2405,59 @@ por script (achado 154): selos do Painel, versão com e sem registro,
 `data-sign`, botão e `data-status` da Biblioteca. PDF e Word não foram
 vistos no navegador no container; Claudio validou na homologação.
 
+### 3.21 MO-1 — Modelos por setor e categoria (`1f46cb7`, `v0.7.11`)
+
+Decisões de Claudio (04/10/2026), sobre mockup: setor e categoria **ambos
+opcionais**; modelo **sem setor aparece para todos** (grupo **Geral**); na
+criação a lista filtra pelo **setor e categorias escolhidos no formulário**
+(não pelo setor de quem cria). Colunas no modelo, não tabela de ligação:
+o documento mora num setor só (SC1) e, para servir a duas categorias,
+duplica-se o modelo.
+
+- **Schema:** `glpi_plugin_codexplus_templates` ganha
+  `plugin_codexplus_sectors_id` e `plugin_codexplus_categories_id` (`int
+  unsigned`, padrão 0, com índice). `Install::installMO1()` só cria as
+  colunas (guarda `fieldExists`); **não semeia** (achado 137). Os modelos
+  existentes ficam em Geral.
+- **Lugar efetivo** (`Template::placementOf`): com categoria, o setor é o
+  **da categoria** (lido na hora — categoria que muda de setor leva o
+  modelo junto); categoria sem setor solta o modelo para o setor gravado
+  ou Geral. Ao gravar, `sanitize()` força o setor da categoria. Update
+  parcial completa o campo de lugar que não veio com o gravado (achado 156).
+- **Padrão:** um por **tipo + lugar** (Geral, setor todo, setor+categoria)
+  — `enforceSingleDefault()` filtra pelos três.
+- **Apagar setor/categoria:** os modelos entram em
+  `plugin_codexplus_getDatabaseRelations()` (`hook.php`); o
+  `cleanRelationData()` do GLPI zera a coluna (ou troca pelo substituto):
+  categoria apagada → setor todo; setor apagado → Geral. Modelo nunca é
+  apagado junto.
+- **Tela Modelos:** `Template::listGrouped($tipo)` — Geral primeiro, depois
+  setores por nome; dentro, "Setor todo" e as categorias por nome completo.
+  Filtro `?doctype=` (inválido = todos). Formulário com Setor e Categoria
+  (`Category::placementTree()`; JS inline mostra só as categorias do setor,
+  categoria travada com setor Geral). "Duplicar" mantém o lugar.
+- **Criação:** `listForCreation()` devolve `sector`, `category` e `scope`
+  (a categoria e as subcategorias, `getSonsOf`). No `codexplus-docform.js`
+  o bloco Setor/Categorias dispara `cx:place` no `form` a cada desenho;
+  `modelos()` remonta a lista com chave tipo|setor|categorias. Cabe: setor
+  0 ou igual; categoria 0 ou alguma escolhida no `scope`. Ordem:
+  categoria > setor > Geral, padrão primeiro. Escolha manual é mantida
+  enquanto couber; o corpo troca sozinho só se ninguém mexeu (senão
+  pergunta, como antes); recusar = "Em branco" e não pergunta de novo.
+
+#### Testes
+
+Container: GLPI 11.0.6 + MariaDB, plugin na 0.7.10 atualizado para a
+0.7.11, reinstalado de novo e instalado do zero (colunas e sementes
+conferidas no banco). Harness com o Kernel, 24 verificações (lugar
+forçado, opcionais, padrão por lugar, `scope`, grupos e filtro, categoria
+trocando de setor, duplicar, update parcial, purge de categoria e de
+setor). JS no jsdom, 11 (filtro, ordem, subcategoria, escolha manual,
+pergunta e recusa, lista vazia). Tela pelo `php -S` com login por script,
+11 (lista, filtro, formulário, POST de gravação, JSON da criação). Select2
+com 10+ modelos não foi visto no container; Claudio validou na
+homologação.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3131,6 +3191,18 @@ depender do comportamento errático de `position: fixed` na impressão.
     Painel. Em dado de teste, `revision > 0` com status de etapa é
     **revisão em andamento** ("em atualização"), nunca "aprovadores".
 
+156. **O purge de dropdown faz update parcial nas tabelas relacionadas.**
+    `cleanRelationData()` grava só a coluna da relação (ex.: categoria = 0)
+    pelo `update()` da classe. `prepareInputFor*` que recalcula campos
+    ligados (setor ← categoria) tem que completar o que não veio com
+    `$this->fields`, senão zera o vizinho. Pego pelo harness do MO-1.
+157. **Harness de JS e de tela:** no jsdom (`runScripts: 'outside-only'`)
+    o documento ainda está em `loading` depois do `eval` — esperar o
+    `DOMContentLoaded` e os `setTimeout` do script antes de afirmar. No
+    script de tela (achado 154), POST para `front/*.form.php` que termina
+    em `Html::back()` precisa do cabeçalho `Referer`, senão o redirect vai
+    para outro host e o teste quebra com "Connection refused".
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -3207,7 +3279,7 @@ codexplus/
 │   ├── Library.php            Biblioteca: Setor → Categoria, lixeira, nichos e decoração (B1, R5, B2)
 │   ├── LegacyMigration.php    migração da Base de Conhecimento (R4)
 │   ├── DocumentMeta.php       tipos, código, vencimento, fluxo por tipo (P2)
-│   ├── Template.php           modelos por tipo, lista da criação, sem imagem (R3b4, M1)
+│   ├── Template.php           modelos por tipo e lugar (setor/categoria), lista da criação e tela agrupada, sem imagem (R3b4, M1, MO-1)
 │   ├── Dashboard.php          indicadores do Painel (modelo novo)
 │   ├── Branding.php           marca, cabeçalho, JSON de impressão
 │   ├── Rights.php             bits, Super-Admin, roleUsers (quem tem Ler, P3), auditores, isProducer (P1, B1, P3)

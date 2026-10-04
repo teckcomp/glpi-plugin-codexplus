@@ -1,12 +1,12 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (noite), depois do **AP-1 ✅** (`42a84c0`).
+> Gerado em 04/10/2026 (noite), depois do **MO-1 ✅** (`1f46cb7`).
 
 ## Estado
 
-- Versão: **`0.7.10`**; último commit de código **`42a84c0`** (AP-1); docs
-  neste pacote. Plugin 0.7.10 habilitado na homologação.
+- Versão: **`0.7.11`**; último commit de código **`1f46cb7`** (MO-1); docs
+  neste pacote. Plugin 0.7.11 habilitado na homologação.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
   MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
@@ -29,8 +29,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.20, achados
-  até 155) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.21, achados
+  até 157) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -55,7 +55,7 @@
 
 1. ~~**HV-1**~~ ✅ `7a54900` — aba Histórico + "incluir obsoletos" na Biblioteca
 2. ~~**AP-1**~~ ✅ `42a84c0` — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
-3. **MO-1** — modelos por setor e categoria (0.7.11)
+3. ~~**MO-1**~~ ✅ `1f46cb7` — modelos por setor e categoria (0.7.11)
 4. **MO-2** — imagens dentro de modelos
 5. **Q7c-1** — cronograma: fase leva linha solta; tela cheia esticada
 6. **Q7c-2** — cronograma: histórico das marcações (0.7.12)
@@ -69,23 +69,26 @@
 
 ## Próximo passo imediato
 
-**MO-1** (0.7.11, **com schema — reinstala**). Clonar o `master` do GitHub
-(`42a84c0`). Entrega (ROADMAP, Reta final, linha 3): modelos por **setor e
-categoria** — colunas no modelo, tela **Modelos** agrupada, e a criação de
-documento oferecendo só os modelos que cabem.
+**MO-2** — imagens dentro de modelos (ROADMAP, Reta final, linha 4;
+**sem schema previsto**, confirmar ao ler o código). Clonar o `master` do
+GitHub (`1f46cb7` + docs).
 
-Antes de codar: ler `src/Template.php`, a tabela de modelos no
-`Install.php`, `front/templates.php`, `front/template.form.php` e
-`Template::listForCreation()` (usado pelo `document.form.php`). Levar a
-Claudio, numa resposta só: (1) **mockup da tela Modelos** agrupada por
-setor → categoria; (2) as decisões pendentes do MO-1 no ROADMAP (setor e
-categoria opcionais? modelo sem setor vale para todos? a criação filtra
-pela categoria escolhida ou pelo setor de quem cria?); (3) o schema
-proposto (colunas no modelo vs. tabela de ligação, se puder ter várias
-categorias). Modelos são dado da instalação (achado 137): a migração não
-semeia nada, só cria as colunas. Pacote com `setup.php` em 0.7.11:
-`plugin:install --force` + `plugin:activate` + `plugin:list | grep -i
-codexplus`, pelo `su -s /bin/sh www-data -c "…"`.
+Antes de codar: ler `Template::sanitize()`/`stripImages()` (a regra do M1
+que este bloco reverte), o `Html::textarea` de `front/templates.php`
+(`enable_images => false`) e o de `front/document.form.php` (linha ~785,
+`enable_images => true`), e como o documento grava as imagens coladas
+(`Document_Item` ligado a UM documento — ver `src/Document.php` e o
+`document.form.php`). Levar a Claudio, numa resposta só, as decisões do
+MO-2 no ROADMAP: (1) a imagem do modelo é **copiada** para cada documento
+novo (arquivo próprio, não o mesmo `Document` do GLPI)? (2) apagar ou
+trocar a imagem no modelo **não mexe** nos documentos já criados? (3)
+"Duplicar" o modelo copia as imagens também? Mockup só se a tela mudar
+(provavelmente não muda). Sem `setup.php` novo se não houver schema:
+`cache:clear` + `systemctl restart apache2`.
+
+Lembretes do container (achados 153, 154, 157): `mysqld` por `setsid
+nohup` no mesmo comando; login por script numa sessão Python só, com
+`Referer` nos POST; jsdom espera o `DOMContentLoaded`.
 
 Ao chegar no **7b**, pedir antes: SMTP configurado na homologação. Ao
 chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de

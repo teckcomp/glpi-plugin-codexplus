@@ -1,6 +1,14 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.6`** (último commit de código **`382b7de`**) ·
+> Estado em **`v0.7.9`** (último commit de código **`ea02b8a`**) ·
+> atualizado em **04/10/2026 (noite, fim da sessão)**: **3c ✅** (modelos de
+> Manual, POP e PSG como dado; imagem anexa da proposta cancelada),
+> **R6-b ✅**, **R7 ✅**, **Etapa 5 ✅** (5a a 5e), Visualizar em folhas A4,
+> dados do documento em abas, tela cheia no fluxograma — CONTEXTO, seção
+> 3.17. Próximo: **caça a bugs** → produção (Etapa 7 logo depois) → aba de
+> Histórico e galeria de Modelos.
+> Antes:
+> Estado em `v0.7.6` (último commit de código **`382b7de`**) ·
 > atualizado em **04/10/2026 (tarde e noite)**: **3c-1 ✅** planilha no
 > lugar, **A-1 ✅** vários editores, **A-2a ✅** aprovadores (DIA e DIV),
 > **P3 ✅** papéis no documento (perfil só Ler + Auditar), **A-2b ✅**
@@ -105,9 +113,9 @@ Vale sobre a lista acima quando houver conflito.
 > conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
 > GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → ~~Q5i~~ ✅ (03/10)
 > → ~~Q6~~ ✅ → ~~Q7a~~ ✅ (03/10) → ~~Q7b-1 a Q7b-4 (cronograma)~~ ✅
-> (03–04/10) → ~~3c-0, M-1, M-2~~ ✅ (04/10) → **3c** (Proposta ✅ 04/10;
-> falta Manual, POP e PSG — como dado, 3c-3b) →
-> R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7 logo depois)
+> (03–04/10) → ~~3c-0, M-1, M-2~~ ✅ (04/10) → ~~3c~~ ✅ → ~~R6-b~~ ✅ →
+> ~~R7~~ ✅ → ~~Etapa 5~~ ✅ (04/10) → **caça a bugs** → produção (com a
+> Etapa 7 logo depois)
 > → aba de Histórico e galeria de Modelos (Claudio, 03/10: "quando
 > finalizar toda a produção").
 >
@@ -154,15 +162,12 @@ Vale sobre a lista acima quando houver conflito.
 9. ~~Migração dos 5 documentos (R4)~~ ✅ 26/09 (os 5 migrados)
 10. ~~Prateleira e corte da base nativa (R5)~~ ✅ 26/09 (Biblioteca com
     situação e lixeira; Modelos por setor/categoria foi para o backlog)
-11. **Modelos com conteúdo real (3c)**
-12. **Revisão R6-b** (prazo da revisão aberta, "Revisão atrasada",
-    prorrogação, histórico de revisões no fim do PDF)
-13. **Acesso anônimo (R7)** — seção "Acesso anônimo" na coluna Permissões,
-    abaixo de Leitura (sugestão de Claudio, 26/09)
-14. **Documentos vinculados e PDF composto em cascata (Etapa 5)** —
-    PSG → POP → Manual/Diagrama (redesenhada em 04/10); o link de forma do
-    fluxograma para documento do Codex+ conversa com isso
-15. Caça a bugs
+11. ~~Modelos com conteúdo real (3c)~~ ✅ 04/10
+12. ~~Revisão R6-b~~ ✅ 04/10 (`f757c31`, `207cda4`)
+13. ~~Acesso anônimo (R7)~~ ✅ 04/10 (`ed00235`, `e8acd88`, `02e4f7c`)
+14. ~~Documentos vinculados e PDF composto em cascata (Etapa 5)~~ ✅ 04/10
+    (`ac6be3d`, `9d48dae`, `7315adf`, `ea02b8a`)
+15. **Caça a bugs** (lista em "Backlog")
 16. Produção, com o alerta de vencimento (Etapa 7) logo depois
 
 A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
@@ -383,6 +388,11 @@ escrita à mão, que a R6-b põe no PDF). **Imagem anexa no PDF da proposta**
 confirmar com Claudio se ainda vale.
 
 ---
+
+> ✅ **Concluída em 04/10/2026** (5a `ac6be3d`, 5b `9d48dae`, 5c/5e `7315adf`, 5d `ea02b8a`).
+> Acréscimos de Claudio durante a construção: quem gere = responsável +
+> editores; referência dentro do texto ("segue POP de referência …") que
+> vira vínculo; "Documentos complementares" só no fim do documento.
 
 ## Etapa 5 — documentos vinculados (PSG, POP, Manual, Diagrama)
 
@@ -619,7 +629,34 @@ POP e PSG.
 | 3c-3 | Modelo completo de Proposta (entrou pelo Install) e planilha remontada pelo JSON; 0.7.6 | `ae40fe3` |
 | 3c-3b | Modelo da Resolutto sai do código (é dado da homologação); semente de Proposta genérica | `382b7de` |
 
+## Sessão de 04/10/2026 (noite) — R6-b, R7, Etapa 5 ✅
+
+| Bloco | O quê | Commit |
+|---|---|---|
+| 3c-4 | Modelos de Manual, POP e PSG como dado; sementes sem histórico manual | `96cbe2b` |
+| R6-b1 | Prazo da revisão, prorrogação com motivo, "Revisão vencida" unificada; 0.7.7 | `f757c31` |
+| R6-b2 | Histórico de revisões no fim do PDF | `207cda4` |
+| R7-1 | Link de acesso anônimo, página pública; 0.7.8 | `ed00235` |
+| R7-2a | Visualizar e link público em folhas como o PDF; logo pela rota do link | `e8acd88` |
+| R7-2b | Imagens e anexos pelo link público | `02e4f7c` |
+| 5a | Documentos vinculados: tabela, regras, seção; 0.7.9 | `ac6be3d` |
+| Telas | Dados do documento em abas; tela cheia na leitura do fluxograma | `d3e22fa` |
+| 5b | Referência no texto; Documentos complementares | `9d48dae` |
+| 5c/5e | Faz parte de; aviso ao pai; Painel de vínculos | `7315adf` |
+| 5d | PDF completo em cascata com sumário | `ea02b8a` |
+
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
+
+**Caça a bugs — já anotados (04/10/2026):**
+
+- Marca d'água "RASCUNHO — não é a versão vigente" nas folhas e no PDF
+  quando o Visualizar mostra algo fora da versão vigente
+- Exportar Word sem o histórico de revisões e sem os Documentos
+  complementares
+- PDF completo: matriz RACI e cronograma saem como nota; só interno (não
+  no link público); conferir a folha deitada em outros navegadores
+- Leitura comum (sem Visualizar) ainda no formato antigo: decidir se vira
+  folhas também
 
 - PDF: partir planilha/tabela maior que uma folha, repetindo o cabeçalho
   (hoje transborda — limite do 3c-0)
@@ -687,14 +724,22 @@ POP e PSG.
       ficaram bons): levar por scripts nossos na etapa de produção, caso a
       caso (Claudio, 03/10/2026). Listar quais antes da subida
 
-- [ ] **Imagem anexa no PDF da proposta** (19/09): ainda vale, com a Planta
-      já cobrindo o caso principal?
+- [x] ~~**Imagem anexa no PDF da proposta**~~ (19/09): cancelada, a Planta
+      cobre — 04/10/2026
 - [ ] **Galeria de Modelos** (fim da fila): proposta de escopo — catálogo
       público de modelos da Teckcomp (ex.: repositório no GitHub), listado e
       importado com um clique na tela Modelos (Claudio, 04/10: só faz
       sentido exportar/importar se for isso)
 
 **Decididas:**
+
+- [x] **Revisão vencida** = uma linha só no Painel (sem revisão aberta +
+      revisão fora do prazo), detalhe na lista e na página — Claudio, 04/10/2026
+- [x] **Acesso anônimo**: link sem validade, até revogar; diagramas fora;
+      página pública = mesma visão do PDF, também no Visualizar — Claudio, 04/10/2026
+- [x] **Vínculos**: responsável + editores gerem; referência no texto vira
+      vínculo; Documentos complementares só no fim — Claudio, 04/10/2026
+- [x] **Dados do documento** recolhíveis em três abas — Claudio, 04/10/2026
 
 - [x] **Vínculo entre documentos em todos os níveis** (Etapa 5): PSG → POP
       → Manual, inclusive `DIA`; PDF composto em cascata; filho com vários

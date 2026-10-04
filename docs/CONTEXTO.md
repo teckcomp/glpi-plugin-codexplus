@@ -2,8 +2,20 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.6`** · último commit de código **`382b7de`** ·
-> atualizado em **04/10/2026 (tarde e noite)**: **3c fechada** — planilha
+> Estado: **`v0.7.9`** · último commit de código **`ea02b8a`** ·
+> atualizado em **04/10/2026 (noite, fim da sessão)**: **R6-b ✅** (prazo
+> da revisão, prorrogação com motivo, "Revisão vencida" unificada,
+> histórico de revisões no fim do PDF), **R7 ✅** (acesso anônimo por link
+> secreto, página pública em folhas como o PDF, logo, imagens e anexos pela
+> rota do link), **Visualizar em folhas A4** (mesmo motor do PDF),
+> **Etapa 5 ✅** (documentos vinculados em todos os níveis: 5a lista e
+> regras, 5b referência no texto e Documentos complementares, 5c/5e "Faz
+> parte de", aviso ao pai e Painel, 5d PDF completo em cascata), **dados do
+> documento recolhíveis em abas**, **tela cheia na leitura do fluxograma**,
+> **3c fechada** (modelos de Manual, POP e PSG como dado). Seção 3.17;
+> achados 140 a 148. Próximo: **caça a bugs** → produção.
+> Antes:
+> Estado anterior: **`v0.7.6`** · atualizado em **04/10/2026 (tarde e noite)**: **3c fechada** — planilha
 > editada no lugar (3c-1), **Resumo do investimento** automático (3c-2),
 > modelo completo de Proposta como **dado** da homologação (3c-3/3c-3b);
 > **editores e aprovadores** (A-1 vários editores na Proposta e no Laudo,
@@ -2165,6 +2177,100 @@ para uma fonte atrasada no iframe não alargar o cartão por cima do vizinho. O
 que se vê é o que sai, com posições, reportes e dobras. A lista aninhada
 (`card()`) ficou só como reserva, e cobrindo todos os blocos (achado 50).
 
+### 3.17 Sessão de 04/10/2026 (noite) — R6-b, R7, Etapa 5, telas
+
+Commits: `96cbe2b` (3c-4), `f757c31` (R6-b1, 0.7.7), `207cda4` (R6-b2),
+`ed00235` (R7-1, 0.7.8), `e8acd88` (R7-2a), `02e4f7c` (R7-2b), `ac6be3d`
+(5a, 0.7.9), `d3e22fa` (dados em abas + tela cheia do fluxograma),
+`9d48dae` (5b), `7315adf` (5c/5e), `ea02b8a` (5d).
+
+#### 3c-4 — modelos de Manual, POP e PSG (`96cbe2b`)
+
+- Três modelos completos entraram como **dado** na homologação por SQL
+  único (Manual "passo a passo com prints (padrão Resolutto)", "POP —
+  procedimento completo", "PSG — regimento completo"), padrão de cada tipo.
+- Sementes do plugin (só instalação nova) sem a tabela "Histórico de
+  revisão" escrita à mão (a R6-b imprime) e sem "Procedimentos vinculados"
+  no PSG (a Etapa 5 lista).
+- Imagem anexa no PDF da proposta (19/09): **cancelada** (a Planta cobre).
+
+#### R6-b — prazo da revisão e histórico no PDF (`f757c31`, `207cda4`)
+
+- Coluna `revision_due` no documento e tabela
+  `glpi_plugin_codexplus_revisionevents` (aberta, prorrogada,
+  sem_alteracao, cancelada; `RevisionEvent`).
+- Abrir revisão: prazo = hoje + dias da Configuração (padrão 30, 1–365,
+  campo em Configuração). Prorrogar: responsável ou Super-Admin, data ≥ hoje
+  e diferente da atual, motivo obrigatório. Publicar ou cancelar zera o prazo.
+  Revisão aberta antes da 0.7.7 fica "sem prazo" e ganha "Definir prazo".
+- **"Revisão vencida" do Painel é uma linha só** (Claudio): publicado
+  vencido **sem** revisão aberta + revisão aberta **fora do prazo** (+
+  revisão sem prazo com o publicado vencido). Revisão aberta no prazo não
+  entra. Lista que abre com o motivo de cada documento.
+- Página: faixa vermelha "Revisão atrasada" só para quem tem papel.
+- Histórico de revisões no fim do PDF (`DocumentVersion::history`): uma
+  linha por publicação e por "revisado sem alteração", até a revisão
+  impressa. Proposta e Laudo (fluxo direto) sem histórico.
+
+#### R7 — acesso anônimo (`ed00235`, `e8acd88`, `02e4f7c`)
+
+- Colunas `anon_token`, `anon_users_id`, `anon_date`, `anon_hits`,
+  `anon_last`. Token de 48 hex; gerar de novo troca; revogar apaga. Gerir:
+  responsável ou Super-Admin **com o bit Anônimo**. Só publicado ou em
+  revisão (mostra a publicada com "Em atualização"); diagrama fora
+  (Claudio: não precisa). Rascunho nunca publicado não tem a seção.
+- `front/public.php` é a **única** rota liberada no Firewall
+  (`STRATEGY_NO_CHECK`, registrado no `plugin_init`); confere o token e
+  responde 404 neutro em qualquer outro caso. `?logo=1` entrega a logo da
+  marca do documento; `?f=N` entrega imagem do corpo ou anexo **ligado a
+  este documento e citado no corpo mostrado ou listado como anexo**.
+- Seção "Acesso anônimo" na coluna Permissões, com formulário próprio fora
+  do formulário de edição (`form=` nos botões).
+
+#### Visualizar e link público em folhas A4 (`e8acd88`)
+
+- `public/js/codexplus.js`: `buildPrint()` monta o HTML da impressão;
+  `renderSheets()` mostra as folhas num iframe visível (escala no celular);
+  `exportPdf()` usa o mesmo HTML. O artigo original só some quando as
+  folhas estão prontas (falha = continua como antes).
+- **Visualizar** mostra a versão que está na tela: numa revisão em
+  andamento, o rascunho (:01); o link público mostra a publicada (:00).
+  Marca d'água "RASCUNHO" nas folhas ficou para a caça a bugs.
+
+#### Etapa 5 — documentos vinculados (`ac6be3d`, `9d48dae`, `7315adf`, `ea02b8a`)
+
+- Tabela `glpi_plugin_codexplus_documentlinks` (pai, filho, rank),
+  `src/DocumentLink.php`. Pares: PSG→POP/DIA, POP→MAN/DIA, MAN→DIA. Vários
+  pais; sem ciclo; sem duplicado. **Gerem: responsável e editores (autor,
+  revisor, editores da A-1) e Super-Admin, a qualquer momento** (Claudio).
+- 5a: seção "Documentos vinculados" (netos em cinza), busca por título ou
+  número, arrastar para reordenar, X para desvincular
+  (`public/js/codexplus-links.js`, `parts/doc-links-rows.html.twig`).
+- 5b: botão **Referência** no editor (`codexplus-docref.js`) insere
+  `<a class="cx-docref" href="…?id=N">`. Ao salvar, o citado vira vinculado
+  (`syncRefs`); citado não sai pela lista; na leitura o texto vira **código
+  da versão em vigor + título atuais** (`resolveRefs`). "Documentos
+  complementares" no **fim do documento** (Claudio: só no fim), na tela,
+  nas folhas e no PDF; no link público apontam para o link público do
+  citado, quando há.
+- 5c/5e: "Faz parte de" na página do filho; aviso ao pai quando um
+  vinculado fica obsoleto ou vencido ("cabe revisar"); Painel com
+  "Vinculado obsoleto ou vencido" e "PSG sem POP vinculado" de verdade.
+- 5d: **PDF completo** no Visualizar (só com vinculados): sumário na 1ª
+  folha, cada documento em folha nova com o próprio cabeçalho, numeração
+  única, versão publicada de cada vinculado, sem acesso / sem versão
+  publicada com nota, repetido só no sumário ("ver página N"), fluxograma e
+  organograma em folha A4 deitada (`@page land`). Matriz e cronograma: folha
+  com nota (limite conhecido). Só interno.
+
+#### Telas (`d3e22fa`)
+
+- Dados do documento **recolhíveis em três abas** (Lugar e tipo; Pessoas e
+  revisão; Permissões e link), faixa de resumo com "falta" em vermelho,
+  preferência no `localStorage`; abre sozinho quando falta algo para enviar
+  (`codexplus-meta.js`). Só tela: campos no mesmo formulário.
+- Fluxograma: **Tela cheia** na leitura com zoom (−, +, Ajustar, Ctrl+roda).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -2831,6 +2937,34 @@ depender do comportamento errático de `position: fixed` na impressão.
     "quem editou não valida" valia para os aprovadores, e não estava
     implementado — nem para o auditor (o comentário citava a regra, o código
     não conferia). Toda regra escrita no texto da entrega entra no harness.
+140. **Twig no container fica em cache:** depois de trocar template no
+    ambiente de validação, `cache:clear` antes do teste de tela, senão a
+    página sai com o Twig antigo e o teste acusa falso erro.
+141. **`Branding::save()` zera os interruptores que não vieram no POST.**
+    Chamar com uma chave só (harness) desliga logo, rodapé etc. Na tela não
+    acontece (o formulário manda tudo); em teste, passe a configuração
+    inteira.
+142. **Condições do `DBmysqlIterator` somadas com `+` perdem chaves
+    numéricas** (a visibilidade sumia da busca de vinculados). Junte blocos
+    como elementos (`[$a, $b]`), nunca `$a + $b`.
+143. **O sanitizador da leitura codifica `=` em `href` como `&#61;`.** Quem
+    lê o `id=` de um link já sanitizado tem que aceitar `=` e `&#61;`.
+144. **Rota sem login no GLPI 11:**
+    `Firewall::addPluginStrategyForLegacyScripts('codexplus',
+    '#^/front/public\.php$#', STRATEGY_NO_CHECK)` no `plugin_init`. A página
+    não pode depender de sessão; arquivo do GLPI sai por
+    `\Document::getAsResponse()` (ou `Toolbox::getFileAsResponse`) com
+    `return`.
+145. **Front que às vezes responde JSON:** o `Wiki::pageHeader()` tem que
+    ficar de fora nesse pedido (senão sai HTML antes do JSON).
+146. **Macros Twig no meio do template quebram;** lista recursiva vai por
+    `include` de um parcial (`parts/doc-links-rows.html.twig`).
+147. **TinyMCE grava o `href` absoluto** (com host). Quem lê citações não
+    pode depender do host; a leitura reescreve o link.
+148. **Folha deitada no meio do PDF retrato:** `@page land{size:A4
+    landscape}` + `.cx-page--land{page:land}` (Chrome/Edge). Paginação de
+    vários documentos: `planPages()` por palco `.cx-stage`, montagem e
+    numeração depois.
 
 ## 6. Contrato de código — não quebrar
 

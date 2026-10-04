@@ -2,8 +2,14 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.0`** + blocos de 03/10/2026 (último commit `1c71a21`;
-> versão não mudou, sem schema novo) · atualizado em **03/10/2026**:
+> Estado: **`v0.7.0`** + blocos de 03/10/2026 (último commit de código
+> `e1070d0`; versão não mudou, sem schema novo) · atualizado em
+> **03/10/2026 (noite)**: **organograma no motor de quadro, fechado** (Q6a a
+> Q6f-2; motor antigo `codexplus-org.js` removido), **cópia da Planta e da
+> Topologia** (Q7a) e **cronograma com datas desenhado e aprovado** (Q7b, a
+> fazer) — seção 3.12; achados 107 a 113. **Documentos encerrados** (sem
+> importar/exportar de documento completo); pendentes para o fim só a aba
+> de Histórico e a galeria de Modelos. Antes, no mesmo dia:
 > **Q5i — importar e exportar o fluxograma em arquivo**: cópia do Codex+
 > (`.json`) e **Mermaid**, o formato que toda IA gera (importar com raias,
 > molduras e corredores; exportar em `.md` para levar a uma IA) — seção
@@ -1525,6 +1531,112 @@ Mockup das telas aprovado antes (montado sobre o print real da barra).
   (ChatGPT, Claude, Gemini), pelas duas portas (arquivo e Ctrl+V) — cada IA
   escreve diferente; arquivo que der problema vira correção do leitor.
 
+### 3.12 Sessão de 03/10/2026 (tarde e noite) — Q6 organograma no motor, Q7a, Q7b desenhado
+
+Commits: `b2bc060` (docs de 03/10, manhã), `b95447d` (Q6a-1), `0944044`
+(Q6b-1), `a0acb83` (Q6b-2), `55d4ee7` (Q6b-3), `895d928` (Q6c), `446841e`
+(Q6d), `42ac39f` (Q6e), `ab3a3b5` (Q7a + Q6f-1), `e1070d0` (Q6f-2). Versão
+segue `0.7.0`; nada no banco nem no instalador. Mockups aprovados antes de
+cada bloco grande (montados sobre o código real no Chromium).
+
+#### Decisões de Claudio (03/10/2026)
+
+- **Organograma no motor de quadro** (um motor só, elementos por paleta),
+  **mantendo o JSON gravado de sempre** (`kind, nodes, edges, levels, esc,
+  elements`): sem converter banco nem versões publicadas. O motor traduz ao
+  abrir e ao salvar.
+- **Edição em tela cheia** (como o fluxograma); a página mostra legenda,
+  desenho e a **matriz de escalonamento, editável na página** (grava sozinha).
+- **Dobras manuais das ligações descartadas** (eram testes): a ligação é
+  sempre o cotovelo automático. Puxar ligação no quadro (diálogo "Quem é o
+  chefe?") **não entrou**: o painel faz o mesmo (Responde a / Também reporta a).
+- **Importar/exportar em todos os diagramas**: organograma (`.json` +
+  Mermaid com a matriz em tabela), Planta e Topologia (`.json`; **a imagem
+  da planta vai junto**), cronograma e RACI em tabela (Q7b-3).
+- **Documentos encerrados**: sem importar/exportar de documento completo.
+  Pendentes só a **aba de Histórico** e a **galeria de Modelos**, no fim.
+- **Organograma fechado** (Q6a a Q6f-2); ajustes só conforme o uso.
+- **Cronograma (Q7b)**: datas reais, fases com tarefas, marcos, linha
+  "hoje", e **acompanhamento separado do planejamento** — planejamento
+  (tarefas, datas, responsáveis) segue revisão e validação; **situação e
+  data de conclusão** são marcadas no documento publicado **sem abrir
+  revisão**, com registro de quem e quando (botões Iniciar / Concluir /
+  Reabrir, e "Concluir selecionadas").
+
+#### Organograma: arquitetura (Q6a a Q6e)
+
+- `public/js/codexplus-orgdraw.js` — **o desenho** (funções puras): `normalize`
+  (regras do motor antigo; tira `waypoints`), `layout` (árvore HGAP 14 / VGAP
+  48, regra linha × cartão, soltos com equipe junto), medida de texto por
+  canvas com as fontes IBM Plex (fallback por caracteres no jsdom), `svg`,
+  `parts` (ligações, cartões e caixas de cartão e de cada pessoa listada,
+  para o quadro), legenda, matriz, modelos (`TEMPLATES`, `fromTemplate`),
+  `levelUsed`. Também a **página** (`[data-cx-orgview]`, leitura e edição):
+  legenda, desenho com zoom/ajustar/tela cheia/busca, matriz (editável com
+  `data-editable="1"`, autosave 900 ms), PDF (A4 pela forma, matriz na página
+  2), **PNG 2× com as fontes embutidas** (achado 110), e "Abrir o organograma".
+- `public/js/codexplus-board.js` — **modo `organograma`** (`var org`): `D.org`
+  é a verdade; a cada `render()` o `orgSync()` refaz o arranjo e `D.items`
+  vira caixas `org` (cartão) e `orow` (pessoa listada). Pintura, seleção,
+  busca, minimapa e ajuste usam essas caixas. Tudo do organograma fica atrás
+  de `if (org)`; **fluxograma, planta e topologia não passam por esse código**
+  (regressão automática: dados, desenho e barra idênticos ao quadro de antes).
+- Edição (Q6b): painel (nome, cargo, nível, chefia, reportes, observação,
+  marcações; subordinado; excluir com confirmação e subordinados subindo),
+  paleta (5 elementos + "Criar elemento"), arrastar com **zonas** (centro =
+  na equipe, bordas = ao lado, vazio = solto) e diálogo "Mover…" (levar a
+  equipe junto ou deixá-la). Níveis e Modelos em diálogo (Q6c).
+- Q6e: Importar/Exportar no quadro, mesmo diálogo do fluxograma. Mermaid:
+  `"Nome<br>Cargo"`, área = `[[ ]]`, `-->` chefia, `-.->` reporte, nível =
+  `classDef`, matriz = tabela Markdown, `<!-- codexplus-org {...} -->` com os
+  níveis exatos. Sem classes (IA), níveis pela profundidade; segunda chefia
+  vira reporte; `subgraph` ignorado; sem tabela, a matriz atual fica. Lê
+  também o JSON do editor antigo e o do protótipo (árvore).
+- **Q6f-1/2 (pedidos de Claudio no uso)**: **guias** ao arrastar (bordas,
+  centro, meio exato entre vizinhos, mesma distância de um par, medida em px;
+  Alt desliga; sem guia, grade de 10); **alinhamento automático** ao entrar
+  numa equipe de colegas soltos (mesma linha e espaço; abre espaço empurrando
+  cartões soltos encavalados); **subordinados soltos vão junto**; crescer para
+  a **esquerda e para cima** (achado 111).
+- Motor antigo `codexplus-org.js` **removido** no Q6d (e do `setup.php`).
+
+#### Q7a — cópia da Planta e da Topologia (`ab3a3b5`)
+
+Barra ganha **Importar** e **Exportar cópia** (`.json`, `formato:
+'codexplus-quadro'`). Na Planta o pacote leva `planta` (data URL da imagem;
+limite 12 MB). Ctrl+Z volta o desenho, não a imagem (igual ao "Trocar
+planta"). Cópia de outro tipo de quadro é recusada com mensagem clara.
+
+#### Q7b — cronograma com datas (aprovado, a fazer)
+
+Mockups aprovados (`q7b-mockup-cronograma.png` e `q7b-mockup-situacao.png`,
+com o cronograma ShopMap). Modelo hoje: `periods[]` relativos e `rows[]
+{name, owner, cells[]}` com `''/'b'/'m'` (motor de grade
+`codexplus-grid.js`, validado em `Diagram::validateGrid`). Proposta:
+
+- **Q7b-1**: tarefa com **início e fim** (dd/mm/aaaa); colunas por semana ou
+  mês com data no cabeçalho; barra desenhada pelas datas; editar na tabela e
+  **arrastando a barra** (mover; alças nas pontas). Cronograma antigo
+  (S1, S2…) continua abrindo.
+- **Q7b-2**: **fases** (linha com resumo calculado e ▾ recolher), **marcos**
+  (◆ com data), numeração automática (1, 1.1…), linha **"hoje"**, PDF novo.
+- **Q7b-3**: Importar/Exportar (`.json` + **tabela Markdown** de ida e volta,
+  também para a RACI). Teste combinado: importar o cronograma ShopMap pela IA.
+- **Q7b-4**: **situação** (Não iniciada / Em andamento / Concluída + data de
+  conclusão), **Atrasada** e **Concluída com atraso** calculadas, % da fase,
+  marco atingido/atrasado, resumo no topo; botões **Iniciar / Concluir /
+  Reabrir** e "Concluir selecionadas"; grava no publicado **sem revisão**,
+  com registro de quem e quando (schema a decidir no bloco).
+- Fora por ora: % por tarefa, dependências (setas), dias úteis e feriados.
+
+#### Testes
+
+DIA0001 real (42 elementos) como caso de teste, **fora do repositório**
+(nomes de pessoas). Geometria do desenho novo × motor antigo (diferença máx.
+1 px), 31 testes jsdom do desenho, testes ponta a ponta por bloco no
+Chromium (página servida por HTTP, para as fontes do PNG), regressão do
+quadro (fluxograma, planta, topologia) contra o arquivo anterior ao Q6.
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -2228,6 +2340,31 @@ depender do comportamento errático de `position: fixed` na impressão.
 106. **Conferir Mermaid gerado com a biblioteca oficial:** `npm i
     mermaid@11` e `mermaid.render()` no Chromium (playwright). O leitor
     próprio é testado contra as mesmas amostras; os dois têm que concordar.
+107. **`hidden` não esconde botão com classe que define `display`**
+    (`.codexplus-btn`, `.cx-board-pal-top`): o CSS da classe vence o
+    atributo. Esconder com `style.display = 'none'` (ou CSS próprio).
+108. **Duas `function` com o mesmo nome no mesmo escopo**: a segunda substitui
+    a primeira em silêncio, inclusive nas chamadas anteriores (o `build()` do
+    quadro é um escopo só, com centenas de funções). Q6c: `orgLevels()`
+    (lista) quase foi trocada pelo diálogo de mesmo nome. Procurar o nome
+    antes de declarar.
+109. **`min-width`/`max-width` do cartão do organograma são de conteúdo**
+    (`box-sizing: content-box`): 178–230 **mais** as bordas (6 + 1). Quem
+    mede em JS soma as bordas depois de limitar.
+110. **SVG desenhado como imagem não enxerga as fontes da página.** Para o
+    PNG (SVG → `<img>` → canvas), embutir `@font-face` com as fontes em data
+    URL dentro do SVG (`fontCss()` no `codexplus-orgdraw.js`).
+111. **`Diagram::coord()` grava posição como inteiro >= 0.** Na edição, a
+    posição pode ficar negativa (a origem do desenho compensa, inclusive no
+    desfazer); **ao gravar**, o organograma inteiro é deslocado até a mais
+    negativa virar 0 (`orgNormPos()`), fixando antes o topo ancorado.
+112. **Medir deslocamento no espaço gravado, não no da tela**: quando o
+    arranjo cresce para a esquerda ou para cima, a origem muda e a caixa
+    "anda" sem ninguém mexer. `orgBoxNow()` desconta `ORG_PAD` e a origem.
+113. **Playwright: `page.evaluate("window.x = function(){…}")` executa a
+    função** (texto que é uma expressão de função vira função a chamar).
+    Embrulhar em `(function(){ … })()`. E `inner_text` não lê texto de SVG:
+    usar `textContent`.
 
 ## 6. Contrato de código — não quebrar
 

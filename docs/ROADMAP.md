@@ -1,7 +1,12 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.0`** + blocos de 03/10/2026 (último commit
-> `1c71a21`) · atualizado em **03/10/2026**: **Q5i ✅** — importar e
+> Estado em **`v0.7.0`** + blocos de 03/10/2026 (último commit de código
+> `e1070d0`) · atualizado em **03/10/2026 (noite)**: **Q6 ✅ organograma no
+> motor de quadro** (Q6a a Q6f-2; motor antigo removido), **Q7a ✅** cópia
+> da Planta e da Topologia, **Q7b desenhado e aprovado** (cronograma com
+> datas, fases, marcos e acompanhamento) — CONTEXTO, seção 3.12. Próximo:
+> **Q7b-1**. **Documentos encerrados**; aba de Histórico e galeria de
+> Modelos ficam para o fim. Antes, no mesmo dia: **Q5i ✅** — importar e
 > exportar o fluxograma em arquivo: cópia `.json` (Q5i-1), **importar
 > Mermaid** com raias (Q5i-2) e **levar para uma IA** em `.md` (Q5i-3);
 > `.bpmn` no backlog (CONTEXTO, seção 3.11). Próximo: **Q6 — organograma
@@ -83,8 +88,10 @@ Vale sobre a lista acima quando houver conflito.
 > segue no `177.87.230.179`). O primeiro passo da subida é o **bloco de
 > conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
 > GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → ~~Q5i~~ ✅ (03/10)
-> → **Q6** → 3c → R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7
-> logo depois).
+> → ~~Q6~~ ✅ → ~~Q7a~~ ✅ (03/10) → **Q7b-1 a Q7b-4 (cronograma)** → 3c →
+> R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7 logo depois)
+> → aba de Histórico e galeria de Modelos (Claudio, 03/10: "quando
+> finalizar toda a produção").
 >
 > **Atualização, 28/09/2026 (madrugada): produção adiada por Claudio.** A
 > subida de 28/09 não aconteceu; sobe "quando estiver tudo pronto"
@@ -119,8 +126,9 @@ Vale sobre a lista acima quando houver conflito.
 6. ~~Editor de documentos~~ ✅ E1 a E4 (24/09) e **E5** (cor e realce, 26/09)
 7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
    Planta, Topologia, Fluxograma e Organograma) — **Q1 a Q4 ✅**, **Q5a a
-   Q5f ✅**; faltam Q5g a Q5i e Q6 (Organograma no motor) — tabelas
-   "Motor de quadro" e "Q5 — Fluxograma" abaixo
+   Q5f ✅**, **Q5g a Q5i ✅**, **Q6 ✅** (organograma no motor, 03/10),
+   **Q7a ✅**; falta **Q7b** (cronograma com datas) — tabelas "Motor de
+   quadro", "Q5 — Fluxograma" e "Sessão de 03/10/2026" abaixo
 8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
    a **Planta** do motor de quadro (Q1), também na Documentação Técnica
 9. ~~Migração dos 5 documentos (R4)~~ ✅ 26/09 (os 5 migrados)
@@ -488,6 +496,32 @@ seus elementos (CONTEXTO, seção 3.7).
 | Q5i-3 | **Levar para uma IA**: exportar Mermaid em `.md` (instrução + bloco); ida e volta preserva tudo menos posições, ícones das raias, links e cores das ligações | ✅ `1c71a21` |
 | Q5i-4 | Imagem ou PDF direto, pela API de uma IA no servidor — **opcional** (chave, custo, dado saindo do servidor; Claudio, 03/10). Hoje a imagem passa pela IA do usuário | opcional |
 
+
+## Sessão de 03/10/2026 (tarde e noite) — Q6, Q7a e Q7b desenhado
+
+| Bloco | O quê | Commit |
+|---|---|---|
+| Q6a-1 | Leitura do organograma em SVG (desenho novo, legenda, matriz, PDF, zoom, tela cheia, busca) | `b95447d` |
+| Q6b-1 | Organograma no motor de quadro: abrir, selecionar, soltar cartão e pessoa, Arrumar, buscar, salvar no mesmo JSON (teste ao lado do antigo) | `0944044` |
+| Q6b-2 | Edição pelo painel, nova pessoa, subordinado, excluir com confirmação | `a0acb83` |
+| Q6b-3 | Paleta (5 elementos + criar elemento), arrastar para mudar de equipe com zonas e diálogo "Mover" | `55d4ee7` |
+| Q6c | Níveis (nome, cor, ordem, novo, excluir sem uso) e Modelos | `895d928` |
+| Q6d | Troca definitiva: página com matriz editável e autosave, PNG com fontes; `codexplus-org.js` removido | `446841e` |
+| Q6e | Importar/exportar do organograma (`.json`, Mermaid ida e volta com matriz) | `42ac39f` |
+| Q7a + Q6f-1 | Cópia da Planta (com imagem) e da Topologia; guias de alinhamento e espaçamento, alinhamento automático na equipe, subordinados soltos junto | `ab3a3b5` |
+| Q6f-2 | Organograma cresce para a esquerda e para cima (normaliza ao gravar) | `e1070d0` |
+
+Não entrou (decisão): puxar ligação no quadro com "Quem é o chefe?" (o
+painel cobre); `.bpmn` segue no backlog.
+
+### Q7b — cronograma com datas (aprovado em 03/10, a fazer)
+
+| Bloco | O quê |
+|---|---|
+| **Q7b-1** | Início e fim por tarefa; colunas semanais/mensais datadas; barra pelas datas; editar na tabela e arrastando a barra (alças) |
+| **Q7b-2** | Fases (resumo calculado, recolher), marcos ◆ com data, numeração automática, linha "hoje", PDF novo |
+| **Q7b-3** | Importar/Exportar: `.json` + tabela Markdown (também RACI); validar com o cronograma ShopMap gerado por IA |
+| **Q7b-4** | Situação (Iniciar / Concluir / Reabrir, concluir várias), atrasos calculados, % da fase, resumo; grava no publicado sem revisão, com registro de quem e quando |
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
 

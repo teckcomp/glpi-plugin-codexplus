@@ -567,6 +567,12 @@
                 <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
             {% endif %}
         </article>
+        {# R7-2 (Claudio, 04/10/2026): "Visualizar" mostra as folhas como no
+           PDF (public/js/codexplus.js, renderSheets). Só documento de texto:
+           sem .codexplus-content o JS tira este elemento. #}
+        {% if preview and not is_diagram %}
+            <div class="cx-sheets" data-cx-sheets></div>
+        {% endif %}
     {% endif %}
 
 

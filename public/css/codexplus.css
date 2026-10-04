@@ -2722,3 +2722,8 @@ html.cx-board-open { overflow: hidden; }
 .cx-public-code { font-family: 'IBM Plex Mono', monospace; color: var(--cx-muted); font-size: .9em; }
 .cx-public-off { max-width: 520px; margin: 80px auto; text-align: center; color: var(--cx-muted); font-size: 1.05em; }
 .cx-public-off i { font-size: 2em; display: block; margin-bottom: 10px; }
+
+/* R7-2: visão em folhas (Visualizar e link público), como no PDF. */
+.cx-sheets { width: 100%; overflow: hidden; margin: 0 auto 16px; }
+.cx-sheets:not(.is-ready) { height: 0; }
+.cx-sheets-hidden { display: none !important; }

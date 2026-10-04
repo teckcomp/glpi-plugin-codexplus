@@ -700,10 +700,14 @@
             + '<tbody>' + body + '</tbody></table></div>';
     }
 
-    function exportPdf() {
+    /**
+     * Monta o HTML da impressão (o mesmo para o PDF e para a visão em folhas,
+     * R7-2). null quando a página não tem documento de texto.
+     */
+    function buildPrint() {
         var doc = document.getElementById('codexplus-doc');
         if (!doc) {
-            return;
+            return null;
         }
 
         var titleEl = doc.querySelector('.codexplus-doc-title');
@@ -711,7 +715,7 @@
         var title   = titleEl ? titleEl.textContent.trim() : 'Documento';
 
         if (!content) {
-            return;
+            return null;
         }
 
         var cfg = getPrintConfig();
@@ -786,6 +790,16 @@
             + '<div id="cx-stage">' + heading + clone.innerHTML + history + '</div>'
             + '</body></html>';
 
+        return { html: html, cfg: cfg, geo: geo, title: title };
+    }
+
+    function exportPdf() {
+        var built = buildPrint();
+        if (!built) {
+            return;
+        }
+        var html = built.html, cfg = built.cfg, geo = built.geo, title = built.title;
+
         var iframe = document.createElement('iframe');
         iframe.setAttribute('aria-hidden', 'true');
         // Fora da tela, mas com DIMENSÕES REAIS: largura de uma folha A4 a
@@ -836,6 +850,68 @@
         document.body.appendChild(iframe);
     }
 
+    /**
+     * R7-2 (Claudio, 04/10/2026): "Visualizar" e o link público mostram o
+     * documento COMO SAI NO PDF — folhas A4 com cabeçalho, logo, rodapé e
+     * histórico — usando o mesmo HTML e o mesmo layoutPages() da impressão,
+     * num iframe visível. A largura acompanha a tela (a folha é reduzida
+     * em proporção no celular). Se algo falhar, o documento continua na
+     * forma antiga (o artigo só some depois que as folhas estão prontas).
+     */
+    var SCREEN_CSS = '@media screen{html,body{margin:0;background:#e9edf2;}'
+        + 'body{padding:16px 0;}'
+        + '.cx-page{margin:0 auto 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);}}';
+
+    function renderSheets(host) {
+        var built = buildPrint();
+        if (!built) {
+            host.parentNode && host.parentNode.removeChild(host);
+            return;
+        }
+        var cfg = built.cfg, geo = built.geo;
+        var PAGE_W = Math.ceil(geo.pageW) + 32;
+        var html = built.html.replace('</style>', SCREEN_CSS + '</style>');
+
+        var frame = document.createElement('iframe');
+        frame.className = 'cx-sheets-frame';
+        frame.setAttribute('title', built.title);
+        frame.style.cssText = 'border:0;display:block;width:' + PAGE_W + 'px;height:600px;transform-origin:0 0;';
+        frame.srcdoc = html;
+
+        function fit() {
+            var idoc = frame.contentDocument;
+            if (!idoc || !idoc.documentElement) { return; }
+            var h = idoc.documentElement.scrollHeight;
+            var avail = host.clientWidth || PAGE_W;
+            var k = Math.min(1, avail / PAGE_W);
+            frame.style.height = h + 'px';
+            frame.style.transform = k < 1 ? 'scale(' + k + ')' : '';
+            frame.style.marginLeft = k < 1 ? '0' : Math.max(0, (avail - PAGE_W) / 2) + 'px';
+            host.style.height = Math.ceil(h * k) + 'px';
+        }
+
+        frame.onload = function () {
+            var idoc = frame.contentDocument;
+            waitImages(idoc, function () {
+                try {
+                    layoutPages(idoc, cfg, geo);
+                } catch (err) {
+                    console.error('Codex+ (folhas):', err);
+                    host.parentNode && host.parentNode.removeChild(host);
+                    return;
+                }
+                waitImages(idoc, function () {
+                    var art = document.getElementById('codexplus-doc');
+                    if (art) { art.classList.add('cx-sheets-hidden'); }
+                    host.classList.add('is-ready');
+                    fit();
+                    window.addEventListener('resize', fit);
+                });
+            });
+        };
+        host.appendChild(frame);
+    }
+
     // E3 (22/09/2026): a exportação em Word (codexplus-export.js) usa a
     // MESMA configuração, marcadores, linha de identificação e nome de
     // arquivo do PDF — fonte única, sem cópia das regras.
@@ -847,6 +923,10 @@
     };
 
     document.addEventListener('DOMContentLoaded', function () {
+        var sheets = document.querySelector('[data-cx-sheets]');
+        if (sheets) {
+            renderSheets(sheets);
+        }
         var btn = document.getElementById('codexplus-pdf');
         if (btn) {
             btn.addEventListener('click', exportPdf);

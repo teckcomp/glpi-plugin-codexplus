@@ -155,11 +155,15 @@ class Branding
      * draft (aviso na linha de identificação quando não é a versão vigente).
      * As flags JSON_HEX_* não são opcionais (achado 14).
      */
-    public static function printConfig(array $document, int $brandId = 0): string
+    public static function printConfig(array $document, int $brandId = 0, ?string $logoUrl = null): string
     {
         // M-1: nome, logo, altura e cor vêm da MARCA (Brand::forPrint); o
         // resto (posição, repetição, caixa alta, rodapé) continua global.
         $brand = Brand::forPrint($brandId);
+        // R7-2: no link público a logo vem pela rota do próprio link.
+        if ($logoUrl !== null && $brand['logo_url'] !== '') {
+            $brand['logo_url'] = $logoUrl;
+        }
         $json = json_encode(
             [
                 'brand'    => [

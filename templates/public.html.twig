@@ -1,6 +1,8 @@
 {# Codex+ — leitura por link secreto (R7). Página própria, sem o cabeçalho
    nem o menu do GLPI. Variáveis: root, version, company, doc (null = link
-   indisponível; senão name, code, date, updating, html). #}
+   indisponível; senão name, code, date, updating, html), print_config.
+   R7-2: as folhas do PDF são montadas por public/js/codexplus.js
+   (renderSheets) a partir do artigo, que some quando elas ficam prontas. #}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -14,9 +16,10 @@
 <body class="codexplus-app">
 {% if doc %}
     <main class="cx-public">
-        {% if company %}
-            <header class="cx-public-bar"><span class="cx-public-brand">{{ company }}</span></header>
-        {% endif %}
+        <header class="cx-public-bar">
+            {% if company %}<span class="cx-public-brand">{{ company }}</span>{% endif %}
+            <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">{{ __('Exportar PDF', 'codexplus') }}</button>
+        </header>
         {% if doc.updating %}
             <div class="cx-notice cx-notice--warn">
                 <div>
@@ -32,12 +35,17 @@
                 <div class="cx-public-meta">{{ __('Publicado em %s', 'codexplus')|format(doc.date|date('d/m/Y')) }}</div>
             {% endif %}
             <div class="codexplus-content rich_text_container">{{ doc.html|raw }}</div>
+            <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
         </article>
+        <div class="cx-sheets" data-cx-sheets></div>
     </main>
 {% else %}
     <main class="cx-public-off">
         <p>{{ __('Este documento não está disponível por este link.', 'codexplus') }}</p>
     </main>
+{% endif %}
+{% if doc %}
+    <script src="{{ root }}/plugins/codexplus/js/codexplus.js?v={{ version }}"></script>
 {% endif %}
 </body>
 </html>

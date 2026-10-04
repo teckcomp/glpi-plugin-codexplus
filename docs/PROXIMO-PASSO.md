@@ -1,12 +1,16 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (noite), depois do **MO-2 ✅** (`fd1db9b`).
+> Gerado em 04/10/2026 (noite), depois do **7b ✅** (`7cc27fe`).
 
 ## Estado
 
-- Versão: **`0.7.11`**; último commit de código **`fd1db9b`** (MO-2); docs
-  neste pacote. Plugin 0.7.11 habilitado na homologação.
+- Versão: **`0.7.14`**; último commit de código **`7cc27fe`** (7b); docs
+  neste pacote. Plugin 0.7.14 habilitado na homologação. Ação automática
+  `codexplusexpiry` ativa; notificações por e-mail **desligadas** na
+  homologação (Claudio: a Teckcomp não usa; pronto para terceiros).
+- **Banco da homologação: `glpidb`** (achado 159) — consulta direta com
+  `mysql "$DBN"`, nome tirado do `config/config_db.php`.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
   MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
@@ -29,8 +33,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.22, achados
-  até 158) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.25, achados
+  até 163) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -57,11 +61,11 @@
 2. ~~**AP-1**~~ ✅ `42a84c0` — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
 3. ~~**MO-1**~~ ✅ `1f46cb7` — modelos por setor e categoria (0.7.11)
 4. ~~**MO-2**~~ ✅ `fd1db9b` — imagens e quadros viram marcadores nos modelos
-5. **Q7c-1** — cronograma: fase leva linha solta; tela cheia esticada
-6. **Q7c-2** — cronograma: histórico das marcações (0.7.12)
-7. **Q5k** — fluxograma: texto solto com quebra; "mais formas"
-8. **7a** — Etapa 7: cron e regra sem repetir (0.7.13)
-9. **7b** — Etapa 7: e-mail pela notificação nativa
+5. ~~**Q7c-1**~~ ✅ `b92a242` — primeira fase não sobe acima das soltas; tela cheia estica
+6. ~~**Q7c-2**~~ ✅ `b92a242` — histórico das marcações no balão do selo (0.7.12)
+7. ~~**Q5k**~~ ✅ `04ea10c` — texto solto com largura; "…" na mini-paleta; quebra pela largura real
+8. ~~**7a**~~ ✅ `e04c5d0` — ação automática diária e marcas (0.7.13)
+9. ~~**7b**~~ ✅ `7cc27fe` — notificação nativa (0.7.14)
 10. **Q8** — DTC: mapa de calor
 11. **Q5i-5** — `.bpmn`
 12. **Q5i-6** — draw.io
@@ -69,20 +73,17 @@
 
 ## Próximo passo imediato
 
-**Q7c-1** — cronograma (ROADMAP, Reta final, linha 5; **só JS**, sem schema,
-aplicação com Ctrl+F5). Clonar o `master` do GitHub (`fd1db9b` + docs).
+**Q8** — DTC: **mapa de calor** na Planta (ROADMAP, Reta final, linha 10).
+Clonar o `master` do GitHub (`7cc27fe` + docs). **Antes de codar:**
+decisão de abordagem com Claudio e **mockup** (ROADMAP, "Decisões
+pendentes → Da Reta final"): (a) camada **estimada** na Planta, por AP, com
+raio em metros pela escala da planta e aviso "estimativa" (sugestão: sem
+paredes nem atenuação) ou (b) só **imagem** de ferramenta de site survey
+sobre a planta. Prever campo novo no JSON do quadro (o PHP já aceita campo
+simples, `Diagram::plain`).
 
-Dois itens da lista revisada de 04/10: (16) **fase que sobe leva a linha
-solta do topo** e (17) **linha do tempo esticada na tela cheia**. O texto
-da lista é curto: **antes de codar, pedir a Claudio um print (ou passo a
-passo) de cada um** — o que ele faz, o que acontece e o que esperava. Sem
-isso a certeza do comportamento é baixa (regra do projeto: não gerar JS
-"no escuro").
-
-Ler antes: `public/js/codexplus-grid.js` (cronograma, Q7b) e a seção do
-cronograma no CONTEXTO (Q7b, 03–04/10). Validar no Chromium do container
-(Playwright, achado 154/158): o cronograma é desenhado por JS, o HTTP não
-basta.
+Depois: **Q5i-5** (`.bpmn`) e **Q5i-6** (draw.io) — pedir arquivos de
+exemplo a Claudio; sem eles, validar com exemplos públicos e avisar o risco.
 
 Lembretes do container (achados 153, 154, 157, 158): `mysqld` por `setsid
 nohup` no mesmo comando; `php -S` com `< /dev/null` (senão o comando trava);
@@ -90,6 +91,5 @@ nunca `pkill -f` com o padrão literal na linha (use `[p]hp -S`); login por
 script numa sessão Python só, com `Referer` nos POST; jsdom espera o
 `DOMContentLoaded`. Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
 
-Ao chegar no **7b**, pedir antes: SMTP configurado na homologação. Ao
-chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de
+Ao chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de
 exemplo (sem eles, validar com exemplos públicos e avisar o risco).

@@ -2,6 +2,25 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.14`** · último commit de código **`7cc27fe`** ·
+> atualizado em **04/10/2026 (noite)**: **Q5k ✅** (`04ea10c`) — texto
+> solto com **largura** e quebra (alças laterais) e **"…"** na mini-paleta
+> com todas as formas e busca; quebra pela **largura real da letra**
+> (texto saía da forma). **7a ✅** (`e04c5d0`, 0.7.13) — ação automática
+> diária `codexplusexpiry` com marcas de "já avisado". **7b ✅**
+> (`7cc27fe`, 0.7.14) — notificação nativa do GLPI (3 eventos, modelo em
+> português); na Teckcomp as notificações por e-mail ficam **desligadas**.
+> Seções 3.24 e 3.25; achados 161 a 163. Próximo: **Q8** (mapa de calor).
+> Antes:
+> Estado: **`v0.7.12`** · último commit de código **`b92a242`** ·
+> atualizado em **04/10/2026 (noite)**: **Q7c-1 ✅ + Q7c-2 ✅** (um commit
+> só) — no cronograma, a primeira fase **não sobe** acima das tarefas soltas
+> do topo; na **tela cheia** a linha do tempo **estica** até a largura da
+> tela; e o **histórico das marcações** (Iniciar, Concluir, Reabrir, todas)
+> abre num **balão** ao clicar no selo da Situação (tabela nova
+> `scheduleevents`). Seção 3.23; achados 159 e 160. Próximo: **Q5k**
+> (fluxograma, só JS).
+> Antes:
 > Estado: **`v0.7.11`** · último commit de código **`fd1db9b`** ·
 > atualizado em **04/10/2026 (noite)**: **MO-2 ✅** — ao virar modelo,
 > imagem, print anotado, planta e topologia viram **marcadores** ("Imagem
@@ -1767,6 +1786,9 @@ mesmo id em toda leitura até a próxima gravação; achado 120).
 - `src/ScheduleStatus.php` + tabela **`glpi_plugin_codexplus_schedulestatus`**
   (documento, `row_key`, `state` andamento/concluida, `date_start`,
   `date_done`, `users_id`, `date_mod`; único por documento + linha).
+- Q7c-2: tabela **`glpi_plugin_codexplus_scheduleevents`** com **todas** as
+  marcações (documento, `row_key`, `action`, `date_value`, `users_id`,
+  `date_creation`); `ScheduleStatus::history()` (seção 3.23).
 - `ajax/schedule.status.php`: ações `iniciar`, `concluir` (com `data`),
   `reabrir`; só tarefas da versão que a leitura mostra
   (`ScheduleStatus::shownDiagram`); devolve a situação inteira e o token novo.
@@ -2511,6 +2533,171 @@ aviso no Enviar e no Publicar direto, sem aviso sem marcador, leitura,
 JSON da criação). Chromium, 16 (menu por tipo, janela, colar, Inserir
 imagem e Planta no lugar do marcador, janela cancelada, sem erro de JS).
 Claudio aprovou na homologação (Ctrl+V real, PDF).
+
+### 3.23 Q7c-1 e Q7c-2 — Cronograma: fase, tela cheia e histórico das marcações (`b92a242`, `v0.7.12`)
+
+Os dois blocos foram para o GitHub **num commit só** (`b92a242`, mensagem
+do Q7c-2): o Q7c-1 foi aplicado e aprovado na homologação, mas o commit
+dele não saiu antes do pacote do Q7c-2, que já trazia o `codexplus-grid.js`
+com os dois.
+
+#### Q7c-1 (só JS) — decisões de Claudio, 04/10/2026, com desenho antes
+
+- **(16) Fase que sobe:** antes, Subir na primeira fase com tarefas soltas
+  acima pulava uma solta por clique e ela **virava filha** da fase. Agora a
+  **primeira fase não sobe** acima das soltas: a seta Subir some (fica o
+  espaço, para as setas não pularem). Fase abaixo de outra continua
+  trocando de bloco. Para pôr uma solta dentro da fase: **descer a tarefa**
+  (a dica do cronograma diz isso). `soltaAcima(i, est)` em `moveLinha` e no
+  desenho da linha.
+- **(17) Tela cheia:** a linha do tempo **estica** até a largura da tela.
+  `esticaCheia()` mede `.cx-grid-wrap` depois de desenhar e redesenha uma
+  vez com o px por dia novo (`pxCheia`; trava de 2 redesenhos, a barra de
+  rolagem pode mudar a largura); **nunca abaixo do padrão** (6,3 semanas /
+  3 meses) — período longo continua rolando; recalcula no `resize`; fora
+  da tela cheia e no PDF, nada muda. O arrasto lê o `data-px` da tabela, então
+  acompanha a escala nova sem mudança.
+
+#### Q7c-2 (schema, 0.7.12) — decisão de Claudio: balão no selo
+
+- Tabela **`glpi_plugin_codexplus_scheduleevents`**: uma linha por
+  marcação **que mudou algo** (`iniciar` com a data de início real,
+  `concluir` com a data informada, `reabrir` sem data), quem e quando.
+  Marcação que não muda nada ("Nada mudou") não registra. A
+  `schedulestatus` continua guardando só o estado atual (Q7b-4 intacta).
+- **Migração:** tabela criada recebe, **uma vez**, uma marcação por tarefa
+  já marcada (concluída → `concluir` com `date_done`; em andamento →
+  `iniciar` com `date_start`; quem e quando da própria linha). Na
+  homologação: 8 situações → 8 marcações. Reinstalar não duplica (só semeia
+  ao criar a tabela). Entra em `getTables()` (desinstalação) e na purga do
+  documento.
+- `ScheduleStatus::history($id)` → `{ row_key: [{acao, data, user, when}] }`,
+  da mais antiga para a mais nova; vai na página (`<script
+  id="cx-grid-hist">` + `data-hist`) e na resposta do
+  `ajax/schedule.status.php` (`hist`), então o balão se atualiza sem
+  recarregar.
+- **Tela:** só na leitura do publicado, como a situação. O selo da
+  **tarefa** vira botão (`data-hist-row`); o balão (`.cx-gd-hist`, `position:
+  fixed`, preso ao `fullscreenElement` quando houver) lista a mais nova
+  primeiro ("Concluída em dd/mm/aaaa", "Iniciada (início …)",
+  "Reaberta" + "por fulano em dd/mm/aaaa, hh:mm"); sem marcações, "Nenhuma
+  marcação ainda.". Fecha com ×, Esc, clique fora ou clicando de novo no
+  selo; **ao rolar acompanha o selo** e fecha se ele sair de vista
+  (achado 160). Fase, marco, edição e PDF sem balão.
+
+#### Testes
+
+Container: GLPI 11.0.6 + MariaDB + Chromium (Playwright). Q7c-1: 19 no
+Chromium, página isolada com o JS e o CSS reais (setas, troca de blocos,
+Desfazer, descer para dentro da fase, esticar em Semanas e Meses, resize,
+período longo, leitura, sair da tela cheia). Q7c-2: migração 0.7.11 →
+0.7.12 com situação existente, reinstalação, desinstalação e instalação do
+zero; harness com o Kernel, 11 (sequência das marcações, quem e quando, o
+que não muda não registra, situação atual intacta, purga); tela pelo `php
+-S` + Chromium, 13 (balão, ordem, fechar de 4 jeitos, Concluir pela tela
+atualiza o balão, recarregar, rolagem, sem erro de JS). Claudio aprovou os
+dois na homologação.
+
+### 3.24 Q5k — Texto solto com largura, mini-paleta completa e quebra pela largura real (`04ea10c`, `v0.7.12`)
+
+Decisões de Claudio (04/10/2026), referência Miro. Só JS e CSS
+(`codexplus-board.js`, `codexplus.css`).
+
+- **Texto solto (23):** no fluxograma, o texto selecionado ganha alças nas
+  **laterais** (`e`, `w`) que definem a largura `w`; o texto quebra sozinho
+  dentro dela (`textLines()` → `wrapText(…, 80 linhas)`), a letra fica. Os
+  **cantos** continuam mudando a letra; com `w`, a largura acompanha na
+  mesma proporção (as quebras ficam). Sem `w`, como antes (só no Enter).
+  Painel: **Tirar a largura**. `clean()` guarda `w` (40 a 2000) e o texto
+  vai até 1000 caracteres (o PHP aceita 2000). Planta e Topologia sem as
+  alças laterais. O Mermaid ("Levar para uma IA") não carrega a largura.
+- **Mini-paleta (24):** botão **"…"** troca as 9 formas pela lista completa
+  (`miniList()`): seções Fluxograma, BPMN (sem o Grupo, que é moldura) e
+  Ícones, busca com o cursor já nela; a escolhida nasce ligada no ponto
+  solto como antes (`shapeAt` agora aceita ícone). Encolhe para dentro do
+  quadro perto da borda; Esc fecha.
+- **Quebra pela largura real (Q5k-2, print de Claudio, "texto fica fora do
+  balão"):** toda letra valia 0,55 em; palavra longa em maiúsculas saía da
+  forma (achado 163). `textW()` soma a largura de cada letra pela tabela da
+  Arial (`CHAR_W`), **nunca menos que 0,55** — texto comum quebra igual a
+  antes; maiúsculas largas, números, m e w quebram antes. `fitChars()` corta
+  palavra longa pelo que cabe. Vale para formas, nome embaixo do BPMN e
+  caixa do texto solto (tela, leitura, PNG e PDF).
+
+Testes: Chromium com o JS e o CSS reais, 23 do texto e da mini-paleta + forma
+de 140 px com o texto do print (maior linha 118 px, tudo dentro do
+contorno); 90 combinações de textos reais: só minúsculas, 90 de 90 iguais
+ao algoritmo antigo. Claudio aprovou na homologação.
+
+### 3.25 Etapa 7 — Alerta de vencimento: 7a (`e04c5d0`, `v0.7.13`) e 7b (`7cc27fe`, `v0.7.14`)
+
+Decisões de Claudio (04/10/2026):
+
+- **Quando:** uma vez ao entrar em **a vencer** (30 dias, a mesma
+  `EXPIRY_WINDOW_DAYS` do Painel); uma ao **vencer** e um **lembrete a cada 7
+  dias** enquanto vencido. **Revisão atrasada** (revisão aberta com o
+  `revision_due` estourado, R6-b) também avisa, no ritmo do vencido.
+- **Quem:** responsável, revisor e **auditor** do documento. Claudio tinha
+  escolhido "gestores do setor", mas o papel não existe desde o P1
+  (`sectormembers` sem uso) — trocado pelo auditor.
+- **E-mail:** na Teckcomp **não é usado** (notificações desligadas); fica
+  pronto para instalações de terceiros. Validado pela fila do GLPI.
+
+#### 7a — ação automática e marcas
+
+- `src/ExpiryAlert.php` (`CommonGLPI`), ação **`codexplusexpiry`**, diária
+  (`DAY_TIMESTAMP`, modo padrão da instalação), registrada no `install7a()`
+  (`CronTask::register` não duplica e mantém o que o administrador mudou);
+  desinstalar chama `CronTask::unregister('codexplus')` (achado 161).
+- Tabela **`glpi_plugin_codexplus_expiryalerts`**: documento, `kind`
+  (`avencer`/`vencido`/`revisao`), **`cycle`** (data de vencimento; na
+  revisão `r{revisão}:{prazo}`), `times`, `users`, `date_first`,
+  `date_last`; único por documento + tipo + ciclo. **O ciclo faz o
+  reinício:** validade renovada (publicação, "revisado sem alteração",
+  janela mudada) ou prazo da revisão mudado = ciclo novo = aviso de novo,
+  sem apagar nada. Lembrete: `date_last` há 7 dias (1 h de folga).
+- `situations()` usa `DocumentMeta::expiryState()` (só publicado; validade 0
+  nunca vence) e `Document::dueState()` para a revisão. Lixeira, rascunho
+  sem revisão e obsoleto não entram. Destinatários: ativos, não excluídos,
+  sem repetir. Log da ação: uma linha por aviso (`POP0003:01 a vencer →
+  fulano, beltrano`; "lembrete n" a partir do 2º). Purga do documento
+  apaga as marcas.
+- **Primeira execução avisa de uma vez** tudo que já estiver a vencer ou
+  vencido (na produção com e-mail, uma leva inicial).
+
+#### 7b — notificação nativa
+
+- `src/NotificationTargetDocument.php` (o GLPI acha pelo nome: itemtype
+  `GlpiPlugin\Codexplus\Document` → `…\NotificationTargetDocument`, achado
+  162). Eventos `codexplus_avencer`, `codexplus_vencido`,
+  `codexplus_revisao`; destinatários próprios **1301 responsável, 1302
+  revisor, 1303 auditor** (`addUserByField`), mais os padrões do GLPI. Tags:
+  `document.code`, `.name`, `.type`, `.situation`, `.datelabel`, `.date`,
+  `.reminder` (vazio no 1º aviso; `##IFdocument.reminder##`), `.url`
+  (`formatURL` → `index.php?redirect=/plugins/codexplus/front/document.form.php?id=N`).
+- `setup.php`: `Plugin::registerClass(Document::class,
+  ['notificationtemplates_types' => true])`.
+- `install7b()`: modelo **"Codex+ - Alerta de vencimento"** (tradução
+  padrão em português, texto e HTML) e as 3 notificações (e-mail, ativas,
+  raiz recursiva, os 3 destinatários). Só cria o que não existe. Desinstalar
+  apaga notificações e modelo do tipo Documento (`deleteByCriteria`, com
+  traduções, destinos e modos).
+- `ExpiryAlert::deliver()` → `NotificationEvent::raiseEvent()` com `due`,
+  `times`, `kind`. Notificações desligadas: não sai nada; marca e log
+  seguem.
+
+#### Testes
+
+Container (GLPI 11.0.6 + MariaDB). 7a: instalação, reinstalação, desinstalação
+e instalação do zero da ação; harness com o Kernel, 9 (9 documentos de teste:
+só a vencer, vencido e revisão atrasada avisam; destinatários; nada no mesmo
+dia; 6 dias não, 7 dias lembrete; ciclo novo na renovação e no prazo da
+revisão; purga); ação de verdade pelo `front/cron.php --force` (log e volume).
+7b: notificações e modelo criados uma vez; com notificações ligadas e sem
+SMTP, 6 e-mails na **fila** (`glpi_queuednotifications`) com assunto, corpo,
+data e link certos, revisor inativo fora, "Lembrete nº 2" no lembrete;
+desligadas, fila vazia; telas da notificação (aba Destinatários) e do modelo
+abrem. Claudio aprovou os dois na homologação.
 
 ## 4. Decisões de arquitetura que já custaram caro
 
@@ -3268,6 +3455,43 @@ depender do comportamento errático de `position: fixed` na impressão.
     `pkill -f` com o padrão na própria linha de comando mata o shell do
     teste — usar `[p]hp -S`, e subir o `php -S` com `< /dev/null`.
 
+159. **O banco da homologação é `glpidb`, não `glpi`.** `mysql glpi …`
+    falha com `ERROR 1049 Unknown database`. Consulta direta: pegar o nome
+    do `config/config_db.php` (`DBN=$(grep -oP "dbdefault\s*=\s*'\K[^']+"
+    /var/www/html/glpi/config/config_db.php)`) e usar `mysql "$DBN"`. No
+    container de validação o banco se chama `glpi`; não copiar o comando de
+    um para o outro.
+160. **Balão (popover) que fecha ao rolar:** o Playwright rola a página
+    para trazer o alvo à vista **antes** do clique, e o evento `scroll`
+    chega **depois** que o balão abriu — ele fechava sozinho. O mesmo pode
+    acontecer com rolagem suave de verdade. Solução do Q7c-2: no `scroll`
+    (captura) e no `resize`, **reposicionar** pelo `getBoundingClientRect`
+    do selo e só fechar se ele sair de vista. No teste, "clique fora" num
+    ponto fixo (5,5) cai no logo do GLPI e **navega** — clicar numa área
+    neutra do próprio plugin (ex.: `.cx-grid-legend`).
+161. **Ação automática de plugin não sai sozinha na desinstalação** (GLPI
+    11.0.6): o núcleo não chama `CronTask::unregister()`. O `uninstall()`
+    do plugin chama `CronTask::unregister('codexplus')` (casa o itemtype
+    `GlpiPlugin\Codexplus\…` sem diferenciar maiúsculas). `register()` não
+    duplica, então pode ficar no `install()` que roda a cada reinstalação.
+    Teste pela linha de comando: `php front/cron.php --force <nome>` (como
+    `www-data`; root pede `--allow-superuser`).
+162. **Notificação de itemtype com namespace:** o GLPI procura a classe de
+    destinos trocando só o último nome — `GlpiPlugin\Codexplus\Document` →
+    `GlpiPlugin\Codexplus\NotificationTargetDocument`. O tipo só aparece em
+    Configurar > Notificações com `Plugin::registerClass(…,
+    ['notificationtemplates_types' => true])` no `setup.php`. Sem SMTP, a
+    validação é pela fila `glpi_queuednotifications` (com
+    `use_notifications` e `notifications_mailing` ligados e e-mail nos
+    usuários); com `use_notifications` desligado, `raiseEvent()` não faz
+    nada. Destinos próprios: `addAdditionalTargets()` +
+    `addSpecificTargets()` (`addUserByField`).
+163. **Quebra de texto do quadro por número de letras transborda.** A conta
+    "0,55 em por letra" vale para minúsculas; maiúscula larga (H 0,72, W
+    0,94) numa palavra longa saía da forma. `textW()` com a tabela da Arial
+    e **mínimo de 0,55** por letra: o texto comum continua quebrando igual
+    (sem mudar fluxogramas existentes) e só o largo quebra antes.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -3319,6 +3543,7 @@ contêiner inteiro.
 | Usuário de acesso | `resolutto` (sem sudo); **todo o trabalho é feito como root** (`su -`). Console do GLPI por `su -s /bin/sh www-data -c "php …/bin/console …"` (achado 149) |
 | Caminho do GLPI | `/var/www/html/glpi` |
 | Dono dos arquivos do plugin | `www-data:www-data` |
+| Banco da homologação | **`glpidb`** (não `glpi`) — consulta direta sempre pelo nome do `config/config_db.php` (achado 159) |
 | Repositório no servidor | **a própria pasta do plugin**, `plugins/codexplus` (desde 19/09/2026, igual aos demais plugins da Teckcomp) |
 | Repositório remoto | `github.com/teckcomp/glpi-plugin-codexplus` (público) |
 | PC de desenvolvimento | Windows, sem Git local; transferência por `scp` (OpenSSH do Windows). Dois PCs: "Analista Resolutto" salva em `Documents`, "Pc" em `Downloads` (achado 98) |
@@ -3360,7 +3585,9 @@ codexplus/
 │   ├── DocumentApprover.php   aprovadores de DIA e DIV, data de cada aprovação (A-2a)
 │   ├── DocumentVersion.php    versões publicadas (R6-a)
 │   ├── Diagram.php            diagrama DIA: organograma, cronograma (com datas: Q7b), RACI (D1), fluxograma (Q5a)
-│   ├── ScheduleStatus.php     situação das tarefas do cronograma (Q7b-4)
+│   ├── ScheduleStatus.php     situação das tarefas do cronograma (Q7b-4) e histórico das marcações (Q7c-2)
+│   ├── ExpiryAlert.php        alerta de vencimento: ação automática codexplusexpiry e marcas (7a/7b)
+│   ├── NotificationTargetDocument.php  notificações do documento (eventos, destinatários, tags) (7b)
 │   ├── Brand.php              marcas: nome, logo, altura, cor, padrão; marca para a impressão (M-1, M-2)
 │   ├── IconLibrary.php        ícones do quadro criados pelo Super-Admin (Q4)
 │   └── Console/               comandos de teste (plugins:codexplus:…)

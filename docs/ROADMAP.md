@@ -1,5 +1,16 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.7.14`** (último commit de código **`7cc27fe`**) ·
+> **Q5k ✅** (`04ea10c`), **7a ✅** (`e04c5d0`, 0.7.13) e **7b ✅**
+> (`7cc27fe`, 0.7.14) — texto solto com largura, mini-paleta completa,
+> quebra pela largura real; alerta de vencimento (ação diária, marcas,
+> notificação nativa). Próximo: **Q8**.
+> Antes:
+> Estado em **`v0.7.12`** (último commit de código **`b92a242`**) ·
+> **Q7c-1 ✅ + Q7c-2 ✅** (04/10/2026, noite, um commit só): primeira fase
+> não sobe acima das soltas, linha do tempo estica na tela cheia, histórico
+> das marcações no balão do selo da Situação. Próximo: **Q5k**.
+> Antes:
 > Estado em **`v0.7.11`** (último commit de código **`fd1db9b`**) ·
 > **MO-2 ✅** (04/10/2026, noite): imagens e quadros viram marcadores nos
 > modelos ("Imagem aqui", "Planta aqui"…), planilha vai inteira, botão
@@ -218,11 +229,11 @@ números entre parênteses são os da lista revisada de 04/10.
 | 2 | ~~**AP-1**~~ ✅ `42a84c0` | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
 | 3 | ~~**MO-1**~~ ✅ `1f46cb7` | Modelos por **setor e categoria** (colunas no modelo, tela Modelos agrupada, criação filtrando pelo setor) (32) | **sim** (0.7.11) | mockup da tela Modelos |
 | 4 | ~~**MO-2**~~ ✅ `fd1db9b` | Imagens nos modelos **como marcadores** ("Imagem aqui", "Planta aqui", "Topologia aqui"), planilha inteira, botão Marcador, aviso ao enviar (33; escopo trocado por Claudio em 04/10) | não | — |
-| 5 | **Q7c-1** | Cronograma: fase que sobe leva a linha solta do topo (16) + linha do tempo esticada na tela cheia (17) | não (só JS) | — |
-| 6 | **Q7c-2** | Cronograma: **histórico das marcações** da situação (Iniciar, Concluir, Reabrir — todas, não só a última) (15) | **sim** (0.7.12) | onde mostrar |
-| 7 | **Q5k** | Fluxograma: **texto solto** com largura e quebra de linha (23) + **"mais formas"** na mini-paleta (24) | não (só JS) | — |
-| 8 | **7a** | **Etapa 7** — ação automática do GLPI (cron) que encontra vencidos e a vencer, com marca de "já avisado" para não repetir (6) | **sim** (0.7.13) | regras do aviso |
-| 9 | **7b** | **Etapa 7** — e-mail pelo mecanismo de notificações nativo (modelo de notificação, destinatário = responsável) (6) | **sim** | SMTP na homologação |
+| 5 | ~~**Q7c-1**~~ ✅ `b92a242` | Cronograma: primeira fase **não sobe** acima das tarefas soltas (16) + linha do tempo **esticada** na tela cheia (17) | não (só JS) | — |
+| 6 | ~~**Q7c-2**~~ ✅ `b92a242` | Cronograma: **histórico das marcações** (Iniciar, Concluir, Reabrir — todas) num **balão** ao clicar no selo da Situação (15) | **sim** (0.7.12) | — |
+| 7 | ~~**Q5k**~~ ✅ `04ea10c` | Fluxograma: **texto solto** com largura e quebra (alças laterais) (23) + **"…"** na mini-paleta com todas as formas e busca (24) + quebra pela largura real da letra | não (só JS) | — |
+| 8 | ~~**7a**~~ ✅ `e04c5d0` | **Etapa 7** — ação automática diária `codexplusexpiry`, marcas de "já avisado" por ciclo (6) | **sim** (0.7.13) | — |
+| 9 | ~~**7b**~~ ✅ `7cc27fe` | **Etapa 7** — notificação nativa do GLPI (3 eventos, responsável/revisor/auditor, modelo em português); desligada na Teckcomp (6) | **sim** (0.7.14) | — |
 | 10 | **Q8** | **DTC: mapa de calor** na Planta (14) | não (prever: campo novo no JSON do quadro, aceito no PHP) | decisão de abordagem + mockup |
 | 11 | **Q5i-5** | Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda) (25) | não | arquivo de exemplo |
 | 12 | **Q5i-6** | Fluxograma: importar **draw.io** (XML, com posições) (26) | não | arquivo de exemplo |
@@ -810,11 +821,14 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
 - [x] **MO-2:** em vez da imagem real, **marcador** no lugar dela ("Imagem
       aqui", "Planta aqui", "Topologia aqui"); planilha fica inteira; aviso
       (sem bloquear) ao enviar com marcador sobrando (Claudio, 04/10/2026)
-- [ ] **Q7c-2:** onde aparece o histórico das marcações (na linha da
-      tarefa, num balão, ou no Histórico do documento)
-- [ ] **7a/7b:** antecedência do aviso "a vencer" (sugestão: 30 dias), quem
-      recebe (responsável; revisor?), se "revisão vencida" da R6-b também
-      avisa, e **SMTP configurado na homologação** para testar o e-mail
+- [x] **Q7c-1:** a primeira fase não muda de posição acima das soltas;
+      tela cheia estica a linha do tempo (Claudio, 04/10/2026)
+- [x] **Q7c-2:** histórico num **balão** ao clicar no selo da Situação
+      (Claudio, 04/10/2026)
+- [x] **7a/7b:** 30 dias; uma vez a vencer, uma ao vencer + lembrete
+      semanal; revisão atrasada também; responsável, revisor e auditor (sem
+      gestor do setor desde o P1); e-mail desligado na Teckcomp, pronto para
+      terceiros (Claudio, 04/10/2026)
 - [ ] **Q8 (mapa de calor):** (a) camada estimada na Planta, por AP, com
       raio em metros pela escala e aviso "estimativa", ou (b) só imagem de
       ferramenta de site survey sobre a planta. Sugestão: (a), sem paredes

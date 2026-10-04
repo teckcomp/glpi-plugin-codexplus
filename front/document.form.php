@@ -225,7 +225,7 @@ if ($id > 0 && isset($_GET['link_search'])) {
         return new \Symfony\Component\HttpFoundation\JsonResponse(['erro' => 'sem_acesso'], 403);
     }
     return new \Symfony\Component\HttpFoundation\JsonResponse([
-        'itens' => \GlpiPlugin\Codexplus\DocumentLink::candidates($doc, (string) ($_GET['q'] ?? '')),
+        'itens' => \GlpiPlugin\Codexplus\DocumentLink::candidates($doc, (string) ($_GET['q'] ?? ''), 15, !empty($_GET['all'])),
     ]);
 }
 
@@ -1047,6 +1047,13 @@ $brandField = [
 // só os nomes.
 $signersLine = $isNew ? '' : $doc->approverSummary(!$version['on']);
 
+// 5b: vinculados diretos, com link para quem pode ler.
+$complements = $isNew ? [] : \GlpiPlugin\Codexplus\DocumentLink::complements(
+    $id,
+    static fn ($d) => $d->canViewItem() ? $CFG_GLPI['url_base'] . '/plugins/codexplus/front/document.form.php?id=' . (int) $d->fields['id'] : null,
+    [\GlpiPlugin\Codexplus\DocumentLink::class, 'noteFor']
+);
+
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'brand'       => $brandField,
     'signers_line' => $signersLine,
@@ -1068,7 +1075,15 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     // text_maxsize 0: sem o "ler mais" do GLPI. Documento longo (ou com
     // planilha/quadro, que guardam dados no corpo) era recolhido na leitura e
     // o PDF paginava o bloco recolhido — saía em branco (Claudio, 26/09/2026).
-    'content_html' => $isNew ? '' : RichText::getEnhancedHtml($shown['content'] ?? (string) ($doc->fields['content'] ?? ''), ['text_maxsize' => 0]),
+    // 5b: referências no texto com código e título atuais.
+    'content_html' => $isNew ? '' : RichText::getEnhancedHtml(\GlpiPlugin\Codexplus\DocumentLink::resolveRefs(
+        $shown['content'] ?? (string) ($doc->fields['content'] ?? ''),
+        static fn ($d) => $d->canViewItem() ? $self . '?id=' . (int) $d->fields['id'] : null
+    ), ['text_maxsize' => 0]),
+    // 5b: Documentos complementares (fim do documento).
+    'complements'  => $complements,
+    // 5b: botão Referência do editor (só em quem aceita vinculados e já existe).
+    'docref_url'   => (!$isNew && \GlpiPlugin\Codexplus\DocumentLink::canManage($doc)) ? $self . '?id=' . $id . '&link_search=1&all=1' : '',
     'owner_name'  => $isNew ? '' : ((int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : ''),
     'author_name' => $isNew ? '' : getUserName((int) $doc->fields['users_id']),
     'category_names' => $categoryNames,
@@ -1205,6 +1220,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         // R6-b2: histórico de revisões no fim do PDF, até a revisão impressa
         // (na revisão em andamento, até a publicada em vigor). Tipos de fluxo
         // direto (proposta, laudo) não têm revisão periódica: sem histórico.
+        'complements'    => $complements,
         'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
             : \GlpiPlugin\Codexplus\DocumentVersion::history(
                 $id,

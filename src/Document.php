@@ -1983,6 +1983,10 @@ class Document extends CommonDBTM
 
         $this->saveEditors();
         $this->saveApprovers();
+        // Etapa 5b: documento citado no corpo vira vinculado.
+        if (in_array('content', $this->updates, true) && DocumentLink::canHaveChildren((string) ($this->fields['doctype'] ?? ''))) {
+            DocumentLink::syncRefs($this);
+        }
         if (array_intersect($this->updates, self::CONTENT_FIELDS)) {
             DocumentContributor::record(
                 (int) $this->fields['id'],

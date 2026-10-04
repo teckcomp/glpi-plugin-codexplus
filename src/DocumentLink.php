@@ -179,6 +179,10 @@ class DocumentLink
         if (!self::canManage($parent)) {
             return self::deny(__('Sem direito de desvincular documentos deste.', 'codexplus'));
         }
+        // 5b: citado no texto não sai pela lista (a citação ficaria órfã).
+        if (in_array($childId, self::refIds((string) ($parent->fields['content'] ?? '')), true)) {
+            return self::deny(__('Este documento é citado no texto. Tire a referência do corpo (e salve) antes de desvincular.', 'codexplus'));
+        }
         return (bool) $DB->delete(self::getTable(), [
             'parent_documents_id' => (int) $parent->fields['id'],
             'child_documents_id'  => $childId,
@@ -292,7 +296,7 @@ class DocumentLink
      *
      * @return array<int, array{id:int, code:string, name:string, type_label:string}>
      */
-    public static function candidates(Document $parent, string $q, int $limit = 15): array
+    public static function candidates(Document $parent, string $q, int $limit = 15, bool $withLinked = false): array
     {
         /** @var \DBmysql $DB */
         global $DB;
@@ -310,7 +314,8 @@ class DocumentLink
             $t . '.is_deleted'       => 0,
             $t . '.knowbaseitems_id' => 0,
             ['NOT' => [$t . '.status' => Document::STATUS_OBSOLETE]],
-            ['NOT' => [$t . '.id' => array_merge([$pid], self::childIds($pid))]],
+            // 5b: a referência no texto também aceita quem já está vinculado.
+            ['NOT' => [$t . '.id' => $withLinked ? [$pid] : array_merge([$pid], self::childIds($pid))]],
             // Visibilidade como um bloco só: somar com + perderia as chaves
             // numéricas repetidas.
             $vis['WHERE'],
@@ -345,6 +350,124 @@ class DocumentLink
             }
         }
         return $out;
+    }
+
+    // ---------------------------------------------------------------------
+    // 5b — referência dentro do texto e Documentos complementares
+    // ---------------------------------------------------------------------
+
+    /**
+     * Documentos citados no corpo: <a class="cx-docref" href="…?id=N">. O
+     * número sai do href (o sanitizador da leitura tira data-*, achado 57;
+     * class e href ficam).
+     *
+     * @return int[]
+     */
+    public static function refIds(string $html): array
+    {
+        if (stripos($html, 'cx-docref') === false) {
+            return [];
+        }
+        preg_match_all('#<a\b[^>]*\bcx-docref\b[^>]*>#i', $html, $tags);
+        $ids = [];
+        foreach ($tags[0] as $tag) {
+            if (preg_match('#[?&](?:amp;)?id(?:=|&\#61;|&\#x3d;)(\d+)#i', $tag, $m)) {
+                $ids[] = (int) $m[1];
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Ao gravar o corpo: todo documento citado vira vinculado (no fim da
+     * lista), se o par for permitido. Par recusado avisa e não vincula.
+     */
+    public static function syncRefs(Document $parent): void
+    {
+        $pid = (int) $parent->fields['id'];
+        $ja  = self::childIds($pid);
+        foreach (self::refIds((string) ($parent->fields['content'] ?? '')) as $cid) {
+            if ($cid === $pid || in_array($cid, $ja, true)) {
+                continue;
+            }
+            self::add($parent, $cid);
+        }
+    }
+
+    /**
+     * Troca o texto de cada referência pelo código da versão em vigor e o
+     * título atuais (o texto gravado pode estar velho), e o destino do link
+     * por $href($doc): string = link, null = só o texto (sem link).
+     *
+     * @param callable(Document): ?string $href
+     */
+    public static function resolveRefs(string $html, callable $href): string
+    {
+        if (stripos($html, 'cx-docref') === false) {
+            return $html;
+        }
+        return (string) preg_replace_callback(
+            '#<a\b([^>]*\bcx-docref\b[^>]*)>(.*?)</a>#is',
+            static function ($m) use ($href) {
+                if (!preg_match('#[?&](?:amp;)?id(?:=|&\#61;|&\#x3d;)(\d+)#i', $m[1], $id)) {
+                    return $m[0];
+                }
+                $d = new Document();
+                if (!$d->getFromDB((int) $id[1]) || !empty($d->fields['is_deleted'])) {
+                    return '<span class="cx-docref is-gone">' . $m[2] . '</span>';
+                }
+                $info  = self::describe($d);
+                $label = '<span class="cx-docref-code">' . htmlspecialchars($info['code']) . '</span> '
+                    . htmlspecialchars($info['name'])
+                    . ($info['state'] === 'obsoleto' ? ' <span class="cx-docref-flag">(' . htmlspecialchars(__('obsoleto', 'codexplus')) . ')</span>' : '');
+                $to = $href($d);
+                return $to === null
+                    ? '<span class="cx-docref">' . $label . '</span>'
+                    : '<a class="cx-docref" href="' . htmlspecialchars($to) . '">' . $label . '</a>';
+            },
+            $html
+        );
+    }
+
+    /**
+     * "Documentos complementares" (fim do documento, tela, folhas e PDF):
+     * os vinculados diretos, na ordem. $href como em resolveRefs; $note($d,
+     * $info) devolve a observação ("sem acesso", "obsoleto"…) ou ''.
+     *
+     * @return array<int, array{code:string, type:string, name:string, href:?string, note:string}>
+     */
+    public static function complements(int $parentId, callable $href, ?callable $note = null): array
+    {
+        $out = [];
+        foreach (self::childIds($parentId) as $cid) {
+            $d = new Document();
+            if (!$d->getFromDB($cid) || !empty($d->fields['is_deleted'])) {
+                continue;
+            }
+            $info  = self::describe($d);
+            $out[] = [
+                'code' => $info['code'],
+                'type' => $info['type_label'],
+                'name' => $info['name'],
+                'href' => $href($d),
+                'note' => $note ? (string) $note($d, $info) : '',
+            ];
+        }
+        return $out;
+    }
+
+    /** Observação padrão da página interna: sem acesso / obsoleto / vencido / sem publicação. */
+    public static function noteFor(Document $d, array $info): string
+    {
+        $n = [];
+        if (!$info['can_view']) {
+            $n[] = __('sem acesso', 'codexplus');
+        }
+        $map = ['obsoleto' => __('obsoleto', 'codexplus'), 'vencido' => __('vencido', 'codexplus'), 'sem_publicacao' => __('sem versão publicada', 'codexplus')];
+        if (isset($map[$info['state']])) {
+            $n[] = $map[$info['state']];
+        }
+        return implode(' · ', $n);
     }
 
     /** Documento apagado de vez: some como pai e como filho. */

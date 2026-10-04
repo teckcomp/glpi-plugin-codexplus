@@ -110,6 +110,14 @@
         + 'h4{font-size:11.5pt;margin:12px 0 6px;}'
         + 'p{margin:0 0 9px;}'
         + 'table{border-collapse:collapse;width:100%;margin:0 0 12px;}'
+        // Etapa 5b: Documentos complementares e referência no texto.
+        + '.cx-print-complements{margin-top:18px;}'
+        + '.cx-print-complements table{table-layout:fixed;font-size:.9em;}'
+        + '.cx-print-complements th,.cx-print-complements td{text-align:left;vertical-align:top;}'
+        + '.cx-print-complements .cx-h-code{width:110px;}.cx-print-complements .cx-h-type{width:210px;}'
+        + '.cx-print-complements a,a.cx-docref{color:inherit;text-decoration:underline;}'
+        + '.cx-print-note,.cx-docref-flag{color:#666;font-size:.9em;}'
+        + '.cx-docref-code{font-family:Consolas,monospace;font-size:.92em;}'
         // R6-b2: histórico de revisões no fim do PDF.
         + '.cx-print-history{margin-top:18px;}'
         + '.cx-print-history table{table-layout:fixed;font-size:.9em;}'
@@ -174,7 +182,9 @@
                 // Q1: tipo sem revisão periódica — tira "rev. {revisao}" do texto
                 norev: 0,
                 // R6-b2: linhas do histórico de revisões (fim do PDF)
-                history: []
+                history: [],
+                // Etapa 5b: Documentos complementares (antes do histórico)
+                complements: []
             }
         };
 
@@ -215,6 +225,9 @@
         // uma config antiga persistida antes de uma validação ser adicionada).
         if (!Array.isArray(cfg.document.history)) {
             cfg.document.history = [];
+        }
+        if (!Array.isArray(cfg.document.complements)) {
+            cfg.document.complements = [];
         }
         cfg.brand.show_logo   = !!(cfg.brand.show_logo && cfg.brand.logo_url);
         cfg.brand.repeat_logo = !!cfg.brand.repeat_logo;
@@ -678,6 +691,32 @@
     }
 
     /**
+     * Etapa 5b: "Documentos complementares" no fim (vinculados diretos, com
+     * link). Vem do servidor (DocumentLink::complements). Vazio = nada.
+     */
+    function buildComplementsHtml(cfg) {
+        var rows = (cfg.document && cfg.document.complements) || [];
+        if (!rows.length) {
+            return '';
+        }
+        var esc = function (t) {
+            return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        };
+        var cell = function (r, t) {
+            return r.href ? '<a href="' + esc(r.href) + '">' + esc(t) + '</a>' : esc(t);
+        };
+        var body = '';
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            body += '<tr><td>' + cell(r, r.code) + '</td><td>' + esc(r.type) + '</td><td>' + cell(r, r.name)
+                + (r.note ? ' <span class="cx-print-note">(' + esc(r.note) + ')</span>' : '') + '</td></tr>';
+        }
+        return '<div class="cx-print-complements"><h2>Documentos complementares</h2>'
+            + '<table><thead><tr><th class="cx-h-code">Código</th><th class="cx-h-type">Tipo</th><th>Título</th></tr></thead>'
+            + '<tbody>' + body + '</tbody></table></div>';
+    }
+
+    /**
      * R6-b2: tabela "Histórico de revisões" (cfg.document.history, montado
      * pelo servidor: DocumentVersion::history). Vazia = nada.
      */
@@ -781,7 +820,7 @@
 
         // R6-b2: histórico de revisões no fim, um bloco atômico (título e
         // tabela juntos; layoutPages não os separa).
-        var history = buildHistoryHtml(cfg);
+        var history = buildComplementsHtml(cfg) + buildHistoryHtml(cfg);
 
         var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
             + '<base href="' + window.location.origin + '/">'

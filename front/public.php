@@ -152,6 +152,15 @@ if ($doc === null) {
         $rev   = (int) $doc->fields['revision'] - ($updating ? 1 : 0);
         $owner = (int) ($doc->fields['users_id_owner'] ?? 0);
         // Mesma bagagem do PDF da página interna (front/document.form.php).
+        // 5b: referência e complementares pelo link público do citado, quando
+        // ele tem um; senão só o texto (quem está fora não entra no GLPI).
+        $anonHref = static fn (Document $d) => (!empty($d->fields['anon_token']) && $d->isAnonymousReadable())
+            ? $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/public.php?t=' . $d->fields['anon_token'] : null;
+        $complements = \GlpiPlugin\Codexplus\DocumentLink::complements(
+            (int) $doc->fields['id'],
+            $anonHref,
+            static fn ($d, $info) => $info['state'] === 'obsoleto' ? __('obsoleto', 'codexplus') : ''
+        );
         $vars['print_config'] = Branding::printConfig([
             'title'          => $name,
             'code'           => $code,
@@ -169,6 +178,7 @@ if ($doc === null) {
             'header_html'    => '',
             'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
             'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
+            'complements'    => $complements,
             'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
                 : DocumentVersion::history((int) $doc->fields['id'], $rev, $doc),
         ], $brandId, $self . '&logo=1');
@@ -179,11 +189,11 @@ if ($doc === null) {
             'updating' => $updating,
             // R7-2b: imagens do corpo pela rota do link (a do GLPI pede login).
             'html'     => RichText::getEnhancedHtml(
-                (string) preg_replace(
+                \GlpiPlugin\Codexplus\DocumentLink::resolveRefs((string) preg_replace(
                     '#[^"\'\s>]*/front/document\.send\.php\?docid=(\d+)[^"\'\s>]*#',
                     htmlspecialchars($self, ENT_QUOTES) . '&amp;f=$1',
                     $content
-                ),
+                ), $anonHref),
                 ['text_maxsize' => 0]
             ),
             'files'    => array_map(static fn ($a) => [

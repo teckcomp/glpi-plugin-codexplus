@@ -2785,3 +2785,26 @@ html.cx-board-open { overflow: hidden; }
 .cx-meta[data-tab="perm"] .cx-docform-grid { display: none; }
 .cx-meta.is-closed .cx-meta-tabs,
 .cx-meta.is-closed .cx-docform-split { display: none !important; }
+
+/* =========================================================================
+   Etapa 5b — referência no texto e Documentos complementares
+   ========================================================================= */
+.codexplus-content a.cx-docref, .codexplus-content span.cx-docref { background: var(--cx-accent-soft); color: var(--cx-accent-strong);
+    padding: 1px 6px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+.cx-docref-code { font-family: 'IBM Plex Mono', monospace; font-size: .92em; }
+.cx-docref-flag { color: var(--cx-danger); font-size: .9em; }
+.cx-complements { margin-top: 18px; }
+.cx-complements h2 { font-size: 1.1em; }
+.cx-complements table { width: 100%; border-collapse: collapse; font-size: .92em; }
+.cx-complements th, .cx-complements td { border: 1px solid var(--cx-border); padding: 5px 8px; text-align: left; }
+.cx-complements-note { color: var(--cx-muted); }
+.cx-docref-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .35); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+.cx-docref-box { background: #fff; width: min(560px, 92vw); border-radius: 10px; padding: 14px 16px; box-shadow: 0 12px 32px rgba(0,0,0,.2); }
+.cx-docref-head { display: flex; align-items: center; margin-bottom: 8px; }
+.cx-docref-x { margin-left: auto; border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: var(--cx-muted); }
+.cx-docref-list { list-style: none; margin: 8px 0; padding: 0; max-height: 320px; overflow: auto; }
+.cx-docref-list button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: 6px; cursor: pointer; }
+.cx-docref-list button:hover { background: var(--cx-accent-soft); }
+.cx-docref-list small { color: var(--cx-muted); }
+.cx-docref-list .is-empty { padding: 7px 8px; color: var(--cx-muted); }
+.cx-docref-hint { font-size: 12px; color: var(--cx-muted); }

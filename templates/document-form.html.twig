@@ -446,7 +446,7 @@
                         </div>
                     </div>
                 {% else %}
-                    <div class="codexplus-doc-edit-zone codexplus-doc-edit-body" id="cx-docform-body" data-cx-doctype="{{ doctype }}">
+                    <div class="codexplus-doc-edit-zone codexplus-doc-edit-body" id="cx-docform-body" data-cx-doctype="{{ doctype }}"{% if docref_url %} data-cx-docref-url="{{ docref_url }}"{% endif %}>
                     <label class="codexplus-doc-edit-zone-label">
                         <i class="ti ti-article"></i> {{ __('Corpo do documento', 'codexplus') }}
                     </label>
@@ -600,6 +600,24 @@
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% else %}
                 <div class="codexplus-content rich_text_container">{{ content_html|raw }}</div>
+                {# 5b: na tela; nas folhas e no PDF quem desenha é o JS (cfg.document.complements). #}
+                {% if complements is not empty %}
+                    <section class="cx-complements">
+                        <h2>{{ __('Documentos complementares', 'codexplus') }}</h2>
+                        <table>
+                            <thead><tr><th>{{ __('Código', 'codexplus') }}</th><th>{{ __('Tipo', 'codexplus') }}</th><th>{{ __('Título', 'codexplus') }}</th></tr></thead>
+                            <tbody>
+                            {% for c in complements %}
+                                <tr>
+                                    <td>{% if c.href %}<a href="{{ c.href }}">{{ c.code }}</a>{% else %}{{ c.code }}{% endif %}</td>
+                                    <td>{{ c.type }}</td>
+                                    <td>{% if c.href %}<a href="{{ c.href }}">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}{% if c.note %} <span class="cx-complements-note">({{ c.note }})</span>{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </section>
+                {% endif %}
                 <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
             {% endif %}
         </article>

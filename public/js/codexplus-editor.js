@@ -188,6 +188,8 @@
     function contentCss() {
         return sizeCss()
             + 'h2,h3,h4{color:#1f5fbf;}'
+            // Etapa 5b: referência a outro documento (não editável por dentro).
+            + 'a.cx-docref{background:#e4edfa;color:#174a94;padding:1px 6px;border-radius:6px;text-decoration:none;white-space:nowrap;}'
             + 'h2{font-size:1.33em;}h3{font-size:1.13em;}h4{font-size:1em;}'
             + '.cx-callout{margin:0 0 12px;padding:9px 12px;border-radius:0;'
             + 'border-left:4px solid;}'
@@ -690,6 +692,20 @@
             }
         });
 
+        // Etapa 5b (Claudio, 04/10/2026): "segue POP de referência …" — insere
+        // um link para outro documento do Codex+. Código e título se
+        // atualizam sozinhos na leitura; ao salvar, o citado vira vinculado.
+        ui.addButton('cxdocref', {
+            text: 'Referência',
+            tooltip: 'Citar outro documento do Codex+ (POP, Manual, Diagrama)',
+            onAction: function () {
+                if (window.CodexplusDocref) { window.CodexplusDocref.open(editor); }
+            },
+            onSetup: function (api) {
+                api.setEnabled(!!document.querySelector('[data-cx-docref-url]'));
+            }
+        });
+
         ui.addButton('cximport', {
             text: 'Importar',
             tooltip: 'Importar .docx ou .md (só com o corpo em branco)',
@@ -727,7 +743,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxdocref cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {

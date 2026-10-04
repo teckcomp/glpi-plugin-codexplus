@@ -513,6 +513,114 @@ class DocumentLink
         return $out;
     }
 
+    // ---------------------------------------------------------------------
+    // 5d — PDF composto em cascata
+    // ---------------------------------------------------------------------
+
+    /**
+     * Árvore do PDF composto, em ordem de leitura (o documento, depois cada
+     * vinculado e, logo abaixo dele, os vinculados dele…). Regras (Claudio,
+     * 04/10/2026): todos os níveis, inclusive DIA (folha deitada); sempre a
+     * versão PUBLICADA dos vinculados; sem acesso = só título e código;
+     * sem versão publicada = nota; repetido = "ver página N" (aponta para
+     * a 1ª aparição). A raiz sai como está no Visualizar.
+     *
+     * @param array<string, mixed> $rootDoc  bagagem do PDF da raiz (print_config.document)
+     * @return array{entries: array<int, array<string, mixed>>}
+     */
+    public static function composite(Document $root, array $rootDoc, string $rootHtml): array
+    {
+        /** @var array $CFG_GLPI */
+        global $CFG_GLPI;
+
+        $entries = [[
+            'id' => (int) $root->fields['id'], 'depth' => 0, 'kind' => 'text',
+            'doc' => $rootDoc, 'html' => $rootHtml, 'note' => '',
+        ]];
+        $seen = [(int) $root->fields['id'] => 0];
+        $href = static fn (Document $d) => $d->canViewItem()
+            ? $CFG_GLPI['url_base'] . '/plugins/codexplus/front/document.form.php?id=' . (int) $d->fields['id'] : null;
+
+        $walk = static function (int $parentId, int $depth) use (&$walk, &$entries, &$seen, $href): void {
+            if ($depth > self::MAX_DEPTH) {
+                return;
+            }
+            foreach (self::childIds($parentId) as $cid) {
+                $d = new Document();
+                if (!$d->getFromDB($cid) || !empty($d->fields['is_deleted'])) {
+                    continue;
+                }
+                $info = self::describe($d);
+                $doc  = ['title' => $info['name'], 'code' => $info['code'], 'doctype' => $info['type']];
+                if (isset($seen[$cid])) {
+                    $entries[] = ['id' => $cid, 'depth' => $depth, 'kind' => 'repeat', 'first' => $seen[$cid], 'doc' => $doc];
+                    continue;
+                }
+                $seen[$cid] = count($entries);
+                if (!$info['can_view']) {
+                    $entries[] = ['id' => $cid, 'depth' => $depth, 'kind' => 'noaccess', 'doc' => $doc,
+                        'note' => __('Sem acesso: este documento faz parte do conjunto, mas você não tem permissão para lê-lo.', 'codexplus')];
+                    continue;
+                }
+                if ($info['state'] === 'sem_publicacao') {
+                    $entries[] = ['id' => $cid, 'depth' => $depth, 'kind' => 'unpublished', 'doc' => $doc,
+                        'note' => __('Sem versão publicada: este documento ainda não foi validado.', 'codexplus')];
+                    $walk($cid, $depth + 1);
+                    continue;
+                }
+                $entries[] = self::compositeEntry($d, $info, $depth, $href);
+                $walk($cid, $depth + 1);
+            }
+        };
+        $walk((int) $root->fields['id'], 1);
+
+        return ['entries' => $entries];
+    }
+
+    /**
+     * Uma entrada do composto com a versão publicada (na revisão, a anterior).
+     *
+     * @param array<string, mixed> $info  describe()
+     * @return array<string, mixed>
+     */
+    private static function compositeEntry(Document $d, array $info, int $depth, callable $href): array
+    {
+        $id   = (int) $d->fields['id'];
+        $rev  = (int) $d->fields['revision'] - ($d->isInRevision() ? 1 : 0);
+        $v    = $d->isInRevision() ? DocumentVersion::get($id, $rev) : null;
+        $type = (string) $d->fields['doctype'];
+        $direct = DocumentMeta::flowOf($type) === DocumentMeta::FLOW_DIRECT;
+        $owner  = (int) ($d->fields['users_id_owner'] ?? 0);
+        $doc = [
+            'title'          => $info['name'],
+            'code'           => $info['code'],
+            'revision'       => $rev,
+            'client'         => (string) ($d->fields['client_name'] ?? ''),
+            'date_mod'       => (string) ($d->fields['date_mod'] ?? ''),
+            'doctype'        => $type,
+            'owner'          => $owner > 0 ? getUserName($owner) : '',
+            'sector'         => implode(', ', array_map(
+                static fn ($sid) => \Dropdown::getDropdownName('glpi_plugin_codexplus_sectors', $sid),
+                $d->getSectorIds()
+            )),
+            'date_published' => (string) ($v['date_published'] ?? $d->fields['date_published'] ?? ''),
+            'draft'          => $info['state'] === 'obsoleto' ? __('OBSOLETO', 'codexplus') : '',
+            'header_html'    => '',
+            'norev'          => $direct ? 1 : 0,
+            'footer_text'    => (string) ($d->fields['footer_text'] ?? ''),
+            'complements'    => self::complements($id, $href, [self::class, 'noteFor']),
+            'history'        => $direct ? [] : DocumentVersion::history($id, $rev, $d),
+        ];
+        if ($type === 'DIA') {
+            $data = $v !== null ? DocumentVersion::diagramOf($v) : (Diagram::load($id)['data'] ?? null);
+            return ['id' => $id, 'depth' => $depth, 'kind' => 'diagram', 'doc' => $doc,
+                'diagram' => ['subtype' => is_array($data) ? Diagram::subtypeOf($data) : '', 'data' => $data]];
+        }
+        $content = $v !== null ? (string) $v['content'] : (string) ($d->fields['content'] ?? '');
+        return ['id' => $id, 'depth' => $depth, 'kind' => 'text', 'doc' => $doc, 'note' => '',
+            'html' => \Glpi\RichText\RichText::getEnhancedHtml(self::resolveRefs($content, $href), ['text_maxsize' => 0])];
+    }
+
     /** Documento apagado de vez: some como pai e como filho. */
     public static function purgeDocument(int $docId): void
     {

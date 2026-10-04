@@ -121,6 +121,13 @@
                                 title="{{ __('Baixa o documento em Word (.docx), para editar ou enviar fora do GLPI', 'codexplus') }}">
                             <i class="ti ti-file-type-docx"></i> {{ __('Exportar Word', 'codexplus') }}
                         </button>
+                        {% if composite_url %}
+                            {# 5d: PDF com os documentos vinculados, em cascata. #}
+                            <button type="button" class="codexplus-btn" id="codexplus-pdf-full" data-url="{{ composite_url }}"
+                                    title="{{ __('Este documento e todos os vinculados, em cascata, com sumário (versão publicada de cada um)', 'codexplus') }}">
+                                <i class="ti ti-files"></i> {{ __('PDF completo', 'codexplus') }}
+                            </button>
+                        {% endif %}
                         <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">
                             <i class="ti ti-file-type-pdf"></i> {{ __('Exportar PDF', 'codexplus') }}
                         </button>

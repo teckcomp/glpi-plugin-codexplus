@@ -307,7 +307,16 @@
     function buildPageCss(geo) {
         return ''
             + '@page{size:A4;margin:0;}'
-            + '#cx-stage{width:' + geo.contentW + 'px;}'
+            + '#cx-stage,.cx-stage{width:' + geo.contentW + 'px;}'
+            // 5d: folha deitada (diagrama dentro do PDF composto).
+            + '@page land{size:A4 landscape;margin:0;}'
+            + '.cx-page--land{page:land;width:' + geo.pageH + 'px;height:' + geo.pageW + 'px;}'
+            + '.cx-page--land .cx-page-content{width:' + (geo.pageH - 2 * geo.marginX) + 'px;}'
+            + '.cx-land-fig{display:flex;align-items:center;justify-content:center;}'
+            + '.cx-toc h1{margin:0 0 14px;}.cx-toc-row{display:flex;gap:8px;padding:3px 0;border-bottom:1px dotted #ccc;}'
+            + '.cx-toc-row .t{flex:1;}.cx-toc-code{font-family:Consolas,monospace;font-size:.92em;}'
+            + '.cx-toc-row .n{min-width:28px;text-align:right;}.cx-toc-note{color:#666;font-size:.9em;}'
+            + '.cx-box-note{border:1px solid #ccc;border-radius:6px;padding:12px 14px;color:#444;margin-top:12px;}'
             + '.cx-page{position:relative;width:' + geo.pageW + 'px;height:' + geo.pageH + 'px;'
             + 'box-sizing:border-box;page-break-after:always;'
             + 'padding:' + (geo.marginTop + geo.headerH) + 'px ' + geo.marginX + 'px '
@@ -321,7 +330,7 @@
             // filho dentro do bloco, na medição e na folha (mesma regra nos
             // dois lugares). Só em div/p/blockquote: em table e lista mudaria
             // o desenho.
-            + '#cx-stage>div,#cx-stage>p,#cx-stage>blockquote,'
+            + '#cx-stage>div,#cx-stage>p,#cx-stage>blockquote,.cx-stage>div,.cx-stage>p,.cx-stage>blockquote,'
             + '.cx-page-content>div,.cx-page-content>p,.cx-page-content>blockquote{display:flow-root;}'
             // 0.5.8: cabeçalho corrido aprovado em 19/09/2026 — título
             // pequeno de um lado, logo do outro, filete embaixo. Altura fixa
@@ -547,6 +556,24 @@
         if (!stage) {
             return 1;
         }
+        var pages = planPages(idoc, stage, geo);
+        var total = pages.length;
+        var frag  = idoc.createDocumentFragment();
+        for (var p = 0; p < total; p++) {
+            frag.appendChild(buildPageEl(idoc, cfg, geo, pages[p], p, total));
+        }
+
+        idoc.body.innerHTML = '';
+        idoc.body.appendChild(frag);
+        return total;
+    }
+
+    /**
+     * Etapa 5d: só decide as folhas (listas de blocos) de um palco, sem
+     * montar nem trocar o <body> — o PDF composto pagina vários documentos
+     * e numera tudo junto. Mesmas regras de sempre (ver layoutPages).
+     */
+    function planPages(idoc, stage, geo) {
         var win = idoc.defaultView || window;
 
         var blocks = Array.prototype.slice.call(stage.children);
@@ -678,16 +705,7 @@
             return pg.some(function (el) { return !isBlank(el); });
         });
         if (!pages.length) { pages = [[]]; }
-
-        var total = pages.length;
-        var frag  = idoc.createDocumentFragment();
-        for (var p = 0; p < total; p++) {
-            frag.appendChild(buildPageEl(idoc, cfg, geo, pages[p], p, total));
-        }
-
-        idoc.body.innerHTML = '';
-        idoc.body.appendChild(frag);
-        return total;
+        return pages;
     }
 
     /**
@@ -951,6 +969,192 @@
         host.appendChild(frame);
     }
 
+    /* =====================================================================
+       Etapa 5d (Claudio, 04/10/2026): PDF composto em cascata.
+       O servidor manda a árvore já resolvida (document.form.php?composite=1):
+       cada entrada com o corpo da versão PUBLICADA, a bagagem de impressão e
+       o tipo de folha — texto, diagrama (folha deitada), sem acesso,
+       sem versão publicada ou repetido (\"ver página N\"). Aqui: um palco
+       por documento, a paginação de sempre (planPages), sumário na 1ª
+       folha e numeração única do arquivo inteiro.
+       ===================================================================== */
+    function esc5(t) {
+        return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function entryCfg(base, e) {
+        var cfg = { brand: base.brand, document: {} };
+        for (var k in base.document) { cfg.document[k] = base.document[k]; }
+        for (var k2 in e.doc) { cfg.document[k2] = e.doc[k2]; }
+        var ident = buildIdentLine(cfg);
+        cfg._ident = cfg.brand.footer_show ? ident : '';
+        cfg._meta = cfg.brand.footer_show ? '' : ident;
+        return cfg;
+    }
+
+    function diagramSvg(e) {
+        try {
+            var d = e.diagram || {};
+            if (d.subtype === 'fluxograma' && window.CodexplusBoard && d.data && d.data.board) {
+                return window.CodexplusBoard._boardSvg(window.CodexplusBoard._clean(d.data.board, 'fluxograma'), null, 1);
+            }
+            if (d.subtype === 'organograma' && window.CodexplusOrgDraw && d.data) {
+                var od = window.CodexplusOrgDraw;
+                var r = od.svg(od.normalize(d.data), { pad: false });
+                return r && r.svg ? r : null;
+            }
+        } catch (err) {
+            console.error('Codex+ (PDF composto, diagrama):', err);
+        }
+        return null;
+    }
+
+    function headingHtml(cfg, e, note) {
+        return '<div class="cx-heading"><h1 class="cx-print-title' + (cfg.brand.title_upper ? ' cx-print-title--upper' : '') + '">'
+            + esc5(e.doc.title) + '</h1><div class="cx-print-meta">' + esc5(cfg._meta || '') + '</div></div>'
+            + (note ? '<div class="cx-box-note">' + esc5(note) + '</div>' : '');
+    }
+
+    function exportComposite(url, btn) {
+        if (btn) { btn.disabled = true; }
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (pack) { buildComposite(pack, btn); })
+            .catch(function (err) {
+                console.error('Codex+ (PDF composto):', err);
+                window.alert('Não foi possível montar o PDF completo.');
+                if (btn) { btn.disabled = false; }
+            });
+    }
+
+    function buildComposite(pack, btn) {
+        var base = getPrintConfig();
+        if (pack.brand) { base.brand = pack.brand; base.brand.show_logo = !!(base.brand.show_logo && base.brand.logo_url); }
+        var geo = computeGeometry(base);
+        var entries = pack.entries || [];
+        var stages = '', root = entries[0] || { doc: {} };
+        entries.forEach(function (e, i) {
+            var cfg = entryCfg(base, e);
+            e._cfg = cfg;
+            var body;
+            if (e.kind === 'text') {
+                body = headingHtml(cfg, e, e.note) + (e.html || '') + buildComplementsHtml(cfg) + buildHistoryHtml(cfg);
+            } else if (e.kind === 'diagram') {
+                body = headingHtml(cfg, e, '');
+            } else if (e.kind === 'repeat') {
+                body = headingHtml(cfg, e, 'Este documento já está neste PDF. Ver página {{p' + e.first + '}}.');
+            } else {
+                body = headingHtml(cfg, e, e.note || '');
+            }
+            stages += '<div class="cx-stage" data-i="' + i + '">' + body + '</div>';
+        });
+        var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
+            + '<base href="' + window.location.origin + '/">'
+            + '<title>' + esc5(fileTitle(root._cfg || base, root.doc.title) + ' (completo)') + '</title>'
+            + '<style>' + PRINT_CSS + brandCss(base) + editorSizeCss() + buildPageCss(geo) + '</style></head><body>'
+            + stages + '</body></html>';
+
+        var iframe = document.createElement('iframe');
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:1123px;height:1123px;border:0;opacity:0;';
+        iframe.srcdoc = html;
+        iframe.onload = function () {
+            var idoc = iframe.contentDocument;
+            var win = iframe.contentWindow;
+            waitImages(idoc, function () {
+                try {
+                    var plans = [];
+                    var st = Array.prototype.slice.call(idoc.querySelectorAll('.cx-stage'));
+                    st.forEach(function (stage, i) {
+                        var e = entries[i];
+                        var pages = planPages(idoc, stage, geo);
+                        if (e.kind === 'repeat') {
+                            // Repetido não ganha folha: no sumário, "ver página N".
+                            plans.push({ e: e, pages: [], skip: true });
+                        } else if (e.kind === 'diagram') {
+                            // Folha deitada logo depois do cabeçalho do diagrama.
+                            plans.push({ e: e, pages: pages.slice(0, 1), land: true });
+                        } else {
+                            plans.push({ e: e, pages: pages });
+                        }
+                    });
+                    // Numeração: sumário = 1 folha; diagrama = cabeçalho + folha deitada.
+                    var n = 1, firstPage = [];
+                    plans.forEach(function (pl, i) {
+                        if (pl.skip) { return; }
+                        firstPage[i] = n + 1;
+                        n += pl.land ? 1 : pl.pages.length;
+                    });
+                    plans.forEach(function (pl, i) {
+                        if (pl.skip) { firstPage[i] = firstPage[pl.e.first]; }
+                    });
+                    var total = n;
+                    var frag = idoc.createDocumentFragment();
+                    // Sumário.
+                    var toc = '<div class="cx-toc"><h1>Sumário</h1>';
+                    entries.forEach(function (e, i) {
+                        var note = e.kind === 'noaccess' ? ' <span class="cx-toc-note">— sem acesso</span>'
+                            : e.kind === 'unpublished' ? ' <span class="cx-toc-note">— sem versão publicada</span>'
+                            : e.kind === 'repeat' ? ' <span class="cx-toc-note">— ver página ' + firstPage[e.first] + '</span>'
+                            : (e.doc.draft ? ' <span class="cx-toc-note">— ' + esc5(e.doc.draft) + '</span>' : '');
+                        toc += '<div class="cx-toc-row" style="padding-left:' + (e.depth * 18) + 'px"><span class="t"><span class="cx-toc-code">'
+                            + esc5(e.doc.code) + '</span> ' + esc5(e.doc.title) + note + '</span><span class="n">' + firstPage[i] + '</span></div>';
+                    });
+                    toc += '</div>';
+                    var tocBox = idoc.createElement('div');
+                    tocBox.innerHTML = toc;
+                    frag.appendChild(buildPageEl(idoc, root._cfg || base, geo, [tocBox.firstChild], 0, total));
+                    var idx = 1;
+                    plans.forEach(function (pl) {
+                        if (pl.skip) { return; }
+                        var cfg = pl.e._cfg;
+                        if (pl.land) {
+                            var r = diagramSvg(pl.e);
+                            var blocks = pl.pages[0] || [];
+                            var fig = idoc.createElement('div');
+                            fig.className = 'cx-land-fig';
+                            if (r) {
+                                var aw = geo.pageH - 2 * geo.marginX;
+                                var ah = geo.pageW - geo.marginTop - geo.marginBottom - geo.headerH - geo.footerH - 90;
+                                var k = Math.min(aw / r.w, ah / r.h, 1.5);
+                                fig.innerHTML = r.svg.replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1 width="' + Math.floor(r.w * k) + '" height="' + Math.floor(r.h * k) + '"');
+                            } else {
+                                fig.innerHTML = '<div class="cx-box-note">Este tipo de diagrama não entra desenhado no PDF completo. Abra o documento no Codex+ para ver.</div>';
+                            }
+                            var page = buildPageEl(idoc, cfg, geo, blocks.concat([fig]), idx, total);
+                            page.classList.add('cx-page--land');
+                            frag.appendChild(page);
+                            idx++;
+                            return;
+                        }
+                        pl.pages.forEach(function (blocks) {
+                            frag.appendChild(buildPageEl(idoc, cfg, geo, blocks, idx, total));
+                            idx++;
+                        });
+                    });
+                    idoc.body.innerHTML = '';
+                    idoc.body.appendChild(frag);
+                    // \"ver página N\" das repetições.
+                    idoc.body.innerHTML = idoc.body.innerHTML.replace(/\{\{p(\d+)\}\}/g, function (m, i) { return firstPage[+i] || '?'; });
+                } catch (err) {
+                    console.error('Codex+ (PDF composto):', err);
+                    window.alert('Não foi possível montar o PDF completo.');
+                    if (btn) { btn.disabled = false; }
+                    return;
+                }
+                waitImages(idoc, function () {
+                    var prev = document.title;
+                    document.title = fileTitle(root._cfg || base, root.doc.title) + ' (completo)';
+                    try { win.focus(); win.print(); } catch (err) { console.error('Codex+ (PDF composto):', err); }
+                    setTimeout(function () { document.title = prev; }, 1000);
+                    setTimeout(function () { iframe.remove(); }, 2000);
+                    if (btn) { btn.disabled = false; }
+                });
+            });
+        };
+        document.body.appendChild(iframe);
+    }
+
     // E3 (22/09/2026): a exportação em Word (codexplus-export.js) usa a
     // MESMA configuração, marcadores, linha de identificação e nome de
     // arquivo do PDF — fonte única, sem cópia das regras.
@@ -969,6 +1173,10 @@
         var btn = document.getElementById('codexplus-pdf');
         if (btn) {
             btn.addEventListener('click', exportPdf);
+        }
+        var full = document.getElementById('codexplus-pdf-full');
+        if (full) {
+            full.addEventListener('click', function () { exportComposite(full.getAttribute('data-url'), full); });
         }
     });
 })();

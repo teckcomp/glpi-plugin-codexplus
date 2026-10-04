@@ -666,7 +666,10 @@ if ($isDiagram && !$canEdit && $diagramKind === Diagram::SUBTYPE_SCHEDULE) {
     }
 }
 
-Wiki::pageHeader(); // S1
+// 5d: o pedido do PDF composto responde JSON — sem o cabeçalho da página.
+if (!isset($_GET['composite'])) {
+    Wiki::pageHeader(); // S1
+}
 
 // B2b: "+ Novo documento" da Biblioteca chega com ?cat= (categoria aberta).
 $presetCat   = $isNew ? (int) ($_GET['cat'] ?? 0) : 0;
@@ -1054,6 +1057,58 @@ $complements = $isNew ? [] : \GlpiPlugin\Codexplus\DocumentLink::complements(
     [\GlpiPlugin\Codexplus\DocumentLink::class, 'noteFor']
 );
 
+// Bagagem do PDF (também a raiz do PDF composto, 5d).
+$printDoc = ($isNew || $isDiagram) ? [] : [
+        'title'          => $version['on'] ? (string) ($shown['name'] ?? '') : (string) $doc->fields['name'],
+        'code'           => $version['on'] ? $version['code'] : $doc->getCode(),
+        'revision'       => $version['on'] ? $version['rev'] : (int) $doc->fields['revision'],
+        'client'         => $client['name'],
+        'date_mod'       => (string) ($doc->fields['date_mod'] ?? ''),
+        'doctype'        => (string) $doc->fields['doctype'],
+        'owner'          => (int) $doc->fields['users_id_owner'] > 0
+            ? getUserName((int) $doc->fields['users_id_owner']) : getUserName((int) $doc->fields['users_id']),
+        'sector'         => implode(', ', $sectorNames),
+        'approvers'      => $signersLine, // A-2b
+        // A versão mostrada é a publicada? Então data de publicação; senão,
+        // o aviso de que não é a versão vigente.
+        'date_published' => $version['on'] ? $version['date']
+            : ($status === Document::STATUS_PUBLISHED || $status === Document::STATUS_OBSOLETE
+                ? (string) ($doc->fields['date_published'] ?? '') : ''),
+        'draft'          => $version['on'] || $status === Document::STATUS_PUBLISHED ? ''
+            : ($status === Document::STATUS_OBSOLETE ? __('OBSOLETO', 'codexplus')
+                : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(
+                    // A-2b: com aprovador pendente, o aviso diz isso (como o selo da página).
+                    $doc->signersPending() ? __('Aguardando aprovadores', 'codexplus') : (Document::getStatuses()[$status] ?? $status)
+                ))),
+        'header_html'    => '',
+        // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
+        'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
+        'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
+        // R6-b2: histórico de revisões no fim do PDF, até a revisão impressa
+        // (na revisão em andamento, até a publicada em vigor). Tipos de fluxo
+        // direto (proposta, laudo) não têm revisão periódica: sem histórico.
+        'complements'    => $complements,
+        'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
+            : \GlpiPlugin\Codexplus\DocumentVersion::history(
+                $id,
+                $version['on'] ? (int) $version['rev'] : ((int) $doc->fields['revision'] - ($inRevision ? 1 : 0)),
+                $doc
+            ),
+    ];
+
+
+// 5d: PDF composto — a árvore resolvida, em JSON (o navegador monta o PDF).
+if ($id > 0 && isset($_GET['composite']) && !$isDiagram) {
+    return new \Symfony\Component\HttpFoundation\JsonResponse(\GlpiPlugin\Codexplus\DocumentLink::composite(
+        $doc,
+        $printDoc,
+        RichText::getEnhancedHtml(\GlpiPlugin\Codexplus\DocumentLink::resolveRefs(
+            $shown['content'] ?? (string) ($doc->fields['content'] ?? ''),
+            static fn ($d) => $d->canViewItem() ? $CFG_GLPI['url_base'] . '/plugins/codexplus/front/document.form.php?id=' . (int) $d->fields['id'] : null
+        ), ['text_maxsize' => 0])
+    ));
+}
+
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'brand'       => $brandField,
     'signers_line' => $signersLine,
@@ -1196,43 +1251,9 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_edit_doc' => $canEditDoc,
     'view_link'    => $isNew ? '' : $self . '?id=' . $id . '&view=1',
     'edit_link'    => $isNew ? '' : $self . '?id=' . $id,
-    'print_config' => $isNew || $isDiagram ? '{}' : Branding::printConfig([
-        'title'          => $version['on'] ? (string) ($shown['name'] ?? '') : (string) $doc->fields['name'],
-        'code'           => $version['on'] ? $version['code'] : $doc->getCode(),
-        'revision'       => $version['on'] ? $version['rev'] : (int) $doc->fields['revision'],
-        'client'         => $client['name'],
-        'date_mod'       => (string) ($doc->fields['date_mod'] ?? ''),
-        'doctype'        => (string) $doc->fields['doctype'],
-        'owner'          => (int) $doc->fields['users_id_owner'] > 0
-            ? getUserName((int) $doc->fields['users_id_owner']) : getUserName((int) $doc->fields['users_id']),
-        'sector'         => implode(', ', $sectorNames),
-        'approvers'      => $signersLine, // A-2b
-        // A versão mostrada é a publicada? Então data de publicação; senão,
-        // o aviso de que não é a versão vigente.
-        'date_published' => $version['on'] ? $version['date']
-            : ($status === Document::STATUS_PUBLISHED || $status === Document::STATUS_OBSOLETE
-                ? (string) ($doc->fields['date_published'] ?? '') : ''),
-        'draft'          => $version['on'] || $status === Document::STATUS_PUBLISHED ? ''
-            : ($status === Document::STATUS_OBSOLETE ? __('OBSOLETO', 'codexplus')
-                : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(
-                    // A-2b: com aprovador pendente, o aviso diz isso (como o selo da página).
-                    $doc->signersPending() ? __('Aguardando aprovadores', 'codexplus') : (Document::getStatuses()[$status] ?? $status)
-                ))),
-        'header_html'    => '',
-        // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
-        'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
-        'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
-        // R6-b2: histórico de revisões no fim do PDF, até a revisão impressa
-        // (na revisão em andamento, até a publicada em vigor). Tipos de fluxo
-        // direto (proposta, laudo) não têm revisão periódica: sem histórico.
-        'complements'    => $complements,
-        'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
-            : \GlpiPlugin\Codexplus\DocumentVersion::history(
-                $id,
-                $version['on'] ? (int) $version['rev'] : ((int) $doc->fields['revision'] - ($inRevision ? 1 : 0)),
-                $doc
-            ),
-    ], $brandShownId),
+    'print_config' => $isNew || $isDiagram ? '{}' : Branding::printConfig($printDoc, $brandShownId),
+    // 5d: PDF completo (com os vinculados), só no Visualizar de quem tem vinculados.
+    'composite_url' => ($preview && !$isDiagram && \GlpiPlugin\Codexplus\DocumentLink::childIds($id)) ? $self . '?id=' . $id . '&composite=1' : '',
 ]);
 
 Wiki::pageFooter();

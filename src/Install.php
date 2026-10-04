@@ -48,6 +48,8 @@ class Install
 
     // Q4a (0.6.10) — ícones criados na instalação (IconLibrary)
     public const ICONS_TABLE          = 'glpi_plugin_codexplus_icons';
+    /** Q7b-4: situação das tarefas do cronograma (ScheduleStatus). */
+    public const SCHEDULE_TABLE       = 'glpi_plugin_codexplus_schedulestatus';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -57,6 +59,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::SCHEDULE_TABLE,
             self::ICONS_TABLE,
             self::DIAGRAMS_TABLE,
             self::DOC_CONTRIB_TABLE,
@@ -182,6 +185,9 @@ class Install
 
         // --- Bloco A2: setor de auditoria ---
         self::installA2($migration);
+
+        // --- Bloco Q7b-4: situação das tarefas do cronograma ---
+        self::installQ7b4();
 
         $migration->executeMigration();
         return true;
@@ -462,6 +468,34 @@ class Install
      * documentos só desse(s) setor(es), quem aprovou a 1ª etapa pode validar
      * a 2ª; nos demais, não.
      */
+    /**
+     * Q7b-4 (Claudio, 04/10/2026): situação de cada tarefa do cronograma,
+     * por documento + id fixo da linha do JSON. Marcada no publicado, sem
+     * abrir revisão; quem e quando ficam na própria linha.
+     */
+    private static function installQ7b4(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::SCHEDULE_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `row_key` varchar(16) NOT NULL DEFAULT '',
+                `state` varchar(16) NOT NULL DEFAULT '',
+                `date_start` date NULL DEFAULT NULL,
+                `date_done` date NULL DEFAULT NULL,
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `row_key`),
+                KEY `users_id` (`users_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q7b-4): erro ao criar $t");
+        }
+    }
+
     private static function installA2(Migration $migration): void
     {
         $migration->addField(self::SECTORS_TABLE, 'is_audit', 'bool');

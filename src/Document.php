@@ -504,6 +504,19 @@ class Document extends CommonDBTM
             && $this->isAuditor();
     }
 
+    /**
+     * Q7b-4: marcar a situação das tarefas do cronograma (Iniciar, Concluir,
+     * Reabrir). No publicado e durante a revisão dele (vale para a versão
+     * publicada que a leitura mostra), sem abrir revisão. Quem edita e gere
+     * o documento: responsável, revisor e autor; e o Super-Admin.
+     */
+    public function canMarkSchedule(): bool
+    {
+        return $this->checkEntity()
+            && ($this->status() === self::STATUS_PUBLISHED || $this->isInRevision())
+            && (Rights::isSuperAdmin() || $this->isEditor());
+    }
+
     public function canMarkObsolete(): bool
     {
         return $this->status() === self::STATUS_PUBLISHED && $this->canManage();
@@ -1456,6 +1469,7 @@ class Document extends CommonDBTM
         DocumentContributor::purgeDocument((int) $this->fields['id']);
         Diagram::purgeDocument((int) $this->fields['id']);
         DocumentVersion::purgeDocument((int) $this->fields['id']);
+        ScheduleStatus::purgeDocument((int) $this->fields['id']);
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */

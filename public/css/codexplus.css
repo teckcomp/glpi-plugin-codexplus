@@ -2129,7 +2129,66 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 [data-cx-grid].is-full .cx-grid-table thead th { position: sticky; top: 0; z-index: 3; }
 [data-cx-grid].is-full .cx-grid-table thead th.cx-grid-name, [data-cx-grid].is-full .cx-grid-table thead th.cx-grid-owner,
 [data-cx-grid].is-full .cx-gd-table thead th.cx-gd-n, [data-cx-grid].is-full .cx-gd-table thead th.cx-gd-owner,
-[data-cx-grid].is-full .cx-gd-table thead th.cx-gd-date { z-index: 4; }
+[data-cx-grid].is-full .cx-gd-table thead th.cx-gd-date, [data-cx-grid].is-full .cx-gd-table thead th.cx-gd-chk,
+[data-cx-grid].is-full .cx-gd-table thead th.cx-gd-sit { z-index: 4; }
+
+/* Q7b-4: situação das tarefas na leitura do publicado (mockup q7b-mockup-situacao).
+   Cores fixas iguais às do PDF (o JS embute as mesmas). As posições fixas à
+   esquerda vêm do JS (style="left"), porque as colunas mudam com a situação. */
+.cx-gd-table .cx-gd-chk, .cx-gd-table .cx-gd-sit { position: sticky; z-index: 1; background: var(--cx-surface); }
+.cx-gd-table thead th.cx-gd-chk, .cx-gd-table thead th.cx-gd-sit { z-index: 2; background: var(--cx-surface-1); }
+.cx-gd-table tr.cx-gd-r-fase td.cx-gd-chk, .cx-gd-table tr.cx-gd-r-fase td.cx-gd-sit { background: var(--cx-surface-1); }
+.cx-gd-table tr.is-sel td.cx-gd-chk, .cx-gd-table tr.is-sel td.cx-gd-sit { background: #eaf2fd; }
+.cx-gd-table .cx-gd-chk { text-align: center; padding: 0 4px; }
+.cx-gd-table .cx-gd-chk input { margin: 0; cursor: pointer; vertical-align: middle; }
+.cx-gd-table .cx-gd-sit { padding: 0 6px; box-shadow: 1px 0 0 var(--cx-border); }
+.cx-gd-pill { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+    padding: 1px 8px; border-radius: 10px; font-size: .8em; font-weight: 600; line-height: 1.5; }
+.cx-gd-pill.is-ok { background: #e1f5ee; color: #085041; }
+.cx-gd-pill.is-okatraso { background: #faeeda; color: #633806; }
+.cx-gd-pill.is-atrasada { background: #fcebeb; color: #a32d2d; }
+.cx-gd-pill.is-andamento { background: #e6f1fb; color: #0c447c; }
+.cx-gd-pill.is-nao { background: #f1efe8; color: #5f5e5a; font-weight: 500; }
+.cx-gd-fase-sit { font-weight: 600; font-size: .9em; color: var(--cx-muted); }
+.cx-gd-fase-sit.is-atrasada { color: #a32d2d; }
+.cx-gd-fase-sit.is-ok { color: #0f6e56; }
+.cx-gd-barra.st-ok { background: #1d9e75; border-color: #0f6e56; }
+.cx-gd-barra.st-okatraso { background: #efc66b; border-color: #ba7517; }
+.cx-gd-barra.st-atrasada { background: #e57373; border-color: #a32d2d; }
+.cx-gd-barra.st-andamento { background: #85b7eb; border-color: #378add; }
+.cx-gd-barra.st-nao { background: #d6f1e6; border-color: #9fe1cb; }
+.cx-gd-ok { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); color: #fff; font-size: .72em; font-weight: 700; line-height: 1; pointer-events: none; }
+.cx-gd-barra.st-okatraso .cx-gd-ok { color: #633806; }
+.cx-gd-ext { position: absolute; top: 13px; height: 4px; background: #f4c0c0; border-radius: 0 2px 2px 0; pointer-events: none; }
+.cx-gd-fase-barra.has-prog { background: #c9ced8; }
+.cx-gd-fase-barra.has-prog::before, .cx-gd-fase-barra.has-prog::after { border-top-color: #c9ced8; }
+.cx-gd-fase-barra.is-atrasada { background: #f4c0c0; }
+.cx-gd-fase-barra.is-atrasada::before, .cx-gd-fase-barra.is-atrasada::after { border-top-color: #a32d2d; }
+.cx-gd-prog { position: absolute; left: 0; top: 0; bottom: 0; background: #2c3a4a; }
+.cx-gd-fase-barra.is-atrasada .cx-gd-prog { background: #a32d2d; }
+.cx-gd-fase-barra.is-ok .cx-gd-prog { background: #0f6e56; }
+.cx-gd-marco.is-atrasada { background: #a32d2d; }
+.cx-gd-marco.is-okatraso { background: #ba7517; }
+.cx-gd-marco-data.is-atrasada { color: #a32d2d; }
+.cx-gd-marco-data.is-okatraso { color: #854f0b; }
+.cx-gd-sumario { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin: 0 0 10px; padding: 8px 12px;
+    border: 1px solid var(--cx-border); border-radius: 8px; background: var(--cx-surface); font-size: .92em; }
+.cx-gd-sumario b { font-weight: 700; }
+.cx-gd-sumario .is-atrasada { color: #a32d2d; }
+.cx-gd-sumario .is-okatraso { color: #854f0b; }
+.cx-gd-ultima { margin-left: auto; color: var(--cx-muted); font-size: .9em; }
+.cx-gd-sep-bar { width: 1px; align-self: stretch; background: var(--cx-border); margin: 4px 4px; }
+.cx-gd-dica { color: var(--cx-muted); font-size: .85em; }
+.cx-gd-msg.is-ok { color: #0f6e56; }
+.cx-gd-dlg { width: 420px; }
+.cx-gd-dlg-l { display: block; margin: 4px 0 0; font-weight: 600; }
+.cx-gd-dlg-l input { margin-top: 6px; max-width: 180px; font-variant-numeric: tabular-nums; }
+.cx-grid-legend b.cx-gd-leg { min-width: 22px; height: 12px; border-radius: 3px; }
+.cx-grid-legend b.cx-gd-leg.st-ok { background: #1d9e75; }
+.cx-grid-legend b.cx-gd-leg.st-okatraso { background: #efc66b; }
+.cx-grid-legend b.cx-gd-leg.st-atrasada { background: #e57373; }
+.cx-grid-legend b.cx-gd-leg.st-andamento { background: #85b7eb; }
+.cx-grid-legend b.cx-gd-leg.st-nao { background: #d6f1e6; border: 1px solid #9fe1cb; }
 
 /* Q7b-2b: cronograma com datas no desenho do mockup aprovado (q7b-mockup-cronograma).
    Nº | Fase, tarefa ou marco | Responsável | Início | Fim (dd/mm) fixos à esquerda

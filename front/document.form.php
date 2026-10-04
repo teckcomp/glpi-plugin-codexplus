@@ -34,6 +34,7 @@ use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\DocumentVersion;
 use GlpiPlugin\Codexplus\Rights;
+use GlpiPlugin\Codexplus\ScheduleStatus;
 use GlpiPlugin\Codexplus\Sector;
 use GlpiPlugin\Codexplus\Wiki;
 
@@ -590,6 +591,27 @@ if ($inRevision) {
     }
 }
 
+// Q7b-4: situação das tarefas do cronograma com datas, na LEITURA do
+// publicado (também da versão publicada durante uma revisão, e do obsoleto,
+// só para ver). Quem pode marcar: Document::canMarkSchedule().
+$schedule = ['on' => false, 'can_mark' => false, 'json' => '{}', 'url' => ''];
+if ($isDiagram && !$canEdit && $diagramKind === Diagram::SUBTYPE_SCHEDULE) {
+    $mostrado  = json_decode($diagramJson, true);
+    $stDoc     = (string) $doc->fields['status'];
+    $publicado = in_array($stDoc, [Document::STATUS_PUBLISHED, Document::STATUS_OBSOLETE], true) || $version['on'];
+    if ($publicado && is_array($mostrado) && ($mostrado['mode'] ?? '') === Diagram::SCHEDULE_MODE_DATES) {
+        $schedule = [
+            'on'       => true,
+            'can_mark' => $stDoc !== Document::STATUS_OBSOLETE && $doc->canMarkSchedule(),
+            'json'     => json_encode(
+                (object) ScheduleStatus::load($id),
+                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
+            ),
+            'url'      => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/schedule.status.php',
+        ];
+    }
+}
+
 Wiki::pageHeader(); // S1
 
 // B2b: "+ Novo documento" da Biblioteca chega com ?cat= (categoria aberta).
@@ -915,6 +937,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'template_types' => implode(' ', array_diff(array_keys(DocumentMeta::getDoctypes()), ['DIA'])),
     'diagram_kind' => $diagramKind,
     'diagram_kind_label' => Diagram::getSubtypes()[$diagramKind] ?? '',
+    'schedule'     => $schedule,
     'diagram_json' => $diagramJson,
     'can_submit'   => !$isNew && $doc->canSubmit(),
     'can_publish_direct' => !$isNew && !$version['on'] && $doc->canPublishDirect(),

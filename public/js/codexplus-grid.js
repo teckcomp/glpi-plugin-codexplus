@@ -53,7 +53,8 @@
     // As posições fixas na tela (sticky) do CSS seguem estas larguras.
     var GD = {
         n: 48, name: 320, owner: 140, date: 58, pxS: 6.3, pxM: 3,
-        pN: 24, pName: 200, pOwner: 92, pDate: 40, pxSp: 5, pxMp: 2
+        pN: 30, pName: 200, pOwner: 92, pDate: 40, pxSp: 5, pxMp: 2,
+        chk: 32, sit: 190, pSit: 132 // Q7b-4: caixinha (quem marca) e coluna Situação
     };
     function p2(n) { return (n < 10 ? '0' : '') + n; }
     function dn(iso) {
@@ -82,6 +83,39 @@
     function diaSemana(n) { return (new Date(n * DIA).getUTCDay() + 6) % 7; } // 0 = segunda
     function inicioMes(y, m) { return Math.round(Date.UTC(y, m, 1) / DIA); }
     function dias(n) { return n + (n === 1 ? ' dia' : ' dias'); }
+
+    /* ---------- Q7b-4: id fixo da linha (chave da situação da tarefa) ---------- */
+    var ID_OK = /^[a-z0-9]{1,12}$/;
+    function novoId(usados) {
+        var id;
+        do { id = 't' + Math.random().toString(36).slice(2, 8); } while (!ID_OK.test(id) || id.length < 4 || usados[id]);
+        usados[id] = 1;
+        return id;
+    }
+    /** Toda linha com id válido e único; o que faltar ganha um novo (sempre como último campo). */
+    function garanteIds(rows) {
+        var us = {};
+        rows.forEach(function (r) {
+            if (typeof r.id === 'string' && ID_OK.test(r.id) && !us[r.id]) { us[r.id] = 1; } else { delete r.id; }
+        });
+        rows.forEach(function (r) { if (!r.id) { r.id = novoId(us); } });
+        return rows;
+    }
+    /**
+     * Tabela da IA não traz id: a linha que volta com o mesmo tipo e nome
+     * herda o id da linha atual (a situação acompanha a ida e volta).
+     */
+    function herdaIds(velhas, novas) {
+        var usados = {}, chave = function (r) { return (r.type || 'tarefa') + '|' + norm(r.name); };
+        novas.forEach(function (r) { if (r.id) { usados[r.id] = 1; } });
+        novas.forEach(function (r) {
+            if (r.id) { return; }
+            for (var i = 0; i < velhas.length; i++) {
+                var v = velhas[i];
+                if (v.id && !usados[v.id] && chave(v) === chave(r)) { r.id = v.id; usados[v.id] = 1; return; }
+            }
+        });
+    }
 
     function esc(t) {
         return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
@@ -316,12 +350,17 @@
                 kind: 'cronograma', mode: 'datas', scale: ESCALAS[g.scale] ? g.scale : 'S',
                 rows: rows.map(function (r) {
                     var nm = txt(r.name, 200), ow = txt(r.owner, 120);
-                    if (r.type === 'fase') { return { type: 'fase', name: nm, owner: ow }; }
-                    var a = dn(r.start), b = dn(r.end);
-                    if (a == null || b == null) { a = b = (a == null ? b : a); }
-                    if (a != null && b < a) { var t = a; a = b; b = t; }
-                    if (r.type === 'marco') { return { type: 'marco', name: nm, owner: ow, start: a == null ? '' : iso(a), end: a == null ? '' : iso(a) }; }
-                    return { name: nm, owner: ow, start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
+                    var o;
+                    if (r.type === 'fase') { o = { type: 'fase', name: nm, owner: ow }; } else {
+                        var a = dn(r.start), b = dn(r.end);
+                        if (a == null || b == null) { a = b = (a == null ? b : a); }
+                        if (a != null && b < a) { var t = a; a = b; b = t; }
+                        o = r.type === 'marco' ? { type: 'marco', name: nm, owner: ow, start: a == null ? '' : iso(a), end: a == null ? '' : iso(a) }
+                            : { name: nm, owner: ow, start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
+                    }
+                    // Q7b-4: a cópia leva o id (a situação continua valendo no mesmo documento).
+                    if (typeof r.id === 'string' && ID_OK.test(r.id)) { o.id = r.id; }
+                    return o;
                 })
             };
         }
@@ -400,6 +439,20 @@
         var title = root.getAttribute('data-title') || '';
         var code = root.getAttribute('data-code') || '';
         var hist = [], autoTimer = null, salvando = false, denovo = false;
+        // Q7b-4: situação das tarefas (só na leitura do publicado). ST.map = { id: { state, start, done, user, when } }.
+        var ST = null, marcadas = {}, enviando = false;
+        (function () {
+            var src = root.getAttribute('data-status');
+            if (!src || editable) { return; }
+            var el = document.getElementById(src), mp = {};
+            try { mp = JSON.parse(el ? el.textContent : '{}'); } catch (e) { mp = {}; }
+            ST = {
+                map: mp && typeof mp === 'object' && !Array.isArray(mp) ? mp : {},
+                can: root.getAttribute('data-can-mark') === '1',
+                url: root.getAttribute('data-status-url') || ''
+            };
+            if (!ST.url) { ST.can = false; }
+        })();
 
         function ser() { return JSON.stringify(S); }
         function normDated() {
@@ -408,18 +461,24 @@
             S.rows = S.rows.filter(function (r) { return r && typeof r === 'object'; }).map(function (r) {
                 var nm = String(r.name || ''), ow = String(r.owner || '');
                 // Q7b-2: fase não guarda datas (o resumo é calculado); marco tem uma data só.
-                if (r.type === 'fase') { return { type: 'fase', name: nm, owner: ow }; }
-                var a = dn(r.start), b = dn(r.end);
-                if (a == null || b == null) { a = b = (a == null ? b : a); }
-                if (a != null && b < a) { var t = a; a = b; b = t; }
-                if (r.type === 'marco') { return { type: 'marco', name: nm, owner: ow, start: a == null ? '' : iso(a), end: a == null ? '' : iso(a) }; }
-                return { name: nm, owner: ow, start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
+                var o;
+                if (r.type === 'fase') { o = { type: 'fase', name: nm, owner: ow }; } else {
+                    var a = dn(r.start), b = dn(r.end);
+                    if (a == null || b == null) { a = b = (a == null ? b : a); }
+                    if (a != null && b < a) { var t = a; a = b; b = t; }
+                    o = r.type === 'marco' ? { type: 'marco', name: nm, owner: ow, start: a == null ? '' : iso(a), end: a == null ? '' : iso(a) }
+                        : { name: nm, owner: ow, start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
+                }
+                if (typeof r.id === 'string') { o.id = r.id; }
+                return o;
             });
+            garanteIds(S.rows);
         }
         function snapshot() { hist.push(ser()); if (hist.length > 50) { hist.shift(); } }
         function cols() { return S[colKey]; }
 
         function changed() {
+            if (!raci && S.mode === 'datas') { garanteIds(S.rows); }
             if (input) { input.value = ser(); }
             render();
             agenda();
@@ -586,7 +645,7 @@
         // Reserva por CSS: o Esc não vem do navegador, então sai por aqui
         // (com o diálogo de importar aberto, o Esc fecha só o diálogo).
         function escFull(e) {
-            if (e.key !== 'Escape' || io || document.fullscreenElement === root) { return; }
+            if (e.key !== 'Escape' || io || document.querySelector('.cx-gd-dlg') || document.fullscreenElement === root) { return; }
             e.preventDefault();
             setFull(false);
         }
@@ -631,10 +690,11 @@
         var fechadas = new WeakSet();
         var selRow = null; // linha selecionada (só na tela)
         function tipo(r) { return r && (r.type === 'fase' || r.type === 'marco') ? r.type : 'tarefa'; }
-        function avisa(t) {
+        function avisa(t, ok) {
             var el = root.querySelector('.cx-gd-msg');
             if (!el) { return; }
             el.textContent = t;
+            el.classList.toggle('is-ok', !!ok);
             el.hidden = false;
             clearTimeout(el.__t);
             el.__t = setTimeout(function () { el.hidden = true; }, 6000);
@@ -654,6 +714,95 @@
          * linhas dela (tarefas e marcos).
          */
         function gdEstrutura() { return estruturaDe(S.rows); }
+        /* =================== Q7b-4: situação (calculada na hora) =================== */
+        function stOn() { return !!ST && dated; }
+        function quando(rec) {
+            if (!rec || !rec.when) { return ''; }
+            var w = String(rec.when), d = dn(w.slice(0, 10));
+            return (rec.user ? ' por ' + rec.user : '') + (d != null ? ' em ' + br(d) + (w.length >= 16 ? ', ' + w.slice(11, 16) : '') : '');
+        }
+        /**
+         * Situação de uma tarefa: k = ok (concluída no prazo), okatraso
+         * (concluída depois do Fim), atrasada (passou do Fim sem concluir),
+         * andamento ou nao (não iniciada).
+         */
+        function sitTarefa(row, hj) {
+            var rec = (ST && row.id && ST.map[row.id]) || null;
+            var b = dn(row.end), done = rec && rec.state === 'concluida' ? dn(rec.done) : null;
+            var tip = rec ? (rec.state === 'concluida' ? 'Concluída' : 'Iniciada') + quando(rec) : '';
+            if (done != null) {
+                if (b != null && done > b) { return { k: 'okatraso', txt: '✓ concluída em ' + brCurto(done) + ' (atraso)', tip: tip, done: done }; }
+                return { k: 'ok', txt: '✓ concluída ' + brCurto(done), tip: tip, done: done };
+            }
+            if (b != null && b < hj) { return { k: 'atrasada', txt: '● atrasada ' + (hj - b) + ' d', tip: tip || 'Passou do fim (' + br(b) + ') sem concluir', fim: b }; }
+            if (rec && rec.state === 'andamento') { return { k: 'andamento', txt: '● em andamento', tip: tip }; }
+            return { k: 'nao', txt: '○ não iniciada', tip: '' };
+        }
+        /** Fase: % de tarefas concluídas e quantas atrasadas. */
+        function sitFase(i, est, hj) {
+            var tot = 0, ok = 0, atr = 0;
+            S.rows.forEach(function (r, k) {
+                if (est[k].fase !== i || tipo(r) !== 'tarefa') { return; }
+                var x = sitTarefa(r, hj).k;
+                tot++;
+                if (x === 'ok' || x === 'okatraso') { ok++; }
+                if (x === 'atrasada') { atr++; }
+            });
+            if (!tot) { return null; }
+            var pct = Math.round(ok * 100 / tot);
+            return { pct: pct, atr: atr, txt: pct + '%' + (atr ? ' · ' + atr + (atr === 1 ? ' atrasada' : ' atrasadas') : ''), k: atr ? 'atrasada' : (pct === 100 ? 'ok' : 'nao') };
+        }
+        /**
+         * Marco: as tarefas acima dele, na mesma fase (ou soltas no topo).
+         * Atingido quando todas estão concluídas até a data dele; atrasado
+         * quando a data passou e falta tarefa.
+         */
+        function sitMarco(i, est, hj) {
+            var m = dn(S.rows[i].start), tot = 0, ok = 0, ult = null;
+            for (var k = 0; k < i; k++) {
+                if (est[k].fase !== est[i].fase || tipo(S.rows[k]) !== 'tarefa') { continue; }
+                var x = sitTarefa(S.rows[k], hj);
+                tot++;
+                if (x.done != null) { ok++; ult = ult == null ? x.done : Math.max(ult, x.done); }
+            }
+            if (!tot || m == null) { return null; }
+            if (ok === tot) {
+                if (ult > m) { return { k: 'okatraso', txt: '◆ atingido em ' + brCurto(ult) + ' (atraso)' }; }
+                return { k: 'ok', txt: '◆ atingido ' + brCurto(ult) };
+            }
+            if (m < hj) { return { k: 'atrasada', txt: '◆ atrasado' }; }
+            return { k: 'nao', txt: '◆ previsto' };
+        }
+        /** Resumo do topo (mockup): concluídas, atrasadas, concluídas com atraso, marcos atrasados. */
+        function resumoSit(est, hj) {
+            var tot = 0, ok = 0, atr = 0, okat = 0, mat = 0;
+            S.rows.forEach(function (r, i) {
+                if (tipo(r) === 'tarefa') {
+                    var x = sitTarefa(r, hj).k;
+                    tot++;
+                    if (x === 'ok' || x === 'okatraso') { ok++; }
+                    if (x === 'okatraso') { okat++; }
+                    if (x === 'atrasada') { atr++; }
+                } else if (tipo(r) === 'marco') {
+                    var mm = sitMarco(i, est, hj);
+                    if (mm && mm.k === 'atrasada') { mat++; }
+                }
+            });
+            var h = '<div class="cx-gd-sumario"><span><b>' + ok + ' de ' + tot + '</b> ' + (tot === 1 ? 'tarefa concluída' : 'tarefas concluídas') + '</span>';
+            if (atr) { h += '<span class="is-atrasada"><b>' + atr + '</b> ' + (atr === 1 ? 'atrasada' : 'atrasadas') + '</span>'; }
+            if (okat) { h += '<span class="is-okatraso"><b>' + okat + '</b> ' + (okat === 1 ? 'concluída' : 'concluídas') + ' com atraso</span>'; }
+            if (mat) { h += '<span class="is-atrasada"><b>' + mat + '</b> ' + (mat === 1 ? 'marco atrasado' : 'marcos atrasados') + '</span>'; }
+            // Última marcação (quem e quando).
+            var ult = null;
+            Object.keys(ST.map).forEach(function (k) { var r = ST.map[k]; if (r && r.when && (!ult || r.when > ult.when)) { ult = { k: k, state: r.state, user: r.user, when: r.when }; } });
+            if (ult) {
+                var nm = '';
+                S.rows.forEach(function (r) { if (r.id === ult.k) { nm = r.name; } });
+                h += '<span class="cx-gd-ultima">Última marcação: ' + esc((nm ? nm + ' ' : '') + (ult.state === 'concluida' ? 'concluída' : 'iniciada') + quando(ult)) + '</span>';
+            }
+            return h + '</div>';
+        }
+
         /** Colunas da linha do tempo: semanas (segunda a domingo) ou meses, com folga no fim. */
         function gdUnits() {
             var lo = null, hi = null;
@@ -664,6 +813,7 @@
             });
             if (lo == null) { lo = hoje(); }
             if (hi == null || hi < lo) { hi = lo; }
+            if (stOn()) { hi = Math.max(hi, hoje()); } // a extensão do atraso vai até hoje
             var u = [], i, n, s0;
             if (S.scale === 'M') {
                 var a0 = ymd(lo), b0 = ymd(hi);
@@ -711,7 +861,12 @@
             return forPrint ? (S.scale === 'M' ? GD.pxMp : GD.pxSp) : (S.scale === 'M' ? GD.pxM : GD.pxS);
         }
         function gdFixed(forPrint) {
-            return forPrint ? GD.pN + GD.pName + GD.pOwner + 2 * GD.pDate : GD.n + GD.name + GD.owner + 2 * GD.date;
+            var sit = stOn() ? (forPrint ? GD.pSit : GD.sit + (ST.can ? GD.chk : 0)) : 0;
+            return sit + (forPrint ? GD.pN + GD.pName + GD.pOwner + 2 * GD.pDate : GD.n + GD.name + GD.owner + 2 * GD.date);
+        }
+        /** Tarefas marcadas (caixinhas) que ainda existem. */
+        function idsMarcados() {
+            return S.rows.filter(function (r) { return tipo(r) === 'tarefa' && r.id && marcadas[r.id]; }).map(function (r) { return r.id; });
         }
         /** Linhas que aparecem: as de fase recolhida somem (tela e PDF). */
         function gdVisiveis(est) {
@@ -734,6 +889,14 @@
             var px = pxF || gdPx(forPrint);
             var t0 = units[uFrom].s, t1 = units[uTo - 1].s + units[uTo - 1].n, tw = (t1 - t0) * px;
             var wN = forPrint ? GD.pN : GD.n, wn = forPrint ? GD.pName : GD.name, wo = forPrint ? GD.pOwner : GD.owner, wd = forPrint ? GD.pDate : GD.date;
+            // Q7b-4: com situação, caixinha à esquerda (quem marca, só na tela) e coluna Situação depois do Fim.
+            var so = stOn(), ck = so && ST.can && !forPrint;
+            var wC = ck ? GD.chk : 0, wS = so ? (forPrint ? GD.pSit : GD.sit) : 0;
+            var fixo = wC + wN + wn + wo + 2 * wd + wS;
+            // Colunas fixas ao rolar: a posição de cada uma (na tela).
+            var esq = {}, acc = 0;
+            [['chk', wC], ['n', wN], ['name', wn], ['owner', wo], ['ini', wd], ['fim', wd], ['sit', wS]].forEach(function (c) { esq[c[0]] = acc; acc += c[1]; });
+            var L = function (k) { return forPrint ? '' : ' style="left:' + esq[k] + 'px"'; };
             var bands = gdBands(t0, t1), hj = hoje();
             var mesX = {}, seps = '', heads = '', bandH = '';
             bands.forEach(function (b, k) {
@@ -750,11 +913,19 @@
             var hojeX = (hj >= t0 && hj < t1) ? (hj - t0) * px + px / 2 : null;
             var hojeL = hojeX == null ? '' : '<i class="cx-gd-hoje" style="left:' + hojeX + 'px"></i>';
             var hojeH = hojeX == null ? '' : hojeL + '<span class="cx-gd-hoje-rot" style="left:' + hojeX + 'px" title="Hoje, ' + br(hj) + '">hoje</span>';
-            var h = '<table class="cx-grid-table cx-gd-table" data-t0="' + t0 + '" data-px="' + px + '" data-fixo="' + (wN + wn + wo + 2 * wd) + '" style="width:' + (wN + wn + wo + 2 * wd + tw) + 'px"><colgroup>' +
+            var visiveis = gdVisiveis(est);
+            var tarefasVis = visiveis.filter(function (r) { return tipo(S.rows[r]) === 'tarefa' && S.rows[r].id; });
+            var todas = tarefasVis.length > 0 && tarefasVis.every(function (r) { return marcadas[S.rows[r].id]; });
+            var h = '<table class="cx-grid-table cx-gd-table' + (so ? ' cx-gd-table--sit' : '') + '" data-t0="' + t0 + '" data-px="' + px + '" data-fixo="' + fixo + '" style="width:' + (fixo + tw) + 'px"><colgroup>' +
+                (ck ? '<col style="width:' + wC + 'px">' : '') +
                 '<col style="width:' + wN + 'px"><col style="width:' + wn + 'px"><col style="width:' + wo + 'px"><col style="width:' + wd + 'px"><col style="width:' + wd + 'px">' +
+                (so ? '<col style="width:' + wS + 'px">' : '') +
                 '<col style="width:' + tw + 'px"></colgroup>' +
-                '<thead><tr><th class="cx-gd-n">Nº</th><th class="cx-grid-name">Fase, tarefa ou marco</th><th class="cx-gd-owner">Responsável</th>' +
-                '<th class="cx-gd-date cx-gd-ini">Início</th><th class="cx-gd-date cx-gd-fim">Fim</th>' +
+                '<thead><tr>' +
+                (ck ? '<th class="cx-gd-chk"' + L('chk') + '><input type="checkbox" data-chk-all' + (todas ? ' checked' : '') + ' title="Marcar todas as tarefas visíveis" aria-label="Marcar todas as tarefas visíveis"></th>' : '') +
+                '<th class="cx-gd-n"' + L('n') + '>Nº</th><th class="cx-grid-name"' + L('name') + '>Fase, tarefa ou marco</th><th class="cx-gd-owner"' + L('owner') + '>Responsável</th>' +
+                '<th class="cx-gd-date cx-gd-ini"' + L('ini') + '>Início</th><th class="cx-gd-date cx-gd-fim"' + L('fim') + '>Fim</th>' +
+                (so ? '<th class="cx-gd-sit"' + L('sit') + '>Situação</th>' : '') +
                 '<th class="cx-gd-head"><div class="cx-gd-scale" style="width:' + tw + 'px">' + bandH + heads + seps + hojeH + '</div></th></tr></thead><tbody>';
             function barra(a, b, cls, extra, attrs) {
                 var s0 = Math.max(a, t0), e0 = Math.min(b + 1, t1);
@@ -762,8 +933,12 @@
                 return '<div class="' + cls + (a < t0 ? ' is-corta-i' : '') + (b + 1 > t1 ? ' is-corta-f' : '') + '"' + (attrs || '') +
                     ' style="left:' + ((s0 - t0) * px) + 'px;width:' + ((e0 - s0) * px) + 'px">' + (extra || '') + '</div>';
             }
-            gdVisiveis(est).forEach(function (r) {
+            visiveis.forEach(function (r) {
                 var row = S.rows[r], tp = tipo(row), e = est[r];
+                // Q7b-4: situação calculada (tarefa, fase ou marco).
+                var st = so && tp === 'tarefa' ? sitTarefa(row, hj) : null;
+                var sf = so && tp === 'fase' ? sitFase(r, est, hj) : null;
+                var sm = so && tp === 'marco' ? sitMarco(r, est, hj) : null;
                 var a = dn(row.start), b = dn(row.end);
                 if (tp === 'fase') { a = e.a; b = e.b; }
                 var tem = a != null && b != null;
@@ -773,37 +948,50 @@
                     '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="1" title="Descer" aria-label="Descer"><i class="ti ti-arrow-down"></i></button>' +
                     '<button type="button" class="cx-gd-act" data-del-row="' + r + '" title="Tirar ' + (tp === 'fase' ? 'fase (as linhas dela ficam)' : (tp === 'marco' ? 'marco' : 'tarefa')) + '" aria-label="Tirar"><i class="ti ti-x"></i></button></span>' : '';
                 var vazio = { fase: 'nome da fase', marco: 'nome do marco', tarefa: 'clique para nomear' }[tp];
-                h += '<tr class="cx-gd-r-' + tp + (e.fase >= 0 ? ' cx-gd-r-filha' : '') + (!forPrint && row === selRow ? ' is-sel' : '') + '" data-r="' + r + '">' +
-                    '<td class="cx-gd-n">' + e.num + '</td>' +
+                var marcada = ck && tp === 'tarefa' && row.id && marcadas[row.id];
+                h += '<tr class="cx-gd-r-' + tp + (e.fase >= 0 ? ' cx-gd-r-filha' : '') + ((!forPrint && row === selRow) || marcada ? ' is-sel' : '') + '" data-r="' + r + '">' +
+                    (ck ? '<td class="cx-gd-chk"' + L('chk') + '>' + (tp === 'tarefa' && row.id ? '<input type="checkbox" data-chk="' + esc(row.id) + '"' + (marcada ? ' checked' : '') + ' aria-label="Marcar ' + esc(row.name || 'tarefa') + '">' : '') + '</td>' : '') +
+                    '<td class="cx-gd-n"' + L('n') + '>' + e.num + '</td>' +
                     // Caixa flexível: ▾/◆ no tamanho deles, o nome (ou o campo de edição) com o resto.
-                    '<td class="cx-grid-name"><div class="cx-gd-nome">' +
+                    '<td class="cx-grid-name"' + L('name') + '><div class="cx-gd-nome">' +
                     (tp === 'fase' && !forPrint ? '<button type="button" class="cx-gd-fold" data-fold="' + r + '" aria-expanded="' + (fechada ? 'false' : 'true') + '" title="' + (fechada ? 'Mostrar as linhas da fase' : 'Recolher a fase') + '">' + (fechada ? '▸' : '▾') + '</button>' : '') +
                     (tp === 'marco' ? '<span class="cx-gd-losango" aria-hidden="true">◆</span>' : '') +
                     '<span class="cx-gd-txt"' + (row.name ? ' title="' + esc(row.name) + '"' : '') + (ed ? ' data-edit-name="' + r + '"' : '') + '>' +
                     (row.name ? esc(row.name) : (ed ? '<em>' + vazio + '</em>' : '')) + '</span></div>' + acts + '</td>' +
-                    '<td class="cx-gd-owner"><span' + (ed ? ' data-edit-owner="' + r + '"' : '') + (ed && !row.owner ? ' class="cx-gd-vazio" title="Responsável"' : '') + '>' + esc(row.owner || (ed ? '—' : '')) + '</span></td>';
+                    '<td class="cx-gd-owner"' + L('owner') + '><span' + (ed ? ' data-edit-owner="' + r + '"' : '') + (ed && !row.owner ? ' class="cx-gd-vazio" title="Responsável"' : '') + '>' + esc(row.owner || (ed ? '—' : '')) + '</span></td>';
                 if (tp === 'fase') {
-                    h += '<td class="cx-gd-date cx-gd-ini cx-gd-calc">' + dataCel(tem ? a : null) + '</td><td class="cx-gd-date cx-gd-fim cx-gd-calc">' + dataCel(tem ? b : null) + '</td>';
+                    h += '<td class="cx-gd-date cx-gd-ini cx-gd-calc"' + L('ini') + '>' + dataCel(tem ? a : null) + '</td><td class="cx-gd-date cx-gd-fim cx-gd-calc"' + L('fim') + '>' + dataCel(tem ? b : null) + '</td>';
                 } else if (tp === 'marco') {
-                    h += '<td class="cx-gd-date cx-gd-ini">' + (tem ? dataCel(a, ed ? ' data-edit-start="' + r + '"' : '') : (ed ? '<span data-edit-start="' + r + '">—</span>' : '')) + '</td>' +
-                        '<td class="cx-gd-date cx-gd-fim"></td>';
+                    h += '<td class="cx-gd-date cx-gd-ini"' + L('ini') + '>' + (tem ? dataCel(a, ed ? ' data-edit-start="' + r + '"' : '') : (ed ? '<span data-edit-start="' + r + '">—</span>' : '')) + '</td>' +
+                        '<td class="cx-gd-date cx-gd-fim"' + L('fim') + '></td>';
                 } else {
-                    h += '<td class="cx-gd-date cx-gd-ini">' + (tem ? dataCel(a, ed ? ' data-edit-start="' + r + '"' : '') : (ed ? '<span data-edit-start="' + r + '">—</span>' : '')) + '</td>' +
-                        '<td class="cx-gd-date cx-gd-fim">' + (tem ? dataCel(b, ed ? ' data-edit-end="' + r + '"' : '') : (ed ? '<span data-edit-end="' + r + '">—</span>' : '')) + '</td>';
+                    h += '<td class="cx-gd-date cx-gd-ini"' + L('ini') + '>' + (tem ? dataCel(a, ed ? ' data-edit-start="' + r + '"' : '') : (ed ? '<span data-edit-start="' + r + '">—</span>' : '')) + '</td>' +
+                        '<td class="cx-gd-date cx-gd-fim"' + L('fim') + '>' + (tem ? dataCel(b, ed ? ' data-edit-end="' + r + '"' : '') : (ed ? '<span data-edit-end="' + r + '">—</span>' : '')) + '</td>';
+                }
+                if (so) {
+                    var pill = st ? '<span class="cx-gd-pill is-' + st.k + '"' + (st.tip ? ' title="' + esc(st.tip) + '"' : '') + '>' + esc(st.txt) + '</span>'
+                        : sm ? '<span class="cx-gd-pill is-' + sm.k + '">' + esc(sm.txt) + '</span>'
+                        : sf ? '<span class="cx-gd-fase-sit is-' + sf.k + '">' + esc(sf.txt) + '</span>' : '';
+                    h += '<td class="cx-gd-sit"' + L('sit') + '>' + pill + '</td>';
                 }
                 h += '<td class="cx-gd-track' + (tem || tp === 'fase' ? '' : ' is-vazia') + (tp === 'fase' ? ' is-fase' : '') + '" data-r="' + r + '"><div class="cx-gd-lane" style="width:' + tw + 'px">' + seps + hojeL;
                 if (tem && tp === 'fase') {
-                    h += barra(a, b, 'cx-gd-fase-barra', '', ' title="' + esc((row.name ? row.name + ': ' : 'Fase: ') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')') + '"');
+                    // Q7b-4: a barra da fase mostra o progresso (o trecho cumprido mais escuro).
+                    h += barra(a, b, 'cx-gd-fase-barra' + (sf ? ' has-prog is-' + sf.k : ''), sf ? '<i class="cx-gd-prog" style="width:' + sf.pct + '%"></i>' : '',
+                        ' title="' + esc((row.name ? row.name + ': ' : 'Fase: ') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')' + (sf ? ' · ' + sf.txt : '')) + '"');
                 } else if (tem && tp === 'marco') {
                     if (a >= t0 && a < t1) {
                         var mx = (a - t0) * px + px / 2;
-                        h += '<div class="cx-gd-marco" data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : 'Marco: ') + br(a)) + '" style="left:' + mx + 'px"></div>' +
-                            '<span class="cx-gd-marco-data" style="left:' + mx + 'px">' + brCurto(a) + '</span>';
+                        h += '<div class="cx-gd-marco' + (sm ? ' is-' + sm.k : '') + '" data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : 'Marco: ') + br(a)) + '" style="left:' + mx + 'px"></div>' +
+                            '<span class="cx-gd-marco-data' + (sm ? ' is-' + sm.k : '') + '" style="left:' + mx + 'px">' + brCurto(a) + '</span>';
                     }
                 } else if (tem) {
-                    h += barra(a, b, 'cx-gd-barra',
-                        ed ? '<span class="cx-gd-alca is-i" data-h="i" title="Mudar o início"></span><span class="cx-gd-alca is-f" data-h="f" title="Mudar o fim"></span>' : '',
-                        ' data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : '') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')') + '"');
+                    // Q7b-4: atrasada ganha a extensão até hoje (rosa), por baixo da barra.
+                    if (st && st.k === 'atrasada' && b + 1 <= hj) { h += barra(b + 1, hj, 'cx-gd-ext'); }
+                    h += barra(a, b, 'cx-gd-barra' + (st ? ' st-' + st.k : ''),
+                        (ed ? '<span class="cx-gd-alca is-i" data-h="i" title="Mudar o início"></span><span class="cx-gd-alca is-f" data-h="f" title="Mudar o fim"></span>' : '') +
+                        (st && (st.k === 'ok' || st.k === 'okatraso') ? '<span class="cx-gd-ok" aria-hidden="true">✓</span>' : ''),
+                        ' data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : '') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')' + (st ? ' · ' + st.txt : '')) + '"');
                 }
                 h += '</div></td></tr>';
             });
@@ -811,6 +999,13 @@
             return h;
         }
         function gdLegend() {
+            if (stOn()) {
+                return '<span><b class="cx-gd-leg st-ok"></b>Concluída</span><span><b class="cx-gd-leg st-okatraso"></b>Concluída com atraso</span>' +
+                    '<span><b class="cx-gd-leg st-atrasada"></b>Atrasada</span><span><b class="cx-gd-leg st-andamento"></b>Em andamento</span>' +
+                    '<span><b class="cx-gd-leg st-nao"></b>Não iniciada</span>' +
+                    '<span><b class="cx-gd-leg-fase"></b>Fase (resumo das tarefas)</span><span><b class="cx-gd-leg-marco">◆</b>Marco</span>' +
+                    '<span title="Hoje, ' + br(hoje()) + '"><b class="cx-gd-leg-hoje"></b>Hoje</span>';
+            }
             return '<span><b class="cx-sched-b"></b>Tarefa</span>' +
                 '<span><b class="cx-gd-leg-fase"></b>Fase (resumo das tarefas)</span>' +
                 '<span><b class="cx-gd-leg-marco">◆</b>Marco</span>' +
@@ -830,13 +1025,21 @@
                     '<button type="button" class="codexplus-btn" data-act="undo"' + (hist.length ? '' : ' disabled') + '><i class="ti ti-arrow-back-up"></i> Desfazer</button>' +
                     '<span class="cx-grid-savestate"></span><span class="cx-gd-msg" role="status" hidden></span>';
             } else {
-                // Leitura: só Hoje (e a tela cheia, no fim da barra).
-                bar += '<button type="button" class="codexplus-btn" data-act="hoje" title="Levar a linha do tempo até hoje"><i class="ti ti-calendar"></i> Hoje</button>' +
-                    '<span class="cx-gd-msg" role="status" hidden></span>';
+                // Leitura: Hoje (e a tela cheia, no fim da barra); quem pode marcar, Iniciar/Concluir/Reabrir (Q7b-4).
+                bar += '<button type="button" class="codexplus-btn" data-act="hoje" title="Levar a linha do tempo até hoje"><i class="ti ti-calendar"></i> Hoje</button>';
+                if (stOn() && ST.can) {
+                    var nm = idsMarcados().length, off = !nm || enviando ? ' disabled' : '';
+                    bar += '<span class="cx-gd-sep-bar"></span>' +
+                        '<button type="button" class="codexplus-btn" data-act="iniciar"' + off + ' title="Marcar as tarefas selecionadas como em andamento"><i class="ti ti-player-play"></i> Iniciar</button>' +
+                        '<button type="button" class="codexplus-btn" data-act="concluir"' + off + ' title="Concluir as tarefas selecionadas"><i class="ti ti-check"></i> Concluir' + (nm ? ' (' + nm + ')' : '') + '</button>' +
+                        '<button type="button" class="codexplus-btn" data-act="reabrir"' + off + ' title="Voltar as tarefas selecionadas para em andamento ou não iniciada"><i class="ti ti-arrow-back-up"></i> Reabrir</button>' +
+                        (nm ? '' : '<span class="cx-gd-dica">Marque as tarefas na primeira coluna.</span>');
+                }
+                bar += '<span class="cx-gd-msg" role="status" hidden></span>';
             }
             bar += '<span class="cx-grid-spacer"></span>' + (editable ? ioBotoes() : '') + botoesFim() + '</div>';
             var rol = rolagem();
-            root.innerHTML = '<div class="cx-grid cx-grid--sched cx-grid--datas">' + bar +
+            root.innerHTML = '<div class="cx-grid cx-grid--sched cx-grid--datas">' + bar + (stOn() ? resumoSit(gdEstrutura(), hoje()) : '') +
                 '<div class="cx-grid-wrap">' + gdTable(false) + '</div><div class="cx-grid-legend">' + gdLegend() + '</div></div>';
             rol();
         }
@@ -859,7 +1062,9 @@
         }
         /** Linha nova no fim: tarefa logo depois da última data; marco no último fim; fase sem datas. */
         function novaLinha(tp, ref) {
-            if (tp === 'fase') { return { type: 'fase', name: '', owner: '' }; }
+            var us = {};
+            S.rows.forEach(function (r) { if (r.id) { us[r.id] = 1; } });
+            if (tp === 'fase') { return { type: 'fase', name: '', owner: '', id: novoId(us) }; }
             var ult = null;
             S.rows.forEach(function (r) { var b = dn(r.end); if (b != null) { ult = ult == null ? b : Math.max(ult, b); } });
             // Abaixo de uma linha selecionada: a nova começa depois dela (ou do fim da fase selecionada).
@@ -869,10 +1074,10 @@
             }
             if (tp === 'marco') {
                 var m = ult == null ? hoje() : ult;
-                return { type: 'marco', name: '', owner: '', start: iso(m), end: iso(m) };
+                return { type: 'marco', name: '', owner: '', start: iso(m), end: iso(m), id: novoId(us) };
             }
             var a = ult == null ? hoje() : ult + 1;
-            return { name: '', owner: '', start: iso(a), end: iso(a + 6) };
+            return { name: '', owner: '', start: iso(a), end: iso(a + 6), id: novoId(us) };
         }
         /**
          * Q7b-2: subir/descer. A fase leva as linhas dela junto (troca de lugar
@@ -1234,9 +1439,108 @@
         function ioApply() {
             if (!io || !io.got) { return; }
             snapshot();
-            S = io.got.data;
+            var nd = io.got.data;
+            if (!raci && nd.mode === 'datas' && S.mode === 'datas') { herdaIds(S.rows, nd.rows); }
+            S = nd;
             ioClose();
             changed();
+        }
+
+        /* ---------- Q7b-4: marcar a situação (Iniciar, Concluir, Reabrir) ---------- */
+        root.addEventListener('change', function (e) {
+            if (!stOn() || !ST.can) { return; }
+            var t = e.target;
+            if (t.hasAttribute('data-chk')) {
+                var id = t.getAttribute('data-chk');
+                if (t.checked) { marcadas[id] = 1; } else { delete marcadas[id]; }
+                render();
+            } else if (t.hasAttribute('data-chk-all')) {
+                root.querySelectorAll('[data-chk]').forEach(function (c) {
+                    var k = c.getAttribute('data-chk');
+                    if (t.checked) { marcadas[k] = 1; } else { delete marcadas[k]; }
+                });
+                render();
+            }
+        });
+        var MSG_ERRO = {
+            sem_permissao: 'Sem permissão para marcar a situação deste documento.',
+            sem_tarefas: 'Nenhuma das tarefas marcadas existe na versão publicada. Recarregue a página.',
+            data_invalida: 'Data de conclusão inválida (no máximo hoje).',
+            nao_encontrado: 'Documento não encontrado.',
+            sem_acesso: 'Sem acesso a este documento.'
+        };
+        function marca(acao, data) {
+            var ids = idsMarcados();
+            if (!ids.length || enviando) { return; }
+            var tk = (root.parentNode && root.parentNode.querySelector('[name="_glpi_csrf_token"]')) || document.querySelector('[name="_glpi_csrf_token"]');
+            if (!tk) { avisa('A página está sem o token de segurança: recarregue (F5).'); return; }
+            enviando = true;
+            render();
+            var fd = new FormData();
+            fd.append('id', docId);
+            fd.append('acao', acao);
+            fd.append('linhas', JSON.stringify(ids));
+            if (data) { fd.append('data', data); }
+            fd.append('_glpi_csrf_token', tk.value);
+            fetch(ST.url, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j || {} }; }); })
+                .then(function (res) {
+                    enviando = false;
+                    // Token consumido a cada POST (achado 43): o novo vai para todos.
+                    if (res.j.csrf) { document.querySelectorAll('[name="_glpi_csrf_token"]').forEach(function (i) { i.value = res.j.csrf; }); }
+                    if (!res.ok || !res.j.ok) {
+                        render();
+                        avisa(MSG_ERRO[res.j.erro] || 'Não foi possível gravar a situação.');
+                        return;
+                    }
+                    ST.map = res.j.status && typeof res.j.status === 'object' ? res.j.status : {};
+                    marcadas = {};
+                    render();
+                    var n = res.j.n || 0, verbo = { iniciar: 'iniciada', concluir: 'concluída', reabrir: 'reaberta' }[acao];
+                    avisa(n ? n + (n === 1 ? ' tarefa ' + verbo : ' tarefas ' + verbo + 's') + ' às ' + (res.j.hora || '') : 'Nada mudou (já estavam assim).', true);
+                })
+                .catch(function () {
+                    enviando = false;
+                    render();
+                    avisa('Não foi possível gravar a situação (sem conexão?).');
+                });
+        }
+        /** Concluir: pergunta a data (hoje, editável; conclusão no futuro não vale). */
+        function dlgConcluir() {
+            var n = idsMarcados().length;
+            if (!n || enviando) { return; }
+            var el = document.createElement('div');
+            el.className = 'cx-io-back cx-io-back--fixo';
+            (document.fullscreenElement && document.fullscreenElement.contains(root) ? document.fullscreenElement : document.body).appendChild(el);
+            el.innerHTML = '<div class="cx-io cx-gd-dlg" role="dialog" aria-modal="true" aria-label="Concluir tarefas">' +
+                '<h3>Concluir ' + n + (n === 1 ? ' tarefa' : ' tarefas') + '</h3>' +
+                '<p class="cx-io-sub">Data em que ' + (n === 1 ? 'foi concluída' : 'foram concluídas') + '. Depois do Fim planejado, conta como concluída com atraso.</p>' +
+                '<label class="cx-gd-dlg-l">Data da conclusão <input type="text" class="form-control" data-d="data" value="' + br(hoje()) + '" placeholder="dd/mm/aaaa" autocomplete="off"></label>' +
+                '<p class="cx-io-err" data-d="err" hidden></p>' +
+                '<div class="cx-io-foot"><button type="button" class="cx-io-btn" data-d="cancel">Cancelar</button>' +
+                '<button type="button" class="cx-io-btn cx-io-pri" data-d="ok">Concluir</button></div></div>';
+            var q = function (k) { return el.querySelector('[data-d="' + k + '"]'); };
+            function fecha() { document.removeEventListener('keydown', tecla, true); el.remove(); }
+            function ok() {
+                var v = q('data').value.trim(), d = parseBr(v);
+                var m = /^(\d{1,2})[\/.\-](\d{1,2})$/.exec(v);
+                if (d == null && m) { d = dn(ymd(hoje()).y + '-' + p2(+m[2]) + '-' + p2(+m[1])); }
+                var err = d == null ? 'Data inválida: use dd/mm/aaaa.' : (d > hoje() ? 'A conclusão não pode ser no futuro.' : '');
+                if (err) { q('err').textContent = err; q('err').hidden = false; return; }
+                fecha();
+                marca('concluir', iso(d));
+            }
+            function tecla(e) {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecha(); }
+                if (e.key === 'Enter') { e.preventDefault(); ok(); }
+            }
+            document.addEventListener('keydown', tecla, true);
+            el.addEventListener('pointerdown', function (e) { if (e.target === el) { fecha(); } });
+            q('cancel').addEventListener('click', fecha);
+            q('ok').addEventListener('click', ok);
+            q('data').addEventListener('input', function () { q('err').hidden = true; });
+            q('data').focus();
+            q('data').select();
         }
 
         /* ---------- unidade (cronograma) ---------- */
@@ -1277,6 +1581,9 @@
                 if (a === 'pdf') { printGrid(); return; }
                 if (a === 'full') { toggleFull(); return; }
                 if (a === 'hoje') { if (dated) { vaiHoje(); } return; }
+                // Q7b-4: situação (leitura do publicado, quem pode marcar).
+                if (a === 'iniciar' || a === 'reabrir') { if (stOn() && ST.can) { marca(a, ''); } return; }
+                if (a === 'concluir') { if (stOn() && ST.can) { dlgConcluir(); } return; }
                 if (!editable) { return; }
                 if (a === 'undo') { if (hist.length) { S = JSON.parse(hist.pop()); changed(); } return; }
                 if (a === 'datas') { if (!raci && !dated) { converte(); } return; }
@@ -1419,7 +1726,7 @@
                 }
                 return '<section' + (k < blocos.length - 1 ? ' style="page-break-after:always"' : '') + '>' +
                     '<div class="h"><b>' + esc(title) + '</b><span>' + esc(code + parte) + '</span></div>' +
-                    (dated ? gdTable(true, bl[0], bl[1], plan.px) + '<div class="l">' + gdLegend() + '</div>'
+                    (dated ? (k === 0 && stOn() ? resumoSit(gdEstrutura(), hoje()) : '') + gdTable(true, bl[0], bl[1], plan.px) + '<div class="l">' + gdLegend() + '</div>'
                         : tableHtml(true, bl[0], bl[1]) + '<div class="l">' + legendHtml() + '</div>') + '</section>';
             }).join('');
             d.open();
@@ -1450,6 +1757,18 @@
                 '.cx-gd-hoje{position:absolute;top:0;bottom:0;border-left:2px dashed #d6456e;margin-left:-1px}.cx-gd-scale .cx-gd-hoje{top:15px}' +
                 '.cx-gd-hoje-rot{position:absolute;bottom:0;transform:translateX(-50%);padding:0 3px;background:#d6456e;color:#fff;font-size:7px;font-weight:bold;line-height:10px;border-radius:2px}' +
                 '.cx-gd-leg-fase{background:#2c3a4a;height:5px!important}.cx-gd-leg-marco{color:#1d9e75}.cx-gd-leg-hoje{width:0;min-width:0!important;border-left:2px solid #d6456e}' +
+                // Q7b-4: situação no PDF.
+                '.cx-gd-sumario{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 6px;font-size:9px}.cx-gd-sumario .is-atrasada{color:#a32d2d}.cx-gd-sumario .is-okatraso{color:#854f0b}.cx-gd-ultima{margin-left:auto;color:#5a6575}' +
+                '.cx-gd-pill{display:inline-block;padding:0 4px;border-radius:6px;font-size:8px;font-weight:bold;line-height:12px}' +
+                '.cx-gd-pill.is-ok{background:#e1f5ee;color:#085041}.cx-gd-pill.is-okatraso{background:#faeeda;color:#633806}.cx-gd-pill.is-atrasada{background:#fcebeb;color:#a32d2d}' +
+                '.cx-gd-pill.is-andamento{background:#e6f1fb;color:#0c447c}.cx-gd-pill.is-nao{background:#f1efe8;color:#5f5e5a}' +
+                '.cx-gd-fase-sit{font-size:8px;font-weight:bold}.cx-gd-fase-sit.is-atrasada{color:#a32d2d}' +
+                '.cx-gd-barra.st-ok{background:#1d9e75;border-color:#0f6e56}.cx-gd-barra.st-okatraso{background:#efc66b;border-color:#ba7517}.cx-gd-barra.st-atrasada{background:#e57373;border-color:#a32d2d}' +
+                '.cx-gd-barra.st-andamento{background:#85b7eb;border-color:#378add}.cx-gd-barra.st-nao{background:#d6f1e6;border-color:#9fe1cb}' +
+                '.cx-gd-ok{position:absolute;left:2px;top:-1px;color:#fff;font-size:8px;font-weight:bold}.cx-gd-ext{position:absolute;top:8px;height:4px;background:#f4c0c0}' +
+                '.cx-gd-fase-barra.has-prog{background:#c9ced8}.cx-gd-fase-barra.is-atrasada{background:#f4c0c0}.cx-gd-prog{position:absolute;left:0;top:0;bottom:0;background:#2c3a4a}.cx-gd-fase-barra.is-atrasada .cx-gd-prog{background:#a32d2d}' +
+                '.cx-gd-marco.is-atrasada{background:#a32d2d}.cx-gd-marco.is-okatraso{background:#ba7517}.cx-gd-marco-data.is-atrasada{color:#a32d2d}.cx-gd-marco-data.is-okatraso{color:#854f0b}' +
+                '.cx-gd-leg{min-width:16px}.cx-gd-leg.st-ok{background:#1d9e75}.cx-gd-leg.st-okatraso{background:#efc66b}.cx-gd-leg.st-atrasada{background:#e57373}.cx-gd-leg.st-andamento{background:#85b7eb}.cx-gd-leg.st-nao{background:#d6f1e6}' +
                 '.l{margin-top:6px;display:flex;gap:14px}.l span{display:inline-flex;align-items:center}.l b{display:inline-block;min-width:16px;height:12px;line-height:12px;margin-right:4px;text-align:center;border-radius:2px}' +
                 '</style></head><body>' + corpo + '</body></html>');
             d.close();

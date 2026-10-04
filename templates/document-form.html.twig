@@ -485,8 +485,16 @@
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% elseif is_diagram and diagram_kind != 'organograma' %}
                 <script type="application/json" id="cx-grid-data">{{ diagram_json|raw }}</script>
+                {# Q7b-4: situação das tarefas (publicado); quem pode marcar ganha Iniciar/Concluir/Reabrir. #}
+                {% if schedule.on %}
+                    <script type="application/json" id="cx-grid-status">{{ schedule.json|raw }}</script>
+                    {% if schedule.can_mark %}
+                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}" form="cx-grid-status-token">
+                    {% endif %}
+                {% endif %}
                 <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-source="cx-grid-data"
-                     data-title="{{ name }}" data-code="{{ code }}"></div>
+                     data-title="{{ name }}" data-code="{{ code }}"
+                     {% if schedule.on %}data-status="cx-grid-status" data-doc="{{ id }}"{% if schedule.can_mark %} data-can-mark="1" data-status-url="{{ schedule.url }}"{% endif %}{% endif %}></div>
             {% elseif is_diagram %}
                 {# Q6a-1: leitura do organograma no desenho novo, em SVG
                    (public/js/codexplus-orgdraw.js); a edição continua no motor

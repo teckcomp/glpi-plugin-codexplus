@@ -79,6 +79,7 @@ class Diagram
      * cronograma antigo (S1, S2…), que continua abrindo como sempre.
      * Q7b-2: linha pode ter `type` 'fase' ({ type, name, owner }, sem datas)
      * ou 'marco' (start = end); sem `type`, é tarefa.
+     * Q7b-4: toda linha tem `id` fixo (último campo), a chave da situação.
      */
     public const SCHEDULE_MODE_DATES = 'datas';
     public const SCHEDULE_SCALES     = ['S', 'M'];
@@ -482,10 +483,14 @@ class Diagram
     private static function validateDated(array $data): array
     {
         $rows = [];
+        $ids  = [];
         foreach (array_slice((array) ($data['rows'] ?? []), 0, self::MAX_GRID_ROWS) as $r) {
             if (!is_array($r)) {
                 continue;
             }
+            // Q7b-4: id fixo da linha (a situação da tarefa fica presa a ele).
+            $id = is_scalar($r['id'] ?? null) ? (string) $r['id'] : '';
+            $ids[] = (preg_match('/^[a-z0-9]{1,12}$/', $id) && !in_array($id, $ids, true)) ? $id : '';
             $name  = self::text($r['name'] ?? '', 200);
             $owner = self::text($r['owner'] ?? '', 120);
             $type  = in_array($r['type'] ?? '', self::SCHEDULE_ROW_TYPES, true) ? $r['type'] : '';
@@ -512,6 +517,22 @@ class Diagram
                 'start' => $start,
                 'end'   => $end,
             ];
+        }
+        // Linha sem id (cronograma de antes do Q7b-4) ou com id repetido:
+        // r + posição, pulando o que já existe. Determinístico: enquanto o
+        // JSON não muda, a mesma linha ganha o mesmo id em toda leitura (e o
+        // motor o grava na próxima edição).
+        $usados = array_flip(array_filter($ids, 'strlen'));
+        foreach ($rows as $i => $row) {
+            $id = $ids[$i];
+            if ($id === '') {
+                $id = 'r' . ($i + 1);
+                while (isset($usados[$id])) {
+                    $id .= 'x';
+                }
+                $usados[$id] = true;
+            }
+            $rows[$i]['id'] = $id;
         }
         return [
             'kind'  => self::SUBTYPE_SCHEDULE,

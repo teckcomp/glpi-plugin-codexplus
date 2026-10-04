@@ -89,7 +89,7 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
 8. **R3b2** — liberar a leitura pela tela (decidir antes: Self-Service vê o Codex+?)
 9. **R3b3 → R3b4 → R4 → R5 → resto da R6 → R7** — fecha a Etapa R
 10. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
-11. **Etapa 5** — PSG e seus POPs
+11. **Etapa 5** — documentos vinculados em todos os níveis (PSG, POP, Manual, Diagrama)
 12. **Etapa 7** — alerta de vencimento
 13. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
 14. **Etapa 8** — personalização completa do PDF
@@ -159,7 +159,8 @@ Vale sobre a lista acima quando houver conflito.
     prorrogação, histórico de revisões no fim do PDF)
 13. **Acesso anônimo (R7)** — seção "Acesso anônimo" na coluna Permissões,
     abaixo de Leitura (sugestão de Claudio, 26/09)
-14. **PSG com POPs e PDF composto (Etapa 5)** — o link de forma do
+14. **Documentos vinculados e PDF composto em cascata (Etapa 5)** —
+    PSG → POP → Manual/Diagrama (redesenhada em 04/10); o link de forma do
     fluxograma para documento do Codex+ conversa com isso
 15. Caça a bugs
 16. Produção, com o alerta de vencimento (Etapa 7) logo depois
@@ -383,27 +384,62 @@ confirmar com Claudio se ainda vale.
 
 ---
 
-## Etapa 5 — PSG e seus POPs
+## Etapa 5 — documentos vinculados (PSG, POP, Manual, Diagrama)
 
-**Tabela** `glpi_plugin_codexplus_psg_items`: `id`, `psg_documents_id`,
-`pop_documents_id`, `rank`.
+> **Redesenhada em 04/10/2026 (noite), por decisão de Claudio:** o vínculo
+> deixa de ser só PSG → POP. Vale em **todos os níveis**, inclusive `DIA`:
+> um Manual faz parte de um POP, que faz parte de um PSG. Substitui a tabela
+> `psg_items` prevista antes (nunca criada).
 
-**Entrega:**
+**Tabela** `glpi_plugin_codexplus_documentlinks`: `id`,
+`parent_documents_id`, `child_documents_id`, `rank`, `date_creation`;
+chave única (pai, filho). Precisa reinstalar.
 
-- Na leitura de um PSG, seção "Procedimentos vinculados" com os POPs em ordem
-- Interface para vincular, desvincular e reordenar
-- **PDF composto:** exportar o PSG gerando um arquivo único com o regimento
-  seguido de todos os POPs vinculados, cada um começando em página nova, com
-  sumário no início
+**Decisões de Claudio (04/10/2026):**
 
-**Aceite:** um PSG com 3 POPs gera um PDF único, paginado corretamente, com
-sumário.
+1. **PDF composto em cascata, todos os níveis**, inclusive os `DIA`
+   vinculados: o PDF do PSG traz o regimento, cada POP e, dentro de cada
+   POP, os Manuais e Diagramas dele. Cada documento começa em página nova;
+   sumário no início com a árvore inteira.
+2. **Um filho pode ter vários pais** (um Manual serve a vários POPs).
+3. **Filho obsoleto ou vencido avisa o pai**: aviso na leitura do pai e
+   entrada em "Precisa de atenção" no Painel — é o gatilho para revisar o
+   pai.
+4. **Filho sem acesso de leitura continua constando** na lista e no
+   sumário, com a nota **"sem acesso"**.
+
+**A confirmar com Claudio no mockup (propostas do assistente):**
+
+- **Pares permitidos:** PSG → POP, PSG → DIA, POP → MAN, POP → DIA,
+  MAN → DIA. Os outros tipos (PRP, LAU, DTC, DIV) ficam fora.
+- **Sem ciclo:** vincular A dentro de B é recusado se B já está, em
+  qualquer nível, dentro de A.
+- **Documento repetido na mesma cascata** (Manual em dois POPs do mesmo
+  PSG): sai inteiro na primeira vez; nas seguintes, uma linha "ver página N".
+- **"Sem acesso" no PDF:** título, código e a nota; o conteúdo não sai
+  (senão a nota não protege nada).
+- **Versão que entra no PDF do pai:** a publicada do filho. Filho só em
+  rascunho aparece com a nota "sem versão publicada".
+- **`DIA` em paisagem dentro do composto:** folha A4 paisagem no meio do
+  PDF retrato (o motor de cada diagrama já gera paisagem).
+
+**Blocos (um pacote, um deploy, um teste cada; mockup antes):**
+
+| Bloco | Entrega |
+|---|---|
+| 5a | Tabela, regras (pares, ciclo, vários pais) e tela de vincular, desvincular e reordenar na página do documento. Harness com as regras |
+| 5b | Leitura: seção "Documentos vinculados" (filhos em ordem) e "Faz parte de" (pais); notas "sem acesso", obsoleto e vencido |
+| 5c | PDF composto em cascata, com sumário e as notas |
+| 5d | Painel: indicador "PSG sem POP vinculado" de verdade e filho obsoleto/vencido em "Precisa de atenção" |
+
+**Aceite:** um PSG com 3 POPs, um deles com um Manual e um DIA, gera um PDF
+único, paginado corretamente, com sumário em árvore; tornar o Manual
+obsoleto faz o POP aparecer em "Precisa de atenção".
 
 > É a função que nenhuma das referências (BookStack, GLPI nativo) entrega.
 > Depende da 4c (concluída) — reusa o mesmo motor de paginação, chamando
 > `layoutPages()` uma vez por documento vinculado dentro do mesmo `#cx-stage`.
-> Destrava também o indicador "PSG sem POP vinculado" do Painel, que hoje
-> exibe `—` justamente por falta desta tabela.
+> O link de forma do fluxograma para documento do Codex+ conversa com isto.
 
 ---
 
@@ -660,6 +696,10 @@ POP e PSG.
 
 **Decididas:**
 
+- [x] **Vínculo entre documentos em todos os níveis** (Etapa 5): PSG → POP
+      → Manual, inclusive `DIA`; PDF composto em cascata; filho com vários
+      pais; filho obsoleto ou vencido avisa o pai ("Precisa de atenção");
+      filho sem acesso consta com a nota "sem acesso" — Claudio, 04/10/2026
 - [x] **Papéis no documento (P3)**, substitui a parte de bits do P1:
       responsável, editores, revisor e aprovadores entre quem tem Ler;
       Auditar fica no perfil; quem montou (autor, editores, revisor) não

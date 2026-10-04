@@ -1080,6 +1080,25 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'date_validated'     => $version['on'] ? $version['date'] : ($isNew ? '' : (string) ($doc->fields['date_validated'] ?? '')),
     'widgets'     => $widgets,
     'perm'        => $perm,
+    // Dados do documento recolhíveis (Claudio, 04/10/2026): faixa de resumo
+    // e o que falta para enviar (abre sozinho quando falta algo).
+    'meta'        => $isNew ? ['new' => true, 'missing' => true] : (static function () use ($doc, $sectorNames, $categoryNames, $perm, $brandShown, $review) {
+        $full    = $doc->flow() === DocumentMeta::FLOW_FULL;
+        $auditor = (string) ($review['auditor_name'] ?? '');
+        $lugar   = $doc->placementError() === null;
+        $draft   = (string) $doc->fields['status'] === Document::STATUS_DRAFT;
+        return [
+            'new'      => false,
+            'estante'  => $sectorNames ? implode(', ', $sectorNames) . ($categoryNames ? ' › ' . implode(', ', $categoryNames) : '') : '',
+            'owner'    => (int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : '',
+            'auditor'  => $full ? ($auditor !== '' ? $auditor : null) : false,
+            'readers'  => count($perm['targets'] ?? []),
+            'brand'    => (string) ($brandShown['name'] ?? ''),
+            // Só pesa em rascunho: é o que impede enviar.
+            'missing'  => $draft && (!$lugar || ($full && $auditor === '')),
+            'no_place' => !$lugar,
+        ];
+    })(),
     // Etapa 5a: documentos vinculados (só tipos que aceitam filhos).
     'links'       => (!$isNew && !$version['on'] && !$preview
         && \GlpiPlugin\Codexplus\DocumentLink::canHaveChildren((string) $doc->fields['doctype'])

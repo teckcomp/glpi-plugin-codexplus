@@ -55,6 +55,15 @@
                 : '')
             + '<button type="button" class="codexplus-btn" data-act="png" title="Baixar o fluxograma como imagem PNG (o que está salvo)"><i class="ti ti-photo-down"></i> Baixar PNG</button>'
             + '<button type="button" class="codexplus-btn" data-act="pdf"' + (editable ? '' : ' hidden') + ' title="Exportar o fluxograma em PDF (o que está salvo)"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>'
+            // Tela cheia na leitura (Claudio, 04/10/2026), como no organograma:
+            // desenho em tamanho real, com zoom e rolagem.
+            + '<button type="button" class="codexplus-btn" data-act="full" data-full><i class="ti ti-maximize"></i> Tela cheia</button>'
+            + '<span class="cx-flow-zoom" data-zoombar hidden>'
+            + '<button type="button" class="codexplus-btn" data-act="zout" title="Diminuir" aria-label="Diminuir"><i class="ti ti-zoom-out"></i></button>'
+            + '<span class="cx-flow-zoomval" data-zoomval>100%</span>'
+            + '<button type="button" class="codexplus-btn" data-act="zin" title="Aumentar" aria-label="Aumentar"><i class="ti ti-zoom-in"></i></button>'
+            + '<button type="button" class="codexplus-btn" data-act="zfit" title="Ajustar à tela">Ajustar</button>'
+            + '</span>'
             + '</div><div class="cx-flow-view"></div>';
         var view = root.querySelector('.cx-flow-view');
 
@@ -68,6 +77,7 @@
                     ? 'Fluxograma vazio. Clique em "Abrir o fluxograma" para desenhar.'
                     : 'Fluxograma ainda sem desenho.') + '</p>';
                 root.querySelector('[data-act="png"]').hidden = true;
+                root.querySelector('[data-act="full"]').hidden = true;
                 if (editable) { root.querySelector('[data-act="pdf"]').hidden = true; }
                 return;
             }
@@ -88,7 +98,9 @@
                 });
             });
             root.querySelector('[data-act="png"]').hidden = false;
+            root.querySelector('[data-act="full"]').hidden = false;
             if (editable) { root.querySelector('[data-act="pdf"]').hidden = false; }
+            if (root.classList.contains('is-full')) { applyZoom(); }
         }
 
         function cssId(id) { return String(id).replace(/["\\]/g, '\\$&'); }
@@ -215,12 +227,73 @@
             }).then(function () { btn.disabled = false; });
         }
 
+        /* Tela cheia (API do navegador; sem ela, a classe de reserva is-full).
+           Dentro dela o desenho deixa de encolher para a largura: zoom em
+           passos, "Ajustar" cabe na tela, e o resto é rolagem. */
+        var zoom = 1;
+        function svgEl() { return view.querySelector('svg'); }
+        function applyZoom() {
+            var el = svgEl();
+            if (!el) { return; }
+            var w = parseFloat(el.getAttribute('width')) || el.viewBox.baseVal.width;
+            var h = parseFloat(el.getAttribute('height')) || el.viewBox.baseVal.height;
+            if (root.classList.contains('is-full')) {
+                el.style.width = Math.round(w * zoom) + 'px';
+                el.style.height = Math.round(h * zoom) + 'px';
+                el.style.maxWidth = 'none';
+            } else {
+                el.style.width = el.style.height = el.style.maxWidth = '';
+            }
+            root.querySelector('[data-zoomval]').textContent = Math.round(zoom * 100) + '%';
+        }
+        function fitZoom() {
+            var el = svgEl();
+            if (!el) { return; }
+            var w = parseFloat(el.getAttribute('width')) || el.viewBox.baseVal.width;
+            var h = parseFloat(el.getAttribute('height')) || el.viewBox.baseVal.height;
+            var aw = view.clientWidth - 24, ah = view.clientHeight - 24;
+            zoom = Math.max(0.1, Math.min(aw / w, ah / h, 2));
+            applyZoom();
+        }
+        function setFullUi(on) {
+            root.classList.toggle('is-full', on);
+            root.querySelector('[data-full]').innerHTML = on
+                ? '<i class="ti ti-minimize"></i> Sair da tela cheia' : '<i class="ti ti-maximize"></i> Tela cheia';
+            root.querySelector('[data-zoombar]').hidden = !on;
+            if (on) { setTimeout(fitZoom, 60); } else { zoom = 1; applyZoom(); }
+        }
+        function toggleFull() {
+            var on = !root.classList.contains('is-full');
+            if (root.requestFullscreen) {
+                if (on) { root.requestFullscreen().then(function () { setFullUi(true); }).catch(function () { setFullUi(true); }); }
+                else if (document.fullscreenElement) { document.exitFullscreen(); }
+                else { setFullUi(false); }
+            } else { setFullUi(on); }
+        }
+        document.addEventListener('fullscreenchange', function () {
+            if (!document.fullscreenElement && root.classList.contains('is-full')) { setFullUi(false); }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && root.classList.contains('is-full') && !document.fullscreenElement) { setFullUi(false); }
+        });
+        view.addEventListener('wheel', function (e) {
+            if (!root.classList.contains('is-full') || !(e.ctrlKey || e.metaKey)) { return; }
+            e.preventDefault();
+            zoom = Math.max(0.1, Math.min(4, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+            applyZoom();
+        }, { passive: false });
+
         root.addEventListener('click', function (e) {
             var b = e.target.closest('button[data-act]');
             if (!b || !root.contains(b)) { return; }
-            if (b.getAttribute('data-act') === 'edit') { edit(); }
-            else if (b.getAttribute('data-act') === 'png') { png(); }
-            else if (b.getAttribute('data-act') === 'pdf') { pdf(); }
+            var act = b.getAttribute('data-act');
+            if (act === 'edit') { edit(); }
+            else if (act === 'png') { png(); }
+            else if (act === 'pdf') { pdf(); }
+            else if (act === 'full') { toggleFull(); }
+            else if (act === 'zin') { zoom = Math.min(4, zoom * 1.25); applyZoom(); }
+            else if (act === 'zout') { zoom = Math.max(0.1, zoom / 1.25); applyZoom(); }
+            else if (act === 'zfit') { fitZoom(); }
         });
 
         draw();

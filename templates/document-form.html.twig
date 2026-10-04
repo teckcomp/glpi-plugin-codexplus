@@ -259,16 +259,47 @@
                            placeholder="{{ __('Título do documento', 'codexplus') }}">
                 </div>
 
+                {# Dados do documento recolhíveis, em três abas (Claudio,
+                   04/10/2026). Só tela: os campos continuam neste formulário e
+                   são gravados juntos. public/js/codexplus-meta.js. #}
+                <div class="cx-meta" data-cx-meta data-new="{{ meta.new ? '1' : '0' }}" data-missing="{{ meta.missing ? '1' : '0' }}" data-missing-tab="{{ meta.no_place|default(false) ? 'lugar' : 'pessoas' }}">
+                    <div class="cx-meta-bar">
+                        <i class="ti ti-info-square-rounded cx-meta-ico"></i>
+                        {% if meta.new %}
+                            <span class="cx-meta-item">{{ __('Dados do documento', 'codexplus') }}</span>
+                        {% else %}
+                            <span class="cx-meta-item"><span>{{ __('Estante', 'codexplus') }}</span>
+                                {% if meta.no_place %}<b class="is-missing">{{ __('falta', 'codexplus') }}</b>{% else %}{{ meta.estante }}{% endif %}</span>
+                            <span class="cx-meta-item"><span>{{ __('Responsável', 'codexplus') }}</span> {{ meta.owner ?: '—' }}</span>
+                            {% if meta.auditor is not same as(false) %}
+                                <span class="cx-meta-item"><span>{{ __('Auditor', 'codexplus') }}</span>
+                                    {% if meta.auditor is null %}<b class="is-missing">{{ __('falta', 'codexplus') }}</b>{% else %}{{ meta.auditor }}{% endif %}</span>
+                            {% endif %}
+                            {% if perm.show %}
+                                <span class="cx-meta-item"><span>{{ __('Leitura', 'codexplus') }}</span>
+                                    {{ meta.readers == 0 ? __('só quem tem papel', 'codexplus') : (meta.readers == 1 ? __('1 alvo', 'codexplus') : __('%d alvos', 'codexplus')|format(meta.readers)) }}</span>
+                            {% endif %}
+                            {% if meta.brand %}<span class="cx-meta-item"><span>{{ __('Marca', 'codexplus') }}</span> {{ meta.brand }}</span>{% endif %}
+                        {% endif %}
+                        <button type="button" class="codexplus-btn cx-meta-toggle" data-cx-meta-toggle aria-expanded="true">
+                            <i class="ti ti-chevron-up"></i> {{ __('Ocultar dados', 'codexplus') }}
+                        </button>
+                    </div>
+                    <div class="cx-meta-tabs" role="tablist">
+                        <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="lugar">{{ __('Lugar e tipo', 'codexplus') }}</button>
+                        <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="pessoas">{{ __('Pessoas e revisão', 'codexplus') }}</button>
+                        {% if perm.show %}<button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="perm">{{ __('Permissões e link', 'codexplus') }}</button>{% endif %}
+                    </div>
                 {# R3b2-a: campos à esquerda, coluna "Permissões" à direita. #}
                 <div class="codexplus-doc-edit-zone cx-docform-split{{ perm.show ? ' cx-docform-split--perm' : '' }}">
                 <div class="cx-docform-grid">
                     {% if is_new %}
-                        <div class="cx-docform-field">
+                        <div class="cx-docform-field" data-cx-tab="lugar">
                             <label>{{ __('Tipo', 'codexplus') }}</label>
                             {{ widgets.doctype|raw }}
                             <div class="codexplus-form-hint">{{ __('O tipo forma o código e não muda depois.', 'codexplus') }}</div>
                         </div>
-                        <div class="cx-docform-field" data-cx-only-type="{{ template_types }}">
+                        <div class="cx-docform-field" data-cx-tab="lugar" data-cx-only-type="{{ template_types }}">
                             {# R3b4: modelo do tipo escolhido; preenche o corpo
                                (public/js/codexplus-docform.js). Busca a partir de
                                10 modelos. #}
@@ -277,7 +308,7 @@
                             <script type="application/json" id="cx-templates-data">{{ templates_json|raw }}</script>
                             <div class="codexplus-form-hint">{{ __('Preenche o corpo ao criar. Dá para apagar ou mudar tudo depois.', 'codexplus') }}</div>
                         </div>
-                        <div class="cx-docform-field" data-cx-only-type="DIA">
+                        <div class="cx-docform-field" data-cx-tab="lugar" data-cx-only-type="DIA">
                             <label>{{ __('Subtipo do diagrama', 'codexplus') }}</label>
                             {{ widgets.subtype|raw }}
                             <div class="codexplus-form-hint">{{ __('Organograma, cronograma, matriz RACI ou fluxograma. Não muda depois.', 'codexplus') }}</div>
@@ -285,12 +316,12 @@
                     {% endif %}
 
                     {# SC1: Setor / Categorias (parts/doc-placement). #}
-                    <div class="cx-docform-field cx-docform-field--wide">
+                    <div class="cx-docform-field cx-docform-field--wide" data-cx-tab="lugar">
                         {% include '@codexplus/parts/doc-placement.html.twig' with {placement: placement, category_names: category_names} only %}
                     </div>
 
                     {% if widgets.owner is defined %}
-                        <div class="cx-docform-field">
+                        <div class="cx-docform-field" data-cx-tab="pessoas">
                             <label>{{ __('Responsável', 'codexplus') }}</label>
                             {{ widgets.owner|raw }}
                             <div class="codexplus-form-hint">{{ __('Gestor do documento: aprova a 1ª etapa, edita e recebe o aviso de vencimento. Aparece quem tem Ler no Codex+.', 'codexplus') }}</div>
@@ -298,14 +329,16 @@
                     {% endif %}
 
                     {% if review.show %}
+                        <div class="cx-meta-group" data-cx-tab="pessoas">
                         {% include '@codexplus/parts/doc-review.html.twig' with {review: review} only %}
+                        </div>
                     {% endif %}
 
                     {% if is_new or doctype == 'PRP' %}
                         {# Só em proposta. Na criação o tipo ainda pode mudar: o
                            campo aparece quando o tipo escolhido é PRP
                            (public/js/codexplus-docform.js). #}
-                        <div class="cx-docform-field" data-cx-only-type="PRP" {% if is_new %}hidden{% endif %}>
+                        <div class="cx-docform-field" data-cx-tab="lugar" data-cx-only-type="PRP" {% if is_new %}hidden{% endif %}>
                             <label for="cx-docform-client">{{ __('Cliente', 'codexplus') }}</label>
                             <input type="text" id="cx-docform-client" name="client_name" value="{{ client_name }}" class="form-control">
                             <div class="codexplus-form-hint">{{ __('A quem a proposta se destina. Sai na identificação do documento e no PDF.', 'codexplus') }}</div>
@@ -317,7 +350,7 @@
                            vinculado a um usuário ou entidade do GLPI (a
                            configuração do Codex+ diz qual). Na criação aparece
                            com o tipo (public/js/codexplus-docform.js). #}
-                        <div class="cx-docform-field" data-cx-only-type="LAU DTC" {% if is_new %}hidden{% endif %}>
+                        <div class="cx-docform-field" data-cx-tab="lugar" data-cx-only-type="LAU DTC" {% if is_new %}hidden{% endif %}>
                             <label>{{ __('Cliente', 'codexplus') }} <span class="codexplus-muted">({{ client.source_label }})</span></label>
                             <input type="hidden" name="client_itemtype" value="{{ client.itemtype }}">
                             {{ widgets.client|raw }}
@@ -330,7 +363,7 @@
                            logo, nome e cor do PDF e do Word. Só com mais de uma
                            marca; na criação, some no DIA (codexplus-docform.js). #}
                         {% set brand_sel = brand.options|filter(b => b.id == brand.id)|first %}
-                        <div class="cx-docform-field" {% if is_new %}data-cx-only-type="{{ brand.types }}" hidden{% endif %}>
+                        <div class="cx-docform-field" data-cx-tab="lugar" {% if is_new %}data-cx-only-type="{{ brand.types }}" hidden{% endif %}>
                             <label for="cx-docform-brand">{{ __('Marca', 'codexplus') }}</label>
                             <div class="cx-docbrand">
                                 <span class="cx-docbrand-logo"><img data-cx-brand-logo src="{{ brand_sel ? brand_sel.logo : '' }}" alt="" {% if not brand_sel or not brand_sel.logo %}hidden{% endif %}></span>
@@ -345,9 +378,12 @@
                     {% endif %}
                 </div>
                 {% if perm.show %}
+                    <div data-cx-tab="perm">
                     {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token, anon: anon} only %}
+                    </div>
                 {% endif %}
                 </div>
+                </div>{# /cx-meta #}
 
                 {% if is_diagram and diagram_kind == 'fluxograma' %}
                     {# Q5a: fluxograma no motor de quadro (codexplus-board.js), aberto

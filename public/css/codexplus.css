@@ -2757,3 +2757,31 @@ html.cx-board-open { overflow: hidden; }
 .cx-links-results button:hover { background: var(--cx-accent-soft); }
 .cx-links-results small { color: var(--cx-muted); }
 .cx-links-results .is-empty { padding: 6px 8px; color: var(--cx-muted); }
+
+/* Fluxograma: tela cheia na leitura (Claudio, 04/10/2026). */
+.cx-flow.is-full { position: fixed; inset: 0; z-index: 1050; margin: 0; padding: 14px 18px; background: #fff;
+    display: flex; flex-direction: column; max-width: none; }
+.cx-flow.is-full .cx-flow-view { flex: 1; min-height: 0; overflow: auto; text-align: left; }
+.cx-flow:fullscreen { background: #fff; padding: 14px 18px; display: flex; flex-direction: column; }
+.cx-flow-zoom { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.cx-flow-zoomval { min-width: 46px; text-align: center; font-size: .9em; color: var(--cx-muted); }
+
+/* =========================================================================
+   Dados do documento recolhíveis, em abas (Claudio, 04/10/2026)
+   ========================================================================= */
+.cx-meta { margin: 0 0 14px; border: 1px dashed var(--cx-border); border-radius: 10px; padding: 10px 14px; }
+.cx-meta-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.cx-meta-ico { font-size: 18px; color: var(--cx-muted); }
+.cx-meta-item > span { color: var(--cx-muted); margin-right: 4px; }
+.cx-meta-item .is-missing { color: var(--cx-danger); font-weight: 600; }
+.cx-meta-toggle { margin-left: auto; }
+.cx-meta-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--cx-border); margin: 10px 0 12px; }
+.cx-meta-tab { border: 0; background: transparent; padding: 6px 12px; color: var(--cx-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.cx-meta-tab.is-active { color: var(--cx-accent); border-bottom-color: var(--cx-accent); }
+.cx-meta .cx-docform-split { border: 0; padding: 0; margin: 0; background: transparent; }
+.cx-meta[data-tab] .cx-docform-split { display: block; }
+.cx-meta-group { display: contents; }
+.cx-meta .cx-tab-off { display: none !important; }
+.cx-meta[data-tab="perm"] .cx-docform-grid { display: none; }
+.cx-meta.is-closed .cx-meta-tabs,
+.cx-meta.is-closed .cx-docform-split { display: none !important; }

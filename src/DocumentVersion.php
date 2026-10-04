@@ -54,6 +54,8 @@ class DocumentVersion
             'summary'        => $doc->fields['revision_summary'] ?? null,
             'users_id'       => (int) ($doc->fields['users_id_validator'] ?? 0),
             'date_published' => $doc->fields['date_published'] ?: ($_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s')),
+            // AP-1: quem aprovou ESTA versão (a lista do documento muda depois).
+            'approvers'      => $doc->usesApprovers() ? self::encodeApprovers(DocumentApprover::approved($id)) : null,
         ];
         $existe = self::get($id, $rev);
         if ($existe !== null) {
@@ -64,6 +66,46 @@ class DocumentVersion
             'revision'                      => $rev,
             'date_creation'                 => $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * AP-1: users_id => data em JSON ([{"users_id":12,"date":"…"}], na
+     * ordem da lista). Lista vazia = null (a versão não mostra a linha).
+     *
+     * @param array<int, string> $rows
+     */
+    public static function encodeApprovers(array $rows): ?string
+    {
+        $out = [];
+        foreach ($rows as $uid => $quando) {
+            if ((int) $uid > 0 && $quando) {
+                $out[] = ['users_id' => (int) $uid, 'date' => (string) $quando];
+            }
+        }
+        return $out === [] ? null : json_encode($out);
+    }
+
+    /**
+     * AP-1: aprovadores gravados na versão (users_id => data). Versão
+     * publicada antes da 0.7.10 sem o registro = [] (sem a linha).
+     *
+     * @param array<string, mixed> $version linha da tabela
+     * @return array<int, string>
+     */
+    public static function approversOf(array $version): array
+    {
+        $raw = json_decode((string) ($version['approvers'] ?? ''), true);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $r) {
+            $uid = (int) ($r['users_id'] ?? 0);
+            if ($uid > 0 && !empty($r['date'])) {
+                $out[$uid] = (string) $r['date'];
+            }
+        }
+        return $out;
     }
 
     /**
@@ -138,7 +180,7 @@ class DocumentVersion
      * HV-1: publicações do documento (sem corpo nem diagrama), para o
      * Histórico.
      *
-     * @return array<int, array{revision: int, summary: ?string, users_id: int, date_published: string}>
+     * @return array<int, array{revision: int, summary: ?string, users_id: int, date_published: string, approvers: array<int, string>}>
      */
     public static function listFor(int $documentId): array
     {
@@ -147,7 +189,7 @@ class DocumentVersion
 
         $out = [];
         foreach ($DB->request([
-            'SELECT' => ['revision', 'summary', 'users_id', 'date_published'],
+            'SELECT' => ['revision', 'summary', 'users_id', 'date_published', 'approvers'],
             'FROM'   => self::getTable(),
             'WHERE'  => ['plugin_codexplus_documents_id' => $documentId],
             'ORDER'  => ['revision ASC'],
@@ -157,6 +199,7 @@ class DocumentVersion
                 'summary'        => $r['summary'],
                 'users_id'       => (int) $r['users_id'],
                 'date_published' => (string) ($r['date_published'] ?? ''),
+                'approvers'      => self::approversOf($r), // AP-1
             ];
         }
         return $out;

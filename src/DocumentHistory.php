@@ -224,7 +224,9 @@ final class DocumentHistory
                 'date' => (string) $v['date_published'],
                 'user' => (int) $v['users_id'] > 0 ? getUserName((int) $v['users_id']) : '',
                 'what' => sprintf(__('Publicada a revisão %s', 'codexplus'), $fmtCode($rev))
-                    . ($sum !== '' ? ' — ' . $sum : ($rev === 0 ? ' — ' . __('Emissão inicial', 'codexplus') : '')),
+                    . ($sum !== '' ? ' — ' . $sum : ($rev === 0 ? ' — ' . __('Emissão inicial', 'codexplus') : ''))
+                    // AP-1: quem aprovou esta versão.
+                    . ($v['approvers'] !== [] ? ' — ' . sprintf(__('aprovadores: %s', 'codexplus'), DocumentApprover::format($v['approvers'])) : ''),
                 'kind' => 'versao',
             ];
         }

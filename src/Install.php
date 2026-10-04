@@ -216,6 +216,9 @@ class Install
         self::installR7($migration);
         self::installE5();
 
+        // --- Bloco AP-1: aprovadores de cada versão publicada ---
+        self::installAP1();
+
         $migration->executeMigration();
         return true;
     }
@@ -696,6 +699,60 @@ class Install
     }
 
     /** Etapa 5 (Claudio, 04/10/2026): documentos vinculados. */
+    /**
+     * AP-1 (Claudio, 04/10/2026): cada versão publicada guarda quem a aprovou
+     * (JSON users_id + data), para a leitura, o PDF e o Word da versão não
+     * lerem a lista atual. Coluna criada e preenchida UMA vez: só a última
+     * versão publicada de cada documento recebe os aprovadores que têm data
+     * (as datas são zeradas no envio, então as que restam são da rodada que
+     * publicou); as anteriores ficam sem registro (sem a linha).
+     */
+    private static function installAP1(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::VERSIONS_TABLE;
+        if ($DB->fieldExists($t, 'approvers', false)) {
+            return;
+        }
+        $DB->doQueryOrDie("ALTER TABLE `$t` ADD `approvers` text NULL DEFAULT NULL AFTER `users_id`", "Codex+ (AP-1): erro ao criar $t.approvers");
+
+        $ultima = [];
+        foreach ($DB->request(['SELECT' => ['id', 'plugin_codexplus_documents_id', 'revision'], 'FROM' => $t]) as $r) {
+            $did = (int) $r['plugin_codexplus_documents_id'];
+            if (!isset($ultima[$did]) || (int) $r['revision'] > $ultima[$did]['rev']) {
+                $ultima[$did] = ['id' => (int) $r['id'], 'rev' => (int) $r['revision']];
+            }
+        }
+        if ($ultima === []) {
+            return;
+        }
+        $tipos = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'doctype'],
+            'FROM'   => self::DOCUMENTS_TABLE,
+            'WHERE'  => ['id' => array_keys($ultima)],
+        ]) as $r) {
+            $tipos[(int) $r['id']] = (string) $r['doctype'];
+        }
+        $aprov = [];
+        foreach ($DB->request([
+            'SELECT' => ['plugin_codexplus_documents_id', 'users_id', 'date_approved'],
+            'FROM'   => self::DOC_APPROVERS_TABLE,
+            'WHERE'  => ['plugin_codexplus_documents_id' => array_keys($ultima), 'NOT' => ['date_approved' => null]],
+            'ORDER'  => ['id ASC'],
+        ]) as $r) {
+            $aprov[(int) $r['plugin_codexplus_documents_id']][(int) $r['users_id']] = (string) $r['date_approved'];
+        }
+        foreach ($ultima as $did => $v) {
+            if (!Document::typeUsesApprovers($tipos[$did] ?? '') || empty($aprov[$did])) {
+                continue;
+            }
+            $DB->update($t, ['approvers' => DocumentVersion::encodeApprovers($aprov[$did])], ['id' => $v['id']]);
+        }
+    }
+
     private static function installE5(): void
     {
         /** @var \DBmysql $DB */

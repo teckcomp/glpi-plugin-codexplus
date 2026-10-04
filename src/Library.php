@@ -110,7 +110,7 @@ final class Library
         ksort($types);
         $status = [];
         foreach ($docs as $d) {
-            $status[$d['status']] = ($status[$d['status']] ?? 0) + 1;
+            $status[$d['situation']] = ($status[$d['situation']] ?? 0) + 1; // AP-1
         }
         return ['sectors' => $out, 'total' => count($docs), 'types' => $types, 'status' => $status];
     }
@@ -178,7 +178,7 @@ final class Library
         $status = [];
         foreach ($seen as $d) {
             $types[$d['doctype']]  = ($types[$d['doctype']] ?? 0) + 1;
-            $status[$d['status']] = ($status[$d['status']] ?? 0) + 1;
+            $status[$d['situation']] = ($status[$d['situation']] ?? 0) + 1; // AP-1
         }
         ksort($types);
         return ['total' => count($seen), 'types' => $types, 'status' => $status];

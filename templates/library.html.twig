@@ -19,6 +19,8 @@
    category), niches, decor, new_url, doctypes, client_types, producer,
    can_templates, statuses, trash, me, q, situacao, tipo, meus, obsoletos,
    self, csrf, form_url.
+   AP-1: d.situation = d.status, ou 'aprovadores' na 1ª etapa com aprovador
+   pendente (filtro, contagem e rótulo usam a situação).
    HV-1 (Claudio, 04/10/2026): quem só lê tem "Incluir obsoletos" (recarrega
    com ?obsoletos=1, levado de nível para nível como os outros filtros).
    Estilos em public/css/codexplus.css, seção 21. #}
@@ -29,11 +31,11 @@
         {% set cx_sit = d.expiry == 'vencido' ? __('revisão vencida', 'codexplus') : (d.expiry == 'avencer' ? __('a vencer', 'codexplus') : __('vigente', 'codexplus')) %}
     {% else %}
         {% set cx_dot = 'dr' %}
-        {% set cx_sit = statuses[d.status] ?? d.status %}
+        {% set cx_sit = statuses[d.situation] ?? d.status %}
     {% endif %}
     <a class="cx-lib-spine cx-sp-{{ d.doctype }}{{ cx_draft ? ' is-draft' : '' }}{{ d.status == 'obsoleto' ? ' is-obsolete' : '' }}{{ fic ? ' cx-lib-fic' : '' }}"
        href="{{ form_url }}?id={{ d.id }}"
-       {% if fic %}data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"{% endif %}
+       {% if fic %}data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.situation }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"{% endif %}
        title="{{ d.code }} · {{ d.name }} · {{ doctypes[d.doctype] ?? d.doctype }} · {{ cx_sit }}{% if d.in_revision %} · {{ __('em atualização', 'codexplus') }}{% endif %}">
         <i class="cx-lib-dot cx-lib-dot--{{ cx_dot }}" aria-hidden="true"></i>
         <span class="cx-lib-spine-t"><b>{{ d.code }}</b><br>{{ d.name }}</span>
@@ -45,11 +47,11 @@
         {% set cx_sit = d.expiry == 'vencido' ? __('revisão vencida', 'codexplus') : (d.expiry == 'avencer' ? __('a vencer', 'codexplus') : __('vigente', 'codexplus')) %}
     {% else %}
         {% set cx_dot = 'dr' %}
-        {% set cx_sit = statuses[d.status] ?? d.status %}
+        {% set cx_sit = statuses[d.situation] ?? d.status %}
     {% endif %}
     <a class="cx-lib-roll{{ d.status in ['rascunho', 'aprovacao', 'validacao'] ? ' is-draft' : '' }} cx-lib-roll--h{{ d.id % 3 }}"
        href="{{ form_url }}?id={{ d.id }}"
-       data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"
+       data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.situation }}" data-mine="{{ d.owner_id == me ? '1' : '0' }}"
        title="{{ d.code }} · {{ d.name }} · {{ doctypes[d.doctype] ?? d.doctype }} · {{ cx_sit }}">
         <span class="cx-lib-roll-body"></span>
         <span class="cx-lib-roll-band"><span>{{ d.code }}</span></span>
@@ -199,7 +201,7 @@
                     <h3><i class="ti ti-folder"></i> {{ c.name }}</h3>
                     <ul class="cx-lib-list">
                         {% for d in c.docs %}
-                            <li class="cx-lib-doc" data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.status }}"
+                            <li class="cx-lib-doc" data-id="{{ d.id }}" data-type="{{ d.doctype }}" data-status="{{ d.situation }}"
                                 data-mine="{{ d.owner_id == me ? '1' : '0' }}"
                                 data-text="{{ (d.code ~ ' ' ~ d.name)|lower }}">
                                 <span class="codexplus-code cx-code-chip cx-code-type-{{ d.doctype }}">{{ d.code }}</span>
@@ -209,7 +211,7 @@
                                     {% if d.client_name and d.doctype in client_types %} · {{ d.client_name }}{% endif %}
                                 </span>
                                 {% if d.status != 'publicado' and (producer or d.status == 'obsoleto') %}
-                                    <span class="cx-lib-tag">{{ statuses[d.status] ?? d.status }}</span>
+                                    <span class="cx-lib-tag">{{ statuses[d.situation] ?? d.status }}</span>
                                 {% endif %}
                                 {% if d.in_revision %}
                                     <span class="cx-lib-tag">{{ __('em atualização', 'codexplus') }}</span>

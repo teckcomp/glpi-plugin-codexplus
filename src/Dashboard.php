@@ -210,7 +210,28 @@ class Dashboard
                 // R6-b: prazo da revisão aberta ('' = sem prazo ou fora de revisão).
                 'revision_due' => $emRevisao ? substr((string) ($r['revision_due'] ?? ''), 0, 10) : '',
                 'due_ts'       => $expiry['due'],
+                // AP-1: 1ª etapa com aprovador pendente (preenchido abaixo).
+                'signers_pending' => false,
+                'situation'       => $status,
             ];
+        }
+
+        // AP-1: "aguarda aprovadores" — 1ª etapa de diagrama/diverso com
+        // aprovador que ainda não aprovou (a mesma regra de signersPending).
+        $etapa1 = array_keys(array_filter(
+            $docs,
+            static fn ($d) => $d['status'] === Document::STATUS_APPROVAL && Document::typeUsesApprovers($d['doctype'])
+        ));
+        if ($etapa1 !== []) {
+            foreach ($DB->request([
+                'SELECT' => ['plugin_codexplus_documents_id'],
+                'FROM'   => Install::DOC_APPROVERS_TABLE,
+                'WHERE'  => ['plugin_codexplus_documents_id' => $etapa1, 'users_id' => ['>', 0], 'date_approved' => null],
+            ]) as $r) {
+                $did = (int) $r['plugin_codexplus_documents_id'];
+                $docs[$did]['signers_pending'] = true;
+                $docs[$did]['situation']       = Document::SITUATION_SIGNERS;
+            }
         }
 
         if ($docs) {

@@ -117,7 +117,8 @@ TemplateRenderer::getInstance()->display('@codexplus/library.html.twig', [
     // Cliente só nos tipos que têm cliente (dado antigo em outro tipo fica fora).
     'client_types' => array_merge(DocumentMeta::CLIENT_TEXT_TYPES, DocumentMeta::CLIENT_LINK_TYPES),
     'producer'  => $producer,
-    'statuses'  => \GlpiPlugin\Codexplus\Document::getStatuses(),
+    // AP-1: com "Aguardando aprovadores" (situação, não status gravado).
+    'statuses'  => \GlpiPlugin\Codexplus\Document::getSituations(),
     'trash'     => $producer ? Library::trash() : [],
     'me'        => (int) Session::getLoginUserID(),
     'q'         => $q,

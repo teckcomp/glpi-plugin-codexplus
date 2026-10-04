@@ -121,6 +121,25 @@ class Document extends CommonDBTM
         ];
     }
 
+    /**
+     * AP-1: situação mostrada no Painel e no filtro da Biblioteca. Não é
+     * status gravado: é a 1ª etapa (aprovacao) com aprovador pendente.
+     */
+    public const SITUATION_SIGNERS = 'aprovadores';
+
+    /** AP-1: as situações do filtro — os status, com "Aguardando aprovadores" antes do responsável. */
+    public static function getSituations(): array
+    {
+        $out = [];
+        foreach (self::getStatuses() as $k => $label) {
+            if ($k === self::STATUS_APPROVAL) {
+                $out[self::SITUATION_SIGNERS] = __('Aguardando aprovadores', 'codexplus');
+            }
+            $out[$k] = $label;
+        }
+        return $out;
+    }
+
     // ---------------------------------------------------------------------
     // Camada 1 — perfil (estáticos)
     // ---------------------------------------------------------------------
@@ -486,17 +505,7 @@ class Document extends CommonDBTM
         if (!$this->usesApprovers()) {
             return '';
         }
-        $out = [];
-        foreach (DocumentApprover::rows((int) ($this->fields['id'] ?? 0)) as $uid => $quando) {
-            $nome = getUserName((int) $uid);
-            if ($comStatus) {
-                $nome .= $quando
-                    ? ' (' . date('d/m/Y', strtotime((string) $quando)) . ')'
-                    : ' (' . __('pendente', 'codexplus') . ')';
-            }
-            $out[] = $nome;
-        }
-        return implode(', ', $out);
+        return DocumentApprover::format(DocumentApprover::rows((int) ($this->fields['id'] ?? 0)), $comStatus);
     }
 
     /** Aprovador aprova. Com o último, a vez passa ao responsável. */

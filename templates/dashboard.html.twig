@@ -413,6 +413,8 @@
                             <td>
                                 {% if d.in_revision|default(false) %}
                                     <span class="codexplus-status codexplus-status--aprovacao">{{ __('em atualização', 'codexplus') }}</span>
+                                {% elseif d.signers_pending|default(false) %}
+                                    <span class="codexplus-status codexplus-status--aprovacao">{{ __('aguarda aprovadores', 'codexplus') }}</span>
                                 {% elseif d.status == 'aprovacao' %}
                                     <span class="codexplus-status codexplus-status--aprovacao">{{ __('aguarda gestor', 'codexplus') }}</span>
                                 {% elseif d.status == 'validacao' %}

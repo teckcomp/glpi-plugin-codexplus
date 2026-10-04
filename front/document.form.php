@@ -615,7 +615,7 @@ if ($isDiagram) {
 // andamento e pode abrir a publicada por ?version=N.
 $fmtCode = static fn (string $t, int $seq, int $rev) => sprintf('%s%04d:%02d', $t, $seq, $rev);
 $inRevision = !$isNew && $doc->isInRevision();
-$version = ['on' => false, 'reader' => false, 'rev' => -1, 'code' => '', 'link' => '', 'validator' => '', 'date' => ''];
+$version = ['on' => false, 'reader' => false, 'rev' => -1, 'code' => '', 'link' => '', 'validator' => '', 'date' => '', 'approvers' => []];
 $revinfo = ['on' => false, 'prev_code' => '', 'link' => ''];
 $shown   = [];
 if ($inRevision) {
@@ -633,6 +633,8 @@ if ($inRevision) {
             'link'      => $self . '?id=' . $id,
             'validator' => (int) $vRow['users_id'] > 0 ? getUserName((int) $vRow['users_id']) : '',
             'date'      => (string) ($vRow['date_published'] ?? ''),
+            // AP-1: quem aprovou ESTA versão (gravado na publicação).
+            'approvers' => DocumentVersion::approversOf($vRow),
         ];
         $canEdit = false;
         $shown = ['name' => (string) $vRow['name'], 'content' => (string) $vRow['content'],
@@ -1049,7 +1051,11 @@ $brandField = [
 // A-2b: aprovadores no rodapé da edição, na linha de papéis da leitura e no
 // PDF (texto e diagramas). Na versão publicada mostrada durante a revisão,
 // só os nomes.
-$signersLine = $isNew ? '' : $doc->approverSummary(!$version['on']);
+// AP-1: a versão publicada mostra os aprovadores DELA (com as datas);
+// versão anterior à 0.7.10 sem o registro fica sem a linha.
+$signersLine = $isNew ? '' : ($version['on']
+    ? ($doc->usesApprovers() ? DocumentApprover::format($version['approvers']) : '')
+    : $doc->approverSummary());
 
 // 5b: vinculados diretos, com link para quem pode ler.
 $complements = $isNew ? [] : \GlpiPlugin\Codexplus\DocumentLink::complements(

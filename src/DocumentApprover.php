@@ -117,6 +117,40 @@ final class DocumentApprover
         unset(self::$cache[$documentId]);
     }
 
+    /**
+     * AP-1: quem aprovou na rodada que está valendo, na ordem da lista
+     * (users_id => data). Gravado na versão no momento da publicação: as
+     * datas só são zeradas no envio e na devolução, então na publicação
+     * ainda são as da rodada que publicou.
+     *
+     * @return array<int, string>
+     */
+    public static function approved(int $documentId): array
+    {
+        return array_filter(self::rows($documentId), static fn ($d) => $d !== null);
+    }
+
+    /**
+     * AP-1: "Ana (05/10/2026), Bruno (pendente)" a partir de users_id => data
+     * (null = pendente). $comStatus false = só os nomes.
+     *
+     * @param array<int, ?string> $rows
+     */
+    public static function format(array $rows, bool $comStatus = true): string
+    {
+        $out = [];
+        foreach ($rows as $uid => $quando) {
+            $nome = getUserName((int) $uid);
+            if ($comStatus) {
+                $nome .= $quando
+                    ? ' (' . date('d/m/Y', strtotime((string) $quando)) . ')'
+                    : ' (' . __('pendente', 'codexplus') . ')';
+            }
+            $out[] = $nome;
+        }
+        return implode(', ', $out);
+    }
+
     public static function purgeDocument(int $documentId): void
     {
         /** @var \DBmysql $DB */

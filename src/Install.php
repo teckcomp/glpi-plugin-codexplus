@@ -198,6 +198,9 @@ class Install
         // --- Bloco M-2: marca do documento ---
         self::installM2($migration);
 
+        // --- Bloco A-1: vários editores na Proposta e no Laudo ---
+        self::installA1();
+
         $migration->executeMigration();
         return true;
     }
@@ -566,6 +569,42 @@ class Install
         if ($padrao !== null) {
             $DB->update(self::DOCUMENTS_TABLE, ['plugin_codexplus_brands_id' => $padrao['id']], ['plugin_codexplus_brands_id' => 0]);
             $DB->update(self::VERSIONS_TABLE, ['plugin_codexplus_brands_id' => $padrao['id']], ['plugin_codexplus_brands_id' => 0]);
+        }
+    }
+
+    /**
+     * A-1 (Claudio, 04/10/2026): Proposta e Laudo com vários editores, na
+     * tabela documenteditors (criada na R3c). O editor único de antes
+     * (users_id_reviewer) vira a primeira linha da lista, uma vez só: só
+     * entra se o documento ainda não tem nenhuma linha.
+     */
+    private static function installA1(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::DOC_EDITORS_TABLE;
+        if (!$DB->tableExists($t)) {
+            return;
+        }
+        $docs = $DB->request([
+            'SELECT' => ['id', 'users_id_reviewer'],
+            'FROM'   => self::DOCUMENTS_TABLE,
+            'WHERE'  => [
+                'doctype'           => explode(' ', DocumentMeta::typesWithFlow([DocumentMeta::FLOW_DIRECT])),
+                'users_id_reviewer' => ['>', 0],
+            ],
+        ]);
+        foreach ($docs as $d) {
+            if (countElementsInTable($t, ['plugin_codexplus_documents_id' => (int) $d['id']]) > 0) {
+                continue;
+            }
+            $DB->insert($t, [
+                'plugin_codexplus_documents_id' => (int) $d['id'],
+                'users_id'                      => (int) $d['users_id_reviewer'],
+                'groups_id'                     => 0,
+                'date_creation'                 => date('Y-m-d H:i:s'),
+            ]);
         }
     }
 

@@ -284,11 +284,37 @@ class Document extends CommonDBTM
         return '';
     }
 
-    /** É o revisor deste documento (R3d)? */
+    /**
+     * É o revisor deste documento (R3d)? No fluxo direto, é um dos editores
+     * (A-1: lista em DocumentEditor; users_id_reviewer é o primeiro).
+     */
     public function isReviewer(): bool
     {
         $me = (int) Session::getLoginUserID();
-        return $me > 0 && (int) ($this->fields['users_id_reviewer'] ?? 0) === $me;
+        if ($me <= 0) {
+            return false;
+        }
+        if ((int) ($this->fields['users_id_reviewer'] ?? 0) === $me) {
+            return true;
+        }
+        return $this->flow() === DocumentMeta::FLOW_DIRECT
+            && DocumentEditor::has((int) ($this->fields['id'] ?? 0), $me);
+    }
+
+    /**
+     * Editores do fluxo direto (A-1). Documento anterior à A-1 sem linha na
+     * tabela: o editor do campo antigo.
+     *
+     * @return int[]
+     */
+    public function editorIds(): array
+    {
+        $ids = DocumentEditor::ids((int) ($this->fields['id'] ?? 0));
+        $r = (int) ($this->fields['users_id_reviewer'] ?? 0);
+        if ($ids === [] && $r > 0) {
+            $ids = [$r];
+        }
+        return $ids;
     }
 
     /** Tem algum papel no documento (vê em qualquer status). */
@@ -737,6 +763,12 @@ class Document extends CommonDBTM
             // R3d: auditor responsável e revisor também têm papel.
             [$doc . '.users_id_auditor' => $me],
             [$doc . '.users_id_reviewer' => $me],
+            // A-1: qualquer um dos editores da Proposta e do Laudo.
+            [$doc . '.id' => new QuerySubQuery([
+                'SELECT' => 'plugin_codexplus_documents_id',
+                'FROM'   => Install::DOC_EDITORS_TABLE,
+                'WHERE'  => ['users_id' => $me],
+            ])],
         ];
 
         // Leitor: Ler + alvo, só publicado/obsoleto. (canView() garante que,
@@ -1196,8 +1228,12 @@ class Document extends CommonDBTM
             // (edita o rascunho, bit Revisar e editar), sem revisão periódica.
             // Vem num campo próprio (users_id_editor) porque, na criação, o
             // campo "Revisor" dos outros tipos também está na página.
+            // A-1 (Claudio, 04/10/2026): vários editores. A lista vai em
+            // _editors (gravada no post_add/post_update); o primeiro fica em
+            // users_id_reviewer, espelho para Histórico, busca e console.
             if (array_key_exists('users_id_editor', $input)) {
-                $input['users_id_reviewer'] = (int) $input['users_id_editor'];
+                $input['_editors'] = DocumentEditor::normalize($input['users_id_editor']);
+                $input['users_id_reviewer'] = $input['_editors'][0] ?? 0;
             }
         }
         unset($input['users_id_editor']);
@@ -1330,6 +1366,31 @@ class Document extends CommonDBTM
                 $mudou[$f] = true;
             }
         }
+        // A-1: editores (lista). Mudou se a lista é outra; só os NOVOS
+        // precisam do bit Revisar e editar (quem já era continua, como o
+        // "(sem o direito …)" do campo único).
+        $novosEditores = [];
+        if (array_key_exists('_editors', $input)) {
+            $antes = $novo ? [] : $this->editorIds();
+            // Quem já era editor fica na frente, na ordem gravada; o espelho
+            // (users_id_reviewer) é o primeiro dessa ordem — reordenar a
+            // escolha na tela não muda nada.
+            $input['_editors'] = array_values(array_merge(
+                array_intersect($antes, $input['_editors']),
+                array_diff($input['_editors'], $antes)
+            ));
+            $input['users_id_reviewer'] = $input['_editors'][0] ?? 0;
+            $x = $input['_editors'];
+            $y = $antes;
+            sort($x);
+            sort($y);
+            if ($x !== $y) {
+                $mudou['_editors'] = true;
+                $novosEditores = array_diff($input['_editors'], $antes);
+            }
+            // O espelho só conta como mudança junto com a lista.
+            unset($mudou['users_id_reviewer']);
+        }
         if ($mudou === []) {
             return $input;
         }
@@ -1346,6 +1407,13 @@ class Document extends CommonDBTM
             return $this->deny(DocumentMeta::flowOf((string) ($input['doctype'] ?? $this->fields['doctype'] ?? '')) === DocumentMeta::FLOW_DIRECT
                 ? __('O editor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus')
                 : __('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+        }
+        $semBit = array_diff($novosEditores, Rights::reviewerUsers($entityId));
+        if ($semBit !== []) {
+            return $this->deny(sprintf(
+                __('Editor sem o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
+                DocumentEditor::names($semBit)
+            ));
         }
         if (isset($mudou['users_id_auditor'])) {
             if (!$novo && $this->status() !== self::STATUS_DRAFT) {
@@ -1381,6 +1449,7 @@ class Document extends CommonDBTM
         }
 
         DocumentContributor::record($id, 0, (int) Session::getLoginUserID());
+        $this->saveEditors(true);
 
         // R3b3-1: imagens coladas no corpo e arquivos anexados viram
         // documentos do GLPI ligados a este (Document_Item), como no
@@ -1458,6 +1527,7 @@ class Document extends CommonDBTM
         // com o link definitivo das imagens (volta aqui sem arquivos: para).
         $this->input = $this->addFiles($this->input, ['force_update' => true, 'content_field' => 'content', '_add_link' => false]);
 
+        $this->saveEditors();
         if (array_intersect($this->updates, self::CONTENT_FIELDS)) {
             DocumentContributor::record(
                 (int) $this->fields['id'],
@@ -1466,6 +1536,28 @@ class Document extends CommonDBTM
             );
         }
         parent::post_updateItem($history);
+    }
+
+    /**
+     * A-1: grava a lista de editores que veio em _editors (só fluxo direto,
+     * já conferida em checkManagedFields) e registra no Histórico quando
+     * muda. A 1ª gravação de um documento antigo copia o editor do campo.
+     */
+    private function saveEditors(bool $novo = false): void
+    {
+        if (!array_key_exists('_editors', (array) $this->input) || $this->flow() !== DocumentMeta::FLOW_DIRECT) {
+            return;
+        }
+        $id = (int) $this->fields['id'];
+        $antesVisto = $novo ? [] : $this->editorIds();
+        [, $depois] = DocumentEditor::set($id, (array) $this->input['_editors']);
+        if (!$novo && $antesVisto !== $depois) {
+            \Log::history($id, self::class, [0, '', sprintf(
+                __('Editores: %1$s → %2$s', 'codexplus'),
+                $antesVisto === [] ? '—' : DocumentEditor::names($antesVisto),
+                $depois === [] ? '—' : DocumentEditor::names($depois)
+            )], '', \Log::HISTORY_LOG_SIMPLE_MESSAGE);
+        }
     }
 
     public function cleanDBonPurge()
@@ -1477,6 +1569,7 @@ class Document extends CommonDBTM
             Document_User::class,
         ]);
         DocumentContributor::purgeDocument((int) $this->fields['id']);
+        DocumentEditor::purgeDocument((int) $this->fields['id']);
         Diagram::purgeDocument((int) $this->fields['id']);
         DocumentVersion::purgeDocument((int) $this->fields['id']);
         ScheduleStatus::purgeDocument((int) $this->fields['id']);

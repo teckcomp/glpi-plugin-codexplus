@@ -30,6 +30,7 @@ use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\Category;
 use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\DocumentContributor;
+use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentMeta;
@@ -148,7 +149,8 @@ if (isset($_POST['add'])) {
     // Document::prepareInputForAdd (cada um com o bit dele no perfil).
     foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
-            $input[$f] = (string) $_POST[$f];
+            // A-1: editores vêm em lista (Dropdown múltiplo).
+            $input[$f] = $f === 'users_id_editor' ? $_POST[$f] : (string) $_POST[$f];
         }
     }
     if (!$doc->can(-1, CREATE, $input)) {
@@ -414,7 +416,7 @@ if ($id > 0 && isset($_POST['update'])) {
         // setor, só em rascunho; janela com as duas datas).
         foreach (['users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
             if (isset($_POST[$f])) {
-                $data[$f] = (string) $_POST[$f];
+                $data[$f] = $f === 'users_id_editor' ? $_POST[$f] : (string) $_POST[$f];
             }
         }
 
@@ -480,7 +482,7 @@ if ($id > 0 && isset($_POST['update_review'])) {
     $data = ['id' => $id];
     foreach (['users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
-            $data[$f] = (string) $_POST[$f];
+            $data[$f] = $f === 'users_id_editor' ? $_POST[$f] : (string) $_POST[$f];
         }
     }
     if ($doc->update($data)) {
@@ -805,6 +807,18 @@ $auditorOptions = static fn (int $entityId, int $atual): array
     => $roleOptions(Rights::auditorUsers($entityId), $atual, __('(sem o direito Auditar)', 'codexplus'));
 $reviewerOptions = static fn (int $entityId, int $atual): array
     => $roleOptions(Rights::reviewerUsers($entityId), $atual, __('(sem o direito Revisar e editar)', 'codexplus'));
+// A-1: editores (vários) — mesma lista de quem tem Revisar e editar; quem já é
+// editor e perdeu o bit continua na lista, marcado.
+$editorOptions = static function (int $entityId, array $atuais) use ($reviewerOptions): array {
+    $opcoes = $reviewerOptions($entityId, 0);
+    unset($opcoes[0]);
+    foreach ($atuais as $uid) {
+        if (!isset($opcoes[$uid])) {
+            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Revisar e editar)', 'codexplus');
+        }
+    }
+    return $opcoes;
+};
 $review = [
     'show'             => true,
     'is_new'           => $isNew,
@@ -847,10 +861,11 @@ if ($isNew) {
         'display' => false,
         'width'   => '100%',
     ]);
-    $review['editor_widget'] = Dropdown::showFromArray('users_id_editor', $reviewerOptions((int) Session::getActiveEntity(), 0), [
-        'value'   => 0,
-        'display' => false,
-        'width'   => '100%',
+    $review['editor_widget'] = Dropdown::showFromArray('users_id_editor', $editorOptions((int) Session::getActiveEntity(), []), [
+        'values'   => [],
+        'multiple' => true,
+        'display'  => false,
+        'width'    => '100%',
     ]);
 }
 if (!$isNew) {
@@ -858,6 +873,11 @@ if (!$isNew) {
     $reviewerId = (int) ($doc->fields['users_id_reviewer'] ?? 0);
     $review['auditor_name']    = $auditorId > 0 ? getUserName($auditorId) : '';
     $review['reviewer_name']   = $reviewerId > 0 ? getUserName($reviewerId) : '';
+    // A-1: no fluxo direto, todos os editores.
+    $editorIds = $doc->flow() === DocumentMeta::FLOW_DIRECT ? $doc->editorIds() : [];
+    if ($editorIds !== []) {
+        $review['reviewer_name'] = DocumentEditor::names($editorIds);
+    }
     $review['start']           = $fmtDate($doc->fields['review_start'] ?? null);
     $review['end']             = $fmtDate($doc->fields['review_end'] ?? null);
     $review['validity_months'] = (int) ($doc->fields['validity_months'] ?? 0);
@@ -874,16 +894,30 @@ if (!$isNew) {
         ]);
     }
     if ($review['can_review']) {
-        // E6: no fluxo direto o mesmo papel aparece como "Editor".
-        $review[$review['show_editor'] ? 'editor_widget' : 'reviewer_widget'] = Dropdown::showFromArray(
-            $review['show_editor'] ? 'users_id_editor' : 'users_id_reviewer',
-            $reviewerOptions((int) $doc->fields['entities_id'], $reviewerId),
-            [
-                'value'   => $reviewerId,
-                'display' => false,
-                'width'   => '100%',
-            ]
-        );
+        // E6: no fluxo direto o mesmo papel aparece como "Editor";
+        // A-1: lista (vários editores).
+        if ($review['show_editor']) {
+            $review['editor_widget'] = Dropdown::showFromArray(
+                'users_id_editor',
+                $editorOptions((int) $doc->fields['entities_id'], $editorIds),
+                [
+                    'values'   => $editorIds,
+                    'multiple' => true,
+                    'display'  => false,
+                    'width'    => '100%',
+                ]
+            );
+        } else {
+            $review['reviewer_widget'] = Dropdown::showFromArray(
+                'users_id_reviewer',
+                $reviewerOptions((int) $doc->fields['entities_id'], $reviewerId),
+                [
+                    'value'   => $reviewerId,
+                    'display' => false,
+                    'width'   => '100%',
+                ]
+            );
+        }
     }
 
     // R3d-1: quem responde pela etapa mas não consegue agir fica sabendo o

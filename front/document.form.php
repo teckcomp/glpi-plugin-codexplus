@@ -354,8 +354,9 @@ if ($id > 0 && isset($_POST['delete_doc'])) {
 
 // -------------------------------------------------------------------------
 // POST — salvar como modelo (M1, Claudio 26/09/2026): o corpo GRAVADO vira um
-// modelo novo do mesmo tipo, para quem tem "Gerenciar modelos". Imagens não
-// vão (Template::stripImages): são arquivos deste documento.
+// modelo novo do mesmo tipo, para quem tem "Gerenciar modelos". MO-2: imagem,
+// print anotado, planta e topologia viram marcadores ("Imagem aqui"...), por
+// Template::toPlaceholders; planilha vai inteira.
 // -------------------------------------------------------------------------
 if ($id > 0 && isset($_POST['save_template'])) {
     if (!Session::haveRight(Rights::NAME, Rights::TEMPLATES) || $doc->fields['doctype'] === 'DIA') {
@@ -364,13 +365,22 @@ if ($id > 0 && isset($_POST['save_template'])) {
     }
     $nome   = trim((string) ($_POST['tpl_name'] ?? '')) ?: (string) $doc->fields['name'];
     $corpo  = (string) ($doc->fields['content'] ?? '');
-    $tinha  = stripos($corpo, '<img') !== false;
+    $antes  = \GlpiPlugin\Codexplus\Template::countPlaceholders($corpo);
     $tpl    = new \GlpiPlugin\Codexplus\Template();
     if ($tpl->add(['name' => $nome, 'doctype' => (string) $doc->fields['doctype'], 'content' => $corpo, 'is_default' => 0])) {
+        $marcas = \GlpiPlugin\Codexplus\Template::countPlaceholders((string) ($tpl->fields['content'] ?? '')) - $antes;
         Session::addMessageAfterRedirect(sprintf(
             __('Modelo "%s" criado. Ele aparece no campo Modelo da criação e na tela Modelos.', 'codexplus'),
             $nome
-        ) . ($tinha ? ' ' . __('As imagens não vão para o modelo.', 'codexplus') : ''));
+        ) . ($marcas > 0 ? ' ' . sprintf(
+            _n(
+                '%d imagem ou quadro virou marcador ("Imagem aqui", "Planta aqui"...), para quem usar o modelo colocar o seu.',
+                '%d imagens ou quadros viraram marcadores ("Imagem aqui", "Planta aqui"...), para quem usar o modelo colocar os seus.',
+                $marcas,
+                'codexplus'
+            ),
+            $marcas
+        ) : ''));
     }
     Html::redirect($self . '?id=' . $id);
 }
@@ -570,6 +580,22 @@ if ($id > 0) {
     if ($flow !== null) {
         if ($flow()) {
             Session::addMessageAfterRedirect($okMsg instanceof \Closure ? $okMsg() : $okMsg);
+            // MO-2: marcador do modelo que ficou sem preencher só avisa.
+            if (isset($_POST['submit_validation']) || isset($_POST['publish_direct'])) {
+                $doc->getFromDB($id);
+                $falta = \GlpiPlugin\Codexplus\Template::countPlaceholders((string) ($doc->fields['content'] ?? ''));
+                if ($falta > 0) {
+                    Session::addMessageAfterRedirect(sprintf(
+                        _n(
+                            'Atenção: ficou %d marcador do modelo sem preencher ("Imagem aqui", "Planta aqui"...). Troque pela imagem ou apague.',
+                            'Atenção: ficaram %d marcadores do modelo sem preencher ("Imagem aqui", "Planta aqui"...). Troque pela imagem ou apague.',
+                            $falta,
+                            'codexplus'
+                        ),
+                        $falta
+                    ), false, WARNING);
+                }
+            }
         }
         Html::redirect($self . '?id=' . $id);
     }

@@ -32,7 +32,8 @@
 
     var EDITOR_ID = 'codexplus-doc-content';
     // M1: o editor da tela Modelos usa a mesma barra, sem imagem (modelo não
-    // guarda imagem: Template::stripImages).
+    // guarda imagem). MO-2: no lugar, o botão Marcador ("Imagem aqui"...),
+    // o mesmo que Template::toPlaceholders grava ao salvar como modelo.
     var TEMPLATE_EDITOR_ID = 'codexplus_tpl_content';
 
     var STYLES = [
@@ -179,7 +180,53 @@
             // Q1: a planta de fundo guardada junto do quadro não aparece (só o PNG).
             + '.cx-board-bg,.cx-board img:not(:last-of-type){display:none!important;}.cx-board img{max-width:100%;height:auto;}'
             // Q3b: legenda do quadro, imagem própria logo abaixo dele.
-            + '.cx-board-legend{display:block;margin:6px 0 12px;}.cx-board-legend img{max-width:100%;height:auto;}';
+            + '.cx-board-legend{display:block;margin:6px 0 12px;}.cx-board-legend img{max-width:100%;height:auto;}'
+            + PH_CSS;
+    }
+
+    /* MO-2 (Claudio, 04/10/2026): marcador do modelo. Só texto, travado
+       (contenteditable=false): um clique seleciona o marcador inteiro, e
+       colar, arrastar, "Inserir imagem" ou Planta/Topologia o substituem.
+       Classe por tipo; o texto padrão vem daqui e de Template::PLACEHOLDER_KINDS. */
+    var PH_KINDS = [
+        { key: 'imagem',    label: 'Imagem',    text: 'Imagem aqui',    tool: '' },
+        { key: 'planta',    label: 'Planta',    text: 'Planta aqui',    tool: 'cxplant' },
+        { key: 'topologia', label: 'Topologia', text: 'Topologia aqui', tool: 'cxtopology' }
+    ];
+    var PH_CSS = '.cx-ph{display:inline-block;box-sizing:border-box;min-width:240px;max-width:100%;padding:28px 18px;margin:4px 0;'
+        + 'border:2px dashed #9aa7b6;border-radius:6px;background-color:#f6f8fa;color:#5f6b7a;font-style:italic;text-align:center;'
+        + '-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+        + '.cx-ph-planta,.cx-ph-topologia{min-width:360px;padding:48px 18px;}';
+    function placeholderHtml(kind, text) {
+        var k = PH_KINDS.filter(function (x) { return x.key === kind; })[0] || PH_KINDS[0];
+        var t = String(text || '').replace(/[\r\n]+/g, ' ').trim() || k.text;
+        var esc = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return '<span class="cx-ph cx-ph-' + k.key + '" contenteditable="false">' + esc + '</span>';
+    }
+    /* Marcador selecionado agora (ou null), guardado para a próxima inserção. */
+    function rememberPh(editor) {
+        var n = editor.selection.getNode();
+        editor.__cxPhTarget = (n && editor.dom.getParent(n, 'span.cx-ph')) || null;
+    }
+    function insertPlaceholder(editor, kind) {
+        var k = PH_KINDS.filter(function (x) { return x.key === kind; })[0] || PH_KINDS[0];
+        editor.windowManager.open({
+            title: 'Marcador: ' + k.label,
+            body: { type: 'panel', items: [
+                { type: 'input', name: 'text', label: 'Texto do marcador (o que vai neste lugar)' }
+            ] },
+            initialData: { text: k.text },
+            buttons: [
+                { type: 'cancel', text: 'Cancelar' },
+                { type: 'submit', text: 'Inserir', primary: true }
+            ],
+            onSubmit: function (api) {
+                var t = api.getData().text;
+                api.close();
+                editor.focus();
+                editor.insertContent(placeholderHtml(k.key, t) + '&nbsp;');
+            }
+        });
     }
 
     /* CSS dentro do editor (iframe do TinyMCE, que não carrega o CSS do
@@ -658,9 +705,48 @@
                     : 'Topologia de rede: equipamentos, zonas e VLANs. Duplo clique num quadro edita.',
                 onAction: function () {
                     if (!toolAllowed(m === 'planta' ? 'cxplant' : 'cxtopology', currentType(editor))) { return; }
+                    rememberPh(editor);
                     if (window.CodexplusBoard) { window.CodexplusBoard.open(editor, null, m); }
                 }
             });
+        });
+
+        // MO-2: com um marcador selecionado (clique), o que entrar — colar,
+        // arrastar, "Inserir imagem", Planta, Topologia — ocupa o lugar dele.
+        // O marcador sai antes e o cursor fica onde ele estava: a troca direta
+        // da seleção de um nó travado (contenteditable=false) comia letras do
+        // parágrafo seguinte no TinyMCE 7.9 do GLPI 11.0.6 (harness do MO-2).
+        // Planta, Topologia e "Inserir imagem" abrem janela fora do editor e a
+        // seleção do marcador se perde no caminho: o botão guarda o marcador
+        // (rememberPh) e ele vale para a próxima inserção. Clique ou tecla no
+        // editor esquecem (janela cancelada).
+        editor.on('click keydown', function () { editor.__cxPhTarget = null; });
+        editor.on('BeforeExecCommand', function (e) {
+            var c = String(e.command || '').toLowerCase();
+            if (c !== 'mceinsertcontent' && c !== 'mceinsertclipboardcontent' && c !== 'mceinsertrawhtml') { return; }
+            var n = editor.selection.getNode();
+            var ph = n && editor.dom.getParent(n, 'span.cx-ph');
+            if (!ph && editor.__cxPhTarget) { ph = editor.__cxPhTarget; }
+            editor.__cxPhTarget = null;
+            if (!ph || !editor.getBody().contains(ph)) { return; }
+            var parent = ph.parentNode;
+            var idx = Array.prototype.indexOf.call(parent.childNodes, ph);
+            parent.removeChild(ph);
+            editor.selection.setCursorLocation(parent, Math.min(idx, parent.childNodes.length));
+        });
+
+        // MO-2: marcador (só na tela Modelos). Planta e Topologia seguem a
+        // tabela de ferramentas por tipo (T2), como os botões do documento.
+        ui.addMenuButton('cxph', {
+            icon: 'image',
+            text: 'Marcador',
+            tooltip: 'Marcar o lugar de uma imagem, planta ou topologia. Quem usar o modelo clica no marcador e cola a imagem (ou insere o quadro) no lugar dele.',
+            fetch: function (cb) {
+                var type = currentType(editor);
+                cb(PH_KINDS.filter(function (k) { return !k.tool || toolAllowed(k.tool, type); }).map(function (k) {
+                    return { type: 'menuitem', text: k.label + ' aqui', onAction: function () { insertPlaceholder(editor, k.key); } };
+                }));
+            }
         });
 
         // E4-3: imagem só por arquivo (ou colar/arrastar), pelo mesmo envio das
@@ -671,6 +757,7 @@
             icon: 'image',
             tooltip: 'Inserir imagem (ou cole / arraste direto no texto)',
             onAction: function () {
+                rememberPh(editor);
                 var input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/png,image/jpeg,image/gif,image/webp';
@@ -743,7 +830,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxdocref cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? ' cxph' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxdocref cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {
@@ -833,7 +920,9 @@
         _toolAllowed: toolAllowed,
         _hiddenTools: hiddenTools,
         _currentType: currentType,
-        _applyTools: applyTools
+        _applyTools: applyTools,
+        _placeholderHtml: placeholderHtml,
+        _phKinds: PH_KINDS
     };
 
     prepare(EDITOR_ID);

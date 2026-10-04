@@ -209,20 +209,114 @@ class Template extends CommonDBTM
             $input[self::SECTOR_FIELD]   = $sid;
             $input[self::CATEGORY_FIELD] = $cid;
         }
-        // M1: modelo não guarda imagem. A imagem é arquivo ligado a UM
-        // documento (Document_Item): num documento novo ela não abriria.
+        // MO-2 (Claudio, 04/10/2026): modelo não guarda imagem (M1), mas o
+        // lugar dela fica: cada imagem, print anotado, planta e topologia vira
+        // um marcador ("Imagem aqui", "Planta aqui"...). Planilha fica inteira.
         if (isset($input['content'])) {
-            $input['content'] = self::stripImages((string) $input['content']);
+            $input['content'] = self::toPlaceholders((string) $input['content']);
         }
         return $input;
     }
 
-    /** Tira imagens (e o invólucro do anotador, E4) do HTML do modelo. */
-    public static function stripImages(string $html): string
+    /** MO-2: classe do marcador e texto padrão de cada tipo. */
+    public const PLACEHOLDER_CLASS = 'cx-ph';
+    public const PLACEHOLDER_KINDS = [
+        'imagem'    => 'Imagem aqui',
+        'planta'    => 'Planta aqui',
+        'topologia' => 'Topologia aqui',
+        'quadro'    => 'Quadro aqui',
+    ];
+
+    /** HTML de um marcador (texto só, sem arquivo: vale em qualquer documento). */
+    public static function placeholderHtml(string $kind, string $text = ''): string
+    {
+        $kind = isset(self::PLACEHOLDER_KINDS[$kind]) ? $kind : 'imagem';
+        $text = trim($text) !== '' ? trim($text) : __(self::PLACEHOLDER_KINDS[$kind], 'codexplus');
+        return '<span class="' . self::PLACEHOLDER_CLASS . ' ' . self::PLACEHOLDER_CLASS . '-' . $kind
+            . '" contenteditable="false">' . htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</span>';
+    }
+
+    /** MO-2: quantos marcadores ainda estão no corpo (não preenchidos). */
+    public static function countPlaceholders(string $html): int
+    {
+        return (int) preg_match_all('#<span\b[^>]*\bclass="[^"]*\bcx-ph\b[^"]*"#i', $html);
+    }
+
+    /**
+     * MO-2: troca imagem, print anotado (span.cx-annot) e quadro (span.cx-board,
+     * planta ou topologia pelo `mode` do JSON) por um marcador. A legenda do
+     * quadro (span.cx-board-legend) sai junto com ele. Planilha (div.cx-sheet)
+     * e marcadores já existentes ficam como estão. Sem nada para trocar, o
+     * HTML volta igual, byte a byte.
+     */
+    public static function toPlaceholders(string $html): string
+    {
+        if (!preg_match('#<img\b|\bcx-annot\b|\bcx-board\b#i', $html)) {
+            return $html;
+        }
+        $dom  = new \DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8"?><html><body><div id="cx-ph-root">' . $html . '</div></body></html>', LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $xp   = new \DOMXPath($dom);
+        $root = $dom->getElementById('cx-ph-root') ?? $xp->query('//div[@id="cx-ph-root"]')->item(0);
+        if (!$root instanceof \DOMElement) {
+            return self::stripImagesRegex($html);
+        }
+        $cls = static fn (string $c): string => "contains(concat(' ', normalize-space(@class), ' '), ' {$c} ')";
+
+        $swap = static function (\DOMNode $old, string $kind) use ($dom): void {
+            $frag = $dom->createDocumentFragment();
+            $tmp  = new \DOMDocument();
+            $tmp->loadHTML('<?xml encoding="UTF-8"?><html><body>' . self::placeholderHtml($kind) . '</body></html>', LIBXML_NONET);
+            $span = $tmp->getElementsByTagName('span')->item(0);
+            $frag->appendChild($dom->importNode($span, true));
+            // Imagem que o GLPI embrulhou num link só dela: troca o link inteiro.
+            $target = $old;
+            $p = $old->parentNode;
+            if ($p instanceof \DOMElement && strtolower($p->nodeName) === 'a' && trim($p->textContent) === '' && $p->getElementsByTagName('img')->length === 1) {
+                $target = $p;
+            }
+            $target->parentNode->replaceChild($frag, $target);
+        };
+
+        // 1. Legendas de quadro: saem (o marcador do quadro já diz o que era).
+        foreach (iterator_to_array($xp->query('.//span[' . $cls('cx-board-legend') . ']', $root)) as $lg) {
+            $par = $lg->parentNode;
+            $par->removeChild($lg);
+            if ($par instanceof \DOMElement && strtolower($par->nodeName) === 'p' && $par !== $root
+                && trim(str_replace("\u{200B}", '', $par->textContent), " \t\n\r\0\x0B\u{00A0}") === '' && $par->getElementsByTagName('*')->length === 0) {
+                $par->parentNode->removeChild($par);
+            }
+        }
+        // 2. Quadros (planta / topologia).
+        foreach (iterator_to_array($xp->query('.//span[' . $cls('cx-board') . ']', $root)) as $b) {
+            $data = json_decode((string) $b->getAttribute('data-cx-board'), true);
+            $mode = is_array($data) ? (string) ($data['mode'] ?? '') : '';
+            $swap($b, in_array($mode, ['planta', 'topologia'], true) ? $mode : 'quadro');
+        }
+        // 3. Prints anotados.
+        foreach (iterator_to_array($xp->query('.//span[' . $cls('cx-annot') . ']', $root)) as $a) {
+            $swap($a, 'imagem');
+        }
+        // 4. Imagens soltas.
+        foreach (iterator_to_array($xp->query('.//img', $root)) as $img) {
+            $swap($img, 'imagem');
+        }
+
+        $out = '';
+        foreach ($root->childNodes as $n) {
+            $out .= $dom->saveHTML($n);
+        }
+        return $out;
+    }
+
+    /** Reserva, se o HTML não puder ser lido: tira as imagens como no M1. */
+    private static function stripImagesRegex(string $html): string
     {
         $html = preg_replace('#<span[^>]*class="[^"]*\bcx-annot\b[^"]*"[^>]*>.*?</span>#si', '', $html) ?? $html;
-        $html = preg_replace('#<img\b[^>]*>#i', '', $html) ?? $html;
-        return $html;
+        return preg_replace('#<img\b[^>]*>#i', '', $html) ?? $html;
     }
 
     public function post_addItem()

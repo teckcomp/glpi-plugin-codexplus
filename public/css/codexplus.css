@@ -2451,6 +2451,15 @@ a.cx-lib-plank:hover, a.cx-lib-plank:focus-visible { color: #fff; text-decoratio
 /* Q3b: legenda do quadro (imagem própria logo abaixo). */
 .codexplus-content .cx-board-legend { display: block; margin: 6px 0 12px; }
 .codexplus-content .cx-board-legend img { max-width: 100%; height: auto; }
+/* MO-2: marcador do modelo ("Imagem aqui") que ficou sem preencher. */
+.codexplus-content .cx-ph {
+    display: inline-block; box-sizing: border-box; min-width: 240px; max-width: 100%;
+    padding: 28px 18px; margin: 4px 0; border: 2px dashed var(--cx-border, #9aa7b6);
+    border-radius: 6px; background: var(--cx-surface-1, #f6f8fa); color: #5f6b7a;
+    font-style: italic; text-align: center;
+}
+.codexplus-content .cx-ph-planta,
+.codexplus-content .cx-ph-topologia { min-width: 360px; padding: 48px 18px; }
 html.cx-board-open { overflow: hidden; }
 .cx-board-modal { position: fixed; inset: 0; z-index: 2000; background: #f4f6f9; display: flex; flex-direction: column;
     font-family: var(--cx-font-body, system-ui, sans-serif); }

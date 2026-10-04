@@ -2097,6 +2097,74 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-grid-legend b.cx-gd-leg-marco { color: #0f6e56; }
 .cx-grid-legend b.cx-gd-leg-hoje { min-width: 0; width: 0; border-left: 2px solid #d93a3a; border-radius: 0; margin-right: 8px; }
 
+/* Q7b-3: Importar e Exportar na grade (mesmo diálogo .cx-io do quadro). */
+.cx-grid-xw { position: relative; display: inline-flex; }
+.cx-grid-xm { position: absolute; left: 0; top: calc(100% + 6px); z-index: 40; width: 330px; background: #fff; border: 1px solid var(--cx-border);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(23, 32, 45, .16); padding: 6px; }
+.cx-grid-xm[hidden] { display: none; }
+.cx-grid-xm button { display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 10px 12px; background: #fff;
+    font-size: 14px; line-height: 1.4; white-space: normal; cursor: pointer; color: var(--cx-text); }
+.cx-grid-xm button:hover, .cx-grid-xm button:focus-visible { background: var(--cx-surface-1); }
+.cx-grid-xm b { display: block; font-weight: 600; }
+.cx-grid-xm span { display: block; font-size: 12.5px; color: var(--cx-muted); margin-top: 3px; }
+.cx-grid-xm-nota { padding: 8px 12px; font-size: 12.5px; color: var(--cx-muted); }
+.cx-io-back.cx-io-back--fixo { position: fixed; z-index: 2000; }
+
+/* Q7b-2b: cronograma com datas no desenho do mockup aprovado (q7b-mockup-cronograma).
+   Nº | Fase, tarefa ou marco | Responsável | Início | Fim (dd/mm) fixos à esquerda
+   (posições = larguras do GD em codexplus-grid.js: 48, 320, 140, 58, 58); sem
+   linhas verticais na tabela; meses com linha mais forte; "hoje" tracejada. */
+.cx-grid--datas .cx-grid-xm { left: auto; right: 0; }
+.cx-gd-escala-l { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+.cx-gd-table { font-size: .9em; }
+.cx-gd-table th, .cx-gd-table td { height: 30px; border-width: 0 0 1px 0; text-align: left; padding: 0 8px; }
+.cx-gd-table thead th { background: var(--cx-surface-1); color: var(--cx-muted); font-weight: 600; }
+.cx-gd-table .cx-gd-n, .cx-gd-table .cx-grid-name, .cx-gd-table .cx-gd-owner, .cx-gd-table .cx-gd-date { position: sticky; z-index: 1; background: var(--cx-surface); }
+.cx-gd-table .cx-gd-n { left: 0; color: var(--cx-muted); font-variant-numeric: tabular-nums; }
+.cx-gd-table .cx-grid-name { left: 48px; }
+.cx-gd-table .cx-gd-owner { left: 368px; color: var(--cx-muted); }
+.cx-gd-table .cx-gd-ini { left: 508px; }
+.cx-gd-table .cx-gd-fim { left: 566px; }
+.cx-gd-table .cx-gd-date { padding: 0 6px; }
+.cx-gd-table td.cx-gd-date { font-variant-numeric: tabular-nums; }
+.cx-gd-table thead th.cx-gd-n, .cx-gd-table thead th.cx-grid-name, .cx-gd-table thead th.cx-gd-owner, .cx-gd-table thead th.cx-gd-date { z-index: 2; background: var(--cx-surface-1); }
+.cx-gd-table th.cx-gd-head, .cx-gd-table td.cx-gd-track { padding: 0; border-left: 1px solid var(--cx-border); }
+.cx-gd-table tr.cx-gd-r-fase td { background: var(--cx-surface-1); font-weight: 600; color: var(--cx-text); }
+.cx-gd-table tr.cx-gd-r-fase td.cx-gd-calc { color: var(--cx-text); }
+.cx-gd-table tr.cx-gd-r-marco td.cx-grid-name { font-weight: 600; }
+.cx-gd-table tr.cx-gd-r-filha td.cx-grid-name { padding-left: 26px; }
+.cx-gd-table tr.cx-gd-r-fase td.cx-grid-name { padding-left: 4px; }
+.cx-gd-losango { margin-right: 5px; font-size: .85em; }
+/* Responsável vazio: o "—" (para clicar) só aparece ao passar o mouse na linha. */
+.cx-gd-table .cx-gd-vazio { opacity: .4; }
+.cx-gd-table tr:not(:hover):not(.is-sel) .cx-gd-vazio { visibility: hidden; }
+.cx-gd-table tr.is-sel td { background: #eaf2fd; }
+.cx-gd-table th.cx-gd-head { height: 44px; }
+.cx-gd-band { color: var(--cx-muted); font-size: .85em; font-weight: 600; border: 0; }
+.cx-gd-unit { color: var(--cx-muted); font-size: .82em; }
+.cx-gd-lane { height: 30px; }
+.cx-gd-sep { border-left: 1px solid var(--cx-border); opacity: .45; }
+.cx-gd-sep.is-mes { opacity: 1; }
+.cx-gd-scale .cx-gd-sep { top: 22px; opacity: .6; }
+.cx-gd-scale .cx-gd-sep.is-mes { top: 0; opacity: 1; }
+.cx-gd-barra { top: 8px; height: 14px; background: #9fe1cb; border: 1px solid #86d6ba; border-radius: 4px; }
+.cx-gd-table tr.is-sel .cx-gd-barra { outline: 2px solid #3b82f6; outline-offset: 1px; }
+.cx-gd-table tr.is-sel .cx-gd-alca::after { content: ''; position: absolute; left: 1px; top: 0; width: 6px; height: 12px; background: #fff;
+    border: 1.5px solid #3b82f6; border-radius: 3px; box-sizing: border-box; }
+.cx-gd-table tr.is-sel .cx-gd-alca.is-i::after { left: 0; }
+.cx-gd-fase-barra { top: 11px; height: 7px; background: #2c3a4a; }
+.cx-gd-fase-barra::before, .cx-gd-fase-barra::after { top: 7px; border-top: 5px solid #2c3a4a; }
+.cx-gd-fase-barra::before { border-right-width: 5px; }
+.cx-gd-fase-barra::after { border-left-width: 5px; }
+.cx-gd-marco { top: 9px; width: 12px; height: 12px; margin-left: -6px; background: #1d9e75; border: 0; }
+.cx-gd-marco-data { top: 7px; margin-left: 11px; font-size: .85em; font-weight: 700; color: #1d9e75; }
+.cx-gd-hoje { border-left: 2px dashed #d6456e; }
+.cx-gd-hoje-rot { top: auto; bottom: -1px; width: auto; height: auto; margin-left: 0; transform: translateX(-50%); border: 0;
+    padding: 0 6px; border-radius: 4px; background: #d6456e; color: #fff; font-size: .72em; font-weight: 700; line-height: 16px; z-index: 3; }
+.cx-grid-legend b.cx-gd-leg-fase { background: #2c3a4a; }
+.cx-grid-legend b.cx-gd-leg-marco { color: #1d9e75; }
+.cx-grid-legend b.cx-gd-leg-hoje { border-left-color: #d6456e; }
+
 /* =========================================================================
    21. BIBLIOTECA (bloco B1) — templates/library.html.twig
    Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.

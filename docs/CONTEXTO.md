@@ -2,6 +2,14 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.10`** · último commit de código **`42a84c0`** ·
+> atualizado em **04/10/2026 (noite)**: **AP-1 ✅** — cada versão publicada
+> guarda **quem a aprovou** (coluna `approvers` em `documentversions`; a
+> leitura `?version=N`, o PDF, o Word e o Histórico mostram os dela) e a
+> situação **"Aguardando aprovadores"** no Painel e no filtro da
+> Biblioteca. Seção 3.20; achados 154 e 155. Próximo: **MO-1** (0.7.11,
+> schema, mockup da tela Modelos).
+> Antes:
 > Estado: **`v0.7.9`** · último commit de código **`7a54900`** ·
 > atualizado em **04/10/2026 (madrugada)**: **HV-1 ✅** — aba **Histórico**
 > do documento (4ª aba dos dados na edição; na leitura, a mesma barra
@@ -2341,6 +2349,55 @@ simulada) e tela no Chromium como `glpi` e como `normal` (Observer). Na
 homologação a aba só apareceu depois do `cache:clear` de verdade (achado
 149). Aprovado por Claudio.
 
+### 3.20 AP-1 — Aprovadores por versão e "Aguardando aprovadores" (`42a84c0`, `v0.7.10`)
+
+Decisões de Claudio (04/10/2026): **coluna JSON** na tabela de versões
+(não tabela nova); versões anteriores à 0.7.10 — a migração preenche **só a
+última publicada**, as demais ficam **sem a linha**; rótulos **"aguarda
+aprovadores"** (Painel) e **"Aguardando aprovadores"** (filtro).
+
+- **Schema:** `glpi_plugin_codexplus_documentversions.approvers` (`text`,
+  null) = `[{"users_id":7,"date":"…"}, …]` na ordem da lista.
+  `Install::installAP1()` cria a coluna e, **só nessa hora** (guarda
+  `fieldExists`), preenche a última versão de cada DIA/DIV com os
+  aprovadores que têm data. Reinstalar de novo não repreenche.
+- **Por que funciona sem mexer no fluxo:** as datas de
+  `documentapprovers` só são zeradas no envio (`submit`) e na devolução
+  (`reject`); na publicação (`publishNow` → `DocumentVersion::snapshot`)
+  ainda são as da rodada que publicou. O `snapshot()` grava
+  `DocumentApprover::approved()` (só quem tem data); lista vazia ou tipo
+  sem aprovadores = `null`.
+- **Leitura:** `DocumentVersion::approversOf($linha)` (users_id => data;
+  lixo/null = `[]`) e `DocumentApprover::format()` ("Ana (05/10/2026),
+  Bruno (pendente)", usado também por `approverSummary()`). No
+  `document.form.php`, com `?version=N` a linha "Aprovadores" (texto do
+  DIV e `data-sign` dos diagramas, que o PDF e o Word desenham) vem da
+  versão, **com datas**; sem registro, sem a linha. Fora da versão, a
+  lista atual como antes.
+- **Histórico (HV-1):** "Publicada a revisão :0N — … — aprovadores: …".
+- **Situação derivada (achado 155):** o status gravado continua
+  `aprovacao`. `Dashboard::loadAllNew()` acrescenta a cada linha
+  `signers_pending` e `situation` (= status, ou `aprovadores` na 1ª etapa
+  de DIA/DIV com aprovador pendente — uma consulta só, mesma regra de
+  `signersPending()`; revisão em andamento continua "em atualização").
+  `Document::SITUATION_SIGNERS` e `Document::getSituations()` (os status,
+  com "Aguardando aprovadores" antes de "Aguardando responsável";
+  `getStatuses()` não mudou). Painel: selo antes de "aguarda gestor".
+  Biblioteca: botão no filtro, contagens (`Library::shelf/counts`),
+  `data-status` e rótulos pela `situation`. Rosca e contadores do Painel
+  não mudam.
+
+#### Testes
+
+Container: GLPI 11.0.6 + MariaDB, plugin instalado na 0.7.9 com dados
+semeados e atualizado para a 0.7.10 (migração e idempotência conferidas
+no banco); harness com o Kernel, 28 verificações (snapshot, lista trocada
+depois da publicação, POP e lista vazia, ordem do filtro, Painel contra
+`signersPending()`, contagens, Histórico); tela pelo `php -S` com login
+por script (achado 154): selos do Painel, versão com e sem registro,
+`data-sign`, botão e `data-status` da Biblioteca. PDF e Word não foram
+vistos no navegador no container; Claudio validou na homologação.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3059,6 +3116,20 @@ depender do comportamento errático de `position: fixed` na impressão.
 153. **Container de validação:** o `mysqld_safe` em segundo plano morre no
     meio do harness ("server has gone away"). Subir com
     `setsid nohup mysqld --user=mysql &` no mesmo comando do teste.
+154. **Tela sem Chromium no container:** o login do GLPI 11 tem campos
+    fixos (`login_name`, `login_password`, `auth=local`, `noAUTO`,
+    `_glpi_csrf_token` da própria página). Passar o cookie do Python para o
+    `curl` perde a sessão (volta `error=3`): login e páginas na **mesma
+    sessão Python** (`http.cookiejar.CookieJar`). Serve para conferir o
+    HTML (selos, atributos, `data-sign`); o que o JS desenha (SVG, PDF,
+    Word) ainda pede navegador. Se o `apt-get update` falhar pelo
+    repositório do Node (403), remover `/etc/apt/sources.list.d/nodesource*`.
+155. **Situação derivada ≠ status gravado.** "Aguardando aprovadores" não
+    é status: é `situation` calculada em `loadAllNew()`. Filtro, contagem
+    e rótulo usam `situation`; fluxo, contadores e `is-draft` usam
+    `status` — trocar o status das linhas quebraria os contadores do
+    Painel. Em dado de teste, `revision > 0` com status de etapa é
+    **revisão em andamento** ("em atualização"), nunca "aprovadores".
 
 ## 6. Contrato de código — não quebrar
 

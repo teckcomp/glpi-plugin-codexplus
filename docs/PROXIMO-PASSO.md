@@ -1,12 +1,12 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (madrugada), depois da **HV-1 ✅** (`7a54900`).
+> Gerado em 04/10/2026 (noite), depois do **AP-1 ✅** (`42a84c0`).
 
 ## Estado
 
-- Versão: **`0.7.9`**; último commit de código **`7a54900`** (HV-1); docs
-  neste pacote. Plugin 0.7.9 habilitado na homologação.
+- Versão: **`0.7.10`**; último commit de código **`42a84c0`** (AP-1); docs
+  neste pacote. Plugin 0.7.10 habilitado na homologação.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
   MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
@@ -29,8 +29,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.19, achados
-  até 153) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.20, achados
+  até 155) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -44,7 +44,8 @@
   pacote seguinte**. Clonar do GitHub no último commit antes de mexer
   (achado 71).
 - **Validação no container** (achado 136): GLPI 11.0.6 real + MariaDB,
-  harness PHP com o Kernel, tela pelo `php -S` + Chromium. **MariaDB e
+  harness PHP com o Kernel, tela pelo `php -S` + Chromium (sem Chromium:
+  login por script numa sessão Python só, achado 154). **MariaDB e
   `php -S` morrem entre comandos: subir no mesmo comando**; `cache:clear`
   depois de trocar Twig (achado 140).
 - **Toda regra prometida no texto da entrega entra no harness** (achado 139).
@@ -53,7 +54,7 @@
 ## Ordem da Reta final
 
 1. ~~**HV-1**~~ ✅ `7a54900` — aba Histórico + "incluir obsoletos" na Biblioteca
-2. **AP-1** — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
+2. ~~**AP-1**~~ ✅ `42a84c0` — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
 3. **MO-1** — modelos por setor e categoria (0.7.11)
 4. **MO-2** — imagens dentro de modelos
 5. **Q7c-1** — cronograma: fase leva linha solta; tela cheia esticada
@@ -68,23 +69,23 @@
 
 ## Próximo passo imediato
 
-**AP-1** (0.7.10, **com schema — reinstala**). Clonar o `master` do GitHub
-(`7a54900`). Entrega (ROADMAP, Reta final, linha 2):
+**MO-1** (0.7.11, **com schema — reinstala**). Clonar o `master` do GitHub
+(`42a84c0`). Entrega (ROADMAP, Reta final, linha 3): modelos por **setor e
+categoria** — colunas no modelo, tela **Modelos** agrupada, e a criação de
+documento oferecendo só os modelos que cabem.
 
-- **Quem aprovou cada versão publicada**: coluna/tabela que guarda os
-  aprovadores de cada revisão no momento da publicação; a tabela de
-  versões, a leitura de uma versão (`?version=N`), o PDF e o Word dessa
-  versão mostram os aprovadores **dela** (hoje leem a lista atual).
-- **Status próprio "Aguardando aprovadores"** no Painel e no filtro de
-  Situação (hoje aparece como "aguarda gestor").
-
-Antes de codar: ler `DocumentApprover`, `Document::sign()/approve()`,
-`DocumentVersion::snapshot()` e onde o Painel monta as situações; mostrar a
-Claudio a proposta de schema (tabela nova ou coluna JSON na
-`documentversions`) e o rótulo do status. Sem mockup (tela quase não muda).
-Pacote com `setup.php` em 0.7.10: `plugin:install --force` +
-`plugin:activate` + `plugin:list | grep -i codexplus`, pelo
-`su -s /bin/sh www-data -c "…"`.
+Antes de codar: ler `src/Template.php`, a tabela de modelos no
+`Install.php`, `front/templates.php`, `front/template.form.php` e
+`Template::listForCreation()` (usado pelo `document.form.php`). Levar a
+Claudio, numa resposta só: (1) **mockup da tela Modelos** agrupada por
+setor → categoria; (2) as decisões pendentes do MO-1 no ROADMAP (setor e
+categoria opcionais? modelo sem setor vale para todos? a criação filtra
+pela categoria escolhida ou pelo setor de quem cria?); (3) o schema
+proposto (colunas no modelo vs. tabela de ligação, se puder ter várias
+categorias). Modelos são dado da instalação (achado 137): a migração não
+semeia nada, só cria as colunas. Pacote com `setup.php` em 0.7.11:
+`plugin:install --force` + `plugin:activate` + `plugin:list | grep -i
+codexplus`, pelo `su -s /bin/sh www-data -c "…"`.
 
 Ao chegar no **7b**, pedir antes: SMTP configurado na homologação. Ao
 chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de

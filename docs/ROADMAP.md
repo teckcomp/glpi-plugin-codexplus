@@ -1,5 +1,9 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.7.10`** (último commit de código **`42a84c0`**) ·
+> **AP-1 ✅** (04/10/2026, noite): aprovadores gravados em cada versão
+> publicada e situação "Aguardando aprovadores". Próximo: **MO-1**.
+> Antes:
 > Estado em **`v0.7.9`** (último commit de código **`7a54900`**) ·
 > **HV-1 ✅** (04/10/2026, madrugada): aba Histórico e "Incluir obsoletos".
 > Próximo: **AP-1**.
@@ -202,7 +206,7 @@ números entre parênteses são os da lista revisada de 04/10.
 | Ordem | Bloco | Entrega | Reinstalar? | Antes de começar |
 |---|---|---|---|---|
 | 1 | ~~**HV-1**~~ ✅ `7a54900` | Aba **Histórico** do documento (o `Log::history` já grava: quem, quando, o quê) (7) + filtro **"incluir obsoletos"** na Biblioteca (31) | não | mockup do Histórico |
-| 2 | **AP-1** | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
+| 2 | ~~**AP-1**~~ ✅ `42a84c0` | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
 | 3 | **MO-1** | Modelos por **setor e categoria** (colunas no modelo, tela Modelos agrupada, criação filtrando pelo setor) (32) | **sim** (0.7.11) | mockup da tela Modelos |
 | 4 | **MO-2** | **Imagens dentro de modelos**: o modelo guarda as imagens; documento novo recebe uma cópia de cada (33) | não (prever) | decisão: reverte o M1 |
 | 5 | **Q7c-1** | Cronograma: fase que sobe leva a linha solta do topo (16) + linha do tempo esticada na tela cheia (17) | não (só JS) | — |
@@ -785,6 +789,12 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
 - [x] **HV-1:** 4ª aba dos dados na edição; na leitura, a mesma barra
       recolhida só com o Histórico. Entra toda alteração do documento;
       acessos pelo link, não (Claudio, 04/10/2026)
+- [x] **AP-1:** coluna JSON na tabela de versões; migração preenche só a
+      última publicada (as anteriores sem a linha); "aguarda aprovadores"
+      no Painel e "Aguardando aprovadores" no filtro (Claudio, 04/10/2026)
+- [ ] **MO-1:** mockup da tela Modelos agrupada; modelo com setor e
+      categoria opcionais? modelo sem setor aparece para todos? a criação
+      filtra pelo setor de quem cria ou pela categoria escolhida?
 - [ ] **MO-2:** imagem dentro do modelo **reverte a regra do M1** (modelo
       não guardava imagem). Confirmar: a imagem é copiada para cada
       documento novo; apagar do modelo não mexe nos documentos já criados

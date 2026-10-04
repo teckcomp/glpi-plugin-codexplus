@@ -2,12 +2,23 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.0`** + blocos de 03/10/2026 (último commit de código
-> `e1070d0`; versão não mudou, sem schema novo) · atualizado em
-> **03/10/2026 (noite)**: **organograma no motor de quadro, fechado** (Q6a a
+> Estado: **`v0.7.3`** (schema novo: marcas) · último commit de código
+> **`c4ad5ff`** · atualizado em **04/10/2026**: **3c-0 — paginação do PDF
+> corrigida** (todos os 26 documentos da homologação sem sobreposição; seção
+> 3.14) e **marcas** (M-1 cadastro com cor sugerida pela logo, M-2 marca por
+> documento; seção 3.15); ícone do plugin (`logo.png`); achados 123 a 128.
+> Próximo: **3c — modelos com conteúdo real** (decisão pendente da Proposta:
+> total geral, condições comerciais e aceite). Antes, em 03–04/10/2026
+> (noite): **cronograma fechado (Q7b)** — datas reais, fases, marcos,
+> numeração, linha "hoje", importar/exportar (`.json` + tabela para IA,
+> também RACI), desenho do mockup aprovado, PDF e leitura em **paisagem**,
+> **tela cheia** na edição e na leitura e **situação das tarefas** (Iniciar,
+> Concluir, Reabrir no publicado, sem abrir revisão) — seção 3.13; achados
+> 114 a 122. Próximo: **3c — modelos com conteúdo real**. Antes, na tarde e
+> noite de 03/10: **organograma no motor de quadro, fechado** (Q6a a
 > Q6f-2; motor antigo `codexplus-org.js` removido), **cópia da Planta e da
-> Topologia** (Q7a) e **cronograma com datas desenhado e aprovado** (Q7b, a
-> fazer) — seção 3.12; achados 107 a 113. **Documentos encerrados** (sem
+> Topologia** (Q7a) e **cronograma com datas desenhado e aprovado** (Q7b,
+> feito em seguida, seção 3.13) — seção 3.12; achados 107 a 113. **Documentos encerrados** (sem
 > importar/exportar de documento completo); pendentes para o fim só a aba
 > de Histórico e a galeria de Modelos. Antes, no mesmo dia:
 > **Q5i — importar e exportar o fluxograma em arquivo**: cópia do Codex+
@@ -1607,7 +1618,7 @@ Barra ganha **Importar** e **Exportar cópia** (`.json`, `formato:
 limite 12 MB). Ctrl+Z volta o desenho, não a imagem (igual ao "Trocar
 planta"). Cópia de outro tipo de quadro é recusada com mensagem clara.
 
-#### Q7b — cronograma com datas (aprovado, a fazer)
+#### Q7b — cronograma com datas (aprovado; feito na seção 3.13)
 
 Mockups aprovados (`q7b-mockup-cronograma.png` e `q7b-mockup-situacao.png`,
 com o cronograma ShopMap). Modelo hoje: `periods[]` relativos e `rows[]
@@ -1636,6 +1647,207 @@ DIA0001 real (42 elementos) como caso de teste, **fora do repositório**
 1 px), 31 testes jsdom do desenho, testes ponta a ponta por bloco no
 Chromium (página servida por HTTP, para as fontes do PNG), regressão do
 quadro (fluxograma, planta, topologia) contra o arquivo anterior ao Q6.
+
+### 3.13 Sessão de 03–04/10/2026 (noite) — Q7b: cronograma completo
+
+Commits: `1f8085f` (docs de 03/10, noite), `27d330e` (Q7b-1), `4bd1e87`
+(Q7b-2), `913c6d4` (Q7b-3 + Q7b-2b), `19ca003` (paisagem e tela cheia),
+`2366adb` (Q7b-4, **versão 0.7.1**). Claudio pediu **blocos grandes**
+(um pacote por bloco, validado antes de entregar).
+
+#### Decisões de Claudio (03–04/10/2026)
+
+- **Q7b-1 e Q7b-2 em bloco único cada** (o resto do método não muda:
+  pacote, roteiro, commit antes do próximo).
+- **Seguir o mockup aprovado à risca** (`q7b-mockup-cronograma.png`,
+  `q7b-mockup-situacao.png`): o Q7b-1/2 foi feito só pela descrição escrita
+  e divergiu; o **Q7b-2b** alinhou (achado 116). **Sem a coluna Dias**;
+  **datas em dd/mm** na tabela (ano no `title` e ao editar).
+- **PDF do cronograma e da RACI sempre em A4 paisagem**; a **leitura**
+  deles usa a folha larga (1320 px, como a edição) — os outros documentos
+  continuam na folha de 900 px.
+- **Tela cheia** no cronograma e na RACI, na edição e na leitura.
+- **Situação (Q7b-4)**: `id` fixo por linha + tabela separada; marca quem
+  pode **editar e gerir** o documento (responsável, revisor, autor) e o
+  Super-Admin; **data de conclusão editável** (padrão hoje, nunca no
+  futuro); atrasos, % e resumo **calculados na hora**, nunca gravados.
+
+#### Formato gravado (cronograma com datas)
+
+`{ kind: 'cronograma', mode: 'datas', scale: 'S'|'M', rows: [...] }`, linha
+= `{ name, owner, start, end, id }` (tarefa), `{ type: 'fase', name, owner,
+id }` (sem datas; resumo calculado das linhas abaixo até a próxima fase) ou
+`{ type: 'marco', name, owner, start, end (= start), id }`. Datas
+AAAA-MM-DD. Sem `mode`, é o cronograma antigo (S1, S2…), que abre igual e
+ganha **Usar datas** (converte; Desfazer volta). `Diagram::validateDated`
+confere tudo; **linha sem `id` ganha `r` + posição** (determinístico: o
+mesmo id em toda leitura até a próxima gravação; achado 120).
+
+#### Motor (`public/js/codexplus-grid.js`)
+
+- **Q7b-1**: início e fim, escala semanas/meses, barra pelas datas, editar
+  na tabela e **arrastando** (mover; alças nas pontas; desenhar a barra numa
+  tarefa sem datas).
+- **Q7b-2**: fases (▾ recolhe só na tela), marcos ◆, numeração automática
+  (**marco sem número**), subir/descer (a fase leva as linhas dela), linha
+  **hoje** tracejada, PDF que estica a linha do tempo quando cabe numa folha.
+- **Q7b-2b** (mockup): barra Fase · Tarefa · Marco · Escala · **Hoje** ·
+  Desfazer … Importar · Exportar · Exportar PDF; colunas Nº · Fase, tarefa ou
+  marco · Responsável · Início · Fim fixas ao rolar; meses curtos seguindo as
+  semanas; **seleção** de linha (inserir abaixo dela); semana de ~44 px.
+- **Q7b-3**: **Importar/Exportar** em cronograma e RACI — cópia `.json`
+  (`formato: 'codexplus-grade'`) e **tabela Markdown** para levar a uma IA,
+  de ida e volta. O leitor aceita cabeçalhos em português e inglês, datas
+  dd/mm/aaaa, dd/mm/aa e ISO, deduz fase (numeração 1 → 1.1, "Fase…" sem
+  datas) e marco (Dias = 0, ◆); RACI aceita palavras e "R/A". Tabela
+  importada **herda o id** da linha atual de mesmo tipo e nome.
+- **Paisagem e tela cheia**: `printPlan`/`gdPrintPlan` sempre paisagem;
+  classe `cx-docpage--paisagem` na leitura; tela cheia igual à do
+  organograma (API do navegador ou classe `is-full`), cabeçalho fixo ao
+  rolar, diálogos anexados dentro da tela cheia (achado 121).
+- **Q7b-4 (situação)**, só na **leitura do publicado** (também da versão
+  publicada durante uma revisão, e do obsoleto, só para ver): resumo no topo
+  (concluídas, atrasadas, com atraso, marcos atrasados, última marcação),
+  coluna **Situação** com selos, barras pela situação (✓ verde, ✓ âmbar,
+  vermelha com extensão rosa até hoje, azul, clara), progresso na barra da
+  fase, ◆ vermelho/âmbar, caixinhas + **Iniciar / Concluir (n) / Reabrir**
+  para quem pode marcar, diálogo da data de conclusão, PDF com a situação.
+  Na edição nada disso aparece.
+
+#### Situação: servidor
+
+- `src/ScheduleStatus.php` + tabela **`glpi_plugin_codexplus_schedulestatus`**
+  (documento, `row_key`, `state` andamento/concluida, `date_start`,
+  `date_done`, `users_id`, `date_mod`; único por documento + linha).
+- `ajax/schedule.status.php`: ações `iniciar`, `concluir` (com `data`),
+  `reabrir`; só tarefas da versão que a leitura mostra
+  (`ScheduleStatus::shownDiagram`); devolve a situação inteira e o token novo.
+- `Document::canMarkSchedule()`: publicado ou em revisão + (Super-Admin ou
+  `isEditor()`). A purga do documento apaga a situação.
+- Regras de cálculo (no navegador): concluída depois do Fim = **com
+  atraso**; não concluída com Fim antes de hoje = **atrasada N d**; fase =
+  % de tarefas concluídas + quantas atrasadas; marco = tarefas acima dele na
+  mesma fase: todas concluídas até a data → atingido; data passada sem todas
+  → atrasado.
+
+#### Testes da sessão
+
+jsdom: 158 (motor) + 55 (importar/exportar) + 50 (situação, com o **mockup
+de situação como gabarito**: 10 de 30, 3 atrasadas, 2 com atraso, 1 marco;
+Fase 1 82% · 2 atrasadas). Harness PHP: 17 (`validate`, ids) + 18
+(`ScheduleStatus` com banco falso). Twig estrito (template e trechos
+renderizados). Chromium: quatro roteiros de ponta a ponta (arrastar, fases,
+importar/exportar, tela cheia) e o da situação, com hoje fixo e o endpoint
+simulado por interceptação (achado 122).
+
+### 3.14 Sessão de 04/10/2026 — 3c-0: paginação do PDF
+
+Commit `5561ec6`. Só `public/js/codexplus.js` (`layoutPages()` e CSS do
+rodapé). Vale para todo documento de texto (POP, PSG, MAN, PRP, LAU, DTC,
+DIV); diagramas têm o PDF do próprio motor e o Word pagina sozinho.
+
+Claudio mandou PDFs com o rodapé por cima do texto e títulos sozinhos no
+pé da página ("em todos os documentos"). Causas e regras:
+
+- **Altura com margens**: o motor somava `getBoundingClientRect().height`,
+  que não conta margem (parágrafo 9 px, título 26 px, tabela 12 px); a
+  página enchia acima do que cabia. Agora soma margem de cima e de baixo.
+- **Margem que vaza**: `div.cx-sheet > table` (planilha) deixava a margem da
+  tabela escapar do `div` (achado 123). Filhos diretos `div`, `p` e
+  `blockquote` do palco e da folha ganham `display: flow-root`.
+- **Folga de 8 px** antes do rodapé (arredondamento de fonte do Windows).
+- **Título desce com o bloco seguinte**: h1–h6, o bloco do título do
+  documento e **parágrafo curto todo em negrito** (como os documentos são
+  escritos hoje).
+- **Legenda acompanha o quadro** (Q3b).
+- **Imagens reduzidas para caber**: bloco (ou quadro + legenda) maior que a
+  folha tem **todas** as imagens reduzidas na mesma proporção, até 35% (o
+  DTC0005 tinha duas fotos em pé no mesmo parágrafo).
+- **Parágrafo vazio** não abre página nem gera folha em branco.
+- **Rodapé** em até duas linhas (8 pt), sem reticências.
+
+Validação: os 26 documentos da homologação, com o tamanho real de cada
+imagem, medidos em modo impressão (achados 124 e 125) — antes 5 com
+problema, depois 0. Limite que fica: bloco sem imagem maior que uma folha
+(planilha de ~30+ linhas) ainda transborda; partir planilha repetindo o
+cabeçalho seria bloco próprio.
+
+**Hábitos de escrita que o motor não adivinha** (vão para os modelos da
+3c): uma foto por parágrafo (Enter, não Shift+Enter); título como
+parágrafo próprio ou Estilo → Título, não no fim do parágrafo de cima.
+
+### 3.15 Sessão de 04/10/2026 — marcas (M-1 e M-2) e ícone do plugin
+
+Pedido de Claudio: cliente com **várias logomarcas** (empresas de um mesmo
+dono, financeiro e compras em comum), **numa entidade só** do GLPI. O
+documento sai com a logo da marca de referência. Mockup aprovado
+(`m1-mockup-marcas.png`, com as logos de Ponto, Cacta, 4B e Buzz Telecom).
+
+#### Decisões de Claudio (04/10/2026)
+
+- Marca **escolhida no documento** (entidade só; com entidades separadas
+  daria para ligar marca a entidade — não é o caso).
+- **Por marca**: nome da empresa (`{empresa}`), logo, altura da logo e
+  **cor principal**. **Globais**: posição e repetição da logo, caixa alta,
+  rodapé.
+- **Cor sugerida pela logo**, editável, escurecida se ilegível.
+- A cor vale para o título, o filete e — além do mockup, aceito — os
+  títulos do corpo e o círculo dos passos (tudo que era o azul fixo
+  `#0c447c`), no PDF e no Word.
+
+#### M-1 — cadastro (`1525c34`, versão 0.7.2)
+
+- Tabela **`glpi_plugin_codexplus_brands`** (`name`, `logo_filename`,
+  `logo_mm`, `color`, `is_default`, datas). `src/Brand.php` (não é
+  CommonDBTM, como IconLibrary). Gerencia quem tem Configurar > Atualizar.
+- Logo em `GLPI_PLUGIN_DOC_DIR/codexplus/brands/brand-<id>.png|jpg` (só
+  PNG/JPG, `getimagesize`), entregue por `front/logo.send.php?brand=ID`.
+- **Semente** (Install, tabela vazia): 1ª marca com o nome da empresa, a
+  altura e uma **cópia** da logo da configuração antiga (que fica no
+  lugar); cor `#0c447c`, padrão. Na homologação nasceu "Marca principal"
+  (nome da empresa estava vazio) — renomear para Resolutto IT Solutions.
+- Tela: seção **Marcas** no topo da configuração (lista, Editar, Tornar
+  padrão, Excluir, Nova marca). "Nome da empresa", "Logo" e "Altura do
+  logo" saíram do formulário geral.
+- **Cor pela logo** (`public/js/codexplus-brand.js`, no navegador): ignora
+  transparente, quase branco e, com os 4 cantos opacos, o fundo; com pixels
+  saturados vence a faixa de matiz mais presente, senão o cinza mais
+  presente; escurece até contraste 4,5 com o branco. Nas logos de teste:
+  Ponto `#252242` (o marinho vence o laranja), Cacta `#8dd350` →
+  `#4e8321`, 4B cinza `#3a3c40`, Buzz errado (achado 128).
+- `Branding::printConfig($doc, $brandId)` → `Brand::forPrint()`; chave
+  nova `brand.color` no JSON (aceita em `getPrintConfig`, só `#rrggbb`);
+  `brandCss()` no PDF; `INK` do Word lido a cada exportação.
+
+#### M-2 — marca do documento (`c4ad5ff`, versão 0.7.3)
+
+- Coluna `plugin_codexplus_brands_id` no documento e na versão publicada.
+  Documento existente ficou **preso à marca padrão do dia da instalação**
+  (linhas com 0, idempotente): trocar a padrão não muda documento antigo.
+- Na `CONTENT_FIELDS`: muda **só em rascunho** e conta como alteração.
+  Escolha vazia ou inválida vira a padrão (`Brand::resolveId`). Cancelar
+  revisão devolve a marca da versão.
+- Campo **Marca** depois do Cliente, só com **mais de uma marca** e fora
+  de DIA; logo da escolhida ao lado do select (select nativo não mostra
+  imagem nas opções — lista com logos fica para se fizer falta). Leitura:
+  "Marca: X" na linha de dados.
+- Duplicar e Duplicar como levam a marca. Versão publicada imprime com a
+  marca com que foi publicada.
+- Marca em uso (documento ou versão) **não se exclui**; a padrão e a última
+  também não.
+
+#### Ícone do plugin (no commit do M-1)
+
+`logo.png` (256 px, monograma C+) na raiz do plugin: o GLPI 11.0.6 usa no
+lugar da letra colorida em Configurar → Plugins (achado 126).
+
+#### Testes
+
+PHP contra MariaDB real com stub mínimo do GLPI (`$DB` sobre mysqli,
+Config, Session, Migration): 30 (M-1) + 13 (M-2). Cor pela logo no
+Chromium com as 4 logos. Twig 3.14 estrito: tela de configuração (4
+estados) e o campo Marca (4 casos). PDF com a marca Cacta no harness da
+paginação.
 
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
@@ -2365,6 +2577,67 @@ depender do comportamento errático de `position: fixed` na impressão.
     função** (texto que é uma expressão de função vira função a chamar).
     Embrulhar em `(function(){ … })()`. E `inner_text` não lê texto de SVG:
     usar `textContent`.
+114. **Pacote enviado mas não extraído**: md5 certo e "nada mudou" na tela.
+    Antes de suspeitar de cache, rodar o `grep -c` do token novo no
+    servidor (deu 0 na tela cheia, 03/10). Com 0, é o `tar` que faltou.
+115. **Conferir a cópia testada**: os roteiros do Chromium rodam numa pasta
+    de teste; uma vez rodaram contra o JS anterior (esquecido de copiar).
+    Antes de cada rodada, `grep -c <token novo>` na pasta de teste.
+116. **Mockup aprovado tem que estar à mão antes de construir**: os mockups
+    do Q7b não estavam no repositório nem na base; o Q7b-1/2 saiu da
+    descrição escrita e divergiu (colunas, marco, cabeçalho, botões). Pedir
+    as imagens no começo do bloco e montar a comparação "mockup × código"
+    com os mesmos dados antes de entregar.
+117. **Achado 107 de novo, na barra da grade**: com a barra visível na
+    leitura, o Exportar PDF escondido (`hidden`) reaparecia —
+    `.cx-grid-bar [hidden] { display: none !important; }`.
+118. **Campo de edição de 100% numa célula com outros elementos** é
+    empurrado para fora (célula com `overflow: hidden` mostra só "l…"):
+    caixa flexível (`.cx-gd-nome`) com o texto em `flex: 1; min-width: 0`.
+    Esconder os botões da linha com `:focus-within` **engole o clique** nos
+    próprios botões: usar uma classe posta pelo JS (`is-editando`).
+119. **Situação só no publicado**: na edição de um rascunho nada muda (é o
+    esperado — não é pacote faltando). Para testar, publicar o documento.
+120. **Id por linha sem migração**: `validate` dá `r` + posição a quem não
+    tem id — estável enquanto o JSON não muda (leitura e versões
+    publicadas, que passam por `validate`), gravado na próxima edição.
+    Linha nova no motor: `t` + 6 caracteres aleatórios. Tabela de IA (sem
+    id) herda pelo tipo + nome.
+121. **Tela cheia só mostra o que está dentro dela**: diálogo anexado ao
+    `body` fica invisível; anexar ao `document.fullscreenElement` quando
+    houver. E o Esc da reserva por CSS precisa ignorar diálogos abertos.
+122. **Testes com data fixa**: jsdom — trocar `window.Date` por subclasse
+    (construtor sem argumentos = data fixa; manter `Date.UTC`) **antes** do
+    `eval` do motor; Playwright — o mesmo por `add_init_script`. Endpoint
+    simulado com `page.route()` (`route.fulfill` com o JSON da resposta).
+
+123. **`getBoundingClientRect()` não inclui margem, e margem de filho vaza
+    do pai** sem padding/borda (`div.cx-sheet > table`). Paginação manual
+    soma margens e usa `display: flow-root` no bloco, igual na medição e na
+    folha.
+124. **Teste de paginação mede em modo impressão e com DOCTYPE.**
+    `page.emulate_media(media='print')`; e `outerHTML` não traz o
+    `<!DOCTYPE>` — `set_content` sem ele cai em modo quirks, a tabela perde
+    o `line-height` herdado e as linhas ficam ~6 px mais baixas (o teste do
+    pacote -1 passou e o PDF real ainda sobrepunha).
+125. **Conferir todos os documentos de uma vez**: no servidor, um
+    `doc-<id>.html` por documento (`mysql -N --raw ... SELECT content`) e
+    as dimensões das imagens por `file -b` em `GLPI_DOC_DIR/<filepath>`
+    (`imagens.tsv`); no harness, cada imagem vira um retângulo do mesmo
+    tamanho. JPEG: a dimensão é a que vem depois de `precision 8,` (a
+    primeira `NxN` é a densidade).
+126. **Ícone do plugin no GLPI 11.0.6**: `logo.png` na raiz da pasta do
+    plugin (`Glpi\Marketplace\View`, linhas 248–251; servido pela rota
+    `/Plugin/{key}/Logo`). Sem ele, a letra colorida; plugins do
+    Marketplace usam o logo de lá.
+127. **Bloco de commit começa com `cd` para a pasta do plugin**: o bloco de
+    aplicar termina em `/var/www/html/glpi` (console), e o commit do M-2
+    rodou lá ("not a git repository"). E o `logo.png` aplicado antes do
+    commit do M-1 entrou nele (achado 75 de novo).
+128. **Logo com fundo escuro e texto branco não serve no PDF** (Buzz):
+    tirar o fundo deixa o texto invisível no papel. Precisa da versão para
+    fundo claro. Logo pequena (Ponto, 241×43) sai borrada: para 14 mm de
+    altura, ~110 px de altura.
 
 ## 6. Contrato de código — não quebrar
 
@@ -2434,6 +2707,7 @@ Ver `docs/DEPLOY.md` para o fluxo completo de publicação e teste.
 ```
 codexplus/
 ├── setup.php                  registro do plugin, hooks, versão, Self-Service (S1)
+├── logo.png                   ícone do plugin em Configurar → Plugins (achado 126)
 ├── hook.php                   install/uninstall, menu direto no Self-Service (B1)
 ├── src/
 │   ├── Install.php            schema, direitos, modelos semeados
@@ -2454,11 +2728,14 @@ codexplus/
 │   ├── TargetRelation.php     comum aos três alvos de leitura (R3a)
 │   ├── DocumentContributor.php quem alterou cada revisão (histórico)
 │   ├── DocumentVersion.php    versões publicadas (R6-a)
-│   ├── Diagram.php            diagrama DIA: organograma, cronograma, RACI (D1), fluxograma (Q5a)
+│   ├── Diagram.php            diagrama DIA: organograma, cronograma (com datas: Q7b), RACI (D1), fluxograma (Q5a)
+│   ├── ScheduleStatus.php     situação das tarefas do cronograma (Q7b-4)
+│   ├── Brand.php              marcas: nome, logo, altura, cor, padrão; marca para a impressão (M-1, M-2)
 │   ├── IconLibrary.php        ícones do quadro criados pelo Super-Admin (Q4)
 │   └── Console/               comandos de teste (plugins:codexplus:…)
 ├── ajax/
 │   ├── diagram.save.php       grava só o diagrama, sem recarregar
+│   ├── schedule.status.php    Iniciar / Concluir / Reabrir tarefas no publicado (Q7b-4)
 │   ├── icons.php              ícones criados: lista, criar, editar, excluir (Q4)
 │   └── document.targets.php   leitores pela coluna Permissões
 ├── front/                     controllers (rodam em escopo de função!)
@@ -2472,7 +2749,7 @@ codexplus/
 ├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
 │   ├── js/codexplus.js        PDF (paginação manual)
 │   ├── js/codexplus-org.js    motor do organograma (grafo)
-│   ├── js/codexplus-grid.js   cronograma e RACI (D1)
+│   ├── js/codexplus-grid.js   cronograma e RACI (D1); com datas, fases, marcos, importar/exportar, tela cheia e situação (Q7b)
 │   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1)
 │   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f); importar e exportar (cópia .json e Mermaid, Q5i)
@@ -2480,6 +2757,7 @@ codexplus/
 │   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1) e os criados na instalação (Q4)
 │   ├── js/codexplus-export.js exportar Word (E3)
 │   ├── js/codexplus-annotate.js anotador de imagens (E4)
+│   ├── js/codexplus-brand.js  cor da marca a partir da logo; logo ao lado do campo Marca (M-1, M-2)
 │   └── lib/                   mammoth, marked, docx (licença e versão em cada pasta)
 └── docs/                      esta documentação
 ```

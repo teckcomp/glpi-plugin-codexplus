@@ -1,7 +1,17 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.0`** + blocos de 03/10/2026 (último commit de código
-> `e1070d0`) · atualizado em **03/10/2026 (noite)**: **Q6 ✅ organograma no
+> Estado em **`v0.7.3`** (último commit de código **`c4ad5ff`**) ·
+> atualizado em **04/10/2026**: **3c-0 ✅** paginação do PDF (`5561ec6`),
+> **M-1 ✅** cadastro de marcas (`1525c34`), **M-2 ✅** marca do documento
+> (`c4ad5ff`), ícone do plugin — CONTEXTO, seções 3.14 e 3.15. Próximo:
+> **3c — modelos com conteúdo real**. Antes,
+> atualizado em **03–04/10/2026 (noite)**: **Q7b ✅ cronograma completo** —
+> Q7b-1 (datas, arrastar), Q7b-2 (fases, marcos, hoje), Q7b-3
+> (importar/exportar `.json` + tabela para IA, também RACI), Q7b-2b (desenho
+> do mockup), PDF e leitura em paisagem, tela cheia, Q7b-4 (situação no
+> publicado, sem revisão; tabela nova, versão 0.7.1) — CONTEXTO, seção 3.13.
+> **Item 7 (motor de quadro e diagramas) fechado.** Próximo: **3c — modelos
+> com conteúdo real**. Antes, na tarde e noite de 03/10: **Q6 ✅ organograma no
 > motor de quadro** (Q6a a Q6f-2; motor antigo removido), **Q7a ✅** cópia
 > da Planta e da Topologia, **Q7b desenhado e aprovado** (cronograma com
 > datas, fases, marcos e acompanhamento) — CONTEXTO, seção 3.12. Próximo:
@@ -88,7 +98,8 @@ Vale sobre a lista acima quando houver conflito.
 > segue no `177.87.230.179`). O primeiro passo da subida é o **bloco de
 > conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
 > GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → ~~Q5i~~ ✅ (03/10)
-> → ~~Q6~~ ✅ → ~~Q7a~~ ✅ (03/10) → **Q7b-1 a Q7b-4 (cronograma)** → 3c →
+> → ~~Q6~~ ✅ → ~~Q7a~~ ✅ (03/10) → ~~Q7b-1 a Q7b-4 (cronograma)~~ ✅
+> (03–04/10) → ~~3c-0, M-1, M-2~~ ✅ (04/10) → **3c** →
 > R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7 logo depois)
 > → aba de Histórico e galeria de Modelos (Claudio, 03/10: "quando
 > finalizar toda a produção").
@@ -119,7 +130,8 @@ Vale sobre a lista acima quando houver conflito.
 2. ~~Papéis e validação~~ ✅ A1, A2 (25/09) e **P1** (26/09: papéis pelo
    perfil, sem gestor de setor nem editores; a R3b2-c foi **descartada**)
    e **P2** (fluxo por tipo)
-3. ~~Cronograma e matrizes~~ ✅ **D1** (26/09)
+3. ~~Cronograma e matrizes~~ ✅ **D1** (26/09); cronograma com datas e
+   situação no **Q7b** (03–04/10)
 4. ~~Permissões e Self-Service~~ ✅ **S1** (Self-Service só lê) e **B1**
    (Biblioteca como entrada de quem só lê)
 5. ~~Anexos, imagens, leitura e PDF (R3b3)~~ ✅ 22/09
@@ -127,8 +139,9 @@ Vale sobre a lista acima quando houver conflito.
 7. **Motor de quadro estilo Miro** (decisão de 26/09: um motor, paletas
    Planta, Topologia, Fluxograma e Organograma) — **Q1 a Q4 ✅**, **Q5a a
    Q5f ✅**, **Q5g a Q5i ✅**, **Q6 ✅** (organograma no motor, 03/10),
-   **Q7a ✅**; falta **Q7b** (cronograma com datas) — tabelas "Motor de
-   quadro", "Q5 — Fluxograma" e "Sessão de 03/10/2026" abaixo
+   **Q7a ✅**, **Q7b ✅** (cronograma com datas e situação, 03–04/10) —
+   **fechado**; tabelas "Motor de quadro", "Q5 — Fluxograma" e "Sessões de
+   03/10/2026" abaixo
 8. Editor de propostas: ~~mini planilha~~ ✅ **PL1**; o "mini desenho" virou
    a **Planta** do motor de quadro (Q1), também na Documentação Técnica
 9. ~~Migração dos 5 documentos (R4)~~ ✅ 26/09 (os 5 migrados)
@@ -514,16 +527,48 @@ seus elementos (CONTEXTO, seção 3.7).
 Não entrou (decisão): puxar ligação no quadro com "Quem é o chefe?" (o
 painel cobre); `.bpmn` segue no backlog.
 
-### Q7b — cronograma com datas (aprovado em 03/10, a fazer)
+## Sessão de 03–04/10/2026 (noite) — Q7b: cronograma completo ✅
 
-| Bloco | O quê |
-|---|---|
-| **Q7b-1** | Início e fim por tarefa; colunas semanais/mensais datadas; barra pelas datas; editar na tabela e arrastando a barra (alças) |
-| **Q7b-2** | Fases (resumo calculado, recolher), marcos ◆ com data, numeração automática, linha "hoje", PDF novo |
-| **Q7b-3** | Importar/Exportar: `.json` + tabela Markdown (também RACI); validar com o cronograma ShopMap gerado por IA |
-| **Q7b-4** | Situação (Iniciar / Concluir / Reabrir, concluir várias), atrasos calculados, % da fase, resumo; grava no publicado sem revisão, com registro de quem e quando |
+| Bloco | O quê | Commit |
+|---|---|---|
+| Q7b-1 | Início e fim por tarefa; semanas/meses com data; barra pelas datas; editar na tabela e arrastando (alças, desenhar barra); antigo ganha "Usar datas" | `27d330e` |
+| Q7b-2 | Fases (resumo calculado, ▾ recolher), marcos ◆, numeração automática, subir/descer, linha "hoje", PDF que estica | `4bd1e87` |
+| Q7b-3 + Q7b-2b | Importar/Exportar (`.json` + tabela para IA, também RACI; ShopMap gerado por IA validado); desenho do mockup (Nº, dd/mm, sem Dias, marco sem número, Hoje, seleção, hoje tracejada) | `913c6d4` |
+| Paisagem e tela cheia | PDF do cronograma e da RACI sempre A4 paisagem; leitura deles na folha larga; tela cheia na edição e na leitura | `19ca003` |
+| Q7b-4 | Situação: Iniciar / Concluir / Reabrir no publicado sem revisão (quem e quando), atrasos, % da fase, resumo, cores, PDF; `id` fixo por linha; tabela `schedulestatus`; **0.7.1** | `2366adb` |
+
+Fora por ora (decisão de 03/10): % por tarefa, dependências (setas), dias
+úteis e feriados.
+
+## Sessão de 04/10/2026 — paginação do PDF, marcas ✅
+
+| Bloco | O quê | Commit |
+|---|---|---|
+| 3c-0 | Paginação do PDF: altura com margens, margem da planilha contida, título com o bloco seguinte, legenda com o quadro, imagens reduzidas para caber, parágrafo vazio não abre página, rodapé em duas linhas. 26 documentos da homologação conferidos | `5561ec6` |
+| M-1 | Marcas: tabela, cadastro na configuração (nome, logo, altura, cor sugerida pela logo, padrão), semente a partir da configuração antiga, cor no PDF e no Word; ícone do plugin (`logo.png`); versão 0.7.2 | `1525c34` |
+| M-2 | Marca do documento: campo em rascunho (com mais de uma marca, fora de DIA), duplicar leva a marca, versão publicada guarda a marca, documento antigo preso à padrão, marca em uso não se exclui; versão 0.7.3 | `c4ad5ff` |
+
+Material recebido para a 3c (Claudio, 04/10): **PRP0005/PRP0006** (proposta
+real, Bibi Calçados) e o **manual de atendimento de chamados da
+Resolutto** (feito fora do Codex+), padrão para o Manual e referência para
+POP e PSG.
 
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
+
+- PDF: partir planilha/tabela maior que uma folha, repetindo o cabeçalho
+  (hoje transborda — limite do 3c-0)
+- Marcas: lista do campo Marca com a logo dentro de cada opção (hoje a logo
+  aparece ao lado do select)
+- DTC: **mapa de calor** — embutir no quadro da Planta (cobertura estimada
+  por AP) ou imagem de ferramenta de site survey; a discutir (Claudio, 04/10)
+
+- Cronograma: guardar o **histórico de marcações** da situação (hoje só a
+  última fica: quem e quando); avaliar no uso
+- Cronograma: fase que sobe acima de uma linha solta do topo passa a levar
+  essa linha (regra "a fase leva as linhas abaixo dela"); avaliar no uso
+- Cronograma: na tela cheia, esticar a linha do tempo até a largura da tela
+  (hoje sobra espaço à direita em cronogramas curtos)
+- Guardar os **mockups aprovados** em `docs/` (achado 116)
 
 - Quadro: PNG com planta de fundo usa a área inteira do quadro (sobra
   branco em volta da planta); recortar só a área útil (observação no Q2f)

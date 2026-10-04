@@ -43,6 +43,64 @@ $brandOf = static function (Document $d): int {
     return Brand::resolveId($id);
 };
 
+// Corpo mostrado (na revisão, o da versão publicada em vigor).
+$shownContent = static function (Document $d): ?string {
+    if (!$d->isInRevision()) {
+        return (string) ($d->fields['content'] ?? '');
+    }
+    $v = DocumentVersion::get((int) $d->fields['id'], (int) $d->fields['revision'] - 1);
+    return $v === null ? null : (string) $v['content'];
+};
+
+/**
+ * R7-2b: arquivos que o link entrega — os ligados a ESTE documento E (citados
+ * no corpo mostrado OU listados como anexo dele). Imagem de outra revisão,
+ * de outro documento ou qualquer docid escolhido na mão: 404.
+ *
+ * @return int[]
+ */
+$allowedFiles = static function (Document $d, string $content): array {
+    /** @var \DBmysql $DB */
+    global $DB;
+    preg_match_all('/docid=(\d+)/', $content, $m);
+    $ok = array_map('intval', $m[1] ?? []);
+    foreach (Document::listAttachments((int) $d->fields['id'], $content) as $a) {
+        $ok[] = (int) $a['docid'];
+    }
+    if (!$ok) {
+        return [];
+    }
+    $linked = [];
+    foreach ($DB->request([
+        'SELECT'     => ['glpi_documents_items.documents_id'],
+        'FROM'       => 'glpi_documents_items',
+        'INNER JOIN' => ['glpi_documents' => ['ON' => ['glpi_documents_items' => 'documents_id', 'glpi_documents' => 'id']]],
+        'WHERE'      => [
+            'glpi_documents_items.itemtype'     => Document::class,
+            'glpi_documents_items.items_id'     => (int) $d->fields['id'],
+            'glpi_documents_items.documents_id' => array_values(array_unique($ok)),
+            'glpi_documents.is_deleted'         => 0,
+        ],
+    ]) as $r) {
+        $linked[] = (int) $r['documents_id'];
+    }
+    return $linked;
+};
+
+// R7-2b: imagem do corpo ou anexo, pelo link.
+if (isset($_GET['f'])) {
+    $content = $doc === null ? null : $shownContent($doc);
+    $fid     = (int) $_GET['f'];
+    if ($content === null || $fid <= 0 || !in_array($fid, $allowedFiles($doc, $content), true)) {
+        throw new NotFoundHttpException();
+    }
+    $file = new \Document();
+    if (!$file->getFromDB($fid)) {
+        throw new NotFoundHttpException();
+    }
+    return $file->getAsResponse();
+}
+
 // R7-2: logo da marca do documento. Nada da requisição escolhe o arquivo.
 if (isset($_GET['logo'])) {
     $b    = $doc === null ? null : Brand::get($brandOf($doc));
@@ -119,7 +177,19 @@ if ($doc === null) {
             'code'     => $code,
             'date'     => $date,
             'updating' => $updating,
-            'html'     => RichText::getEnhancedHtml($content, ['text_maxsize' => 0]),
+            // R7-2b: imagens do corpo pela rota do link (a do GLPI pede login).
+            'html'     => RichText::getEnhancedHtml(
+                (string) preg_replace(
+                    '#[^"\'\s>]*/front/document\.send\.php\?docid=(\d+)[^"\'\s>]*#',
+                    htmlspecialchars($self, ENT_QUOTES) . '&amp;f=$1',
+                    $content
+                ),
+                ['text_maxsize' => 0]
+            ),
+            'files'    => array_map(static fn ($a) => [
+                'name' => $a['name'],
+                'url'  => $self . '&f=' . $a['docid'],
+            ], Document::listAttachments((int) $doc->fields['id'], $content)),
         ];
     }
 }

@@ -38,6 +38,17 @@
             <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
         </article>
         <div class="cx-sheets" data-cx-sheets></div>
+        {# R7-2b: anexos (fora das folhas, como na página interna). #}
+        {% if doc.files %}
+            <section class="cx-public-files">
+                <h2>{{ __('Anexos', 'codexplus') }}</h2>
+                <ul>
+                    {% for f in doc.files %}
+                        <li><a href="{{ f.url }}" rel="nofollow">{{ f.name }}</a></li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
     </main>
 {% else %}
     <main class="cx-public-off">

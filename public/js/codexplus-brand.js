@@ -156,7 +156,21 @@
 
     window.CodexplusBrand = { pick: pick };
 
+    /* M-2: no documento, a logo ao lado do campo Marca acompanha a escolha. */
+    function bindSelect(sel) {
+        var box = sel.closest('.cx-docbrand');
+        var img = box && box.querySelector('[data-cx-brand-logo]');
+        if (!img) { return; }
+        sel.addEventListener('change', function () {
+            var opt = sel.options[sel.selectedIndex];
+            var src = opt ? opt.getAttribute('data-logo') : '';
+            img.hidden = !src;
+            if (src) { img.src = src; }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         Array.prototype.forEach.call(document.querySelectorAll('[data-cx-brand-form]'), bind);
+        Array.prototype.forEach.call(document.querySelectorAll('[data-cx-brand-select]'), bindSelect);
     });
 })();

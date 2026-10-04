@@ -25,6 +25,7 @@
 
 use Glpi\Application\View\TemplateRenderer;
 use Glpi\RichText\RichText;
+use GlpiPlugin\Codexplus\Brand;
 use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\Category;
 use GlpiPlugin\Codexplus\Diagram;
@@ -140,6 +141,9 @@ if (isset($_POST['add'])) {
         $input['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
     $input += $postedClient($input['doctype']);
+    // M-2: marca escolhida (Document::prepareInputForAdd cai na padrão se
+    // vier vazia ou inválida).
+    $input['plugin_codexplus_brands_id'] = (int) ($_POST['plugin_codexplus_brands_id'] ?? 0);
     // Responsável, auditor, revisor e janela já na criação; conferidos em
     // Document::prepareInputForAdd (cada um com o bit dele no perfil).
     foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
@@ -247,6 +251,8 @@ if ($id > 0 && isset($_POST['duplicate'])) {
         'users_id_owner' => in_array((int) Session::getLoginUserID(), Rights::approverUsers((int) $doc->fields['entities_id']), true)
             ? (int) Session::getLoginUserID() : 0,
         '_categories'    => $cats,
+        // M-2: a cópia sai com a mesma marca.
+        'plugin_codexplus_brands_id' => (int) ($doc->fields['plugin_codexplus_brands_id'] ?? 0),
     ];
     $leva = DocumentMeta::clientCarry($origem, $destino);
     if ($leva === 'text' || $leva === 'name') {
@@ -394,6 +400,10 @@ if ($id > 0 && isset($_POST['update'])) {
         $data['client_name'] = (string) ($_POST['client_name'] ?? '');
     }
     $data += $postedClient((string) $doc->fields['doctype']);
+    // M-2: o campo só existe na tela com mais de uma marca; sem ele, nada muda.
+    if (isset($_POST['plugin_codexplus_brands_id'])) {
+        $data['plugin_codexplus_brands_id'] = (int) $_POST['plugin_codexplus_brands_id'];
+    }
 
     $ok = true;
     if ($doc->canManage()) {
@@ -582,7 +592,9 @@ if ($inRevision) {
             'date'      => (string) ($vRow['date_published'] ?? ''),
         ];
         $canEdit = false;
-        $shown = ['name' => (string) $vRow['name'], 'content' => (string) $vRow['content']];
+        $shown = ['name' => (string) $vRow['name'], 'content' => (string) $vRow['content'],
+            // M-2: a versão publicada imprime com a marca com que foi publicada.
+            'brand' => (int) ($vRow['plugin_codexplus_brands_id'] ?? 0)];
         if ($isDiagram && ($d = DocumentVersion::diagramOf($vRow)) !== null) {
             $diagramJson = json_encode($d, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
         }
@@ -894,7 +906,22 @@ if (!$isNew) {
     }
 }
 
+// M-2: marca do documento. O campo só aparece com mais de uma marca e fora
+// de diagrama (o PDF do DIA é do próprio motor, sem cabeçalho de marca).
+$brandList = Brand::all();
+$brandId   = $isNew ? Brand::resolveId(0) : Brand::resolveId((int) ($doc->fields['plugin_codexplus_brands_id'] ?? 0));
+$brandShownId = (int) ($shown['brand'] ?? 0) > 0 ? (int) $shown['brand'] : $brandId;
+$brandShown   = Brand::get($brandShownId);
+$brandField = [
+    'show'    => count($brandList) > 1 && !$isDiagram,
+    'id'      => $brandId,
+    'name'    => $brandShown !== null ? $brandShown['name'] : '',
+    'types'   => implode(' ', array_diff(DocumentMeta::DOCTYPE_KEYS, ['DIA'])),
+    'options' => array_map(static fn ($b) => ['id' => $b['id'], 'name' => $b['name'], 'logo' => $b['logo_url'], 'is_default' => $b['is_default']], $brandList),
+];
+
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
+    'brand'       => $brandField,
     'glpi_root'   => $CFG_GLPI['root_doc'],
     'self'        => $self,
     'is_new'      => $isNew,
@@ -996,7 +1023,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
         'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
         'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
-    ]),
+    ], $brandShownId),
 ]);
 
 Wiki::pageFooter();

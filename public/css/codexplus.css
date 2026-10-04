@@ -1275,6 +1275,11 @@
 .cx-brand-color { display: flex; align-items: center; gap: 10px; }
 .cx-brand-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--cx-border); border-radius: 6px; background: #fff; }
 @media (max-width: 760px) { .cx-brand-grid { grid-template-columns: 1fr; } }
+/* M-2: campo Marca no documento (logo ao lado do select). */
+.cx-docbrand { display: flex; align-items: center; gap: 10px; }
+.cx-docbrand-logo { flex: 0 0 auto; width: 96px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.cx-docbrand-logo img { max-width: 96px; max-height: 32px; object-fit: contain; }
+.cx-docbrand select { flex: 1 1 auto; min-width: 0; }
 
 /* =========================================================================
    13. IDENTIFICAÇÃO DO DOCUMENTO NA LEITURA (Etapa 4b)

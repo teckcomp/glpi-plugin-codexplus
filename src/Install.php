@@ -195,6 +195,9 @@ class Install
         // --- Bloco M-1: marcas ---
         self::installM1();
 
+        // --- Bloco M-2: marca do documento ---
+        self::installM2($migration);
+
         $migration->executeMigration();
         return true;
     }
@@ -536,6 +539,33 @@ class Install
         $row = $DB->request(['COUNT' => 'cpt', 'FROM' => $t])->current();
         if ((int) ($row['cpt'] ?? 0) === 0) {
             Brand::seedFromConfig();
+        }
+    }
+
+    /**
+     * M-2 (Claudio, 04/10/2026): cada documento diz de qual marca é. A versão
+     * publicada guarda a marca com que foi publicada (o leitor, durante uma
+     * revisão, imprime com ela).
+     *
+     * Documento que já existia fica PRESO à marca padrão de hoje, uma vez só
+     * (linhas com 0): sem isso, trocar a padrão depois mudaria a logo de
+     * todos os documentos antigos.
+     */
+    private static function installM2(Migration $migration): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $migration->addField(self::DOCUMENTS_TABLE, 'plugin_codexplus_brands_id', 'fkey', ['after' => 'client_items_id']);
+        $migration->addKey(self::DOCUMENTS_TABLE, 'plugin_codexplus_brands_id');
+        $migration->addField(self::VERSIONS_TABLE, 'plugin_codexplus_brands_id', 'fkey');
+        $migration->migrationOneTable(self::DOCUMENTS_TABLE);
+        $migration->migrationOneTable(self::VERSIONS_TABLE);
+
+        $padrao = Brand::getDefault();
+        if ($padrao !== null) {
+            $DB->update(self::DOCUMENTS_TABLE, ['plugin_codexplus_brands_id' => $padrao['id']], ['plugin_codexplus_brands_id' => 0]);
+            $DB->update(self::VERSIONS_TABLE, ['plugin_codexplus_brands_id' => $padrao['id']], ['plugin_codexplus_brands_id' => 0]);
         }
     }
 

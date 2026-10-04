@@ -49,6 +49,8 @@ class DocumentVersion
             'name'           => (string) $doc->fields['name'],
             'content'        => (string) ($doc->fields['content'] ?? ''),
             'diagram'        => $raw,
+            // M-2: a marca com que foi publicada.
+            'plugin_codexplus_brands_id' => (int) ($doc->fields['plugin_codexplus_brands_id'] ?? 0),
             'summary'        => $doc->fields['revision_summary'] ?? null,
             'users_id'       => (int) ($doc->fields['users_id_validator'] ?? 0),
             'date_published' => $doc->fields['date_published'] ?: ($_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s')),

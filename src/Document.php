@@ -84,7 +84,9 @@ class Document extends CommonDBTM
     public const READER_STATUSES = [self::STATUS_PUBLISHED, self::STATUS_OBSOLETE];
 
     /** Campos cuja mudança conta como "alterar o documento" (contribuição). */
-    private const CONTENT_FIELDS = ['name', 'content', 'header_html', 'footer_text', 'client_name', 'client_itemtype', 'client_items_id'];
+    // M-2: a marca é conteúdo (é a identidade que sai no PDF): muda só em
+    // rascunho e conta como alteração.
+    private const CONTENT_FIELDS = ['name', 'content', 'header_html', 'footer_text', 'client_name', 'client_itemtype', 'client_items_id', 'plugin_codexplus_brands_id'];
 
     public static $rightname = Rights::NAME;
 
@@ -981,6 +983,9 @@ class Document extends CommonDBTM
             'status'             => self::STATUS_PUBLISHED,
             'name'               => (string) $v['name'],
             'content'            => (string) $v['content'],
+            // M-2: a marca volta à da versão publicada (0 em versão antiga: mantém).
+            'plugin_codexplus_brands_id' => (int) ($v['plugin_codexplus_brands_id'] ?? 0) > 0
+                ? (int) $v['plugin_codexplus_brands_id'] : (int) ($this->fields['plugin_codexplus_brands_id'] ?? 0),
             'users_id_submitter' => 0,
             'date_submitted'     => null,
             'users_id_approver'  => 0,
@@ -1147,6 +1152,8 @@ class Document extends CommonDBTM
         if ($input === false) {
             return false;
         }
+        // M-2: todo documento nasce com uma marca (a escolhida ou a padrão).
+        $input['plugin_codexplus_brands_id'] = Brand::resolveId((int) ($input['plugin_codexplus_brands_id'] ?? 0));
 
         // Categorias (P1): opcionais, qualquer uma; o setor é organização.
         if (!self::canCreate()) {
@@ -1398,6 +1405,9 @@ class Document extends CommonDBTM
         $input = $this->normalizeClient($input, (string) ($this->fields['doctype'] ?? ''));
         if ($input === false) {
             return false;
+        }
+        if (array_key_exists('plugin_codexplus_brands_id', $input)) {
+            $input['plugin_codexplus_brands_id'] = Brand::resolveId((int) $input['plugin_codexplus_brands_id']);
         }
         // Só em rascunho: fora dele o corpo não muda (e a comparação abaixo
         // recusaria a diferença).

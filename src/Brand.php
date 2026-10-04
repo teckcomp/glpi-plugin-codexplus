@@ -271,8 +271,8 @@ class Brand
     }
 
     /**
-     * Exclui. Recusa a padrão (escolha outra antes) e a última marca.
-     * O M-2 acrescenta: marca usada por documento não se exclui.
+     * Exclui. Recusa a padrão (escolha outra antes), a última marca e (M-2)
+     * marca usada por documento ou por versão publicada.
      *
      * @return array{0:bool,1:string}
      */
@@ -289,9 +289,40 @@ class Brand
         if (count(self::all()) <= 1) {
             return [false, __('É preciso ter ao menos uma marca.', 'codexplus')];
         }
+        $uso = self::usage($id);
+        if ($uso > 0) {
+            return [false, sprintf(__('A marca está em %d documento(s) e não pode ser excluída.', 'codexplus'), $uso)];
+        }
         self::purgeLogoFiles($id);
         $DB->delete(self::table(), ['id' => $id]);
         return [true, __('Marca excluída.', 'codexplus')];
+    }
+
+    /** M-2: documentos (inclusive na lixeira) e versões publicadas com a marca. */
+    public static function usage(int $id): int
+    {
+        global $DB;
+        $n = 0;
+        foreach ([Install::DOCUMENTS_TABLE, Install::VERSIONS_TABLE] as $t) {
+            if ($DB->tableExists($t) && $DB->fieldExists($t, 'plugin_codexplus_brands_id')) {
+                $r = $DB->request(['COUNT' => 'cpt', 'FROM' => $t, 'WHERE' => ['plugin_codexplus_brands_id' => $id]])->current();
+                $n += (int) ($r['cpt'] ?? 0);
+            }
+        }
+        return $n;
+    }
+
+    /**
+     * M-2: id de marca válido para gravar no documento. Vazio, 0 ou marca
+     * inexistente: a padrão (0 se não houver marca nenhuma).
+     */
+    public static function resolveId(int $id): int
+    {
+        if ($id > 0 && self::get($id) !== null) {
+            return $id;
+        }
+        $d = self::getDefault();
+        return $d !== null ? (int) $d['id'] : 0;
     }
 
     /**
@@ -320,8 +351,8 @@ class Brand
     }
 
     /**
-     * O que a impressão (PDF e Word) usa da marca. $id = 0: a padrão (M-1);
-     * no M-2, a marca do documento. Sem marca nenhuma, a configuração antiga.
+     * O que a impressão (PDF e Word) usa da marca: a do documento (M-2); id 0
+     * ou marca que sumiu, a padrão. Sem marca nenhuma, a configuração antiga.
      *
      * @return array{company:string,logo_url:string,logo_mm:int,color:string}
      */

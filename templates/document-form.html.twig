@@ -292,6 +292,25 @@
                             <div class="codexplus-form-hint">{{ __('Sai na identificação do documento e no PDF. Não dá acesso ao documento: quem lê continua na coluna Permissões.', 'codexplus') }}</div>
                         </div>
                     {% endif %}
+
+                    {% if brand.show %}
+                        {# M-2 (Claudio, 04/10/2026): de qual marca é o documento —
+                           logo, nome e cor do PDF e do Word. Só com mais de uma
+                           marca; na criação, some no DIA (codexplus-docform.js). #}
+                        {% set brand_sel = brand.options|filter(b => b.id == brand.id)|first %}
+                        <div class="cx-docform-field" {% if is_new %}data-cx-only-type="{{ brand.types }}" hidden{% endif %}>
+                            <label for="cx-docform-brand">{{ __('Marca', 'codexplus') }}</label>
+                            <div class="cx-docbrand">
+                                <span class="cx-docbrand-logo"><img data-cx-brand-logo src="{{ brand_sel ? brand_sel.logo : '' }}" alt="" {% if not brand_sel or not brand_sel.logo %}hidden{% endif %}></span>
+                                <select id="cx-docform-brand" name="plugin_codexplus_brands_id" class="form-select" data-cx-brand-select>
+                                    {% for b in brand.options %}
+                                        <option value="{{ b.id }}" data-logo="{{ b.logo }}" {{ b.id == brand.id ? 'selected' : '' }}>{{ b.name }}{{ b.is_default ? ' — ' ~ __('padrão', 'codexplus') : '' }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="codexplus-form-hint">{{ __('Logo, nome e cor que saem no PDF e no Word. Muda só em rascunho.', 'codexplus') }}</div>
+                        </div>
+                    {% endif %}
                 </div>
                 {% if perm.show %}
                     {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
@@ -442,6 +461,9 @@
                 <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
                 {% if client.name %}
                     <span><strong>{{ __('Cliente', 'codexplus') }}:</strong> {{ client.name }}</span>
+                {% endif %}
+                {% if brand.show and brand.name %}
+                    <span><strong>{{ __('Marca', 'codexplus') }}:</strong> {{ brand.name }}</span>
                 {% endif %}
                 {% if status == 'publicado' and validator_name %}
                     <span><strong>{{ __('Validado por', 'codexplus') }}:</strong> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>

@@ -531,6 +531,10 @@ if ($id > 0) {
     } elseif (isset($_POST['cancel_revision'])) {
         $flow = static fn () => $doc->cancelRevision();
         $okMsg = __('Revisão cancelada: o documento voltou à versão publicada.', 'codexplus');
+    } elseif (isset($_POST['extend_revision'])) {
+        // R6-b
+        $flow = static fn () => $doc->extendRevision((string) ($_POST['revision_due'] ?? ''), (string) ($_POST['extend_reason'] ?? ''));
+        $okMsg = __('Prazo da revisão atualizado.', 'codexplus');
     } elseif (isset($_POST['confirm_nochange'])) {
         $flow = static fn () => $doc->confirmNoChange();
         $okMsg = __('Revisado sem alteração: a janela de revisão foi renovada.', 'codexplus');
@@ -1096,6 +1100,12 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'can_open_revision'    => !$isNew && $doc->canOpenRevision(),
     'can_confirm_nochange' => !$isNew && $doc->canConfirmNoChange(),
     'can_cancel_revision'  => !$isNew && $doc->canCancelRevision(),
+    // R6-b: prazo da revisão em andamento (só para quem tem papel: o revinfo).
+    'can_extend_revision'  => !$isNew && $revinfo['on'] && $doc->canExtendRevision(),
+    'revdue'          => $revinfo['on'] ? $doc->revisionDueState() : null,
+    'rev_extensions'  => $revinfo['on'] ? \GlpiPlugin\Codexplus\RevisionEvent::listFor($id, [\GlpiPlugin\Codexplus\RevisionEvent::EXTENDED], (int) $doc->fields['revision']) : [],
+    'rev_opened'      => $revinfo['on'] ? (\GlpiPlugin\Codexplus\RevisionEvent::listFor($id, [\GlpiPlugin\Codexplus\RevisionEvent::OPENED], (int) $doc->fields['revision'])[0] ?? null) : null,
+    'today_ymd'       => substr((string) $_SESSION['glpi_currenttime'], 0, 10),
     'csrf_token'   => Session::getNewCSRFToken(),
     // R3b3-2: leitura com Exportar PDF (texto; o DIA tem o PDF do próprio motor).
     'can_edit_doc' => $canEditDoc,

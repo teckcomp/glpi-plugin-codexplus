@@ -54,6 +54,8 @@ class Install
     public const BRANDS_TABLE         = 'glpi_plugin_codexplus_brands';
     /** A-2a: aprovadores do diagrama (DocumentApprover). */
     public const DOC_APPROVERS_TABLE  = 'glpi_plugin_codexplus_documentapprovers';
+    /** R6-b: eventos da revisão (aberta, prorrogada, sem alteração, cancelada). */
+    public const REV_EVENTS_TABLE     = 'glpi_plugin_codexplus_revisionevents';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -63,6 +65,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::REV_EVENTS_TABLE,
             self::DOC_APPROVERS_TABLE,
             self::BRANDS_TABLE,
             self::SCHEDULE_TABLE,
@@ -206,6 +209,7 @@ class Install
 
         // --- Bloco A-2a: aprovadores do diagrama ---
         self::installA2a();
+        self::installR6b($migration);
 
         $migration->executeMigration();
         return true;
@@ -636,6 +640,38 @@ class Install
                 UNIQUE KEY `doc_user` (`plugin_codexplus_documents_id`, `users_id`),
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (A-2a): erro ao criar $t");
+        }
+    }
+
+    /**
+     * R6-b (Claudio, 04/10/2026): prazo da revisão aberta e eventos da
+     * revisão. revision_due vazio = sem prazo (revisão aberta antes da R6-b:
+     * o responsável define pelo Prorrogar). Os eventos alimentam a lista de
+     * prorrogações da página e o histórico de revisões no fim do PDF.
+     */
+    private static function installR6b(Migration $migration): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $migration->addField(self::DOCUMENTS_TABLE, 'revision_due', 'date');
+
+        $t = self::REV_EVENTS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `revision` int unsigned NOT NULL DEFAULT '0',
+                `event` varchar(16) NOT NULL DEFAULT '',
+                `date_due` date DEFAULT NULL,
+                `reason` text,
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `doc_rev` (`plugin_codexplus_documents_id`, `revision`),
+                KEY `event` (`event`),
+                KEY `users_id` (`users_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (R6-b): erro ao criar $t");
         }
     }
 

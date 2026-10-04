@@ -2683,3 +2683,26 @@ html.cx-board-open { overflow: hidden; }
 
 /* Q5i-2: dica de como pedir o fluxo à IA. */
 .cx-io-tip { margin-top: 14px; font-size: 12.5px; color: var(--cx-muted); background: var(--cx-surface-1); border-radius: 6px; padding: 9px 12px; line-height: 1.45; }
+
+/* =========================================================================
+   R6-b — prazo da revisão (página) e "Revisão vencida" com a lista (Painel)
+   ========================================================================= */
+.cx-notice--danger { background: var(--cx-danger-bg); }
+.cx-notice--danger > i, .cx-notice--danger strong { color: var(--cx-danger); }
+.cx-revdue { margin-top: 6px; font-size: .92em; color: var(--cx-muted); }
+.cx-revdue > i { vertical-align: -2px; }
+.cx-revdue--log div { margin-left: 4px; }
+.cx-flow-extend { align-items: flex-end; }
+.cx-flow-extend-date { display: flex; flex-direction: column; gap: 2px; font-size: .9em; color: var(--cx-muted); }
+.cx-flow-extend-date input { width: 160px; }
+.cx-flow-extend-reason { flex: 1 1 260px; min-width: 200px; }
+.cx-overdue { width: 100%; }
+.cx-overdue > summary { display: flex; align-items: center; gap: 10px; padding: 10px 2px; font-size: 13.5px; color: var(--cx-text); cursor: pointer; list-style: none; }
+.cx-overdue > summary::-webkit-details-marker { display: none; }
+.cx-overdue > summary .cx-card-item-count { margin-left: auto; }
+.cx-overdue-list { list-style: none; margin: 6px 0 2px 26px; padding: 0; font-size: .9em; }
+.cx-card-list .cx-overdue-list li { display: flex; flex-direction: column; padding: 4px 0; border-top: 1px solid var(--cx-border-soft); }
+.cx-card-list .cx-overdue-list li > a { display: inline; padding: 0; font-size: 1em; }
+.cx-card-list .cx-overdue-list li > span { display: block; padding: 0; font-size: .92em; color: var(--cx-danger); }
+.cx-overdue-code { font-family: 'IBM Plex Mono', monospace; color: var(--cx-muted); }
+.cx-overdue-why { color: var(--cx-danger); font-size: .92em; }

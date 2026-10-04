@@ -264,11 +264,38 @@
                 <h3 class="cx-card-title">{{ __('Precisa de atenção', 'codexplus') }}</h3>
                 <ul class="cx-card-list">
                     <li>
-                        <span>
-                            <i class="ti ti-alert-triangle cx-ico-danger"></i>
-                            <span class="cx-card-item-name">{{ __('Revisão vencida', 'codexplus') }}</span>
-                            <span class="cx-card-item-count cx-count-danger">{{ attention.revisao_vencida }}</span>
-                        </span>
+                        {# R6-b: uma linha para os dois casos; a lista diz o de cada um. #}
+                        {% if attention.revisao_vencida > 0 %}
+                            <details class="cx-overdue">
+                                <summary>
+                                    <i class="ti ti-alert-triangle cx-ico-danger"></i>
+                                    <span class="cx-card-item-name">{{ __('Revisão vencida', 'codexplus') }}</span>
+                                    <span class="cx-card-item-count cx-count-danger">{{ attention.revisao_vencida }}</span>
+                                </summary>
+                                <ul class="cx-overdue-list">
+                                    {% for o in attention.revisao_vencida_docs %}
+                                        <li>
+                                            <a href="{{ form_url }}?id={{ o.id }}"><span class="cx-overdue-code">{{ o.code }}</span> {{ o.name }}</a>
+                                            <span class="cx-overdue-why">
+                                                {%- if o.why == 'atrasada' -%}
+                                                    {{ __('revisão aberta fora do prazo (desde %s)', 'codexplus')|format(o.due|date('d/m/Y')) }}
+                                                {%- elseif o.why == 'sem_prazo' -%}
+                                                    {{ __('revisão aberta sem prazo', 'codexplus') }}
+                                                {%- else -%}
+                                                    {{ __('sem revisão aberta', 'codexplus') }}
+                                                {%- endif -%}
+                                            </span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                        {% else %}
+                            <span>
+                                <i class="ti ti-alert-triangle cx-ico-danger"></i>
+                                <span class="cx-card-item-name">{{ __('Revisão vencida', 'codexplus') }}</span>
+                                <span class="cx-card-item-count cx-count-danger">0</span>
+                            </span>
+                        {% endif %}
                     </li>
                     <li>
                         <span>

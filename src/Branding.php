@@ -74,6 +74,9 @@ class Branding
         // Bloco T1 (Claudio, 24/09/2026): onde os clientes estão cadastrados
         // nesta instalação. Vale para Laudo e Documentação Técnica.
         'client_source'          => 'User',     // User | Entity
+
+        // R6-b (Claudio, 04/10/2026): prazo, em dias, de uma revisão aberta.
+        'revision_deadline_days' => '30',
     ];
 
     /** Fontes aceitas para o cliente vinculado (itemtype do GLPI). */
@@ -230,6 +233,11 @@ class Branding
             && !array_key_exists($values['header_logo_position'], self::getLogoPositions())
         ) {
             $values['header_logo_position'] = 'right';
+        }
+
+        if (isset($values['revision_deadline_days'])) {
+            $d = (int) $values['revision_deadline_days'];
+            $values['revision_deadline_days'] = (string) max(1, min(365, $d ?: 30));
         }
 
         if (

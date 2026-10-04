@@ -232,6 +232,20 @@
             </div>
         </fieldset>
 
+        {# R6-b: prazo de uma revisão aberta. #}
+        <fieldset class="cx-cfg-block">
+            <legend>{{ __('Revisão de documento publicado', 'codexplus') }}</legend>
+
+            <div class="codexplus-form-row">
+                <label for="cx-revdays">{{ __('Prazo de uma revisão aberta (dias)', 'codexplus') }}</label>
+                <input type="number" id="cx-revdays" name="revision_deadline_days" min="1" max="365" step="1"
+                       value="{{ cfg.revision_deadline_days }}">
+                <p class="codexplus-form-hint">
+                    {{ __('Conta a partir de quando a revisão é aberta. Passado o prazo sem publicar, o documento aparece em "Revisão vencida" no Painel. O responsável pode prorrogar, com motivo. Vale para as revisões abertas daqui em diante.', 'codexplus') }}
+                </p>
+            </div>
+        </fieldset>
+
         <div class="codexplus-form-actions">
             <button type="submit" name="update" value="1" class="cx-btn cx-btn-primary">
                 <i class="ti ti-device-floppy"></i> {{ __('Salvar', 'codexplus') }}

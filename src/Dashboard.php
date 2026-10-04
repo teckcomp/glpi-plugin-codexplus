@@ -167,6 +167,7 @@ class Dashboard
                 $t . '.sequence', $t . '.revision', $t . '.status',
                 $t . '.users_id_owner', $t . '.validity_months',
                 $t . '.client_name', $t . '.date_published', $t . '.review_end',
+                $t . '.revision_due',
             ],
             'DISTINCT'  => true,
             'FROM'      => $t,
@@ -206,6 +207,8 @@ class Dashboard
                 'owner_id'     => $ownerId,
                 'owner'        => '',
                 'expiry'       => $expiry['state'],
+                // R6-b: prazo da revisão aberta ('' = sem prazo ou fora de revisão).
+                'revision_due' => $emRevisao ? substr((string) ($r['revision_due'] ?? ''), 0, 10) : '',
                 'due_ts'       => $expiry['due'],
             ];
         }
@@ -376,12 +379,13 @@ class Dashboard
      * dar a impressão falsa de que o valor é zero.
      *
      * @param array<int, array<string, mixed>> $docs
-     * @return array{revisao_vencida:int, psg_sem_pop:?int, sem_codigo:int, sem_categoria:int}
+     * @return array{revisao_vencida:int, revisao_vencida_docs:array, psg_sem_pop:?int, sem_codigo:int, sem_categoria:int}
      */
     public static function getAttention(array $docs): array
     {
         $a = [
             'revisao_vencida' => 0,
+            'revisao_vencida_docs' => [],   // R6-b: a lista que abre na linha
             'psg_sem_pop'     => null,
             'sem_codigo'      => 0,
             'sem_categoria'   => 0,
@@ -389,8 +393,21 @@ class Dashboard
         ];
 
         foreach ($docs as $d) {
-            if ($d['expiry'] === 'vencido') {
+            // R6-b (Claudio, 04/10/2026): uma linha só, os dois casos, sem
+            // contar o mesmo documento duas vezes —
+            //   - publicado vencido SEM revisão aberta (ninguém começou);
+            //   - revisão aberta FORA DO PRAZO (começou e não terminou).
+            //     Revisão aberta antes da R6-b (sem prazo) conta se o
+            //     publicado venceu.
+            // Revisão aberta dentro do prazo não entra: está sendo feita.
+            $why = self::overdueReason($d);
+            if ($why !== null) {
                 $a['revisao_vencida']++;
+                $a['revisao_vencida_docs'][] = [
+                    'id'   => (int) $d['id'],
+                    'code' => (string) $d['code'],
+                    'name' => (string) $d['name'],
+                ] + $why;
             }
             if ($d['code'] === '') {
                 $a['sem_codigo']++;
@@ -404,6 +421,28 @@ class Dashboard
         }
 
         return $a;
+    }
+
+    /**
+     * R6-b: por que o documento está em "Revisão vencida", ou null.
+     *
+     * @param array<string, mixed> $d linha de loadAllNew()/loadAll()
+     * @return array{why: string, due: string, days: int}|null
+     */
+    public static function overdueReason(array $d): ?array
+    {
+        $vencido = ($d['expiry'] ?? '') === 'vencido';
+        if (empty($d['in_revision'])) {
+            return $vencido ? ['why' => 'sem_revisao', 'due' => '', 'days' => 0] : null;
+        }
+        $due = (string) ($d['revision_due'] ?? '');
+        if ($due === '') {
+            return $vencido ? ['why' => 'sem_prazo', 'due' => '', 'days' => 0] : null;
+        }
+        $st = Document::dueState($due);
+        return $st['state'] === 'atrasada'
+            ? ['why' => 'atrasada', 'due' => $st['due'], 'days' => $st['days']]
+            : null;
     }
 
     /**

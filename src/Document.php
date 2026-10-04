@@ -611,6 +611,49 @@ class Document extends CommonDBTM
         return $this->isInRevision() && $this->checkEntity() && (Rights::isSuperAdmin() || $this->isOwner());
     }
 
+    /** R6-b: prorrogar (ou definir) o prazo da revisão — quem cancela. */
+    public function canExtendRevision(): bool
+    {
+        return $this->canCancelRevision();
+    }
+
+    /** R6-b: dias de prazo de uma revisão aberta (Configuração, padrão 30). */
+    public static function revisionDeadlineDays(): int
+    {
+        $d = (int) Branding::get('revision_deadline_days');
+        return $d >= 1 ? min($d, 365) : 30;
+    }
+
+    /**
+     * R6-b: situação do prazo da revisão em andamento, ou null fora de
+     * revisão. state: 'sem_prazo' (aberta antes da R6-b), 'no_prazo' ou
+     * 'atrasada'; days = dias que faltam (no prazo) ou de atraso.
+     *
+     * @return array{due: string, state: string, days: int}|null
+     */
+    public function revisionDueState(): ?array
+    {
+        if (!$this->isInRevision()) {
+            return null;
+        }
+        return self::dueState((string) ($this->fields['revision_due'] ?? ''));
+    }
+
+    /** @return array{due: string, state: string, days: int} */
+    public static function dueState(string $due): array
+    {
+        $due = substr($due, 0, 10);
+        if ($due === '') {
+            return ['due' => '', 'state' => 'sem_prazo', 'days' => 0];
+        }
+        $hoje = strtotime(substr((string) ($_SESSION['glpi_currenttime'] ?? date('Y-m-d')), 0, 10));
+        $fim  = strtotime($due);
+        $dias = (int) round(($fim - $hoje) / 86400);
+        return $dias < 0
+            ? ['due' => $due, 'state' => 'atrasada', 'days' => -$dias]
+            : ['due' => $due, 'state' => 'no_prazo', 'days' => $dias];
+    }
+
     /** Criar (P1): o bit Criar basta, em qualquer categoria. */
     public function canCreateItem(): bool
     {
@@ -1168,6 +1211,7 @@ class Document extends CommonDBTM
         $revisao = (int) $this->fields['revision'] > 0;
         if ($revisao) {
             $data['date_published'] = $_SESSION['glpi_currenttime'];
+            $data['revision_due']   = null; // R6-b: a revisão terminou
         }
         if ($revisao || (empty($this->fields['review_start']) && empty($this->fields['review_end']))) {
             $win = self::defaultWindow(
@@ -1200,8 +1244,12 @@ class Document extends CommonDBTM
         if (DocumentVersion::get((int) $this->fields['id'], (int) $this->fields['revision']) === null) {
             DocumentVersion::snapshot($this);
         }
-        return $this->transition([
-            'revision'           => (int) $this->fields['revision'] + 1,
+        // R6-b: a revisão nasce com prazo (hoje + dias da Configuração).
+        $hoje = substr((string) $_SESSION['glpi_currenttime'], 0, 10);
+        $due  = date('Y-m-d', strtotime('+' . self::revisionDeadlineDays() . ' days', strtotime($hoje)));
+        $nova = (int) $this->fields['revision'] + 1;
+        $ok = $this->transition([
+            'revision'           => $nova,
             'status'             => self::STATUS_DRAFT,
             'users_id_submitter' => 0,
             'date_submitted'     => null,
@@ -1209,7 +1257,44 @@ class Document extends CommonDBTM
             'date_approved'      => null,
             'validation_comment' => null,
             'revision_summary'   => null,
+            'revision_due'       => $due,
         ]);
+        if ($ok) {
+            RevisionEvent::add((int) $this->fields['id'], $nova, RevisionEvent::OPENED, $due);
+        }
+        return $ok;
+    }
+
+    /**
+     * R6-b: prorroga (ou define, na revisão aberta antes da R6-b) o prazo da
+     * revisão em andamento. Data de hoje em diante e motivo obrigatório.
+     */
+    public function extendRevision(string $due, string $reason): bool
+    {
+        if (!$this->canExtendRevision()) {
+            return $this->deny(__('Sem direito de prorrogar o prazo desta revisão.', 'codexplus'));
+        }
+        $due = trim($due);
+        $dt  = \DateTime::createFromFormat('!Y-m-d', $due);
+        if ($dt === false || $dt->format('Y-m-d') !== $due) {
+            return $this->deny(__('Informe o novo prazo em uma data válida.', 'codexplus'));
+        }
+        $hoje = substr((string) $_SESSION['glpi_currenttime'], 0, 10);
+        if ($due < $hoje) {
+            return $this->deny(__('O novo prazo não pode ser anterior a hoje.', 'codexplus'));
+        }
+        if ($due === substr((string) ($this->fields['revision_due'] ?? ''), 0, 10)) {
+            return $this->deny(__('O novo prazo é igual ao atual.', 'codexplus'));
+        }
+        $reason = trim($reason);
+        if ($reason === '') {
+            return $this->deny(__('Informe o motivo da prorrogação.', 'codexplus'));
+        }
+        if (!$this->transition(['revision_due' => $due])) {
+            return false;
+        }
+        RevisionEvent::add((int) $this->fields['id'], (int) $this->fields['revision'], RevisionEvent::EXTENDED, $due, $reason);
+        return true;
     }
 
     /**
@@ -1221,7 +1306,8 @@ class Document extends CommonDBTM
         if (!$this->canCancelRevision()) {
             return $this->deny(__('Sem direito de cancelar esta revisão.', 'codexplus'));
         }
-        $anterior = (int) $this->fields['revision'] - 1;
+        $cancelada = (int) $this->fields['revision'];
+        $anterior = $cancelada - 1;
         $v = DocumentVersion::get((int) $this->fields['id'], $anterior);
         if ($v === null) {
             return $this->deny(__('A versão publicada anterior não foi encontrada; a revisão não pode ser cancelada.', 'codexplus'));
@@ -1240,7 +1326,11 @@ class Document extends CommonDBTM
             'date_approved'      => null,
             'validation_comment' => null,
             'revision_summary'   => null,
+            'revision_due'       => null,
         ]);
+        if ($ok) {
+            RevisionEvent::add((int) $this->fields['id'], $cancelada, RevisionEvent::CANCELED);
+        }
         if ($ok && ($d = DocumentVersion::diagramOf($v)) !== null) {
             Diagram::save((int) $this->fields['id'], $d);
         }
@@ -1261,7 +1351,12 @@ class Document extends CommonDBTM
         if ($win === null) {
             return $this->deny(__('Este tipo não tem validade padrão: defina a nova janela de revisão à mão.', 'codexplus'));
         }
-        return $this->transition(['review_start' => $win[0], 'review_end' => $win[1]]);
+        if (!$this->transition(['review_start' => $win[0], 'review_end' => $win[1]])) {
+            return false;
+        }
+        // R6-b: entra no histórico de revisões do PDF.
+        RevisionEvent::add((int) $this->fields['id'], (int) $this->fields['revision'], RevisionEvent::NO_CHANGE, $win[1]);
+        return true;
     }
 
     /**
@@ -1725,7 +1820,7 @@ class Document extends CommonDBTM
         unset($input['doctype'], $input['sequence'], $input['knowbaseitems_id'], $input['users_id']);
         // Revisão e resumo da revisão só mudam pelo fluxo (R6-a).
         if (!$this->inTransition) {
-            unset($input['revision'], $input['revision_summary']);
+            unset($input['revision'], $input['revision_summary'], $input['revision_due']);
         }
 
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
@@ -1850,6 +1945,7 @@ class Document extends CommonDBTM
         Diagram::purgeDocument((int) $this->fields['id']);
         DocumentVersion::purgeDocument((int) $this->fields['id']);
         ScheduleStatus::purgeDocument((int) $this->fields['id']);
+        RevisionEvent::purgeDocument((int) $this->fields['id']);
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */

@@ -5,8 +5,10 @@
    Estilos: public/css/codexplus.css, seção 14. #}
 
 {# 22/09/2026 (Claudio): na criação e na edição a página usa a largura da
-   tela (até 1320px); a visão de leitura continua na moldura de folha. #}
-<div class="codexplus-app{{ can_edit ? ' cx-docpage--wide' : '' }}">
+   tela (até 1320px); a visão de leitura continua na moldura de folha.
+   04/10/2026 (Claudio): cronograma e matriz RACI saem em PDF paisagem, então
+   a leitura deles usa a folha deitada (mesma largura da edição). #}
+<div class="codexplus-app{{ can_edit ? ' cx-docpage--wide' : (is_diagram and diagram_kind in ['cronograma', 'raci'] ? ' cx-docpage--paisagem' : '') }}">
 
     <div class="codexplus-article-bar">
         <a href="{{ glpi_root }}/plugins/codexplus/front/dashboard.php" class="codexplus-back">

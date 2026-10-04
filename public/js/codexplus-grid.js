@@ -554,11 +554,60 @@
             }
             return '<span><b class="cx-sched-b"></b>Período</span><span><b class="cx-sched-m"><i class="ti ti-flag"></i></b>Marco (entrega)</span>';
         }
+        /* ---------- Tela cheia (Claudio, 04/10/2026), igual à do organograma:
+           API do navegador e, se recusada, classe de reserva (is-full). ---------- */
+        function cheia() { return root.classList.contains('is-full'); }
+        /**
+         * Fim da barra: Tela cheia e Exportar PDF. Na leitura o PDF fica
+         * escondido (quem o aciona é o Exportar PDF do topo da página, D1-4),
+         * menos em tela cheia, quando o topo da página não aparece.
+         */
+        function botoesFim() {
+            var on = cheia();
+            return '<button type="button" class="codexplus-btn" data-act="full" title="' + (on ? 'Sair da tela cheia (Esc)' : 'Mostrar na tela inteira') + '">' +
+                '<i class="ti ' + (on ? 'ti-minimize' : 'ti-maximize') + '"></i> ' + (on ? 'Sair da tela cheia' : 'Tela cheia') + '</button>' +
+                '<button type="button" class="codexplus-btn" data-act="pdf"' + (editable || on ? '' : ' hidden') + '><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>';
+        }
+        /** Guarda a rolagem antes de redesenhar e devolve quem a repõe. */
+        function rolagem() {
+            var w = root.querySelector('.cx-grid-wrap');
+            var x = w ? w.scrollLeft : 0, y = w ? w.scrollTop : 0;
+            return function () {
+                var n = root.querySelector('.cx-grid-wrap');
+                if (n && (x || y)) { n.scrollLeft = x; n.scrollTop = y; }
+            };
+        }
+        function setFull(on) {
+            if (on === cheia()) { return; }
+            root.classList.toggle('is-full', on);
+            if (on) { document.addEventListener('keydown', escFull, true); } else { document.removeEventListener('keydown', escFull, true); }
+            render();
+        }
+        // Reserva por CSS: o Esc não vem do navegador, então sai por aqui
+        // (com o diálogo de importar aberto, o Esc fecha só o diálogo).
+        function escFull(e) {
+            if (e.key !== 'Escape' || io || document.fullscreenElement === root) { return; }
+            e.preventDefault();
+            setFull(false);
+        }
+        function toggleFull() {
+            var on = !cheia();
+            if (root.requestFullscreen) {
+                if (on) {
+                    var pr = root.requestFullscreen();
+                    if (pr && pr.catch) { pr.catch(function () { setFull(true); }); }
+                } else if (document.fullscreenElement) { document.exitFullscreen(); } else { setFull(false); }
+            } else { setFull(on); }
+        }
+        document.addEventListener('fullscreenchange', function () {
+            if (document.fullscreenElement === root) { setFull(true); } else if (cheia() && document.fullscreenElement !== root) { setFull(false); }
+        });
+
         function render() {
             dated = !raci && S.mode === 'datas';
             dica();
             if (dated) { renderDated(); return; }
-            var bar = '<div class="cx-grid-bar"' + (editable ? '' : ' hidden') + '>';
+            var bar = '<div class="cx-grid-bar">';
             if (editable) {
                 bar += '<button type="button" class="codexplus-btn" data-act="row"><i class="ti ti-row-insert-bottom"></i> ' + (raci ? 'Atividade' : 'Tarefa') + '</button>' +
                     '<button type="button" class="codexplus-btn" data-act="col"><i class="ti ti-column-insert-right"></i> ' + (raci ? 'Papel' : 'Período') + '</button>' +
@@ -570,12 +619,11 @@
                     ioBotoes() +
                     '<span class="cx-grid-savestate"></span>';
             }
-            // Na leitura o botão fica escondido: quem o aciona é o Exportar PDF
-            // do topo da página (D1-4), no mesmo lugar dos outros documentos.
-            bar += '<span class="cx-grid-spacer"></span><button type="button" class="codexplus-btn" data-act="pdf"' +
-                (editable ? '' : ' hidden') + '><i class="ti ti-file-type-pdf"></i> Exportar PDF</button></div>';
+            bar += '<span class="cx-grid-spacer"></span>' + botoesFim() + '</div>';
+            var rol = rolagem();
             root.innerHTML = '<div class="cx-grid' + (raci ? ' cx-grid--raci' : ' cx-grid--sched') + '">' + bar +
                 '<div class="cx-grid-wrap">' + tableHtml(false) + '</div><div class="cx-grid-legend">' + legendHtml() + '</div></div>';
+            rol();
         }
 
         /* =========== Q7b-1/Q7b-2: cronograma com datas (tarefas, fases e marcos) =========== */
@@ -770,7 +818,7 @@
         }
         function renderDated() {
             // Ordem do mockup Q7b: Fase, Tarefa, Marco, Escala, Hoje, Desfazer … Importar, Exportar, Exportar PDF.
-            var bar = '<div class="cx-grid-bar"' + (editable ? '' : ' hidden') + '>';
+            var bar = '<div class="cx-grid-bar">';
             if (editable) {
                 bar += '<button type="button" class="codexplus-btn" data-act="fase"><i class="ti ti-folder-plus"></i> Fase</button>' +
                     '<button type="button" class="codexplus-btn" data-act="row"><i class="ti ti-row-insert-bottom"></i> Tarefa</button>' +
@@ -781,15 +829,16 @@
                     '<button type="button" class="codexplus-btn" data-act="hoje" title="Levar a linha do tempo até hoje"><i class="ti ti-calendar"></i> Hoje</button>' +
                     '<button type="button" class="codexplus-btn" data-act="undo"' + (hist.length ? '' : ' disabled') + '><i class="ti ti-arrow-back-up"></i> Desfazer</button>' +
                     '<span class="cx-grid-savestate"></span><span class="cx-gd-msg" role="status" hidden></span>';
+            } else {
+                // Leitura: só Hoje (e a tela cheia, no fim da barra).
+                bar += '<button type="button" class="codexplus-btn" data-act="hoje" title="Levar a linha do tempo até hoje"><i class="ti ti-calendar"></i> Hoje</button>' +
+                    '<span class="cx-gd-msg" role="status" hidden></span>';
             }
-            bar += '<span class="cx-grid-spacer"></span>' + (editable ? ioBotoes() : '') + '<button type="button" class="codexplus-btn" data-act="pdf"' +
-                (editable ? '' : ' hidden') + '><i class="ti ti-file-type-pdf"></i> Exportar PDF</button></div>';
-            var wrapOld = root.querySelector('.cx-grid-wrap');
-            var sx = wrapOld ? wrapOld.scrollLeft : 0;
+            bar += '<span class="cx-grid-spacer"></span>' + (editable ? ioBotoes() : '') + botoesFim() + '</div>';
+            var rol = rolagem();
             root.innerHTML = '<div class="cx-grid cx-grid--sched cx-grid--datas">' + bar +
                 '<div class="cx-grid-wrap">' + gdTable(false) + '</div><div class="cx-grid-legend">' + gdLegend() + '</div></div>';
-            // Redesenhar não pode jogar a linha do tempo de volta para o começo.
-            if (sx) { root.querySelector('.cx-grid-wrap').scrollLeft = sx; }
+            rol();
         }
         /** Botão Hoje: rola a linha do tempo até hoje (no meio da parte visível). */
         function vaiHoje() {
@@ -1077,7 +1126,8 @@
             if (io) { return; }
             var el = document.createElement('div');
             el.className = 'cx-io-back cx-io-back--fixo';
-            document.body.appendChild(el);
+            // Em tela cheia só aparece o que está dentro dela.
+            (document.fullscreenElement && document.fullscreenElement.contains(root) ? document.fullscreenElement : document.body).appendChild(el);
             io = { el: el, got: null };
             el.addEventListener('pointerdown', function (e) { if (e.target === el) { ioClose(); } });
             document.addEventListener('paste', ioPaste, true);
@@ -1225,6 +1275,8 @@
                 e.preventDefault();
                 var a = act.getAttribute('data-act');
                 if (a === 'pdf') { printGrid(); return; }
+                if (a === 'full') { toggleFull(); return; }
+                if (a === 'hoje') { if (dated) { vaiHoje(); } return; }
                 if (!editable) { return; }
                 if (a === 'undo') { if (hist.length) { S = JSON.parse(hist.pop()); changed(); } return; }
                 if (a === 'datas') { if (!raci && !dated) { converte(); } return; }
@@ -1233,7 +1285,6 @@
                 if (a === 'expjson') { xm(false); exportJson(); return; }
                 if (a === 'expmd') { xm(false); if (raci || dated) { exportMd(); } return; }
                 if (a === 'imp') { ioOpen(); return; }
-                if (a === 'hoje') { if (dated) { vaiHoje(); } return; }
                 snapshot();
                 if (dated) {
                     if (a === 'row' || a === 'fase' || a === 'marco') {
@@ -1311,29 +1362,26 @@
 
         /* ---------- PDF ---------- */
         /**
-         * Orientação automática (Claudio, 26/09/2026): cabe em retrato, sai
-         * retrato (mais linhas por folha); senão paisagem; se nem assim cabe,
-         * as colunas vão em blocos, cada bloco em folha nova, repetindo a
-         * coluna da tarefa/atividade e o responsável.
+         * Sempre A4 paisagem (Claudio, 04/10/2026: o mesmo documento sai
+         * sempre com a mesma cara; antes era retrato quando cabia). Se não
+         * cabe numa folha, as colunas vão em blocos, cada bloco em folha nova,
+         * repetindo a coluna da tarefa/atividade e o responsável.
          */
         function printPlan() {
             var fixo = W.pName + (raci ? 0 : W.pOwner);
             var wc = raci ? W.pRaci : W.pSched;
-            var n = cols().length;
-            if (fixo + n * wc <= W.portrait) { return { orient: 'portrait', per: n || 1 }; }
             return { orient: 'landscape', per: Math.max(1, Math.floor((W.landscape - fixo) / wc)) };
         }
         /**
-         * Q7b-1: mesma regra no cronograma com datas — cabe em retrato, sai
-         * retrato; senão paisagem, e a linha do tempo vai em blocos de colunas
-         * inteiras (semanas ou meses), cada bloco em folha nova.
+         * Cronograma com datas: também sempre paisagem. Cabe numa folha, a
+         * linha do tempo estica até a largura útil; senão vai em blocos de
+         * colunas inteiras (semanas ou meses), cada bloco em folha nova.
          */
         function gdPrintPlan() {
             var units = gdUnits(), px = gdPx(true), fixo = gdFixed(true);
             var nd = units.reduce(function (t, u) { return t + u.n; }, 0), tot = nd * px;
             // Q7b-2: coube numa folha, a linha do tempo estica até a largura útil (até 3x).
             function estica(larg) { return Math.min(px * 3, Math.floor((larg - fixo) / nd * 100) / 100); }
-            if (fixo + tot <= W.portrait) { return { orient: 'portrait', px: estica(W.portrait), blocos: [[0, units.length]] }; }
             if (fixo + tot <= W.landscape) { return { orient: 'landscape', px: estica(W.landscape), blocos: [[0, units.length]] }; }
             var cabe = W.landscape - fixo, blocos = [], ini = 0, larg = 0;
             units.forEach(function (u, k) {
@@ -1416,7 +1464,7 @@
 
         if (input) { input.value = ser(); }
         render();
-        root.__cxGrid = { ser: ser, plan: printPlan, gdPlan: gdPrintPlan, gdUnits: gdUnits, gdEstrutura: gdEstrutura,
+        root.__cxGrid = { full: toggleFull, cheia: cheia, ser: ser, plan: printPlan, gdPlan: gdPrintPlan, gdUnits: gdUnits, gdEstrutura: gdEstrutura,
             ioText: function (t, n) { ioOpen(); ioText(t, n); }, ioApply: function () { ioApply(); }, io: function () { return io; },
             exportMd: function () { return gridToMd(JSON.parse(ser()), title, hojeBr()); }, ioNome: ioNome };
         return root.__cxGrid;

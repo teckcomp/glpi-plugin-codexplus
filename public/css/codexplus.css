@@ -1908,6 +1908,11 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-docpage--wide .cx-notice,
 .cx-docpage--wide .cx-flow,
 .cx-docpage--wide .codexplus-attachments { max-width: 1320px; }
+/* Leitura de cronograma e matriz RACI em folha paisagem (Claudio, 04/10/2026):
+   o PDF deles é sempre A4 paisagem, e a leitura acompanha. */
+.cx-docpage--paisagem .codexplus-doc,
+.cx-docpage--paisagem .cx-notice,
+.cx-docpage--paisagem .codexplus-attachments { max-width: 1320px; }
 /* Campos 60%, Permissões 40% (Claudio, 22/09/2026). Só em tela larga: abaixo
    de 900px continua uma coluna só (regra da seção da coluna Permissões). */
 @media (min-width: 901px) {
@@ -2102,6 +2107,9 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-grid-xm { position: absolute; left: 0; top: calc(100% + 6px); z-index: 40; width: 330px; background: #fff; border: 1px solid var(--cx-border);
     border-radius: 8px; box-shadow: 0 8px 24px rgba(23, 32, 45, .16); padding: 6px; }
 .cx-grid-xm[hidden] { display: none; }
+/* Achado 107: o display da .codexplus-btn vence o atributo hidden. A barra da
+   grade aparece também na leitura (Hoje, Tela cheia), com o PDF escondido. */
+.cx-grid-bar [hidden], .cx-grid-bar[hidden] { display: none !important; }
 .cx-grid-xm button { display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 10px 12px; background: #fff;
     font-size: 14px; line-height: 1.4; white-space: normal; cursor: pointer; color: var(--cx-text); }
 .cx-grid-xm button:hover, .cx-grid-xm button:focus-visible { background: var(--cx-surface-1); }
@@ -2109,6 +2117,19 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-grid-xm span { display: block; font-size: 12.5px; color: var(--cx-muted); margin-top: 3px; }
 .cx-grid-xm-nota { padding: 8px 12px; font-size: 12.5px; color: var(--cx-muted); }
 .cx-io-back.cx-io-back--fixo { position: fixed; z-index: 2000; }
+
+/* Tela cheia da grade (cronograma e RACI, Claudio 04/10/2026), igual à do
+   organograma: API do navegador ou a classe de reserva is-full. A tabela ocupa
+   a altura, rola nas duas direções e o cabeçalho fica fixo no alto. */
+[data-cx-grid].is-full { position: fixed; inset: 0; z-index: 1050; margin: 0; padding: 16px 20px; max-width: none;
+    background: var(--cx-surface); display: flex; flex-direction: column; overflow: hidden; }
+[data-cx-grid]:fullscreen { background: var(--cx-surface); }
+[data-cx-grid].is-full > .cx-grid { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+[data-cx-grid].is-full .cx-grid-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--cx-border); border-radius: 8px; }
+[data-cx-grid].is-full .cx-grid-table thead th { position: sticky; top: 0; z-index: 3; }
+[data-cx-grid].is-full .cx-grid-table thead th.cx-grid-name, [data-cx-grid].is-full .cx-grid-table thead th.cx-grid-owner,
+[data-cx-grid].is-full .cx-gd-table thead th.cx-gd-n, [data-cx-grid].is-full .cx-gd-table thead th.cx-gd-owner,
+[data-cx-grid].is-full .cx-gd-table thead th.cx-gd-date { z-index: 4; }
 
 /* Q7b-2b: cronograma com datas no desenho do mockup aprovado (q7b-mockup-cronograma).
    Nº | Fase, tarefa ou marco | Responsável | Início | Fim (dd/mm) fixos à esquerda

@@ -2085,6 +2085,7 @@ class Document extends CommonDBTM
         Diagram::purgeDocument((int) $this->fields['id']);
         DocumentVersion::purgeDocument((int) $this->fields['id']);
         ScheduleStatus::purgeDocument((int) $this->fields['id']);
+        ExpiryAlert::purgeDocument((int) $this->fields['id']);
         RevisionEvent::purgeDocument((int) $this->fields['id']);
         DocumentLink::purgeDocument((int) $this->fields['id']);
     }

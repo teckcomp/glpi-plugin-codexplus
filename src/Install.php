@@ -60,6 +60,8 @@ class Install
     public const DOC_LINKS_TABLE      = 'glpi_plugin_codexplus_documentlinks';
     /** Q7c-2: histórico das marcações do cronograma (Iniciar, Concluir, Reabrir). */
     public const SCHEDULE_EVENTS_TABLE = 'glpi_plugin_codexplus_scheduleevents';
+    /** 7a: marcas de "já avisado" do alerta de vencimento (ExpiryAlert). */
+    public const EXPIRY_ALERTS_TABLE   = 'glpi_plugin_codexplus_expiryalerts';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -69,6 +71,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::EXPIRY_ALERTS_TABLE,
             self::SCHEDULE_EVENTS_TABLE,
             self::DOC_LINKS_TABLE,
             self::REV_EVENTS_TABLE,
@@ -227,6 +230,9 @@ class Install
 
         // --- Bloco Q7c-2: histórico das marcações do cronograma ---
         self::installQ7c2();
+
+        // --- Bloco 7a: alerta de vencimento (marcas + ação automática) ---
+        self::install7a();
 
         $migration->executeMigration();
         return true;
@@ -533,6 +539,39 @@ class Install
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q7b-4): erro ao criar $t");
         }
+    }
+
+    /**
+     * 7a (Claudio, 04/10/2026): marca de "já avisado" por documento, tipo
+     * (avencer, vencido, revisao) e ciclo (data de vencimento, ou revisão +
+     * prazo), e a ação automática diária `codexplusexpiry` (ExpiryAlert).
+     * CronTask::register não duplica: reinstalar mantém a configuração que o
+     * administrador tiver mudado.
+     */
+    private static function install7a(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::EXPIRY_ALERTS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `kind` varchar(16) NOT NULL DEFAULT '',
+                `cycle` varchar(32) NOT NULL DEFAULT '',
+                `times` int unsigned NOT NULL DEFAULT '0',
+                `users` varchar(255) NOT NULL DEFAULT '',
+                `date_first` timestamp NULL DEFAULT NULL,
+                `date_last` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `kind`, `cycle`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (7a): erro ao criar $t");
+        }
+        \CronTask::register(ExpiryAlert::class, ExpiryAlert::CRON_NAME, DAY_TIMESTAMP, [
+            'state'   => \CronTask::STATE_WAITING,
+            'comment' => 'Codex+: documentos a vencer, vencidos e revisões atrasadas',
+        ]);
     }
 
     /**
@@ -1018,6 +1057,8 @@ class Install
         ]);
 
         ProfileRight::deleteProfileRights(['plugin_codexplus_wiki']);
+        // 7a: a ação automática do alerta de vencimento sai junto.
+        \CronTask::unregister('codexplus');
         return true;
     }
 }

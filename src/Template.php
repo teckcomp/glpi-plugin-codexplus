@@ -142,6 +142,9 @@ class Template extends CommonDBTM
 
     // ---------------------------------------------------------------------
     // Sementes iniciais (Etapa 3a) — inseridas só na criação da tabela.
+    // 3c-4 (04/10/2026): sem "Histórico de revisão" escrito à mão (a R6-b
+    // imprime o histórico no fim do PDF) e sem "Procedimentos vinculados"
+    // no PSG (a Etapa 5 lista os documentos vinculados sozinha).
     // ---------------------------------------------------------------------
 
     /**
@@ -157,39 +160,19 @@ class Template extends CommonDBTM
         ];
     }
 
-    private static function revisionTable(): string
-    {
-        return '<h2>Histórico de revisão</h2>'
-            . '<table style="border-collapse:collapse;width:100%;">'
-            . '<tr>'
-            . '<th style="border:1px solid #ccc;padding:6px;">Data</th>'
-            . '<th style="border:1px solid #ccc;padding:6px;">Revisão</th>'
-            . '<th style="border:1px solid #ccc;padding:6px;">Alteração</th>'
-            . '</tr>'
-            . '<tr>'
-            . '<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>'
-            . '<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>'
-            . '<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>'
-            . '</tr>'
-            . '</table>';
-    }
-
     private static function seedPOP(): string
     {
         return '<h2>Objetivo</h2><p></p>'
             . '<h2>Pré-requisitos</h2><ul><li></li></ul>'
             . '<h2>Passos</h2><ol><li></li></ol>'
-            . '<h2>Observações</h2><p></p>'
-            . self::revisionTable();
+            . '<h2>Observações</h2><p></p>';
     }
 
     private static function seedPSG(): string
     {
         return '<h2>Objetivo</h2><p></p>'
             . '<h2>Abrangência</h2><p></p>'
-            . '<h2>Procedimentos vinculados</h2><p>Os POPs vinculados ao setor aparecem aqui.</p>'
-            . '<h2>Responsabilidades</h2><p></p>'
-            . self::revisionTable();
+            . '<h2>Responsabilidades</h2><p></p>';
     }
 
     private static function seedMAN(): string

@@ -2271,6 +2271,20 @@ Commits: `96cbe2b` (3c-4), `f757c31` (R6-b1, 0.7.7), `207cda4` (R6-b2),
   (`codexplus-meta.js`). Só tela: campos no mesmo formulário.
 - Fluxograma: **Tela cheia** na leitura com zoom (−, +, Ajustar, Ctrl+roda).
 
+### 3.18 Reorganização para produção (Claudio, 04/10/2026, fim da noite)
+
+- Revisão do backlog contra o código do `ef1db1b`: itens confirmados
+  abertos, resolvidos e obsoletos (a `documenteditors` **está em uso**
+  desde a A-1; só a `sectormembers` sobra). Etapa 9d **não** existe no
+  código: a pessoa do organograma é texto livre.
+- **Decisão de Claudio:** antes da produção entram só os 12 blocos da
+  **Reta final** do ROADMAP (HV-1, AP-1, MO-1, MO-2, Q7c-1, Q7c-2, Q5k,
+  7a, 7b, Q8, Q5i-5, Q5i-6) e o fechamento **F-0** (0.8.0, tag,
+  instalação do zero). A caça a bugs anotada e o resto vão para
+  **Pós-produção**, como atualização por `git pull`.
+- Decisões a tomar no começo de cada bloco: ROADMAP, "Decisões
+  pendentes" → "Da Reta final".
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

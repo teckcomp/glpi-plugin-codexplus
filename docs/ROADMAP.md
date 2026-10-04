@@ -1,6 +1,12 @@
 # Codex+ — roadmap
 
 > Estado em **`v0.7.9`** (último commit de código **`ea02b8a`**) ·
+> **reorganizado em 04/10/2026 (fim da noite), por Claudio:** antes da
+> produção entram só os blocos da **"Reta final"** (abaixo, 12 blocos +
+> fechamento 0.8.0); todo o resto — inclusive a caça a bugs anotada — vai
+> para **"Pós-produção"** (fim do documento). Próximo: **HV-1**.
+> Antes:
+> Estado em **`v0.7.9`** (último commit de código **`ea02b8a`**) ·
 > atualizado em **04/10/2026 (noite, fim da sessão)**: **3c ✅** (modelos de
 > Manual, POP e PSG como dado; imagem anexa da proposta cancelada),
 > **R6-b ✅**, **R7 ✅**, **Etapa 5 ✅** (5a a 5e), Visualizar em folhas A4,
@@ -85,22 +91,22 @@ em 21/09: identidade visual e diagramas passam à frente do resto da Etapa R.
    leitura a partir do **JSON publicado** (o SVG fica para o item 5, desvio
    aprovado por Claudio), zoom e busca, fluxo de validação atual, PDF
    paisagem. Leva junto as validades novas (Manual 6, DIA 3)
-5. **Motor de diagrama em grafo** — ver "Blocos do motor" logo abaixo. A
+5. ~~**Motor de diagrama em grafo**~~ ✅ — ver "Blocos do motor" logo abaixo. A
    pedido de Claudio (20/09/2026, a partir de cinco protótipos de uso real),
    o diagrama deixou de ser uma árvore e passou a ser um grafo com posição
    livre e ligações próprias. Concluído até o 2d-2 e o 2d-3a; falta fechar o 2d-3
-6. **Estante** (parte da R5, pedida por Claudio em 20/09/2026) — tela
+6. ~~**Estante**~~ ✅ (parte da R5, pedida por Claudio em 20/09/2026) — tela
    Documentos como prateleira, agrupada por **Setor → Categoria**, no modelo
    novo. **Modelos** no mesmo formato (exige setor e categoria no modelo:
    schema, junto com a R3b4)
-7. **Núcleo da revisão** (parte da R6) — organograma publicado atualizável
-8. **R3b2** — liberar a leitura pela tela (decidir antes: Self-Service vê o Codex+?)
-9. **R3b3 → R3b4 → R4 → R5 → resto da R6 → R7** — fecha a Etapa R
-10. **Etapa 3c** — modelos de verdade (inclui imagem anexa no PDF da proposta)
-11. **Etapa 5** — documentos vinculados em todos os níveis (PSG, POP, Manual, Diagrama)
-12. **Etapa 7** — alerta de vencimento
-13. **Etapa 9d–9g** — vínculo com usuários e grupos, matrizes, fluxograma, modelos de diagrama
-14. **Etapa 8** — personalização completa do PDF
+7. ~~**Núcleo da revisão**~~ ✅ (parte da R6) — organograma publicado atualizável
+8. ~~**R3b2**~~ ✅ — liberar a leitura pela tela (decidir antes: Self-Service vê o Codex+?)
+9. ~~**R3b3 → R3b4 → R4 → R5 → resto da R6 → R7**~~ ✅ — fecha a Etapa R
+10. ~~**Etapa 3c**~~ ✅ — modelos de verdade (inclui imagem anexa no PDF da proposta)
+11. ~~**Etapa 5** — documentos vinculados em todos os níveis (PSG, POP, Manual, Diagrama)~~ ✅
+12. **Etapa 7** — alerta de vencimento (**Reta final**, blocos 7a e 7b)
+13. **Etapa 9d–9g** — 9e (matrizes, D1) e 9f (fluxograma, Q5) ✅; **9d e 9g em Pós-produção**
+14. **Etapa 8** — personalização completa do PDF (Pós-produção)
 
 ### Ordem até produção, acordada com Claudio em 20/09/2026 (revista em 26/09)
 
@@ -118,6 +124,11 @@ Vale sobre a lista acima quando houver conflito.
 > Etapa 7 logo depois)
 > → aba de Histórico e galeria de Modelos (Claudio, 03/10: "quando
 > finalizar toda a produção").
+>
+> **Revisto por Claudio em 04/10/2026 (fim da noite):** a caça a bugs sai
+> da frente; antes da produção entram só os blocos da **Reta final**
+> (Histórico, Etapa 7, modelos, aprovadores, cronograma, fluxograma, mapa de
+> calor, `.bpmn` e draw.io); o resto vai para **Pós-produção**.
 >
 > **Atualização, 28/09/2026 (madrugada): produção adiada por Claudio.** A
 > subida de 28/09 não aconteceu; sobe "quando estiver tudo pronto"
@@ -167,13 +178,52 @@ Vale sobre a lista acima quando houver conflito.
 13. ~~Acesso anônimo (R7)~~ ✅ 04/10 (`ed00235`, `e8acd88`, `02e4f7c`)
 14. ~~Documentos vinculados e PDF composto em cascata (Etapa 5)~~ ✅ 04/10
     (`ac6be3d`, `9d48dae`, `7315adf`, `ea02b8a`)
-15. **Caça a bugs** (lista em "Backlog")
-16. Produção, com o alerta de vencimento (Etapa 7) logo depois
+15. **Reta final** — blocos da seção seguinte, fechamento em **0.8.0**
+16. **Produção** (P-1 a P-4); caça a bugs e o resto em **Pós-produção**
 
 A Etapa R absorve as antigas 2c (setores), 10 (responsável e histórico) e
 "permissões e acesso anônimo".
 
 Depois: marco **Pronto para produção** (fim deste documento).
+
+---
+
+## ▶ Reta final antes da produção (Claudio, 04/10/2026, fim da noite)
+
+Só estes blocos entram antes da produção. Ordem pensada para alternar
+blocos sem schema e com schema (cada reinstalação isolada num bloco) e
+deixar por último o que depende de decisão ou de arquivo de exemplo. Os
+números entre parênteses são os da lista revisada de 04/10.
+
+| Ordem | Bloco | Entrega | Reinstalar? | Antes de começar |
+|---|---|---|---|---|
+| 1 | **HV-1** | Aba **Histórico** do documento (o `Log::history` já grava: quem, quando, o quê) (7) + filtro **"incluir obsoletos"** na Biblioteca (31) | não | mockup do Histórico |
+| 2 | **AP-1** | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
+| 3 | **MO-1** | Modelos por **setor e categoria** (colunas no modelo, tela Modelos agrupada, criação filtrando pelo setor) (32) | **sim** (0.7.11) | mockup da tela Modelos |
+| 4 | **MO-2** | **Imagens dentro de modelos**: o modelo guarda as imagens; documento novo recebe uma cópia de cada (33) | não (prever) | decisão: reverte o M1 |
+| 5 | **Q7c-1** | Cronograma: fase que sobe leva a linha solta do topo (16) + linha do tempo esticada na tela cheia (17) | não (só JS) | — |
+| 6 | **Q7c-2** | Cronograma: **histórico das marcações** da situação (Iniciar, Concluir, Reabrir — todas, não só a última) (15) | **sim** (0.7.12) | onde mostrar |
+| 7 | **Q5k** | Fluxograma: **texto solto** com largura e quebra de linha (23) + **"mais formas"** na mini-paleta (24) | não (só JS) | — |
+| 8 | **7a** | **Etapa 7** — ação automática do GLPI (cron) que encontra vencidos e a vencer, com marca de "já avisado" para não repetir (6) | **sim** (0.7.13) | regras do aviso |
+| 9 | **7b** | **Etapa 7** — e-mail pelo mecanismo de notificações nativo (modelo de notificação, destinatário = responsável) (6) | **sim** | SMTP na homologação |
+| 10 | **Q8** | **DTC: mapa de calor** na Planta (14) | não (prever: campo novo no JSON do quadro, aceito no PHP) | decisão de abordagem + mockup |
+| 11 | **Q5i-5** | Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda) (25) | não | arquivo de exemplo |
+| 12 | **Q5i-6** | Fluxograma: importar **draw.io** (XML, com posições) (26) | não | arquivo de exemplo |
+| 13 | **F-0** | Fechamento: versão **0.8.0** com tag `v0.8.0`, **instalação do zero** numa instância limpa (como em 28/09, achado 92), docs | sim (versão) | — |
+
+**Produção (depois do F-0):**
+
+| Bloco | Entrega |
+|---|---|
+| P-1 | Conferência do servidor Debian 13 (SSH 2022), **só leitura**: PHP, extensões, MariaDB, espaço, acesso ao GitHub, versão do GLPI |
+| P-2 | Instalação do Codex+ em produção pelo `git clone` na tag `v0.8.0`, `plugin:install` e `plugin:activate`, direitos nos perfis |
+| P-3 | Dados: marcas, setores, categorias, **modelos** e os **documentos escolhidos** da homologação por `mysqldump --where` (lista a fechar antes — Decisões pendentes) |
+| P-4 | Conferência de ponta a ponta com um documento real (criar, validar, publicar, PDF, link público) e ativação do cron da Etapa 7 |
+
+Depois da produção, as atualizações seguem por `git pull` na pasta do
+plugin, com o mesmo método (pacote validado na homologação primeiro), a
+partir da lista **Pós-produção**.
+
 
 ---
 
@@ -344,13 +394,13 @@ não existirá.
 
 | Bloco | Entrega |
 |---|---|
-| 9a | Tipo `DIA`, tabela satélite, entrada no "Novo documento" (mexe no Install) |
-| 9b | Leitura do organograma: zoom, ajustar à tela, busca de pessoa, PDF paisagem |
-| 9c | Editor de organograma: protótipo + desfazer/refazer + salvamento automático do rascunho + publicar |
-| 9d | Vínculo com Usuários e Grupos; "gerar a partir do GLPI" (grupo pai + campo Supervisor) |
-| 9e | Matrizes: escalonamento e RACI |
-| 9f | Fluxograma: paleta de formas e setas sobre o motor próprio. **Referência de interação: Miro** (Claudio, 22/09/2026) — alças de conexão nas bordas, puxar a seta para o vazio cria a forma já ligada, trocar a forma sem perder as ligações, rótulo da seta por duplo clique, estilo (reta, cotovelo, curva) por ligação. Referência de interação, não de escopo: desenho livre continua fora |
-| 9g | Modelos prontos de diagrama (reaproveita o sistema de modelos da etapa 3) |
+| 9a ✅ | Tipo `DIA`, tabela satélite, entrada no "Novo documento" (mexe no Install) |
+| 9b ✅ | Leitura do organograma: zoom, ajustar à tela, busca de pessoa, PDF paisagem |
+| 9c ✅ | Editor de organograma: protótipo + desfazer/refazer + salvamento automático do rascunho + publicar |
+| 9d · Pós-produção | Vínculo com Usuários e Grupos; "gerar a partir do GLPI" (grupo pai + campo Supervisor) |
+| 9e ✅ (D1) | Matrizes: escalonamento e RACI |
+| 9f ✅ (Q5) | Fluxograma: paleta de formas e setas sobre o motor próprio. **Referência de interação: Miro** (Claudio, 22/09/2026) — alças de conexão nas bordas, puxar a seta para o vazio cria a forma já ligada, trocar a forma sem perder as ligações, rótulo da seta por duplo clique, estilo (reta, cotovelo, curva) por ligação. Referência de interação, não de escopo: desenho livre continua fora |
+| 9g · Pós-produção | Modelos prontos de diagrama (reaproveita o sistema de modelos da etapa 3) |
 
 **Validar no 9b:** a leitura abre na **interface simplificada** (Self-Service)?
 A decisão de dar acesso ao Self-Service depende disso.
@@ -376,6 +426,9 @@ são esqueletos.
 
 **Aceite:** criar uma proposta a partir do modelo e ter um documento
 apresentável ao cliente com pouca edição.
+
+**✅ Concluída em 04/10/2026** (3c-4, `96cbe2b`: Manual, POP e PSG como
+dado; imagem anexa da proposta cancelada). Registro anterior:
 
 **Estado (04/10/2026):** Proposta ✅ — planilha no lugar (3c-1), Resumo do
 investimento (3c-2) e modelo completo, que é **dado da homologação**, não
@@ -418,7 +471,7 @@ chave única (pai, filho). Precisa reinstalar.
 4. **Filho sem acesso de leitura continua constando** na lista e no
    sumário, com a nota **"sem acesso"**.
 
-**A confirmar com Claudio no mockup (propostas do assistente):**
+**Propostas do assistente (confirmadas na construção, 04/10/2026; ver CONTEXTO 3.17):**
 
 - **Pares permitidos:** PSG → POP, PSG → DIA, POP → MAN, POP → DIA,
   MAN → DIA. Os outros tipos (PRP, LAU, DTC, DIV) ficam fora.
@@ -485,9 +538,9 @@ os critérios abaixo estiverem cumpridos.
 > completa"** e seguem sendo fechados lá.
 
 - [ ] PDF validado com documentos reais de cada tipo, principalmente proposta
-- [ ] Modelos com conteúdo de verdade (3c)
+- [x] Modelos com conteúdo de verdade (3c) ✅ 04/10
 - [ ] Direitos por perfil definidos e testados
-- [ ] Etapa R concluída (documentos próprios, permissões, histórico, anônimo)
+- [x] Etapa R concluída (documentos próprios, permissões, histórico, anônimo) ✅ 04/10 (R7)
 - [ ] Logo definitiva configurada
 - [x] Instalação e atualização testadas do zero numa instância limpa ✅ 28/09
   (tag `v0.7.0`, banco idêntico ao da homologação — CONTEXTO, achado 92)
@@ -645,73 +698,104 @@ POP e PSG.
 | 5c/5e | Faz parte de; aviso ao pai; Painel de vínculos | `7315adf` |
 | 5d | PDF completo em cascata com sumário | `ea02b8a` |
 
-## Backlog (pequenos ajustes, revisar no fim das etapas)
+## Pós-produção (Claudio, 04/10/2026)
 
-**Caça a bugs — já anotados (04/10/2026):**
+Tudo o que não entrou na Reta final. Atualizações já em produção, por
+tema, com a mesma regra: homologação primeiro, `git pull` em produção
+depois. Números da lista revisada de 04/10 entre parênteses.
 
-- Marca d'água "RASCUNHO — não é a versão vigente" nas folhas e no PDF
+**Caça a bugs (anotados em 04/10):**
+
+- (1) Marca d'água "RASCUNHO — não é a versão vigente" nas folhas e no PDF
   quando o Visualizar mostra algo fora da versão vigente
-- Exportar Word sem o histórico de revisões e sem os Documentos
-  complementares
-- PDF completo: matriz RACI e cronograma saem como nota; só interno (não
-  no link público); conferir a folha deitada em outros navegadores
-- Leitura comum (sem Visualizar) ainda no formato antigo: decidir se vira
-  folhas também
+- (2) Exportar Word sem o histórico de revisões e sem os Documentos
+  complementares (`codexplus-export.js` não os monta)
+- (3) PDF completo em cascata: matriz RACI e cronograma saem como nota
+  (`diagramSvg` só desenha fluxograma e organograma); conferir a folha
+  deitada em outros navegadores. Segue só interno (não no link público)
+- (4) Leitura comum (sem Visualizar) ainda no formato antigo: decidir se
+  vira folhas também
 
-- PDF: partir planilha/tabela maior que uma folha, repetindo o cabeçalho
+**Roadmap:**
+
+- (8) Galeria de Modelos: catálogo público da Teckcomp (ex.: repositório no
+  GitHub), listado e importado com um clique na tela Modelos
+- (9) **Etapa 9d**: organograma ligado a Usuários e Grupos do GLPI; "gerar a
+  partir do GLPI" (grupo pai + campo Supervisor). Hoje a pessoa no cartão é
+  texto livre
+- (10) **Etapa 9g**: modelos de diagrama da empresa (hoje só os modelos
+  embutidos do organograma, Q6c)
+- (11) **Etapa 8**: template do PDF editável por inteiro
+
+**PDF e marcas:**
+
+- (12) Partir planilha/tabela maior que uma folha, repetindo o cabeçalho
   (hoje transborda — limite do 3c-0)
-- Marcas: lista do campo Marca com a logo dentro de cada opção (hoje a logo
-  aparece ao lado do select)
-- DTC: **mapa de calor** — embutir no quadro da Planta (cobertura estimada
-  por AP) ou imagem de ferramenta de site survey; a discutir (Claudio, 04/10)
+- (13) Lista do campo Marca com a logo dentro de cada opção (hoje ao lado)
 
-- Cronograma: guardar o **histórico de marcações** da situação (hoje só a
-  última fica: quem e quando); avaliar no uso
-- Cronograma: fase que sobe acima de uma linha solta do topo passa a levar
-  essa linha (regra "a fase leva as linhas abaixo dela"); avaliar no uso
-- Cronograma: na tela cheia, esticar a linha do tempo até a largura da tela
-  (hoje sobra espaço à direita em cronogramas curtos)
-- Guardar os **mockups aprovados** em `docs/` (achado 116)
+**Quadro (Planta e Topologia):**
 
-- Quadro: PNG com planta de fundo usa a área inteira do quadro (sobra
-  branco em volta da planta); recortar só a área útil (observação no Q2f)
-- Quadro: **régua** para conferir a escala (medir outra cota depois de
-  definir a escala) — sugestão de 27/09, depois do erro de medida na planta
-- Quadro: cabo encaixar no **contorno real** do ícone (hoje sai da borda da
-  caixa quadrada; em ícones baixos, como o switch, a borda norte fica
-  ~15 px acima do desenho)
-- Quadro: desvio automático de obstáculos no cotovelo (hoje se resolve com
-  dobra); só se fizer falta no uso real
-- Fluxograma: texto solto com largura e quebra de linha (hoje as alças do
-  texto mudam a letra)
-- Fluxograma: mini-paleta com "mais formas" (hoje as 9 mais usadas)
-- Fluxograma: **importar e exportar `.bpmn`** (Bizagi, Camunda) — saiu do
-  caminho em 03/10 (não há processos no Bizagi); volta se aparecer cliente
-  com `.bpmn` real para testar
-- Fluxograma: **importar draw.io** (XML, com posições) — se fizer falta
-- Quadro: importar e exportar arquivo na **Planta e na Topologia** (o Q5i
-  é só do fluxograma; a planta de fundo fica no corpo do documento)
-- Mermaid: acompanhar fluxos de IAs reais e ajustar o leitor ao que vier
+- (18) PNG com planta de fundo: recortar só a área útil (observação do Q2f)
+- (19) **Régua** para conferir a escala (medir outra cota depois de definir
+  a escala) — sugestão de 27/09
+- (20) Cabo encaixar no **contorno real** do ícone (hoje sai da borda da
+  caixa quadrada; no switch, ~15 px acima do desenho)
+- (21) Desvio automático de obstáculos no cotovelo — só se fizer falta
+- (22) Importar e exportar arquivo na Planta e na Topologia (o Q5i é só do
+  fluxograma)
 
-- Tabelas `sectormembers` e `documenteditors` sem uso: apagar
-- Textos de ajuda dos comandos de console (ainda citam gestor do setor)
-- Biblioteca: filtro "incluir obsoletos" para quem só lê; estante e busca no
-  Self-Service já existem pela Biblioteca
-- Modelos organizados por setor e categoria (schema)
-- Imagens dentro de modelos (copiar o arquivo para cada documento novo)
-- "Autor:" vazio em documentos migrados sem autor: mostrar "—"
-- Planilha: gráficos, SE/PROCV e mesclar células ficam fora por ora
-- Aprovadores: guardar quem aprovou **cada versão publicada** (hoje, durante
-  uma revisão, a leitura da versão publicada mostra só os nomes) — coluna na
-  tabela de versões
-- Painel: filtro de status com "Aguardando aprovadores" próprio (hoje conta
-  como "Aguardando responsável"; o status gravado é `aprovacao`)
-- Barra do editor: com o botão Resumo, Importar, <> e Tela cheia foram para
-  o "•••" em 1920 px — reordenar se incomodar
-- Homologação: marcador `codexplus_3c3_prp_full` em `glpi_configs`
-  (inofensivo; apagar quando quiser)
+**Limpeza:**
+
+- (27) Apagar a tabela `sectormembers` (sem uso desde o P1). A
+  `documenteditors` **fica**: voltou a ser usada na A-1 (`DocumentEditor`)
+- (28) Textos de ajuda dos comandos de console (ainda citam "gestor do
+  setor" e as etapas antigas)
+- (29) Homologação: marcador `codexplus_3c3_prp_full` em `glpi_configs`
+  (inofensivo; não vai para produção)
+- (30) "Autor:" vazio em documentos migrados sem autor: mostrar "—"
+  (confirmar na tela)
+
+**Outros:**
+
+- (36) Barra do editor: com o botão Resumo, Importar, <> e Tela cheia foram
+  para o "•••" em 1920 px — reordenar se incomodar
+- (37) Guardar os **mockups aprovados** em `docs/` (achado 116; hoje só os
+  de 4c a 4f, em `docs/etapas`)
+
+**Observações (não são tarefa):**
+
+- Mermaid: acompanhar fluxos gerados por IAs reais e ajustar o leitor ao
+  que vier
+- Planilha: gráficos, SE/PROCV e mesclar células ficam fora (decisão)
+- Cronograma: % por tarefa, dependências (setas), dias úteis e feriados
+  ficam fora (decisão de 03/10)
+
+**Já resolvidos (saíram desta lista em 04/10):** indicador "PSG sem POP"
+(5d); Etapas 9e e 9f (D1, Q5); critérios "Modelos (3c)" e "Etapa R" do
+marco; "apagar `documenteditors`" (a tabela está em uso).
 
 ## Decisões pendentes
+
+**Da Reta final (04/10/2026) — tomar no começo de cada bloco:**
+
+- [ ] **HV-1:** onde fica o Histórico (4ª aba dos dados do documento ou
+      seção no fim da página) e o que entra (só `glpi_logs` do documento ou
+      também revisões, prorrogações e acessos pelo link) — mockup
+- [ ] **MO-2:** imagem dentro do modelo **reverte a regra do M1** (modelo
+      não guardava imagem). Confirmar: a imagem é copiada para cada
+      documento novo; apagar do modelo não mexe nos documentos já criados
+- [ ] **Q7c-2:** onde aparece o histórico das marcações (na linha da
+      tarefa, num balão, ou no Histórico do documento)
+- [ ] **7a/7b:** antecedência do aviso "a vencer" (sugestão: 30 dias), quem
+      recebe (responsável; revisor?), se "revisão vencida" da R6-b também
+      avisa, e **SMTP configurado na homologação** para testar o e-mail
+- [ ] **Q8 (mapa de calor):** (a) camada estimada na Planta, por AP, com
+      raio em metros pela escala e aviso "estimativa", ou (b) só imagem de
+      ferramenta de site survey sobre a planta. Sugestão: (a), sem paredes
+      nem atenuação — mockup antes
+- [ ] **Q5i-5/Q5i-6:** arquivo `.bpmn` e `.drawio` de exemplo. Sem
+      arquivo real, a validação usa exemplos públicos (bpmn.io, draw.io) —
+      o risco é o arquivo do primeiro cliente trazer algo que eles não têm
 
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,

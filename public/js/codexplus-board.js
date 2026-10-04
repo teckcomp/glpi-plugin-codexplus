@@ -63,6 +63,10 @@
    espaço e alinhada); ARRASTAR até outra forma liga; ARRASTAR para o
    vazio abre a mini-paleta e a forma escolhida nasce ligada ali. Alinhar
    e distribuir na barra flutuante com 2 ou mais elementos selecionados.
+   Q5k (Claudio, 04/10/2026, referência Miro): texto solto com LARGURA
+   (`w`, alças nas laterais; o texto quebra sozinho; os cantos continuam
+   mudando a letra) e "…" na mini-paleta, que abre todas as formas por
+   seção, com busca.
    ========================================================================= */
 (function () {
     'use strict';
@@ -427,19 +431,50 @@
         }
         return w - 18;
     }
-    // Quebra por palavra pela largura aproximada da letra (Arial ~0,55 em).
-    function wrapText(text, maxW, fs) {
-        var max = Math.max(1, Math.floor(maxW / (fs * 0.55))), out = [];
+    /*
+     * Largura do texto na Arial (em de 1000, tabela da Helvetica/Arial).
+     * Q5k-1 (Claudio, 04/10/2026, "texto fica fora do balão"): antes toda
+     * letra valia 0,55 em, e palavra longa em maiúsculas (H = 0,72; W = 0,94)
+     * saía da forma. Agora cada letra vale a largura dela, NUNCA menos que os
+     * 0,55 de antes: texto comum quebra igual; só o largo quebra mais cedo.
+     */
+    var CHAR_W = (function () {
+        var t = {}, add = function (chars, w) { chars.split('').forEach(function (c) { t[c] = w; }); };
+        add('0123456789', 556); add('LJ', 556); add('FTZ', 611); add('ABEKPSVXY&', 667);
+        add('CDHNRU', 722); add('GOQ', 778); add('M', 833); add('W', 944); add('mw', 833); add('+<>=~', 584);
+        t.w = 722; t['%'] = 889; t['@'] = 1015; t['#'] = 556; t['$'] = 556; t['_'] = 556; t['—'] = 1000; t['…'] = 1000;
+        return t;
+    })();
+    function textW(str, fs) {
+        var n = 0;
+        String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').split('').forEach(function (c) {
+            n += Math.max(550, CHAR_W[c] || 0);
+        });
+        return n * fs / 1000;
+    }
+    /** Quantas letras do começo de `wd` cabem em maxW (pelo menos 1). */
+    function fitChars(wd, maxW, fs) {
+        var k = 1;
+        while (k < wd.length && textW(wd.slice(0, k + 1), fs) <= maxW) { k++; }
+        return k;
+    }
+    // Quebra por palavra pela largura de cada letra (textW).
+    function wrapText(text, maxW, fs, maxLines) {
+        var out = [];
         String(text || '').split('\n').forEach(function (par) {
             var line = '';
             par.split(/\s+/).filter(Boolean).forEach(function (wd) {
-                while (wd.length > max) { if (line) { out.push(line); line = ''; } out.push(wd.slice(0, max)); wd = wd.slice(max); }
-                if (!line) { line = wd; } else if ((line + ' ' + wd).length <= max) { line += ' ' + wd; } else { out.push(line); line = wd; }
+                while (wd.length > 1 && textW(wd, fs) > maxW) {
+                    if (line) { out.push(line); line = ''; }
+                    var k = fitChars(wd, maxW, fs);
+                    out.push(wd.slice(0, k)); wd = wd.slice(k);
+                }
+                if (!line) { line = wd; } else if (textW(line + ' ' + wd, fs) <= maxW) { line += ' ' + wd; } else { out.push(line); line = wd; }
             });
             out.push(line);
         });
         while (out.length > 1 && out[out.length - 1] === '') { out.pop(); }
-        return out.slice(0, 30);
+        return out.slice(0, maxLines || 30);
     }
     // Altura que o texto precisa na largura atual.
     function shapeNeed(it) {
@@ -828,8 +863,10 @@
                 n.label = String(it.label || '').slice(0, 80);
                 n.color = PAL_HEX.indexOf(it.color) >= 0 ? it.color : COLORS[1];
             } else {
-                n.text = String(it.text || '').slice(0, 300);
+                n.text = String(it.text || '').slice(0, TEXT_MAX);
                 n.color = PAL_HEX.indexOf(it.color) >= 0 ? it.color : '#1d2330';
+                // Q5k: largura (o texto quebra dentro dela); sem largura, uma linha por Enter.
+                if (+it.w > 0) { n.w = Math.max(TEXT_MIN_W, Math.min(TEXT_MAX_W, Math.round(+it.w))); }
                 n.size = ['p', 'm', 'g'].indexOf(it.size) >= 0 ? it.size : 'm';
                 // Q5c: letra em px (barra flutuante) e negrito.
                 if (+it.px > 0) { n.px = Math.max(8, Math.min(96, Math.round(+it.px))); }
@@ -1139,6 +1176,12 @@
     }
 
     var TEXT_PX = { p: 12, m: 15, g: 20 };
+    // Q5k: texto solto com largura (`w`) quebra sozinho; sem `w`, só no Enter (como antes).
+    var TEXT_MIN_W = 40, TEXT_MAX_W = 2000, TEXT_MAX = 1000;
+    function textLines(it, ph) {
+        var fs = it.px || TEXT_PX[it.size] || 15, t = String(it.text || ph || '');
+        return it.w > 0 ? wrapText(t, it.w, fs, 80) : t.split('\n');
+    }
 
     /* ---------------- desenho de um item (tela e PNG) ---------------- */
     function itemSvg(it, forExport) {
@@ -1152,7 +1195,7 @@
         }
         if (it.t === 'text') {
             var fs = it.px || TEXT_PX[it.size] || 15;
-            var lines = String(it.text || (forExport ? '' : 'Texto')).split('\n');
+            var lines = textLines(it, forExport ? '' : 'Texto');
             return '<g data-id="' + it.id + '"><text x="' + it.x + '" y="' + (it.y + fs) + '" font-family="Arial,sans-serif" font-size="' + fs + '"' + (it.b ? ' font-weight="bold"' : '') + ' fill="' + it.color + '">'
                 + lines.map(function (l, i) { return '<tspan x="' + it.x + '" dy="' + (i ? fs * 1.25 : 0) + '">' + esc(l) + '</tspan>'; }).join('')
                 + '</text></g>';
@@ -1263,7 +1306,7 @@
         if (it.t === 'shape') {
             // Nome embaixo (BPMN): entra no contorno (seleção por área, PNG).
             if (below(it) && String(it.text || '').trim()) {
-                var fsb = shapeFs(it), ls = wrapText(it.text, labelW(it), fsb), lw = Math.max.apply(null, ls.map(function (l) { return l.length; })) * fsb * 0.55;
+                var fsb = shapeFs(it), ls = wrapText(it.text, labelW(it), fsb), lw = Math.max.apply(null, ls.map(function (l) { return textW(l, fsb); }));
                 if (/^gw/.test(it.shape)) {
                     var gl = it.x + it.w * 0.3 - lw, gt = it.y - 6 - (ls.length - 1) * fsb * 1.25 - fsb;
                     var gx0 = Math.min(it.x, gl), gy0 = Math.min(it.y, gt);
@@ -1281,8 +1324,8 @@
             return { x: bx, y: by, w: Math.max.apply(null, xs) + pd - bx, h: Math.max.apply(null, ys) + pd - by };
         }
         if (it.t === 'text') {
-            var fs = it.px || TEXT_PX[it.size] || 15, lines = String(it.text || 'Texto').split('\n');
-            var w = Math.max.apply(null, lines.map(function (l) { return l.length; })) * fs * 0.55;
+            var fs = it.px || TEXT_PX[it.size] || 15, lines = textLines(it, 'Texto');
+            var w = it.w > 0 ? it.w : Math.max.apply(null, lines.map(function (l) { return textW(l, fs); }));
             return { x: it.x, y: it.y, w: Math.max(30, w), h: lines.length * fs * 1.25 + 4 };
         }
         var lp = labelPx(it.size) + 1;
@@ -3861,7 +3904,8 @@
         var RS_CUR = { nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew' };
         function sizeHandles(it, b) {
             if (['shape', 'zone', 'text'].indexOf(it.t) < 0) { return ''; }
-            var dirs = it.t === 'text' ? ['nw', 'ne', 'se', 'sw'] : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+            // Q5k: no fluxograma o texto ganha as laterais (largura); os cantos mudam a letra.
+            var dirs = it.t === 'text' ? (flow ? ['nw', 'ne', 'e', 'se', 'sw', 'w'] : ['nw', 'ne', 'se', 'sw']) : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
             var x1 = b.x - 4, y1 = b.y - 4, x2 = b.x + b.w + 4, y2 = b.y + b.h + 4, r = 4 / view.z;
             return dirs.map(function (d) {
                 var x = d.indexOf('w') >= 0 ? x1 : d.indexOf('e') >= 0 ? x2 : (x1 + x2) / 2;
@@ -4092,7 +4136,8 @@
             } else if (flow) {
                 h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="px">' + FS_LIST.concat([36, 48]).map(function (v) { return '<option value="' + v + '"' + (v === (it.px || TEXT_PX[it.size] || 15) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
-                    + '<p class="cx-board-none">Cor, negrito, letra e camadas: na barra sobre o texto. Puxe um canto para aumentar a letra.</p>';
+                    + '<p class="cx-board-none">Cor, negrito, letra e camadas: na barra sobre o texto. Puxe um canto para aumentar a letra; puxe uma lateral para definir a largura (o texto quebra sozinho).</p>'
+                    + (it.w > 0 ? '<button type="button" class="cx-board-btn" data-textfree="1" title="Volta a quebrar só no Enter">Tirar a largura</button>' : '');
             } else {
                 h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<label class="cx-board-f"><span>Tamanho</span><select data-k="size"><option value="p"' + (it.size === 'p' ? ' selected' : '') + '>Pequeno</option>'
@@ -4162,6 +4207,12 @@
             if (!e.target.classList.contains('cx-board-lkq')) { return; }
             var q = e.target.value;
             clearTimeout(lkTimer); lkTimer = setTimeout(function () { lkSearch(q.trim()); }, 250);
+        });
+        // Q5k: "Tirar a largura" no painel do texto solto (volta a quebrar só no Enter).
+        props.addEventListener('click', function (e) {
+            if (!e.target.closest('[data-textfree]') || sel.length !== 1) { return; }
+            var it = get(sel[0]); if (!it || it.t !== 'text' || !(it.w > 0)) { return; }
+            snap(); delete it.w; render();
         });
         props.addEventListener('click', function (e) {
             var b = e.target.closest('[data-lkdoc]'); if (!b || sel.length !== 1) { return; }
@@ -4313,8 +4364,17 @@
             var mw = it.t === 'shape' ? shapeMinW(it) : 20;
             if (x2 - x1 < mw) { if (d.indexOf('w') >= 0) { x1 = x2 - mw; } else { x2 = x1 + mw; } }
             if (y2 - y1 < mw) { if (d.indexOf('n') >= 0) { y1 = y2 - mw; } else { y2 = y1 + mw; } }
+            if (it.t === 'text' && (d === 'e' || d === 'w')) {
+                // Q5k: lateral = largura; a letra fica, o texto quebra dentro.
+                it.w = Math.max(TEXT_MIN_W, Math.min(TEXT_MAX_W, Math.round(x2 - x1)));
+                it.x = d === 'w' ? x2 - it.w : x1;
+                return;
+            }
             if (it.t === 'text') {
-                it.px = Math.max(8, Math.min(96, Math.round(s0.px * (x2 - x1) / s0.w)));
+                var kz = (x2 - x1) / s0.w;
+                it.px = Math.max(8, Math.min(96, Math.round(s0.px * kz)));
+                // Com largura, o canto aumenta junto (a quebra fica igual, como no Miro).
+                if (s0.tw > 0) { it.w = Math.max(TEXT_MIN_W, Math.min(TEXT_MAX_W, Math.round(s0.tw * it.px / s0.px))); }
                 var tb = bbox(it);
                 it.x = d.indexOf('w') >= 0 ? x2 - tb.w : x1;
                 it.y = d.indexOf('n') >= 0 ? y2 - tb.h : y1;
@@ -4666,7 +4726,7 @@
             } else if (e.target.getAttribute('data-rs') && sel.length === 1) {
                 var ri = get(sel[0]), rb = coreBox(ri);
                 snap();
-                drag = { k: 'rs', id: ri.id, dir: e.target.getAttribute('data-rs'), p: p, s: { x: rb.x, y: rb.y, w: rb.w, h: rb.h, px: ri.px || TEXT_PX[ri.size] || 15 } };
+                drag = { k: 'rs', id: ri.id, dir: e.target.getAttribute('data-rs'), p: p, s: { x: rb.x, y: rb.y, w: rb.w, h: rb.h, px: ri.px || TEXT_PX[ri.size] || 15, tw: ri.t === 'text' ? ri.w || 0 : 0 } };
             } else if (e.target.getAttribute('data-lh') && sel.length === 1) {
                 var from = get(sel[0]), sd = e.target.getAttribute('data-lh');
                 drag = { k: 'link', from: from.id, side: sd, a: anchor(from, sd), cx0: e.clientX, cy0: e.clientY };
@@ -4992,6 +5052,7 @@
             var ck = SHAPES[k].color;
             var it = { id: uid(), t: 'shape', shape: k, text: '', fill: ck, line: ck, ink: ck, b: false, x: 0, y: 0, lock: false, g: '' };
             if (MK_OPTS[k]) { it.mk = MK_OPTS[k][mk] ? mk : 'none'; }
+            if (k === 'ico') { it.ico = Lucide().SVG[mk] ? mk : ICO_DEFAULT; } // Q5k: ícone pela mini-paleta
             shapeFit(it);
             it.x = p.x - it.w / 2; it.y = p.y - it.h / 2;
             if (toSide === 'o') { it.x = p.x; } else if (toSide === 'l') { it.x = p.x - it.w; }
@@ -5038,24 +5099,71 @@
             el.innerHTML = MINI.map(function (k) {
                 var ck = SHAPES[k].color, demo = shapeFit({ id: 'm', t: 'shape', shape: k, x: 2, y: 2, sz: SQUARE.indexOf(k) >= 0 ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: 'none' });
                 return '<button type="button" data-mshape="' + k + '" title="' + esc(SHAPES[k].label) + '"><svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="40" height="26">' + shapeSvg(demo, true) + '</svg></button>';
-            }).join('');
+            }).join('') + '<button type="button" class="cx-mini-more" data-mmore="1" title="Mais formas (todas, com busca)" aria-label="Mais formas">…</button>';
             el.style.left = (off.x + view.x + p.x * view.z) + 'px';
             el.style.top = (off.y + view.y + p.y * view.z) + 'px';
-            root.querySelector('.cx-board-stage').appendChild(el);
+            var stage = root.querySelector('.cx-board-stage');
+            stage.appendChild(el);
             el.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+            el.addEventListener('wheel', function (ev) { ev.stopPropagation(); }, { passive: true });
+            el.addEventListener('input', function (ev) {
+                if (ev.target.classList.contains('cx-mini-q')) { el.querySelector('.cx-mini-list').innerHTML = miniList(ev.target.value); }
+            });
             el.addEventListener('click', function (ev) {
+                if (ev.target.closest('[data-mmore]')) {
+                    // Q5k: "…" = todas as formas por seção, com busca, no lugar das 9.
+                    el.classList.add('is-full');
+                    el.innerHTML = '<input type="search" class="cx-mini-q form-control" placeholder="Buscar forma ou ícone" aria-label="Buscar forma ou ícone">'
+                        + '<div class="cx-mini-list">' + miniList('') + '</div>';
+                    // Não sair do quadro: encolhe para dentro da área visível.
+                    var sr = stage.getBoundingClientRect(), er = el.getBoundingClientRect();
+                    if (er.right > sr.right - 4) { el.style.left = Math.max(0, parseFloat(el.style.left) - (er.right - sr.right + 12)) + 'px'; }
+                    if (er.bottom > sr.bottom - 4) { el.style.top = Math.max(0, parseFloat(el.style.top) - (er.bottom - sr.bottom + 12)) + 'px'; }
+                    el.querySelector('.cx-mini-q').focus();
+                    return;
+                }
                 var b = ev.target.closest('[data-mshape]'); if (!b) { return; }
                 var from = get(fromId); miniClose(); if (!from) { return; }
                 snap();
                 // A forma nasce com o lado de frente para a origem no ponto solto.
                 var ts = Math.abs(p.x - anchor(from, side).x) > Math.abs(p.y - anchor(from, side).y) ? (p.x > anchor(from, side).x ? 'o' : 'l') : (p.y > anchor(from, side).y ? 'n' : 's');
-                var it = shapeAt(b.getAttribute('data-mshape'), '', p, ts);
+                var it = shapeAt(b.getAttribute('data-mshape'), b.getAttribute('data-mk') || '', p, ts);
                 D.items.push(it);
                 makeLink(fromId, side, it.id, ts);
                 sel = [it.id];
                 render();
             });
             mini = { el: el, from: fromId, side: side, p: p };
+        }
+        /**
+         * Q5k: lista completa da mini-paleta — as seções Fluxograma e BPMN (sem
+         * o grupo, que é moldura e não se liga) e os ícones genéricos, como na
+         * paleta lateral. Buscando, só o que bate e as seções vazias somem.
+         */
+        function miniList(q) {
+            var fq = norm(q), hit = function (t) { return !fq || norm(t).indexOf(fq) >= 0; };
+            var btn = function (key) {
+                var k = key.split(':')[0], mk = key.split(':')[1] || '', name = k === 'ico' ? icoName(mk || ICO_DEFAULT) : PRESETS[key] || SHAPES[k].label;
+                var ck = SHAPES[k].color, small = ['conn', 'offpage', 'dataobj'].indexOf(k) >= 0 || SQUARE.indexOf(k) >= 0;
+                var demo = shapeFit({ id: 'm', t: 'shape', shape: k, x: 2, y: 2, sz: small ? 'm' : 'p', text: '', fill: ck, line: ck, ink: ck, mk: mk || 'none', ico: mk || ICO_DEFAULT });
+                return '<button type="button" class="cx-mini-ic" data-mshape="' + k + '"' + (mk ? ' data-mk="' + esc(mk) + '"' : '') + ' title="' + esc(name) + '">'
+                    + '<svg viewBox="0 0 ' + (demo.w + 4) + ' ' + (demo.h + 4) + '" width="40" height="26">' + shapeSvg(demo, true) + '</svg><span>' + esc(name) + '</span></button>';
+            };
+            var h = SHAPE_GROUPS.map(function (gr) {
+                var body = '';
+                if (gr.k === 'lane') { return ''; }
+                if (gr.k === 'ico') {
+                    body = Lucide().CATS.map(function (c) {
+                        var ks = c.items.filter(function (k) { return hit(icoName(k) + ' ' + k + ' ' + c.label + ' ícone'); });
+                        return ks.length ? '<div class="cx-mini-sub">' + esc(c.label) + '</div><div class="cx-mini-grid">' + ks.map(function (k) { return btn('ico:' + k); }).join('') + '</div>' : '';
+                    }).join('');
+                } else {
+                    var ks = gr.items.filter(function (key) { return key !== 'group' && hit((PRESETS[key] || SHAPES[key.split(':')[0]].label) + ' ' + gr.label); });
+                    body = ks.length ? '<div class="cx-mini-grid">' + ks.map(btn).join('') + '</div>' : '';
+                }
+                return body ? '<div class="cx-mini-sec">' + esc(gr.label) + '</div>' + body : '';
+            }).join('');
+            return h || '<p class="cx-mini-none">Nada encontrado.</p>';
         }
 
         svg.addEventListener('wheel', function (e) {
@@ -5615,9 +5723,9 @@
         setTimeout(fit, 0);
 
         // Exposto para os testes (jsdom).
-        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
+        root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, miniOpen: miniOpen, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

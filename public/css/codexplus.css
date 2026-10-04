@@ -2644,6 +2644,16 @@ html.cx-board-open { overflow: hidden; }
     border: 1px solid #d3d1c7; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.14); transform: translate(8px, 8px); }
 .cx-mini button { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 3px; cursor: pointer; }
 .cx-mini button:hover { border-color: #d3d1c7; background: #f1efe8; }
+/* Q5k — "…" da mini-paleta: todas as formas por seção, com busca. */
+.cx-mini .cx-mini-more { font-size: 18px; line-height: 1; color: #5f5e5a; font-weight: 600; }
+.cx-mini.is-full { display: block; width: 300px; max-height: 360px; overflow: auto; padding: 8px; }
+.cx-mini.is-full .cx-mini-q { width: 100%; margin: 0 0 6px; padding: 4px 8px; font-size: .9em; position: sticky; top: 0; z-index: 1; }
+.cx-mini-sec { font-weight: 600; font-size: .85em; color: #1d2330; margin: 6px 0 2px; }
+.cx-mini-sub { font-size: .78em; color: #5f5e5a; margin: 4px 0 2px; }
+.cx-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+.cx-mini .cx-mini-ic { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.cx-mini-ic span { font-size: .68em; color: #5f5e5a; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-mini-none { margin: 6px 0; color: #5f5e5a; font-size: .85em; }
 .cx-fbar-al { padding: 3px 5px; }
 
 /* Q5h-2: link na forma (painel do quadro e leitura). */

@@ -24,6 +24,11 @@
    `type: 'marco'` (uma data, start = end, desenhado como ◆); sem `type`, é
    tarefa. Numeração automática (1, 1.1…), subir/descer, linha "hoje" e PDF
    que estica a linha do tempo quando o cronograma cabe numa folha.
+   Q7c-1 (Claudio, 04/10/2026): a primeira fase não sobe acima das tarefas
+   soltas do topo; na tela cheia a linha do tempo estica até a largura da
+   tela (nunca abaixo do padrão; fora dela e no PDF, nada muda).
+   Q7c-2: histórico das marcações (Iniciar, Concluir, Reabrir, todas) num
+   balão ao clicar no selo da Situação; vem em data-hist e na resposta.
    Q7b-3: Importar e Exportar (cópia .json `codexplus-grade` e tabela
    Markdown para levar a uma IA, de ida e volta), também na RACI.
    ========================================================================= */
@@ -447,7 +452,11 @@
             if (!src || editable) { return; }
             var el = document.getElementById(src), mp = {};
             try { mp = JSON.parse(el ? el.textContent : '{}'); } catch (e) { mp = {}; }
+            // Q7c-2: todas as marcações por tarefa ({ id: [{ acao, data, user, when }] }).
+            var he = document.getElementById(root.getAttribute('data-hist') || ''), hs = {};
+            try { hs = JSON.parse(he ? he.textContent : '{}'); } catch (e) { hs = {}; }
             ST = {
+                hist: hs && typeof hs === 'object' && !Array.isArray(hs) ? hs : {},
                 map: mp && typeof mp === 'object' && !Array.isArray(mp) ? mp : {},
                 can: root.getAttribute('data-can-mark') === '1',
                 url: root.getAttribute('data-status-url') || ''
@@ -705,7 +714,7 @@
             var h = root.parentNode && root.parentNode.querySelector('[data-cx-grid-hint]');
             if (!h || raci) { return; }
             h.textContent = dated
-                ? 'Arraste a barra ou o marco para mover e puxe as pontas da barra para mudar o início ou o fim. Numa linha sem datas, clique ou arraste na linha do tempo. Clique em tarefa, responsável, início ou fim para editar (dd/mm ou dd/mm/aaaa; mudar o início mantém a duração). A fase leva as linhas abaixo dela até a próxima fase, e o resumo dela é calculado; ▾ recolhe. Clique numa linha para selecionar: Fase, Tarefa e Marco entram logo abaixo dela. Setas ao passar o mouse sobre o nome sobem ou descem a linha.'
+                ? 'Arraste a barra ou o marco para mover e puxe as pontas da barra para mudar o início ou o fim. Numa linha sem datas, clique ou arraste na linha do tempo. Clique em tarefa, responsável, início ou fim para editar (dd/mm ou dd/mm/aaaa; mudar o início mantém a duração). A fase leva as linhas abaixo dela até a próxima fase, e o resumo dela é calculado; ▾ recolhe. Clique numa linha para selecionar: Fase, Tarefa e Marco entram logo abaixo dela. Setas ao passar o mouse sobre o nome sobem ou descem a linha (a primeira fase não sobe acima das tarefas soltas; para pôr uma tarefa solta na fase, desça a tarefa).'
                 : 'Clique na célula para trocar entre vazio, período (barra) e marco. Clique no nome de uma tarefa, responsável ou período para editar. "Usar datas" passa o cronograma para datas reais.';
         }
         /**
@@ -858,7 +867,12 @@
             }
             return out;
         }
+        // Q7c-1 (Claudio, 04/10/2026): na tela cheia a linha do tempo estica até a
+        // largura da tela (px por dia calculado depois de desenhar); nunca abaixo do
+        // padrão, que segue valendo fora dela e no PDF.
+        var pxCheia = null, passesCheia = 0;
         function gdPx(forPrint) {
+            if (!forPrint && pxCheia && cheia()) { return pxCheia; }
             return forPrint ? (S.scale === 'M' ? GD.pxMp : GD.pxSp) : (S.scale === 'M' ? GD.pxM : GD.pxS);
         }
         function gdFixed(forPrint) {
@@ -944,8 +958,11 @@
                 if (tp === 'fase') { a = e.a; b = e.b; }
                 var tem = a != null && b != null;
                 var fechada = tp === 'fase' && fechadas.has(row);
+                // Q7c-1: na primeira fase com soltas acima, sem Subir (o espaço fica, para as setas não pularem).
+                var semSubir = tp === 'fase' && soltaAcima(r, est);
                 var acts = ed ? '<span class="cx-gd-acts">' +
-                    '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="-1" title="Subir" aria-label="Subir"><i class="ti ti-arrow-up"></i></button>' +
+                    (semSubir ? '<span class="cx-gd-act" style="visibility:hidden" aria-hidden="true"><i class="ti ti-arrow-up"></i></span>'
+                        : '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="-1" title="Subir" aria-label="Subir"><i class="ti ti-arrow-up"></i></button>') +
                     '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="1" title="Descer" aria-label="Descer"><i class="ti ti-arrow-down"></i></button>' +
                     '<button type="button" class="cx-gd-act" data-del-row="' + r + '" title="Tirar ' + (tp === 'fase' ? 'fase (as linhas dela ficam)' : (tp === 'marco' ? 'marco' : 'tarefa')) + '" aria-label="Tirar"><i class="ti ti-x"></i></button></span>' : '';
                 var vazio = { fase: 'nome da fase', marco: 'nome do marco', tarefa: 'clique para nomear' }[tp];
@@ -970,7 +987,11 @@
                         '<td class="cx-gd-date cx-gd-fim"' + L('fim') + '>' + (tem ? dataCel(b, ed ? ' data-edit-end="' + r + '"' : '') : (ed ? '<span data-edit-end="' + r + '">—</span>' : '')) + '</td>';
                 }
                 if (so) {
-                    var pill = st ? '<span class="cx-gd-pill is-' + st.k + '"' + (st.tip ? ' title="' + esc(st.tip) + '"' : '') + '>' + esc(st.txt) + '</span>'
+                    // Q7c-2: na tela, o selo da tarefa abre o balão com todas as marcações.
+                    var pill = st && !forPrint && row.id
+                        ? '<button type="button" class="cx-gd-pill cx-gd-pill--hist is-' + st.k + '" data-hist-row="' + esc(row.id) + '" aria-haspopup="dialog" title="' +
+                            esc((st.tip ? st.tip + ' · ' : '') + 'Clique para ver todas as marcações') + '">' + esc(st.txt) + '</button>'
+                        : st ? '<span class="cx-gd-pill is-' + st.k + '"' + (st.tip ? ' title="' + esc(st.tip) + '"' : '') + '>' + esc(st.txt) + '</span>'
                         : sm ? '<span class="cx-gd-pill is-' + sm.k + '">' + esc(sm.txt) + '</span>'
                         : sf ? '<span class="cx-gd-fase-sit is-' + sf.k + '">' + esc(sf.txt) + '</span>' : '';
                     h += '<td class="cx-gd-sit"' + L('sit') + '>' + pill + '</td>';
@@ -1012,7 +1033,77 @@
                 '<span><b class="cx-gd-leg-marco">◆</b>Marco</span>' +
                 '<span title="Hoje, ' + br(hoje()) + '"><b class="cx-gd-leg-hoje"></b>Hoje</span>';
         }
+        /* ---------- Q7c-2: balão com o histórico das marcações (Claudio, 04/10/2026) ---------- */
+        var balao = null;
+        var ACAO_ROT = { iniciar: 'Iniciada', concluir: 'Concluída', reabrir: 'Reaberta' };
+        var ACAO_ICO = { iniciar: 'ti-player-play', concluir: 'ti-check', reabrir: 'ti-arrow-back-up' };
+        function fechaHist() {
+            if (!balao) { return; }
+            balao.remove();
+            balao = null;
+            document.removeEventListener('pointerdown', foraHist, true);
+            document.removeEventListener('keydown', escHist, true);
+            window.removeEventListener('resize', posHist);
+            document.removeEventListener('scroll', posHist, true);
+        }
+        function foraHist(e) {
+            if (balao && !balao.contains(e.target) && !e.target.closest('[data-hist-row]')) { fechaHist(); }
+        }
+        function escHist(e) {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechaHist(); }
+        }
+        /** Itens do balão, da marcação mais nova para a mais antiga. */
+        function histHtml(lista) {
+            if (!lista.length) { return '<p class="cx-gd-hist-vazio">Nenhuma marcação ainda.</p>'; }
+            return '<ol class="cx-gd-hist-l">' + lista.slice().reverse().map(function (ev) {
+                var d = dn(ev.data), tit = ACAO_ROT[ev.acao] || ev.acao;
+                if (ev.acao === 'concluir' && d != null) { tit += ' em ' + br(d); }
+                if (ev.acao === 'iniciar' && d != null) { tit += ' (início ' + br(d) + ')'; }
+                var q = quando(ev).replace(/^ /, '');
+                return '<li class="is-' + esc(ev.acao) + '"><i class="ti ' + (ACAO_ICO[ev.acao] || 'ti-point') + '" aria-hidden="true"></i>' +
+                    '<span><b>' + esc(tit) + '</b>' + (q ? '<small>' + esc(q) + '</small>' : '') + '</span></li>';
+            }).join('') + '</ol>';
+        }
+        function abreHist(btn) {
+            var id = btn.getAttribute('data-hist-row');
+            var aberto = balao && balao.getAttribute('data-row') === id;
+            fechaHist();
+            if (aberto || !ST) { return; }
+            var row = S.rows.filter(function (r) { return r.id === id; })[0];
+            var lista = (ST.hist && Array.isArray(ST.hist[id])) ? ST.hist[id] : [];
+            balao = document.createElement('div');
+            balao.className = 'cx-gd-hist';
+            balao.setAttribute('role', 'dialog');
+            balao.setAttribute('aria-label', 'Histórico das marcações');
+            balao.setAttribute('data-row', id);
+            balao.innerHTML = '<div class="cx-gd-hist-h"><span>Marcações' + (row && row.name ? ' · ' + esc(row.name) : '') + '</span>' +
+                '<button type="button" class="cx-gd-hist-x" aria-label="Fechar"><i class="ti ti-x"></i></button></div>' + histHtml(lista);
+            (document.fullscreenElement && document.fullscreenElement.contains(root) ? document.fullscreenElement : document.body).appendChild(balao);
+            posHist();
+            balao.querySelector('.cx-gd-hist-x').addEventListener('click', fechaHist);
+            document.addEventListener('pointerdown', foraHist, true);
+            document.addEventListener('keydown', escHist, true);
+            window.addEventListener('resize', posHist);
+            document.addEventListener('scroll', posHist, true);
+        }
+        /**
+         * Abaixo do selo; sem espaço, acima; nunca fora da tela na horizontal.
+         * Ao rolar (a página ou a grade), acompanha o selo; se ele sair de
+         * vista, fecha.
+         */
+        function posHist(e) {
+            if (!balao || (e && e.target && e.target.nodeType === 1 && balao.contains(e.target))) { return; }
+            var btn = root.querySelector('[data-hist-row="' + balao.getAttribute('data-row') + '"]');
+            if (!btn) { fechaHist(); return; }
+            var r = btn.getBoundingClientRect(), w = balao.offsetWidth, h = balao.offsetHeight;
+            if (r.bottom < 0 || r.top > window.innerHeight || !r.width) { fechaHist(); return; }
+            var top = r.bottom + 6;
+            if (top + h > window.innerHeight - 8 && r.top - h - 6 > 8) { top = r.top - h - 6; }
+            balao.style.top = Math.max(8, top) + 'px';
+            balao.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+        }
         function renderDated() {
+            fechaHist();
             // Ordem do mockup Q7b: Fase, Tarefa, Marco, Escala, Hoje, Desfazer … Importar, Exportar, Exportar PDF.
             var bar = '<div class="cx-grid-bar">';
             if (editable) {
@@ -1043,7 +1134,36 @@
             root.innerHTML = '<div class="cx-grid cx-grid--sched cx-grid--datas">' + bar + (stOn() ? resumoSit(gdEstrutura(), hoje()) : '') +
                 '<div class="cx-grid-wrap">' + gdTable(false) + '</div><div class="cx-grid-legend">' + gdLegend() + '</div></div>';
             rol();
+            esticaCheia();
         }
+        /**
+         * Q7c-1: mede a área visível da grade e, se o px por dia mudar, redesenha
+         * uma vez (no segundo desenho o valor já bate e para). Fora da tela cheia
+         * volta ao padrão.
+         */
+        function esticaCheia() {
+            if (!cheia()) { pxCheia = null; return; }
+            var tbl = root.querySelector('.cx-gd-table'), wrap = root.querySelector('.cx-grid-wrap');
+            if (!tbl || !wrap || !wrap.clientWidth) { return; }
+            var u = gdUnits(), dias = u[u.length - 1].s + u[u.length - 1].n - u[0].s;
+            var base = S.scale === 'M' ? GD.pxM : GD.pxS;
+            var livre = wrap.clientWidth - (+tbl.getAttribute('data-fixo')) - 1;
+            var alvo = dias > 0 ? Math.max(base, Math.floor(livre / dias * 100) / 100) : base;
+            var atual = +tbl.getAttribute('data-px');
+            pxCheia = alvo;
+            // Trava: no máximo dois redesenhos seguidos (a barra de rolagem pode sumir e mudar a largura).
+            if (Math.abs(alvo - atual) > 0.005 && passesCheia < 2) {
+                passesCheia++;
+                try { renderDated(); } finally { passesCheia--; }
+            }
+        }
+        // Janela mudou de tamanho com a tela cheia aberta: recalcula.
+        var tmResize = null;
+        window.addEventListener('resize', function () {
+            if (!dated || !cheia()) { return; }
+            clearTimeout(tmResize);
+            tmResize = setTimeout(function () { if (dated && cheia()) { render(); } }, 120);
+        });
         /** Botão Hoje: rola a linha do tempo até hoje (no meio da parte visível). */
         function vaiHoje() {
             var tbl = root.querySelector('.cx-gd-table'), wrap = root.querySelector('.cx-grid-wrap');
@@ -1085,6 +1205,10 @@
          * com o bloco vizinho); tarefa e marco trocam com a linha vizinha, e
          * passar por cima de uma fase muda a linha de fase.
          */
+        /** Q7c-1: a linha logo acima da fase i é tarefa ou marco solto (sem fase). */
+        function soltaAcima(i, est) {
+            return i > 0 && tipo(S.rows[i - 1]) !== 'fase' && est[i - 1].fase < 0;
+        }
         function moveLinha(i, dir) {
             var rows = S.rows, est = gdEstrutura();
             function bloco(k) {
@@ -1096,7 +1220,9 @@
             if (tipo(rows[i]) === 'fase') {
                 var b = bloco(i);
                 if (dir < 0) {
-                    if (i === 0) { return false; }
+                    // Q7c-1 (Claudio, 04/10/2026): a primeira fase não sobe acima das
+                    // tarefas soltas do topo (antes subia e a solta virava filha dela).
+                    if (i === 0 || soltaAcima(i, est)) { return false; }
                     var ps = est[i - 1].fase >= 0 ? est[i - 1].fase : i - 1;
                     S.rows = rows.slice(0, ps).concat(rows.slice(b[0], b[1]), rows.slice(ps, i), rows.slice(b[1]));
                 } else {
@@ -1495,6 +1621,7 @@
                         return;
                     }
                     ST.map = res.j.status && typeof res.j.status === 'object' ? res.j.status : {};
+                    if (res.j.hist && typeof res.j.hist === 'object') { ST.hist = res.j.hist; } // Q7c-2
                     marcadas = {};
                     render();
                     var n = res.j.n || 0, verbo = { iniciar: 'iniciada', concluir: 'concluída', reabrir: 'reaberta' }[acao];
@@ -1560,6 +1687,9 @@
         /* ---------- ações ---------- */
         root.addEventListener('click', function (e) {
             var t = e.target;
+            // Q7c-2: selo da Situação abre/fecha o balão do histórico.
+            var hb = dated && t.closest('[data-hist-row]');
+            if (hb) { e.preventDefault(); abreHist(hb); return; }
             // Q7b-2: recolher/mostrar fase vale na leitura também; só a tela muda.
             var fold = dated && t.closest('[data-fold]');
             if (fold) {

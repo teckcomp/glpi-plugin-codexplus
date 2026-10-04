@@ -2179,6 +2179,26 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-gd-pill.is-atrasada { background: #fcebeb; color: #a32d2d; }
 .cx-gd-pill.is-andamento { background: #e6f1fb; color: #0c447c; }
 .cx-gd-pill.is-nao { background: #f1efe8; color: #5f5e5a; font-weight: 500; }
+/* Q7c-2: selo da tarefa abre o balão com o histórico das marcações. */
+button.cx-gd-pill--hist { border: 0; cursor: pointer; font-family: inherit; }
+button.cx-gd-pill--hist:hover { filter: brightness(.95); text-decoration: underline; }
+button.cx-gd-pill--hist:focus-visible { outline: 2px solid #378add; outline-offset: 1px; }
+.cx-gd-hist { position: fixed; z-index: 1060; width: 320px; max-height: 60vh; overflow: auto; background: #fff;
+    border: 1px solid var(--cx-border, #d9dee5); border-radius: 8px; box-shadow: 0 8px 24px rgba(20, 30, 45, .16);
+    font-size: .9em; color: var(--cx-text, #1f2a37); }
+.cx-gd-hist-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--cx-border, #d9dee5);
+    font-weight: 600; position: sticky; top: 0; background: #fff; }
+.cx-gd-hist-h span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-gd-hist-x { border: 0; background: transparent; color: var(--cx-muted, #5a6575); cursor: pointer; padding: 0 2px; }
+.cx-gd-hist-l { list-style: none; margin: 0; padding: 4px 0; }
+.cx-gd-hist-l li { display: flex; gap: 8px; padding: 6px 10px; }
+.cx-gd-hist-l li + li { border-top: 1px solid #eef1f4; }
+.cx-gd-hist-l li > i { margin-top: 2px; color: #0c447c; }
+.cx-gd-hist-l li.is-concluir > i { color: #0f6e56; }
+.cx-gd-hist-l li.is-reabrir > i { color: #854f0b; }
+.cx-gd-hist-l b { display: block; font-weight: 600; }
+.cx-gd-hist-l small { display: block; color: var(--cx-muted, #5a6575); }
+.cx-gd-hist-vazio { margin: 0; padding: 10px; color: var(--cx-muted, #5a6575); }
 .cx-gd-fase-sit { font-weight: 600; font-size: .9em; color: var(--cx-muted); }
 .cx-gd-fase-sit.is-atrasada { color: #a32d2d; }
 .cx-gd-fase-sit.is-ok { color: #0f6e56; }

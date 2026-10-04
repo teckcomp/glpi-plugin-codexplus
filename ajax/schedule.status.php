@@ -68,5 +68,6 @@ return $responder([
     'ok'     => true,
     'n'      => $n,
     'status' => (object) ScheduleStatus::load($id),
+    'hist'   => (object) ScheduleStatus::history($id), // Q7c-2
     'hora'   => date('H:i'),
 ]);

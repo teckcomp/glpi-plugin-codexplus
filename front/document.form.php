@@ -677,7 +677,7 @@ if ($inRevision) {
 // Q7b-4: situação das tarefas do cronograma com datas, na LEITURA do
 // publicado (também da versão publicada durante uma revisão, e do obsoleto,
 // só para ver). Quem pode marcar: Document::canMarkSchedule().
-$schedule = ['on' => false, 'can_mark' => false, 'json' => '{}', 'url' => ''];
+$schedule = ['on' => false, 'can_mark' => false, 'json' => '{}', 'hist' => '{}', 'url' => ''];
 if ($isDiagram && !$canEdit && $diagramKind === Diagram::SUBTYPE_SCHEDULE) {
     $mostrado  = json_decode($diagramJson, true);
     $stDoc     = (string) $doc->fields['status'];
@@ -688,6 +688,11 @@ if ($isDiagram && !$canEdit && $diagramKind === Diagram::SUBTYPE_SCHEDULE) {
             'can_mark' => $stDoc !== Document::STATUS_OBSOLETE && $doc->canMarkSchedule(),
             'json'     => json_encode(
                 (object) ScheduleStatus::load($id),
+                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
+            ),
+            // Q7c-2: todas as marcações, para o balão do selo da Situação.
+            'hist'     => json_encode(
+                (object) ScheduleStatus::history($id),
                 JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE // achado 14
             ),
             'url'      => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/schedule.status.php',

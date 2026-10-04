@@ -58,6 +58,8 @@ class Install
     public const REV_EVENTS_TABLE     = 'glpi_plugin_codexplus_revisionevents';
     /** Etapa 5: documentos vinculados (pai → filho, com ordem). */
     public const DOC_LINKS_TABLE      = 'glpi_plugin_codexplus_documentlinks';
+    /** Q7c-2: histórico das marcações do cronograma (Iniciar, Concluir, Reabrir). */
+    public const SCHEDULE_EVENTS_TABLE = 'glpi_plugin_codexplus_scheduleevents';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -67,6 +69,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::SCHEDULE_EVENTS_TABLE,
             self::DOC_LINKS_TABLE,
             self::REV_EVENTS_TABLE,
             self::DOC_APPROVERS_TABLE,
@@ -221,6 +224,9 @@ class Install
 
         // --- Bloco MO-1: modelos por setor e categoria ---
         self::installMO1();
+
+        // --- Bloco Q7c-2: histórico das marcações do cronograma ---
+        self::installQ7c2();
 
         $migration->executeMigration();
         return true;
@@ -526,6 +532,55 @@ class Install
                 UNIQUE KEY `unicity` (`plugin_codexplus_documents_id`, `row_key`),
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q7b-4): erro ao criar $t");
+        }
+    }
+
+    /**
+     * Q7c-2 (Claudio, 04/10/2026): todas as marcações da situação (Iniciar,
+     * Concluir, Reabrir), não só a última, que é o que a tabela da Q7b-4
+     * guarda. Uma linha por marcação: documento, id da linha, ação, data
+     * informada (início ou conclusão), quem e quando. Mostrado no balão do
+     * selo da Situação.
+     *
+     * Tabela nova recebe, uma vez só, a situação que já existia (uma marcação
+     * por tarefa, com quem e quando da própria linha), para o balão não
+     * nascer vazio nas tarefas já marcadas.
+     */
+    private static function installQ7c2(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::SCHEDULE_EVENTS_TABLE;
+        if ($DB->tableExists($t)) {
+            return;
+        }
+        $DB->doQueryOrDie("CREATE TABLE `$t` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+            `row_key` varchar(16) NOT NULL DEFAULT '',
+            `action` varchar(16) NOT NULL DEFAULT '',
+            `date_value` date NULL DEFAULT NULL,
+            `users_id` int unsigned NOT NULL DEFAULT '0',
+            `date_creation` timestamp NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `doc_row` (`plugin_codexplus_documents_id`, `row_key`),
+            KEY `users_id` (`users_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q7c-2): erro ao criar $t");
+
+        if (!$DB->tableExists(self::SCHEDULE_TABLE)) {
+            return;
+        }
+        foreach ($DB->request(['FROM' => self::SCHEDULE_TABLE, 'ORDER' => 'id']) as $r) {
+            $feita = (string) $r['state'] === 'concluida';
+            $DB->insert($t, [
+                'plugin_codexplus_documents_id' => (int) $r['plugin_codexplus_documents_id'],
+                'row_key'       => (string) $r['row_key'],
+                'action'        => $feita ? 'concluir' : 'iniciar',
+                'date_value'    => $feita ? $r['date_done'] : $r['date_start'],
+                'users_id'      => (int) $r['users_id'],
+                'date_creation' => $r['date_mod'],
+            ]);
         }
     }
 

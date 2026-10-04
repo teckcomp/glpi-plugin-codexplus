@@ -435,6 +435,14 @@
     function decorate(editor, node) {
         var data = readData(node);
         if (!data) { return; }
+        // 3c-3: tabela que não bate com o JSON (modelo grava só o JSON e uma
+        // tabela vazia) é montada de novo a partir dele.
+        var tab = node.querySelector('table');
+        if (!tab || !tab.tHead || bodyRows(node).length !== data.rows.length) {
+            var caixa = node.ownerDocument.createElement('div');
+            caixa.innerHTML = tableHtml(data);
+            if (tab) { node.replaceChild(caixa.firstChild, tab); } else { node.appendChild(caixa.firstChild); }
+        }
         bodyRows(node).forEach(function (tr, r) {
             Array.prototype.slice.call(tr.cells).forEach(function (td, c) {
                 if (c >= data.cols.length) { return; }

@@ -207,6 +207,9 @@ class Install
         // --- Bloco A-2a: aprovadores do diagrama ---
         self::installA2a();
 
+        // --- Bloco 3c-3: modelo completo de Proposta ---
+        self::install3c3();
+
         $migration->executeMigration();
         return true;
     }
@@ -637,6 +640,39 @@ class Install
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (A-2a): erro ao criar $t");
         }
+    }
+
+    /**
+     * 3c-3 (Claudio, 04/10/2026): modelo completo de Proposta. Entra uma vez
+     * só (marcador codexplus_3c3_prp_full em glpi_configs): quem renomear ou
+     * apagar o modelo não o vê voltar a cada reinstalação. Não vira o padrão
+     * do tipo: o padrão continua sendo o que está marcado em Modelos.
+     */
+    private static function install3c3(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::TEMPLATES_TABLE;
+        if (!$DB->tableExists($t)) {
+            return;
+        }
+        $marca = 'codexplus_3c3_prp_full';
+        $ja = $DB->request(['FROM' => 'glpi_configs', 'WHERE' => ['context' => 'plugin:codexplus', 'name' => $marca]])->count() > 0;
+        if ($ja || countElementsInTable($t, ['doctype' => 'PRP', 'name' => Template::PRP_FULL_NAME]) > 0) {
+            \Config::setConfigurationValues('plugin:codexplus', [$marca => '1']);
+            return;
+        }
+        $now = $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s');
+        $DB->insert($t, [
+            'name'          => Template::PRP_FULL_NAME,
+            'doctype'       => 'PRP',
+            'content'       => Template::seedPRPFull(),
+            'is_default'    => 0,
+            'date_creation' => $now,
+            'date_mod'      => $now,
+        ]);
+        \Config::setConfigurationValues('plugin:codexplus', [$marca => '1']);
     }
 
     private static function installA2(Migration $migration): void

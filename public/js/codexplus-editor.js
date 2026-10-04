@@ -93,6 +93,7 @@
        data-cx-doctype em volta do editor (documento já criado). */
     var TOOLS_BY_TYPE = {
         cxsheet:    ['PRP', 'DIV'],
+        cxsum:      ['PRP', 'DIV'], // 3c-2: Resumo do investimento
         cxplant:    ['PRP', 'LAU', 'DTC', 'DIV'],
         cxtopology: ['LAU', 'DTC', 'DIV']
     };
@@ -577,6 +578,43 @@
         // PL1: planilha no corpo (codexplus-sheet.js). 3c-1: conteúdo editado
         // direto no documento; colunas e fórmulas pelo botão Parâmetros.
         if (window.CodexplusSheet && window.CodexplusSheet.attach) { window.CodexplusSheet.attach(editor); }
+        // Salto da página ao clicar (Claudio, 04/10/2026): quando o editor
+        // recebe o foco de volta (clicou fora e depois numa planilha, planta,
+        // topologia ou texto), o TinyMCE 7.9, no Chrome e no Safari, chama
+        // iframe.scrollIntoView({block: 'center'}) se o TOPO do iframe está
+        // fora da tela. Com o autoresize o iframe tem a altura do documento,
+        // então o topo quase sempre está fora: a página pulava para o meio
+        // do documento e o clique caía em outro lugar. Aqui o iframe só é
+        // trazido para a tela se estiver INTEIRO fora dela.
+        editor.on('init', function () {
+            var fr = editor.iframeElement;
+            if (!fr || fr.__cxNoJump) { return; }
+            fr.__cxNoJump = true;
+            var orig = fr.scrollIntoView;
+            fr.scrollIntoView = function () {
+                var r = fr.getBoundingClientRect();
+                if (r.bottom > 0 && r.top < (window.innerHeight || document.documentElement.clientHeight)) { return; }
+                return orig.apply(fr, arguments);
+            };
+            // Segundo salto, nos blocos travados (planilha, planta, topologia):
+            // com um deles selecionado, a seleção do navegador fica num
+            // contêiner invisível (.mce-offscreen-selection) e o TinyMCE dá
+            // foco ao corpo e a esse contêiner sem preventScroll — o navegador
+            // rolava a página até ele (no fim do documento). O foco continua;
+            // só não rola: quem clicou já está vendo o ponto.
+            var W = editor.getWin();
+            var P = W && W.HTMLElement && W.HTMLElement.prototype;
+            if (P && !P.__cxNoJump) {
+                P.__cxNoJump = true;
+                var foco = P.focus;
+                P.focus = function (opt) {
+                    if (this === editor.getBody() || (this.classList && this.classList.contains('mce-offscreen-selection'))) {
+                        opt = Object.assign({}, opt || {}, { preventScroll: true });
+                    }
+                    return foco.call(this, opt);
+                };
+            }
+        });
         ui.addButton('cxsheet', {
             icon: 'table-insert-column-after',
             text: 'Planilha',
@@ -584,6 +622,16 @@
             onAction: function () {
                 if (!toolAllowed('cxsheet', currentType(editor))) { return; }
                 if (window.CodexplusSheet) { window.CodexplusSheet.open(editor, null); }
+            }
+        });
+        // 3c-2: Resumo do investimento (total geral das planilhas).
+        ui.addButton('cxsum', {
+            icon: 'chart',
+            text: 'Resumo',
+            tooltip: 'Inserir o Resumo do investimento logo depois da última planilha: uma linha por planilha (nome = título acima dela) e o total geral. Atualiza sozinho.',
+            onAction: function () {
+                if (!toolAllowed('cxsum', currentType(editor))) { return; }
+                if (window.CodexplusSheet && window.CodexplusSheet.insertSummary) { window.CodexplusSheet.insertSummary(editor); }
             }
         });
         editor.on('dblclick', function (e) {
@@ -679,7 +727,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table cxsheet' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? '' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {

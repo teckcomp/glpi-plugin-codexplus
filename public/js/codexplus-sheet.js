@@ -388,7 +388,9 @@
         + '.cx-sheet-ui-add{margin-top:6px;}'
         + '.cx-sheet-ui button{font:inherit;padding:1px 10px;border:1px solid #85b7eb;border-radius:6px;'
         + 'background:#fff;color:#185fa5;cursor:pointer;}'
-        + '.cx-sheet-ui button:hover{background:#e6f1fb;}';
+        + '.cx-sheet-ui button:hover{background:#e6f1fb;}'
+        // 3c-2: Resumo do investimento (bloco travado, sem edição).
+        + '.cx-sum{outline:1px dashed #85b7eb;outline-offset:3px;margin:0 0 12px;cursor:default;}';
     var LOCK_TIP = 'Calculada: muda em Parâmetros';
     var MARK_CLASSES = ['cx-sheet-edit', 'cx-sheet-lock'];
 
@@ -468,6 +470,7 @@
         var body = editor && editor.getBody && editor.getBody();
         if (!body) { return; }
         Array.prototype.slice.call(body.querySelectorAll('div.cx-sheet')).forEach(function (n) { decorate(editor, n); });
+        refreshSummaries(body); // 3c-2: planilha nova, apagada ou com Parâmetros mudados
     }
 
     /* Valores recalculados nas células (menos a que está em edição). */
@@ -509,6 +512,7 @@
             node.setAttribute('data-cx-sheet', JSON.stringify(data));
         }
         refresh(node, data, keepText ? td : null);
+        refreshSummaries(node.ownerDocument.body); // 3c-2
         return mudou;
     }
 
@@ -556,6 +560,107 @@
         editor.undoManager.add();
     }
 
+    /* ---------------- 3c-2: Resumo do investimento ----------------
+       Claudio, 04/10/2026 (mockup aprovado): bloco automático logo depois da
+       última planilha, uma linha por planilha (nome = título ou parágrafo
+       logo acima dela, sem os dois-pontos; sem título, "Planilha N") e o
+       Total geral. Ninguém digita nele: refaz a cada tecla numa planilha,
+       ao fechar Parâmetros, ao carregar e ao gravar (PreProcess, na cópia
+       que vai para o banco). O gravado é uma tabela comum (.cx-sheet-table),
+       então leitura, PDF e Word não mudam. */
+    var SUM_CLASS = 'cx-sum';
+    function sheetValue(data) {
+        var ev = evaluate(data);
+        var somar = totalCols(data);
+        var col = somar.length ? somar[somar.length - 1] : -1;
+        if (col < 0) { return { v: 0, type: 'money' }; }
+        return { v: ev.totals[col] || 0, type: data.cols[col].type };
+    }
+    function sheetName(node, i) {
+        var el = node.previousElementSibling;
+        while (el && el.textContent.replace(/[\s\u00a0\u200b\ufeff]/g, '') === '' && !el.querySelector('table,img')) {
+            el = el.previousElementSibling;
+        }
+        if (el && !el.classList.contains('cx-sheet') && !el.classList.contains(SUM_CLASS) && !el.querySelector('table')) {
+            var t = lastLine(el).replace(/[\s:;.\-–—]+$/, '');
+            if (t) { return t.length > 90 ? t.slice(0, 87) + '…' : t; }
+        }
+        return 'Planilha ' + (i + 1);
+    }
+    /* Só a ÚLTIMA linha do bloco acima da planilha (Claudio, 04/10/2026):
+       documento colado de fora junta "AVALIAÇÃO; texto… <br> MATERIAIS…:"
+       num parágrafo só, separado por <br>. Cada <br> e cada bloco filho é
+       uma quebra de linha. */
+    function lastLine(el) {
+        var c = el.cloneNode(true);
+        Array.prototype.slice.call(c.querySelectorAll('br')).forEach(function (br) {
+            br.parentNode.replaceChild(c.ownerDocument.createTextNode('\n'), br);
+        });
+        Array.prototype.slice.call(c.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6')).forEach(function (b) {
+            b.appendChild(c.ownerDocument.createTextNode('\n'));
+        });
+        var linhas = (c.textContent || '').split('\n').map(function (l) {
+            return l.replace(/[\u00a0\u200b\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
+        }).filter(Boolean);
+        return linhas.length ? linhas[linhas.length - 1] : '';
+    }
+    function summaryTable(root) {
+        var linhas = [], total = 0, moeda = false;
+        Array.prototype.slice.call(root.querySelectorAll('div.cx-sheet')).forEach(function (n) {
+            var d = readData(n);
+            if (!d) { return; }
+            var sv = sheetValue(d);
+            if (sv.type === 'money') { moeda = true; }
+            total += sv.v;
+            linhas.push({ name: sheetName(n, linhas.length), v: sv.v, type: sv.type });
+        });
+        var h = '<table class="cx-sheet-table"><thead><tr><th>RESUMO</th><th class="cx-sheet-num">Valor</th></tr></thead><tbody>';
+        linhas.forEach(function (l, i) {
+            h += '<tr' + (i % 2 === 1 ? ' class="cx-sheet-alt"' : '') + '><td>' + esc(l.name) + '</td><td class="cx-sheet-num">' + esc(fmt(l.v, l.type)) + '</td></tr>';
+        });
+        if (!linhas.length) {
+            h += '<tr><td>Nenhuma planilha no documento.</td><td class="cx-sheet-num">&nbsp;</td></tr>';
+        }
+        h += '</tbody><tfoot><tr class="cx-sheet-total"><td class="cx-sheet-num"><strong>Total geral</strong></td>'
+            + '<td class="cx-sheet-num"><strong>' + esc(fmt(total, moeda || !linhas.length ? 'money' : 'num')) + '</strong></td></tr></tfoot></table>';
+        return h;
+    }
+    function refreshSummaries(root) {
+        if (!root || !root.querySelectorAll) { return; }
+        var sums = root.querySelectorAll('div.' + SUM_CLASS);
+        if (!sums.length) { return; }
+        var html = summaryTable(root);
+        Array.prototype.slice.call(sums).forEach(function (s) {
+            if (s.innerHTML !== html) { s.innerHTML = html; }
+        });
+    }
+    /** Botão "Resumo": põe o bloco logo depois da última planilha (ou refaz o que já existe). */
+    function insertSummary(editor) {
+        var body = editor.getBody();
+        var sheets = Array.prototype.slice.call(body.querySelectorAll('div.cx-sheet')).filter(function (n) { return !!readData(n); });
+        var existente = body.querySelector('div.' + SUM_CLASS);
+        if (existente) {
+            refreshSummaries(body);
+            existente.scrollIntoView({ block: 'center' });
+            editor.notificationManager.open({ text: 'O documento já tem o Resumo do investimento: ele se atualiza sozinho.', type: 'info', timeout: 4000 });
+            return;
+        }
+        if (!sheets.length) {
+            editor.notificationManager.open({ text: 'Insira ao menos uma planilha antes do Resumo do investimento.', type: 'warning', timeout: 5000 });
+            return;
+        }
+        var ultima = sheets[sheets.length - 1];
+        var el = editor.dom.create('div', { 'class': SUM_CLASS, contenteditable: 'false' }, '');
+        editor.dom.insertAfter(el, ultima);
+        refreshSummaries(body);
+        // Sem selecionar o bloco: a seleção falsa do TinyMCE num bloco
+        // travado engolia o clique seguinte numa célula da planilha.
+        el.scrollIntoView({ block: 'nearest' });
+        editor.setDirty(true);
+        editor.undoManager.add();
+        editor.nodeChanged();
+    }
+
     function attach(editor) {
         if (editor.__cxSheetInline) { return; }
         editor.__cxSheetInline = true;
@@ -576,7 +681,14 @@
         // Cada tecla: valor no JSON e total/calculadas refeitos na hora.
         editor.on('input', function () {
             var td = cellOf(editor.selection.getNode());
-            if (td) { editor.__cxCell = td; commit(td, true); }
+            if (td) { editor.__cxCell = td; commit(td, true); return; }
+            // 3c-2: o título acima de uma planilha é o nome dela no Resumo.
+            refreshSummaries(editor.getBody());
+        });
+        // 3c-2: planilha apagada (Delete/Backspace no bloco, recortar, desfazer).
+        editor.on('Undo Redo cut', function () { refreshSummaries(editor.getBody()); });
+        editor.on('keyup', function (e) {
+            if (e.key === 'Delete' || e.key === 'Backspace') { refreshSummaries(editor.getBody()); }
         });
         editor.on('keydown', function (e) {
             var td = cellOf(editor.selection.getNode());
@@ -611,6 +723,24 @@
             if (e.target && e.target.closest && e.target.closest('[data-cx-act]')) { e.preventDefault(); }
         });
         editor.on('click', function (e) {
+            // 3c-2: com o bloco selecionado (clique antes numa parte travada,
+            // como a coluna Total), o TinyMCE engolia o clique seguinte numa
+            // célula: o cursor ia para fora da planilha. Põe o cursor onde
+            // clicou.
+            var alvo = e.target && e.target.closest ? e.target.closest('td.cx-sheet-edit') : null;
+            if (alvo && cellOf(editor.selection.getNode()) !== alvo) {
+                var d = alvo.ownerDocument;
+                var rng = d.caretRangeFromPoint ? d.caretRangeFromPoint(e.clientX, e.clientY) : null;
+                alvo.focus();
+                if (rng && alvo.contains(rng.startContainer)) {
+                    editor.selection.setRng(rng);
+                } else {
+                    editor.selection.select(alvo, true);
+                    editor.selection.collapse(false);
+                }
+                editor.__cxCell = alvo;
+                return;
+            }
             var b = e.target && e.target.closest ? e.target.closest('[data-cx-act]') : null;
             var node = b && sheetOf(b);
             if (!node) { return; }
@@ -641,9 +771,12 @@
                     if (!td.className) { td.removeAttribute('class'); }
                 });
             });
+            // 3c-2: o Resumo gravado é refeito da cópia (nomes e totais atuais).
+            refreshSummaries(e.node);
         });
     }
 
     window.CodexplusSheet = { open: open, render: tableHtml, block: blockHtml, evaluate: evaluate, starter: starter,
-        attach: attach, decorateAll: decorateAll, parseNum: parseNum };
+        attach: attach, decorateAll: decorateAll, parseNum: parseNum,
+        insertSummary: insertSummary, summaryTable: summaryTable };
 })();

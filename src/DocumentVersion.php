@@ -134,6 +134,34 @@ class DocumentVersion
         }, $rows);
     }
 
+    /**
+     * HV-1: publicações do documento (sem corpo nem diagrama), para o
+     * Histórico.
+     *
+     * @return array<int, array{revision: int, summary: ?string, users_id: int, date_published: string}>
+     */
+    public static function listFor(int $documentId): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $out = [];
+        foreach ($DB->request([
+            'SELECT' => ['revision', 'summary', 'users_id', 'date_published'],
+            'FROM'   => self::getTable(),
+            'WHERE'  => ['plugin_codexplus_documents_id' => $documentId],
+            'ORDER'  => ['revision ASC'],
+        ]) as $r) {
+            $out[] = [
+                'revision'       => (int) $r['revision'],
+                'summary'        => $r['summary'],
+                'users_id'       => (int) $r['users_id'],
+                'date_published' => (string) ($r['date_published'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
     /** @return array<string, mixed>|null */
     public static function get(int $documentId, int $revision): ?array
     {

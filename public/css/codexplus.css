@@ -2786,6 +2786,27 @@ html.cx-board-open { overflow: hidden; }
 .cx-meta.is-closed .cx-meta-tabs,
 .cx-meta.is-closed .cx-docform-split { display: none !important; }
 
+/* HV-1 (Claudio, 04/10/2026): aba Histórico (edição) e a barra recolhida da
+   leitura (.cx-meta--hist). Lista em templates/parts/doc-history.html.twig. */
+.cx-meta[data-tab="historico"] .cx-docform-grid { display: none; }
+.cx-meta--hist { margin: 4px 0 16px; font-family: var(--cx-font); }
+.cx-hist { max-height: 420px; overflow-y: auto; }
+.cx-hist-list { list-style: none; margin: 0; padding: 0; }
+.cx-hist-row { display: grid; grid-template-columns: 112px 18px minmax(0, 1fr); gap: 8px; align-items: baseline;
+    padding: 6px 2px; border-bottom: 1px solid var(--cx-border-soft); font-size: 13px; line-height: 1.45; }
+.cx-hist-row:last-child { border-bottom: 0; }
+.cx-hist-when { color: var(--cx-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cx-hist-ico { color: var(--cx-faint); font-size: 15px; }
+.cx-hist-what { color: var(--cx-text); overflow-wrap: anywhere; }
+.cx-hist-what b { font-weight: 600; }
+.cx-hist-row--versao .cx-hist-ico { color: var(--cx-ok); }
+.cx-hist-row--revisao .cx-hist-ico { color: var(--cx-accent); }
+.cx-hist-none, .cx-hist-more { margin: 6px 2px; font-size: 13px; color: var(--cx-muted); }
+@media (max-width: 600px) {
+    .cx-hist-row { grid-template-columns: 18px minmax(0, 1fr); }
+    .cx-hist-when { grid-column: 1 / -1; }
+}
+
 /* =========================================================================
    Etapa 5b — referência no texto e Documentos complementares
    ========================================================================= */

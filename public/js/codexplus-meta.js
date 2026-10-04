@@ -10,15 +10,21 @@
        que falta.
    Ocultar usa a classe cx-tab-off (não o atributo hidden, que o
    codexplus-docform.js já usa para mostrar campos por tipo).
+   HV-1 (Claudio, 04/10/2026): a mesma barra serve à leitura, só com a aba
+   Histórico — data-default-tab (aba inicial), data-store (chave própria
+   no localStorage, recolhida na primeira vez) e data-label-open/closed
+   (texto do botão). Pode haver mais de uma barra na página.
    ========================================================================= */
 (function () {
     'use strict';
-    var KEY = 'cx-meta-open';
-
-    function read() { try { return window.localStorage.getItem(KEY); } catch (e) { return null; } }
-    function write(v) { try { window.localStorage.setItem(KEY, v); } catch (e) { /* sem storage: só nesta tela */ } }
+    function read(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+    function write(key, v) { try { window.localStorage.setItem(key, v); } catch (e) { /* sem storage: só nesta tela */ } }
 
     function init(box) {
+        var key = box.getAttribute('data-store') || 'cx-meta-open';
+        var first = box.getAttribute('data-default-tab') || 'lugar';
+        var lblOpen = box.getAttribute('data-label-open') || 'Ocultar dados';
+        var lblClosed = box.getAttribute('data-label-closed') || 'Mostrar dados';
         var isNew = box.getAttribute('data-new') === '1';
         var missing = box.getAttribute('data-missing') === '1';
         var toggle = box.querySelector('[data-cx-meta-toggle]');
@@ -39,8 +45,12 @@
         function setOpen(on, remember) {
             box.classList.toggle('is-closed', !on);
             toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
-            toggle.innerHTML = on ? '<i class="ti ti-chevron-up"></i> Ocultar dados' : '<i class="ti ti-chevron-down"></i> Mostrar dados';
-            if (remember) { write(on ? '1' : '0'); }
+            toggle.innerHTML = '';
+            var ico = document.createElement('i');
+            ico.className = 'ti ' + (on ? 'ti-chevron-up' : 'ti-chevron-down');
+            toggle.appendChild(ico);
+            toggle.appendChild(document.createTextNode(' ' + (on ? lblOpen : lblClosed)));
+            if (remember) { write(key, on ? '1' : '0'); }
         }
 
         tabs.forEach(function (b) {
@@ -48,13 +58,12 @@
         });
         toggle.addEventListener('click', function () { setOpen(box.classList.contains('is-closed'), true); });
 
-        setTab(missing && !isNew ? (box.getAttribute('data-missing-tab') || 'lugar') : 'lugar');
-        setOpen(isNew || missing || read() === '1', false);
+        setTab(missing && !isNew ? (box.getAttribute('data-missing-tab') || first) : first);
+        setOpen(isNew || missing || read(key) === '1', false);
     }
 
     function boot() {
-        var box = document.querySelector('[data-cx-meta]');
-        if (box) { init(box); }
+        Array.prototype.forEach.call(document.querySelectorAll('[data-cx-meta]'), init);
     }
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
 })();

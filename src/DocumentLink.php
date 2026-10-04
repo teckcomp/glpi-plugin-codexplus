@@ -162,13 +162,17 @@ class DocumentLink
         ]) as $r) {
             $rank = (int) ($r['m'] ?? 0);
         }
-        return (bool) $DB->insert(self::getTable(), [
+        $ok = (bool) $DB->insert(self::getTable(), [
             'parent_documents_id' => $pid,
             'child_documents_id'  => $childId,
             'rank'                => $rank + 1,
             'users_id'            => (int) Session::getLoginUserID(),
             'date_creation'       => $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s'),
         ]);
+        if ($ok) {
+            DocumentHistory::note($pid, sprintf(__('Documento vinculado: %s', 'codexplus'), self::label($child)));
+        }
+        return $ok;
     }
 
     public static function remove(Document $parent, int $childId): bool
@@ -183,10 +187,24 @@ class DocumentLink
         if (in_array($childId, self::refIds((string) ($parent->fields['content'] ?? '')), true)) {
             return self::deny(__('Este documento é citado no texto. Tire a referência do corpo (e salve) antes de desvincular.', 'codexplus'));
         }
-        return (bool) $DB->delete(self::getTable(), [
+        $ok = (bool) $DB->delete(self::getTable(), [
             'parent_documents_id' => (int) $parent->fields['id'],
             'child_documents_id'  => $childId,
         ]);
+        if ($ok && $DB->affectedRows() > 0) {
+            $child = new Document();
+            DocumentHistory::note(
+                (int) $parent->fields['id'],
+                sprintf(__('Documento desvinculado: %s', 'codexplus'), $child->getFromDB($childId) ? self::label($child) : '#' . $childId)
+            );
+        }
+        return $ok;
+    }
+
+    /** HV-1: "POP0003:01 Título" para o Histórico. */
+    private static function label(Document $d): string
+    {
+        return trim($d->getCode() . ' ' . (string) $d->fields['name']);
     }
 
     /**
@@ -207,6 +225,9 @@ class DocumentLink
         $atual = self::childIds($pid);
         $nova  = array_values(array_unique(array_intersect(array_map('intval', $childIds), $atual)));
         $nova  = array_merge($nova, array_values(array_diff($atual, $nova)));
+        if ($nova !== $atual) {
+            DocumentHistory::note($pid, __('Ordem dos documentos vinculados alterada', 'codexplus'));
+        }
         foreach ($nova as $i => $cid) {
             $DB->update(self::getTable(), ['rank' => $i + 1], [
                 'parent_documents_id' => $pid,

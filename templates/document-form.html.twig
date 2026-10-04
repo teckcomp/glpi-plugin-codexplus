@@ -319,6 +319,7 @@
                         <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="lugar">{{ __('Lugar e tipo', 'codexplus') }}</button>
                         <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="pessoas">{{ __('Pessoas e revisão', 'codexplus') }}</button>
                         {% if perm.show %}<button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="perm">{{ __('Permissões e link', 'codexplus') }}</button>{% endif %}
+                        {% if history.show %}<button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="historico"><i class="ti ti-history"></i> {{ __('Histórico', 'codexplus') }}</button>{% endif %}
                     </div>
                 {# R3b2-a: campos à esquerda, coluna "Permissões" à direita. #}
                 <div class="codexplus-doc-edit-zone cx-docform-split{{ perm.show ? ' cx-docform-split--perm' : '' }}">
@@ -410,6 +411,12 @@
                 {% if perm.show %}
                     <div data-cx-tab="perm">
                     {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token, anon: anon} only %}
+                    </div>
+                {% endif %}
+                {# HV-1: 4ª aba. #}
+                {% if history.show %}
+                    <div data-cx-tab="historico">
+                    {% include '@codexplus/parts/doc-history.html.twig' with {history: history} only %}
                     </div>
                 {% endif %}
                 </div>
@@ -551,6 +558,35 @@
            ficam dentro, mas o PDF só lê título e .codexplus-content. #}
         <article class="codexplus-doc" id="codexplus-doc">
             <h1 class="cx-docform-view-title codexplus-doc-title">{{ name }}</h1>
+            {# HV-1 (Claudio, 04/10/2026): na leitura, a mesma barra dos dados,
+               recolhida, só com a aba Histórico. O PDF só lê o título e
+               .codexplus-content (CONTEXTO, seção 6): esta barra fica fora. #}
+            {% if history.show %}
+                {% set cx_last = history.rows|first %}
+                <div class="cx-meta cx-meta--hist" data-cx-meta data-new="0" data-missing="0"
+                     data-default-tab="historico" data-store="cx-hist-open"
+                     data-label-open="{{ __('Ocultar histórico', 'codexplus') }}" data-label-closed="{{ __('Mostrar histórico', 'codexplus') }}">
+                    <div class="cx-meta-bar">
+                        <i class="ti ti-history cx-meta-ico"></i>
+                        <span class="cx-meta-item">{{ __('Histórico', 'codexplus') }}</span>
+                        {% if cx_last %}
+                            <span class="cx-meta-item"><span>{{ __('Última alteração', 'codexplus') }}</span>
+                                {{ cx_last.date|date('d/m/Y H:i') }}{% if cx_last.user %} · {{ cx_last.user }}{% endif %}</span>
+                        {% endif %}
+                        <button type="button" class="codexplus-btn cx-meta-toggle" data-cx-meta-toggle aria-expanded="false">
+                            <i class="ti ti-chevron-down"></i> {{ __('Mostrar histórico', 'codexplus') }}
+                        </button>
+                    </div>
+                    <div class="cx-meta-tabs" role="tablist">
+                        <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="historico"><i class="ti ti-history"></i> {{ __('Histórico', 'codexplus') }}</button>
+                    </div>
+                    <div class="cx-docform-split">
+                        <div data-cx-tab="historico">
+                            {% include '@codexplus/parts/doc-history.html.twig' with {history: history} only %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
             {# preview: janela "Visualizar e PDF" — só o documento, sem
                revisão periódica, Permissões nem fluxo (Claudio, 25/09/2026). #}
             <div class="cx-docform-split{{ perm.show and not preview ? ' cx-docform-split--perm' : '' }}">

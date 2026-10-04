@@ -9,7 +9,8 @@ namespace GlpiPlugin\Codexplus;
  *
  * Nenhuma regra própria: parte de Dashboard::loadAllNew(), que já aplica
  * Document::getVisibilityCriteria() e troca a revisão em andamento pela
- * versão em vigor ("em atualização"). Obsoleto e rascunho ficam fora.
+ * versão em vigor ("em atualização"). Rascunho fica fora; obsoleto, só com
+ * "Incluir obsoletos" (HV-1, para quem só lê).
  */
 final class Library
 {
@@ -25,16 +26,19 @@ final class Library
     /**
      * @return array{sectors: array<int, array{name: string, total: int, categories: array<int, array{name: string, docs: array<int, array<string, mixed>>}>}>, total: int, types: array<string, int>}
      */
-    public static function shelf(bool $allStatuses = false): array
+    public static function shelf(bool $allStatuses = false, bool $withObsolete = false): array
     {
         /** @var \DBmysql $DB */
         global $DB;
 
         // R5: quem produz vê todas as situações que a visibilidade libera
-        // (a tela filtra; padrão = publicados). Quem só lê, só publicados.
+        // (a tela filtra; padrão = publicados). Quem só lê, só publicados —
+        // e, com "Incluir obsoletos" marcado (HV-1), também os obsoletos.
         $docs = array_filter(
             Dashboard::loadAllNew(),
-            static fn ($d) => $allStatuses || $d['status'] === Document::STATUS_PUBLISHED
+            static fn ($d) => $allStatuses
+                || $d['status'] === Document::STATUS_PUBLISHED
+                || ($withObsolete && $d['status'] === Document::STATUS_OBSOLETE)
         );
 
         // Pares (setor, categoria) de cada documento; sem categoria vai para

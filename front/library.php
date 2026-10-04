@@ -34,7 +34,10 @@ if ($producer && isset($_POST['restore'])) {
 
 Wiki::pageHeader();
 
-$shelf = Library::shelf($producer);
+// HV-1: quem só lê pode incluir os obsoletos (quem produz já tem o filtro
+// de Situação, com Obsoleto).
+$obsoletos = !$producer && !empty($_GET['obsoletos']);
+$shelf = Library::shelf($producer, $obsoletos);
 $q     = trim((string) ($_GET['q'] ?? ''));
 
 // B2b (Claudio, 27/09/2026): três níveis. Sem parâmetro = nichos dos setores;
@@ -123,6 +126,7 @@ TemplateRenderer::getInstance()->display('@codexplus/library.html.twig', [
     // B2b: filtros levados de um nível para o outro.
     'tipo'      => (string) ($_GET['tipo'] ?? ''),
     'meus'      => !empty($_GET['meus']),
+    'obsoletos' => $obsoletos,
     'self'      => $self,
     'csrf'      => Session::getNewCSRFToken(),
     'can_templates' => Session::haveRight(Rights::NAME, Rights::TEMPLATES),

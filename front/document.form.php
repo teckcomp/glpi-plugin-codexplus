@@ -32,6 +32,7 @@ use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\DocumentContributor;
 use GlpiPlugin\Codexplus\DocumentApprover;
 use GlpiPlugin\Codexplus\DocumentEditor;
+use GlpiPlugin\Codexplus\DocumentHistory;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
 use GlpiPlugin\Codexplus\DocumentMeta;
@@ -1109,7 +1110,16 @@ if ($id > 0 && isset($_GET['composite']) && !$isDiagram) {
     ));
 }
 
+// HV-1 (Claudio, 04/10/2026): Histórico — 4ª aba dos dados na edição; na
+// leitura, a mesma barra recolhida só com ele. Quem tem papel, Super-Admin
+// e Ver todos (Document::canSeeHistory). Fora da janela Visualizar e PDF.
+$history = ['show' => false, 'rows' => [], 'more' => false, 'limit' => DocumentHistory::LIMIT];
+if (!$isNew && !$preview && $doc->canSeeHistory()) {
+    $history = ['show' => true, 'limit' => DocumentHistory::LIMIT] + DocumentHistory::entries($doc);
+}
+
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
+    'history'     => $history,
     'brand'       => $brandField,
     'signers_line' => $signersLine,
     'glpi_root'   => $CFG_GLPI['root_doc'],

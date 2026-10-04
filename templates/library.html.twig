@@ -17,8 +17,10 @@
    de planta (até 3, papel quase preto #2A0A0E, etiqueta na cor do DIA).
    Variáveis: shelf (sectors, total, types, status), level (mode, sector,
    category), niches, decor, new_url, doctypes, client_types, producer,
-   can_templates, statuses, trash, me, q, situacao, tipo, meus, self, csrf,
-   form_url.
+   can_templates, statuses, trash, me, q, situacao, tipo, meus, obsoletos,
+   self, csrf, form_url.
+   HV-1 (Claudio, 04/10/2026): quem só lê tem "Incluir obsoletos" (recarrega
+   com ?obsoletos=1, levado de nível para nível como os outros filtros).
    Estilos em public/css/codexplus.css, seção 21. #}
 {% macro spine(d, doctypes, statuses, form_url, me, fic) %}
     {% set cx_draft = d.status in ['rascunho', 'aprovacao', 'validacao'] %}
@@ -81,6 +83,7 @@
                 <i class="ti ti-search"></i>
                 <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
                        aria-label="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}">
+                {% if obsoletos %}<input type="hidden" name="obsoletos" value="1">{% endif %}
             </form>
         {% else %}
             <label class="cx-lib-search">
@@ -101,6 +104,8 @@
                 </button>
             </div>
             <label class="cx-lib-mine"><input type="checkbox" data-cx-lib-mine{{ meus ? ' checked' : '' }}> {{ __('Só os meus (responsável)', 'codexplus') }}</label>
+        {% else %}
+            <label class="cx-lib-mine"><input type="checkbox" data-cx-lib-obs{{ obsoletos ? ' checked' : '' }}> {{ __('Incluir obsoletos', 'codexplus') }}</label>
         {% endif %}
         {% if not cx_niche_mode %}
             <div class="cx-lib-types cx-lib-views" role="group" aria-label="{{ __('Vista', 'codexplus') }}">
@@ -203,7 +208,7 @@
                                     {{ doctypes[d.doctype] ?? d.doctype }}
                                     {% if d.client_name and d.doctype in client_types %} · {{ d.client_name }}{% endif %}
                                 </span>
-                                {% if producer and d.status != 'publicado' %}
+                                {% if d.status != 'publicado' and (producer or d.status == 'obsoleto') %}
                                     <span class="cx-lib-tag">{{ statuses[d.status] ?? d.status }}</span>
                                 {% endif %}
                                 {% if d.in_revision %}
@@ -270,6 +275,8 @@
     var stBtn = root.querySelector('[data-cx-lib-st].is-active');
     var st = stBtn ? stBtn.getAttribute('data-cx-lib-st') : '';
     var mine = root.querySelector('[data-cx-lib-mine]');
+    // HV-1: "Incluir obsoletos" (só quem lê). Muda o que o servidor manda: recarrega.
+    var obs = root.querySelector('[data-cx-lib-obs]');
     var lixo = root.querySelector('[data-cx-lib-trash]');
     var grade = root.querySelector('[data-cx-lib-niches]');
     function passa(el, termo) {
@@ -286,6 +293,7 @@
         if (st && st !== 'lixeira') { p.push('situacao=' + encodeURIComponent(st)); }
         if (tipo) { p.push('tipo=' + encodeURIComponent(tipo)); }
         if (mine && mine.checked) { p.push('meus=1'); }
+        if (obs && obs.checked) { p.push('obsoletos=1'); }
         function junta(b) { return p.length ? b + (b.indexOf('?') >= 0 ? '&' : '?') + p.join('&') : b; }
         root.querySelectorAll('[data-cx-lib-nav]').forEach(function (a) { a.setAttribute('href', junta(a.getAttribute('data-base'))); });
         root.querySelectorAll('.cx-lib-niche[data-href]').forEach(function (n) { n.setAttribute('data-href', junta(n.getAttribute('data-base'))); });
@@ -364,6 +372,13 @@
     vista(salva);
     if (!nichos) { q.addEventListener('input', aplica); }
     if (mine) { mine.addEventListener('change', aplica); }
+    if (obs) {
+        obs.addEventListener('change', function () {
+            var u = new URL(window.location.href);
+            if (obs.checked) { u.searchParams.set('obsoletos', '1'); } else { u.searchParams.delete('obsoletos'); }
+            window.location.href = u.toString();
+        });
+    }
     root.querySelectorAll('[data-cx-lib-st]').forEach(function (b) {
         b.addEventListener('click', function () {
             st = b.getAttribute('data-cx-lib-st');

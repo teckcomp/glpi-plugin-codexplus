@@ -1,0 +1,31 @@
+{# HV-1 (Claudio, 04/10/2026): lista do Histórico do documento.
+   Variável: history (rows: date, user, what, kind; more; limit).
+   Montada em DocumentHistory::entries(): glpi_logs, publicações e eventos
+   da revisão, do mais recente para o mais antigo. #}
+{% set cx_ico = {
+    'campo':   'ti-pencil',
+    'nota':    'ti-point',
+    'ligacao': 'ti-link',
+    'versao':  'ti-circle-check',
+    'revisao': 'ti-refresh'
+} %}
+<div class="cx-hist" data-cx-hist>
+    {% if history.rows is empty %}
+        <p class="cx-hist-none">{{ __('Nenhuma alteração registrada ainda.', 'codexplus') }}</p>
+    {% else %}
+        <ol class="cx-hist-list">
+            {% for r in history.rows %}
+                <li class="cx-hist-row cx-hist-row--{{ r.kind }}">
+                    <span class="cx-hist-when">{{ r.date ? r.date|date('d/m/Y H:i') : '—' }}</span>
+                    <i class="ti {{ cx_ico[r.kind] ?? 'ti-point' }} cx-hist-ico" aria-hidden="true"></i>
+                    <span class="cx-hist-what">
+                        {% if r.user %}<b>{{ r.user }}</b> · {% endif %}{{ r.what }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ol>
+        {% if history.more %}
+            <p class="cx-hist-more">{{ __('Mostrando as %d alterações mais recentes.', 'codexplus')|format(history.limit) }}</p>
+        {% endif %}
+    {% endif %}
+</div>

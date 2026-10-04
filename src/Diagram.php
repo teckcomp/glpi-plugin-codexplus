@@ -226,6 +226,8 @@ class Diagram
             return false;
         }
         $DB->update(self::getTable(), ['data' => $json, 'subtype' => $subtype, 'date_mod' => $now], ['id' => (int) $current['id']]);
+        // HV-1: o desenho não está no glpi_logs; fica a marca no Histórico.
+        DocumentHistory::note($documentId, __('Diagrama alterado', 'codexplus'));
         return true;
     }
 

@@ -179,6 +179,19 @@ class Document extends CommonDBTM
         return self::bit(Rights::VIEWALL);
     }
 
+    /**
+     * HV-1: quem vê o Histórico — quem tem papel no documento (autor,
+     * responsável, revisor, auditor, aprovador), o Super-Admin e quem tem
+     * Ver todos. Leitor comum, não.
+     */
+    public function canSeeHistory(): bool
+    {
+        if (empty($this->fields['id']) || !$this->checkEntity(true)) {
+            return false;
+        }
+        return Rights::isSuperAdmin() || self::hasViewAll() || $this->hasRole() || $this->isOwner();
+    }
+
     // ---------------------------------------------------------------------
     // Camada 2 — papéis no plugin
     // ---------------------------------------------------------------------
@@ -652,7 +665,13 @@ class Document extends CommonDBTM
             'anon_hits'     => 0,
             'anon_last'     => null,
         ], ['id' => (int) $this->fields['id']]);
+        $teve = !empty($this->fields['anon_token']);
         $this->getFromDB((int) $this->fields['id']);
+        if ($ok) {
+            DocumentHistory::note((int) $this->fields['id'], $teve
+                ? __('Link público trocado (o anterior deixou de abrir)', 'codexplus')
+                : __('Link público gerado', 'codexplus'));
+        }
         return (bool) $ok;
     }
 
@@ -669,6 +688,9 @@ class Document extends CommonDBTM
             'anon_token' => null, 'anon_users_id' => 0, 'anon_date' => null, 'anon_hits' => 0, 'anon_last' => null,
         ], ['id' => (int) $this->fields['id']]);
         $this->getFromDB((int) $this->fields['id']);
+        if ($ok) {
+            DocumentHistory::note((int) $this->fields['id'], __('Link público revogado', 'codexplus'));
+        }
         return (bool) $ok;
     }
 
@@ -1993,6 +2015,10 @@ class Document extends CommonDBTM
                 (int) $this->fields['revision'],
                 (int) Session::getLoginUserID()
             );
+        }
+        // HV-1: corpo, marca, prazo e o que mais o GLPI não registra.
+        if ($history) {
+            DocumentHistory::logUpdate($this);
         }
         parent::post_updateItem($history);
     }

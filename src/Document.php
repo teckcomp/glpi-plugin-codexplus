@@ -2047,6 +2047,7 @@ class Document extends CommonDBTM
         DocumentVersion::purgeDocument((int) $this->fields['id']);
         ScheduleStatus::purgeDocument((int) $this->fields['id']);
         RevisionEvent::purgeDocument((int) $this->fields['id']);
+        DocumentLink::purgeDocument((int) $this->fields['id']);
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */

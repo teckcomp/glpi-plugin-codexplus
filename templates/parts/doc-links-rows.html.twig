@@ -1,0 +1,28 @@
+{# Etapa 5a — linhas da lista "Documentos vinculados" (recursiva: netos em
+   cinza). Variáveis: rows (DocumentLink::tree), top, can_manage. #}
+        {% for r in rows %}
+            <li class="cx-link{{ top ? ' is-top' : ' is-sub' }}" {% if top and can_manage %}draggable="true" data-cx-link="{{ r.id }}"{% endif %}
+                style="--cx-depth: {{ r.depth }}">
+                {% if top and can_manage %}<i class="ti ti-grip-vertical cx-link-grip" title="{{ __('Arraste para reordenar', 'codexplus') }}"></i>{% endif %}
+                {% if r.can_view %}
+                    <a class="cx-link-code cx-code-type-{{ r.type }}" href="?id={{ r.id }}">{{ r.code }}</a>
+                    <a class="cx-link-name" href="?id={{ r.id }}">{{ r.name }}</a>
+                {% else %}
+                    <span class="cx-link-code">{{ r.code }}</span>
+                    <span class="cx-link-name">{{ r.name }}</span>
+                {% endif %}
+                <span class="cx-link-flags">
+                    {% if not r.can_view %}<span class="cx-link-flag">{{ __('sem acesso', 'codexplus') }}</span>{% endif %}
+                    {% if r.state == 'obsoleto' %}<span class="cx-link-flag is-danger">{{ __('obsoleto', 'codexplus') }}</span>
+                    {% elseif r.state == 'vencido' %}<span class="cx-link-flag is-danger">{{ __('vencido', 'codexplus') }}</span>
+                    {% elseif r.state == 'sem_publicacao' %}<span class="cx-link-flag">{{ __('sem versão publicada', 'codexplus') }}</span>{% endif %}
+                    {% if top and r.children|length %}<span class="cx-link-count">{{ r.children|length }} {{ r.children|length == 1 ? __('vinculado', 'codexplus') : __('vinculados', 'codexplus') }}</span>{% endif %}
+                </span>
+                {% if top and can_manage %}
+                    <button type="submit" form="cx-links-form" name="link_del" value="{{ r.id }}" class="cx-link-del"
+                            title="{{ __('Desvincular', 'codexplus') }}" aria-label="{{ __('Desvincular', 'codexplus') }} {{ r.code }}"
+                            onclick="return confirm('{{ __('Desvincular este documento?', 'codexplus')|e('js') }}');"><i class="ti ti-x"></i></button>
+                {% endif %}
+            </li>
+            {% if r.children %}{% include '@codexplus/parts/doc-links-rows.html.twig' with {rows: r.children, top: false, can_manage: can_manage} only %}{% endif %}
+        {% endfor %}

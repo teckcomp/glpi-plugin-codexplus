@@ -576,6 +576,39 @@
     {% endif %}
 
 
+    {# Etapa 5a: documentos vinculados (PSG → POP/DIA, POP → MAN/DIA, MAN → DIA).
+       Fora de #codexplus-doc: é gestão, não vai para o PDF (o PDF composto
+       é a 5d). Netos aparecem em cinza, só para conferência. #}
+    {% if links is not null %}
+        <section class="cx-links" data-cx-links data-search="{{ links.search_url }}">
+            <h2 class="codexplus-attachments-title"><i class="ti ti-hierarchy-2"></i> {{ __('Documentos vinculados', 'codexplus') }}</h2>
+            {% if links.tree %}
+                <ul class="cx-links-list" data-cx-links-list>
+                    {% include '@codexplus/parts/doc-links-rows.html.twig' with {rows: links.tree, top: true, can_manage: links.can_manage} only %}
+                </ul>
+            {% else %}
+                <p class="cx-perm-empty">{{ __('Nenhum documento vinculado.', 'codexplus') }}</p>
+            {% endif %}
+            {% if links.can_manage %}
+                <form method="post" action="{{ self }}" id="cx-links-form" class="cx-links-add">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="id" value="{{ id }}">
+                    <input type="hidden" name="child_id" value="" data-cx-link-child>
+                    <input type="hidden" name="link_order" value="" data-cx-link-order disabled>
+                    <div class="cx-links-search">
+                        <input type="search" class="form-control" data-cx-link-q autocomplete="off"
+                               placeholder="{{ __('Buscar %s por código ou título', 'codexplus')|format(links.types) }}">
+                        <ul class="cx-links-results" data-cx-link-results hidden></ul>
+                    </div>
+                    <button type="submit" name="link_add" value="1" class="codexplus-btn" data-cx-link-add disabled>
+                        <i class="ti ti-plus"></i> {{ __('Vincular', 'codexplus') }}
+                    </button>
+                </form>
+                <div class="codexplus-form-hint">{{ __('Arraste para reordenar. Os documentos em cinza vêm dos vinculados e mudam na página deles. Vale na hora, sem revisão.', 'codexplus') }}</div>
+            {% endif %}
+        </section>
+    {% endif %}
+
     {# R3b3-1: anexos. FORA de #codexplus-doc de propósito: anexo é link de
        download, não vai para o PDF (decisão de 19/09/2026; imagem no PDF só
        em proposta, Etapa 3c). Tirar: só quem edita, em rascunho. #}

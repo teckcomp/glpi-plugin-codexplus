@@ -2730,3 +2730,30 @@ html.cx-board-open { overflow: hidden; }
 .cx-public-files { max-width: 826px; margin: 0 auto 24px; }
 .cx-public-files h2 { font-size: 1.05em; margin: 0 0 6px; }
 .cx-public-files ul { margin: 0; padding-left: 18px; }
+
+/* =========================================================================
+   Etapa 5a — documentos vinculados
+   ========================================================================= */
+.cx-links { max-width: 900px; margin: 0 auto 18px; }
+.cx-links-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.cx-link { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--cx-border); border-radius: 8px; background: var(--cx-surface, #fff); }
+.cx-link.is-sub { margin-left: calc(28px * var(--cx-depth)); background: transparent; color: var(--cx-muted); border-style: dashed; }
+.cx-link.is-sub a { color: var(--cx-muted); }
+.cx-link.is-dragging { opacity: .5; }
+.cx-link.is-over { border-color: var(--cx-accent); box-shadow: 0 0 0 2px var(--cx-accent-soft); }
+.cx-link-grip { color: var(--cx-muted); cursor: grab; }
+.cx-link-code { font-family: 'IBM Plex Mono', monospace; font-size: .9em; text-decoration: none; }
+.cx-link-name { text-decoration: none; color: inherit; }
+.cx-link-flags { margin-left: auto; display: flex; gap: 6px; align-items: center; font-size: .85em; color: var(--cx-muted); }
+.cx-link-flag { padding: 1px 6px; border-radius: 6px; background: var(--cx-neutral-bg); }
+.cx-link-flag.is-danger { background: var(--cx-danger-bg); color: var(--cx-danger); }
+.cx-link-del { border: 0; background: transparent; color: var(--cx-muted); cursor: pointer; padding: 2px 4px; }
+.cx-link-del:hover { color: var(--cx-danger); }
+.cx-links-add { display: flex; gap: 8px; align-items: flex-start; }
+.cx-links-search { position: relative; flex: 1; }
+.cx-links-results { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px; list-style: none;
+    background: #fff; border: 1px solid var(--cx-border); border-radius: 8px; max-height: 280px; overflow: auto; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.cx-links-results button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.cx-links-results button:hover { background: var(--cx-accent-soft); }
+.cx-links-results small { color: var(--cx-muted); }
+.cx-links-results .is-empty { padding: 6px 8px; color: var(--cx-muted); }

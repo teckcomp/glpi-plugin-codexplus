@@ -56,6 +56,8 @@ class Install
     public const DOC_APPROVERS_TABLE  = 'glpi_plugin_codexplus_documentapprovers';
     /** R6-b: eventos da revisão (aberta, prorrogada, sem alteração, cancelada). */
     public const REV_EVENTS_TABLE     = 'glpi_plugin_codexplus_revisionevents';
+    /** Etapa 5: documentos vinculados (pai → filho, com ordem). */
+    public const DOC_LINKS_TABLE      = 'glpi_plugin_codexplus_documentlinks';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -65,6 +67,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::DOC_LINKS_TABLE,
             self::REV_EVENTS_TABLE,
             self::DOC_APPROVERS_TABLE,
             self::BRANDS_TABLE,
@@ -211,6 +214,7 @@ class Install
         self::installA2a();
         self::installR6b($migration);
         self::installR7($migration);
+        self::installE5();
 
         $migration->executeMigration();
         return true;
@@ -689,6 +693,29 @@ class Install
         $migration->addField($doc, 'anon_hits', 'integer');
         $migration->addField($doc, 'anon_last', 'timestamp');
         $migration->addKey($doc, 'anon_token');
+    }
+
+    /** Etapa 5 (Claudio, 04/10/2026): documentos vinculados. */
+    private static function installE5(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::DOC_LINKS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `parent_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `child_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `rank` int unsigned NOT NULL DEFAULT '0',
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `pair` (`parent_documents_id`, `child_documents_id`),
+                KEY `child_documents_id` (`child_documents_id`),
+                KEY `users_id` (`users_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Etapa 5): erro ao criar $t");
+        }
     }
 
     private static function installA2(Migration $migration): void

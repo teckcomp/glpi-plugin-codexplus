@@ -219,6 +219,16 @@ if ($id > 0) {
     }
 }
 
+// Etapa 5a: busca de documentos para vincular (JSON, chamada pela tela).
+if ($id > 0 && isset($_GET['link_search'])) {
+    if (!\GlpiPlugin\Codexplus\DocumentLink::canManage($doc)) {
+        return new \Symfony\Component\HttpFoundation\JsonResponse(['erro' => 'sem_acesso'], 403);
+    }
+    return new \Symfony\Component\HttpFoundation\JsonResponse([
+        'itens' => \GlpiPlugin\Codexplus\DocumentLink::candidates($doc, (string) ($_GET['q'] ?? '')),
+    ]);
+}
+
 // -------------------------------------------------------------------------
 // POST — duplicar (R3b2-b, parte 2)
 // Documento NOVO, com código novo, a partir deste: título, categorias,
@@ -531,6 +541,16 @@ if ($id > 0) {
     } elseif (isset($_POST['cancel_revision'])) {
         $flow = static fn () => $doc->cancelRevision();
         $okMsg = __('Revisão cancelada: o documento voltou à versão publicada.', 'codexplus');
+    } elseif (isset($_POST['link_add'])) {
+        // Etapa 5a
+        $flow = static fn () => \GlpiPlugin\Codexplus\DocumentLink::add($doc, (int) ($_POST['child_id'] ?? 0));
+        $okMsg = __('Documento vinculado.', 'codexplus');
+    } elseif (isset($_POST['link_del'])) {
+        $flow = static fn () => \GlpiPlugin\Codexplus\DocumentLink::remove($doc, (int) $_POST['link_del']);
+        $okMsg = __('Documento desvinculado.', 'codexplus');
+    } elseif (isset($_POST['link_order'])) {
+        $flow = static fn () => \GlpiPlugin\Codexplus\DocumentLink::reorder($doc, array_map('intval', explode(',', (string) $_POST['link_order'])));
+        $okMsg = __('Ordem dos documentos vinculados gravada.', 'codexplus');
     } elseif (isset($_POST['anon_generate'])) {
         // R7
         $flow = static fn () => $doc->anonGenerate();
@@ -1060,6 +1080,15 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'date_validated'     => $version['on'] ? $version['date'] : ($isNew ? '' : (string) ($doc->fields['date_validated'] ?? '')),
     'widgets'     => $widgets,
     'perm'        => $perm,
+    // Etapa 5a: documentos vinculados (só tipos que aceitam filhos).
+    'links'       => (!$isNew && !$version['on'] && !$preview
+        && \GlpiPlugin\Codexplus\DocumentLink::canHaveChildren((string) $doc->fields['doctype'])
+        && ($doc->hasRole() || Session::haveRight(Rights::NAME, Rights::VIEWALL) || \GlpiPlugin\Codexplus\DocumentLink::canManage($doc))) ? [
+        'tree'       => \GlpiPlugin\Codexplus\DocumentLink::tree($id),
+        'can_manage' => \GlpiPlugin\Codexplus\DocumentLink::canManage($doc),
+        'types'      => implode(', ', \GlpiPlugin\Codexplus\DocumentLink::ALLOWED[(string) $doc->fields['doctype']]),
+        'search_url' => $self . '?id=' . $id . '&link_search=1',
+    ] : null,
     // R7: seção "Acesso anônimo" da coluna Permissões (só para quem gere o link).
     'anon'        => (!$isNew && $doc->canManageAnonymous()) ? [
         'on'    => !empty($doc->fields['anon_token']),

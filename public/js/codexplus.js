@@ -276,6 +276,15 @@
             + (geo.marginBottom + geo.footerH) + 'px;}'
             + '.cx-page:last-child{page-break-after:auto;}'
             + '.cx-page-content{width:' + geo.contentW + 'px;}'
+            // 3c-0-2: bloco que embrulha outro (div.cx-sheet > table, a
+            // planilha) deixava a margem do filho "vazar" para fora dele, e
+            // essa margem não entrava na altura medida — a planilha da
+            // PRP0006 ainda invadia o rodapé. flow-root segura a margem do
+            // filho dentro do bloco, na medição e na folha (mesma regra nos
+            // dois lugares). Só em div/p/blockquote: em table e lista mudaria
+            // o desenho.
+            + '#cx-stage>div,#cx-stage>p,#cx-stage>blockquote,'
+            + '.cx-page-content>div,.cx-page-content>p,.cx-page-content>blockquote{display:flow-root;}'
             // 0.5.8: cabeçalho corrido aprovado em 19/09/2026 — título
             // pequeno de um lado, logo do outro, filete embaixo. Altura fixa
             // (capacidade de página constante, achado 17); excesso cortado.
@@ -293,7 +302,10 @@
             + 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
             + 'border-top:1px solid #d1d5db;padding-top:6px;'
             + 'font-size:8.5pt;color:#6b7280;}'
-            + '.cx-page-footer-left{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'
+            // 3c-0 (04/10/2026): a identificação quebra em até duas linhas,
+            // em vez de ser cortada com reticências ("Atualizado em 02/10…").
+            + '.cx-page-footer-left{min-width:0;font-size:8pt;line-height:1.25;overflow:hidden;'
+            + 'display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}'
             + '.cx-page-footer-right{flex:0 0 auto;font-weight:600;}';
     }
 
@@ -469,40 +481,163 @@
     /**
      * Fatia #cx-stage em folhas .cx-page e substitui o <body> pelo
      * resultado. Cada filho direto de #cx-stage é um bloco atômico —
-     * nunca é partido no meio (é assim que ".cx-step" e tabela não saem
-     * cortados, por construção, sem precisar de regra própria por tipo de
-     * bloco: quem nunca deve ser separado do que vem em seguida já entra
-     * como um único elemento em #cx-stage).
+     * nunca é partido no meio (passo, tabela, planilha e quadro não saem
+     * cortados).
      *
-     * LIMITE CONHECIDO: um bloco isolado mais alto que a área útil de uma
-     * página inteira (uma tabela ou imagem enorme) ainda assim vai sozinho
-     * para sua própria página e pode transbordar visualmente para a folha
-     * seguinte — não há como evitar isso sem partir o bloco, o que fere a
-     * regra "não partir passo nem tabela no meio". Documento comum (POP,
-     * proposta, manual) não chega perto desse caso.
+     * 3c-0 (04/10/2026, Claudio: "o enquadramento e a sobreposição estão
+     * em todos os documentos"):
+     *  - ALTURA COM MARGENS. getBoundingClientRect() não conta a margem;
+     *    cada parágrafo (9 px), título (26 px) e tabela (12 px) ficava fora
+     *    da conta, e o último bloco da página invadia o rodapé. Agora soma
+     *    margem de cima e de baixo (folga de poucos px onde as margens se
+     *    juntam — nunca invade).
+     *  - TÍTULO NÃO FICA SOZINHO no pé da página: desce junto com o bloco
+     *    seguinte. Conta como título h1–h6, o bloco do título do documento e
+     *    o parágrafo curto todo em negrito (como os documentos são escritos
+     *    hoje: "Planta", "MATERIAIS E MÃO DE OBRA PARA REDE:").
+     *  - LEGENDA ACOMPANHA O QUADRO (Q3b): quadro e legenda vão juntos.
+     *  - BLOCO MAIOR QUE A PÁGINA (ou quadro + legenda que não cabem numa
+     *    folha): as imagens do grupo são reduzidas, todas na mesma
+     *    proporção, até caber — no máximo até 35% do tamanho; abaixo disso,
+     *    transborda como antes.
+     *  - Parágrafo vazio não abre página (não empurra o conteúdo para baixo).
      */
     function layoutPages(idoc, cfg, geo) {
         var stage = idoc.getElementById('cx-stage');
         if (!stage) {
             return 1;
         }
+        var win = idoc.defaultView || window;
 
-        var blocks  = Array.prototype.slice.call(stage.children);
-        var heights = blocks.map(function (el) {
-            return el.getBoundingClientRect().height;
-        });
+        var blocks = Array.prototype.slice.call(stage.children);
+        var n = blocks.length;
+
+        function outerH(el) {
+            var cs = win.getComputedStyle(el);
+            return el.getBoundingClientRect().height
+                + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+        }
+        function text(el) {
+            return (el.textContent || '').replace(/\u00a0/g, ' ').trim();
+        }
+        var MEDIA = 'img,table,svg,hr,canvas,iframe,video';
+        function isBlank(el) {
+            return !text(el) && !/^(IMG|TABLE|SVG|HR)$/.test(el.tagName) && !el.querySelector(MEDIA);
+        }
+        function isHeadingLike(el) {
+            if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('cx-heading')) {
+                return true;
+            }
+            if (el.tagName !== 'P' || el.querySelector(MEDIA)) {
+                return false;
+            }
+            var t = text(el);
+            if (!t || t.length > 150) {
+                return false;
+            }
+            var c = el.cloneNode(true);
+            var bold = c.querySelectorAll('strong,b');
+            for (var k = 0; k < bold.length; k++) {
+                if (bold[k].parentNode) { bold[k].parentNode.removeChild(bold[k]); }
+            }
+            return !text(c);
+        }
+        function hasBoard(el) {
+            return el.classList.contains('cx-board') || !!el.querySelector('.cx-board');
+        }
+        function isLegend(el) {
+            return !hasBoard(el)
+                && (el.classList.contains('cx-board-legend') || !!el.querySelector('.cx-board-legend'));
+        }
+
+        var heights = blocks.map(outerH);
+        // 3c-0-2: folga de 8 px na capacidade da folha — arredondamento de
+        // fonte entre a medição e a impressão não pode encostar no rodapé.
+        var capH = geo.contentH - 8;
+
+        // Fim do grupo que começa em i (blocos que vão juntos para a página).
+        function groupEnd(i) {
+            var j = i;
+            var pending = isHeadingLike(blocks[i]);
+            while (pending && j + 1 < n) {
+                j++;
+                if (isBlank(blocks[j])) { continue; }
+                pending = isHeadingLike(blocks[j]);
+            }
+            if (hasBoard(blocks[j])) {
+                var k = j + 1;
+                while (k < n && isBlank(blocks[k])) { k++; }
+                if (k < n && isLegend(blocks[k])) { j = k; }
+            }
+            return j;
+        }
+        function sumH(a, b) {
+            var t = 0;
+            for (var k = a; k <= b; k++) { t += heights[k]; }
+            return t;
+        }
+        // Reduz as imagens do grupo, todas na mesma proporção, para tirar
+        // `excess` px de altura. 3c-0-3: antes só a maior encolhia, e um
+        // parágrafo com duas fotos (separadas por Shift+Enter) não cabia
+        // nunca (DTC0005). Mínimo de 35% do tamanho; abaixo disso, desiste.
+        function shrink(a, b, excess) {
+            var imgs = [], total = 0;
+            for (var k = a; k <= b; k++) {
+                var list = blocks[k].querySelectorAll('img');
+                for (var m = 0; m < list.length; m++) {
+                    var r = list[m].getBoundingClientRect();
+                    if (r.height > 0) { imgs.push([list[m], r.width, r.height]); total += r.height; }
+                }
+            }
+            if (!total) { return false; }
+            var f = (total - excess) / total;
+            if (f < 0.35) { return false; }
+            for (var q = 0; q < imgs.length; q++) {
+                imgs[q][0].style.width = Math.floor(imgs[q][1] * f) + 'px';
+                imgs[q][0].style.height = 'auto';
+                imgs[q][0].style.maxWidth = '100%';
+            }
+            for (var k2 = a; k2 <= b; k2++) { heights[k2] = outerH(blocks[k2]); }
+            return true;
+        }
 
         var pages = [[]];
         var used  = 0;
-        for (var i = 0; i < blocks.length; i++) {
-            var h = heights[i];
-            if (pages[pages.length - 1].length > 0 && (used + h) > geo.contentH) {
+        var i = 0;
+        while (i < n) {
+            var empty = pages[pages.length - 1].length === 0;
+            // Parágrafo vazio não abre página nem começa uma.
+            if (isBlank(blocks[i]) && (empty || used + heights[i] > capH)) {
+                i++;
+                continue;
+            }
+            var j = groupEnd(i);
+            var gh = sumH(i, j);
+            if (gh > capH) {
+                // Grupo maior que uma folha: tenta reduzir a imagem.
+                if (!shrink(i, j, gh - capH + 1)) {
+                    // Não deu: só a regra antiga, bloco a bloco.
+                    j = i;
+                    if (heights[i] > capH) { shrink(i, i, heights[i] - capH + 1); }
+                }
+                gh = sumH(i, j);
+            }
+            if (!empty && (used + gh) > capH) {
                 pages.push([]);
                 used = 0;
             }
-            pages[pages.length - 1].push(blocks[i]);
-            used += h;
+            for (var k = i; k <= j; k++) {
+                pages[pages.length - 1].push(blocks[k]);
+            }
+            used += gh;
+            i = j + 1;
         }
+
+        // Folha que ficou só com parágrafos vazios sai.
+        pages = pages.filter(function (pg) {
+            return pg.some(function (el) { return !isBlank(el); });
+        });
+        if (!pages.length) { pages = [[]]; }
 
         var total = pages.length;
         var frag  = idoc.createDocumentFragment();

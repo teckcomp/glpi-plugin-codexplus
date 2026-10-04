@@ -19,6 +19,11 @@
    (início, fim, dias corridos) e arrastando a barra (mover; alças nas
    pontas). Sem `mode`, o cronograma antigo abre exatamente como antes; o
    botão "Usar datas" converte (Desfazer volta).
+   Q7b-2: linhas de tipo `type: 'fase'` (sem datas; resumo calculado das
+   linhas abaixo dela até a próxima fase; ▾ recolhe só na tela) e
+   `type: 'marco'` (uma data, start = end, desenhado como ◆); sem `type`, é
+   tarefa. Numeração automática (1, 1.1…), subir/descer, linha "hoje" e PDF
+   que estica a linha do tempo quando o cronograma cabe numa folha.
    ========================================================================= */
 (function () {
     'use strict';
@@ -109,10 +114,14 @@
             if (!ESCALAS[S.scale]) { S.scale = 'S'; }
             if (!Array.isArray(S.rows)) { S.rows = []; }
             S.rows = S.rows.filter(function (r) { return r && typeof r === 'object'; }).map(function (r) {
+                var nm = String(r.name || ''), ow = String(r.owner || '');
+                // Q7b-2: fase não guarda datas (o resumo é calculado); marco tem uma data só.
+                if (r.type === 'fase') { return { type: 'fase', name: nm, owner: ow }; }
                 var a = dn(r.start), b = dn(r.end);
                 if (a == null || b == null) { a = b = (a == null ? b : a); }
                 if (a != null && b < a) { var t = a; a = b; b = t; }
-                return { name: String(r.name || ''), owner: String(r.owner || ''), start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
+                if (r.type === 'marco') { return { type: 'marco', name: nm, owner: ow, start: a == null ? '' : iso(a), end: a == null ? '' : iso(a) }; }
+                return { name: nm, owner: ow, start: a == null ? '' : iso(a), end: b == null ? '' : iso(b) };
             });
         }
         function snapshot() { hist.push(ser()); if (hist.length > 50) { hist.shift(); } }
@@ -173,6 +182,9 @@
             inp.value = atual;
             el.textContent = '';
             el.appendChild(inp);
+            // Q7b-2: célula em edição (esconde os botões da linha; o render tira a marca).
+            var tdEd = el.closest('td');
+            if (tdEd) { tdEd.classList.add('is-editando'); }
             inp.focus();
             inp.select();
             var feito = false;
@@ -273,7 +285,10 @@
                 '<div class="cx-grid-wrap">' + tableHtml(false) + '</div><div class="cx-grid-legend">' + legendHtml() + '</div></div>';
         }
 
-        /* =================== Q7b-1: cronograma com datas =================== */
+        /* =========== Q7b-1/Q7b-2: cronograma com datas (tarefas, fases e marcos) =========== */
+        // Fases recolhidas: só na tela (não vai para o JSON nem dispara salvamento).
+        var fechadas = new WeakSet();
+        function tipo(r) { return r && (r.type === 'fase' || r.type === 'marco') ? r.type : 'tarefa'; }
         function avisa(t) {
             var el = root.querySelector('.cx-gd-msg');
             if (!el) { return; }
@@ -287,8 +302,33 @@
             var h = root.parentNode && root.parentNode.querySelector('[data-cx-grid-hint]');
             if (!h || raci) { return; }
             h.textContent = dated
-                ? 'Arraste a barra para mover a tarefa e puxe as pontas para mudar o início ou o fim. Numa tarefa sem datas, clique ou arraste na linha do tempo para criar a barra. Clique em tarefa, responsável, início, fim ou dias para editar (datas em dd/mm/aaaa; mudar o início mantém a duração).'
+                ? 'Arraste a barra ou o marco para mover e puxe as pontas da barra para mudar o início ou o fim. Numa linha sem datas, clique ou arraste na linha do tempo. Clique em tarefa, responsável, início, fim ou dias para editar (datas em dd/mm/aaaa; mudar o início mantém a duração). A fase leva as linhas abaixo dela até a próxima fase, e o resumo dela é calculado; ▾ recolhe. Setas ao passar o mouse sobre o nome sobem ou descem a linha.'
                 : 'Clique na célula para trocar entre vazio, período (barra) e marco. Clique no nome de uma tarefa, responsável ou período para editar. "Usar datas" passa o cronograma para datas reais.';
+        }
+        /**
+         * Q7b-2: a fase leva as linhas abaixo dela até a próxima fase.
+         * num = numeração automática (1, 1.1…); fase = índice da fase dona
+         * (-1 = solta); a/b da fase = do primeiro início ao último fim das
+         * linhas dela (tarefas e marcos).
+         */
+        function gdEstrutura() {
+            var out = [], top = 0, sub = 0, faseAtual = -1;
+            S.rows.forEach(function (r, i) {
+                var t = tipo(r);
+                if (t === 'fase') {
+                    top++; sub = 0; faseAtual = i;
+                    out.push({ num: String(top), fase: -1, a: null, b: null });
+                    return;
+                }
+                if (faseAtual >= 0) { sub++; out.push({ num: top + '.' + sub, fase: faseAtual }); } else { top++; out.push({ num: String(top), fase: -1 }); }
+                var a = dn(r.start), b = dn(r.end);
+                if (faseAtual >= 0 && a != null && b != null) {
+                    var f = out[faseAtual];
+                    f.a = f.a == null ? a : Math.min(f.a, a);
+                    f.b = f.b == null ? b : Math.max(f.b, b);
+                }
+            });
+            return out;
         }
         /** Colunas da linha do tempo: semanas (segunda a domingo) ou meses, com folga no fim. */
         function gdUnits() {
@@ -337,47 +377,90 @@
         function gdFixed(forPrint) {
             return forPrint ? GD.pName + GD.pOwner + 2 * GD.pDate + GD.pDays : GD.name + GD.owner + 2 * GD.date + GD.days;
         }
-        function gdTable(forPrint, uFrom, uTo) {
-            var units = gdUnits();
+        /** Linhas que aparecem: as de fase recolhida somem (tela e PDF). */
+        function gdVisiveis(est) {
+            var v = [];
+            S.rows.forEach(function (row, r) {
+                if (est[r].fase >= 0 && fechadas.has(S.rows[est[r].fase])) { return; }
+                v.push(r);
+            });
+            return v;
+        }
+        function gdTable(forPrint, uFrom, uTo, pxF) {
+            var units = gdUnits(), est = gdEstrutura();
             uFrom = uFrom || 0;
             uTo = uTo == null ? units.length : uTo;
             var ed = editable && !forPrint;
-            var px = gdPx(forPrint);
+            var px = pxF || gdPx(forPrint);
             var t0 = units[uFrom].s, t1 = units[uTo - 1].s + units[uTo - 1].n, tw = (t1 - t0) * px;
             var wn = forPrint ? GD.pName : GD.name, wo = forPrint ? GD.pOwner : GD.owner;
             var wd = forPrint ? GD.pDate : GD.date, wy = forPrint ? GD.pDays : GD.days;
-            var seps = '', heads = '';
+            var seps = '', heads = '', hj = hoje();
             for (var k = uFrom; k < uTo; k++) {
                 var l = (units[k].s - t0) * px;
                 if (k > uFrom) { seps += '<i class="cx-gd-sep" style="left:' + l + 'px"></i>'; }
                 heads += '<span class="cx-gd-unit" title="' + esc(units[k].tip) + '" style="left:' + l + 'px;width:' + (units[k].n * px) + 'px">' + esc(units[k].label) + '</span>';
             }
+            // Q7b-2: linha "hoje" (só quando hoje cai neste trecho da linha do tempo).
+            var hojeX = (hj >= t0 && hj < t1) ? (hj - t0) * px + px / 2 : null;
+            var hojeL = hojeX == null ? '' : '<i class="cx-gd-hoje" style="left:' + hojeX + 'px"></i>';
+            var hojeH = hojeX == null ? '' : hojeL + '<span class="cx-gd-hoje-rot" style="left:' + hojeX + 'px" title="Hoje, ' + br(hj) + '" aria-label="Hoje, ' + br(hj) + '"></span>';
             var h = '<table class="cx-grid-table cx-gd-table" data-t0="' + t0 + '" data-px="' + px + '" style="width:' + (wn + wo + 2 * wd + wy + tw) + 'px"><colgroup>' +
                 '<col style="width:' + wn + 'px"><col style="width:' + wo + 'px"><col style="width:' + wd + 'px"><col style="width:' + wd + 'px">' +
                 '<col style="width:' + wy + 'px"><col style="width:' + tw + 'px"></colgroup>' +
                 '<thead><tr><th class="cx-grid-name">Tarefa</th><th class="cx-grid-owner">Responsável</th><th class="cx-gd-date">Início</th>' +
                 '<th class="cx-gd-date">Fim</th><th class="cx-gd-days" title="Dias corridos, do início ao fim">Dias</th>' +
-                '<th class="cx-gd-head"><div class="cx-gd-scale" style="width:' + tw + 'px">' + gdBands(t0, t1, px) + heads + seps + '</div></th></tr></thead><tbody>';
-            S.rows.forEach(function (row, r) {
+                '<th class="cx-gd-head"><div class="cx-gd-scale" style="width:' + tw + 'px">' + gdBands(t0, t1, px) + heads + seps + hojeH + '</div></th></tr></thead><tbody>';
+            function barra(a, b, cls, extra, attrs) {
+                var s0 = Math.max(a, t0), e0 = Math.min(b + 1, t1);
+                if (e0 <= s0) { return ''; }
+                return '<div class="' + cls + (a < t0 ? ' is-corta-i' : '') + (b + 1 > t1 ? ' is-corta-f' : '') + '"' + (attrs || '') +
+                    ' style="left:' + ((s0 - t0) * px) + 'px;width:' + ((e0 - s0) * px) + 'px">' + (extra || '') + '</div>';
+            }
+            gdVisiveis(est).forEach(function (r) {
+                var row = S.rows[r], tp = tipo(row), e = est[r];
                 var a = dn(row.start), b = dn(row.end);
+                if (tp === 'fase') { a = e.a; b = e.b; }
                 var tem = a != null && b != null;
-                h += '<tr><td class="cx-grid-name"><span' + (ed ? ' data-edit-name="' + r + '"' : '') + '>' +
-                    (row.name ? esc(row.name) : (ed ? '<em>clique para nomear</em>' : '')) + '</span>' +
-                    (ed ? '<button type="button" class="cx-grid-del" data-del-row="' + r + '" title="Tirar tarefa" aria-label="Tirar tarefa"><i class="ti ti-x"></i></button>' : '') + '</td>' +
-                    '<td class="cx-grid-owner"><span' + (ed ? ' data-edit-owner="' + r + '"' : '') + '>' + esc(row.owner || (ed ? '—' : '')) + '</span></td>' +
-                    '<td class="cx-gd-date"><span' + (ed ? ' data-edit-start="' + r + '"' : '') + '>' + (tem ? br(a) : (ed ? '—' : '')) + '</span></td>' +
-                    '<td class="cx-gd-date"><span' + (ed ? ' data-edit-end="' + r + '"' : '') + '>' + (tem ? br(b) : (ed ? '—' : '')) + '</span></td>' +
-                    '<td class="cx-gd-days"><span' + (ed ? ' data-edit-days="' + r + '"' : '') + '>' + (tem ? (b - a + 1) : (ed ? '—' : '')) + '</span></td>' +
-                    '<td class="cx-gd-track' + (tem ? '' : ' is-vazia') + '" data-r="' + r + '"><div class="cx-gd-lane" style="width:' + tw + 'px">' + seps;
-                if (tem) {
-                    var s0 = Math.max(a, t0), e0 = Math.min(b + 1, t1);
-                    if (e0 > s0) {
-                        h += '<div class="cx-gd-barra' + (a < t0 ? ' is-corta-i' : '') + (b + 1 > t1 ? ' is-corta-f' : '') + '" data-r="' + r + '"' +
-                            ' title="' + esc((row.name ? row.name + ': ' : '') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')') + '"' +
-                            ' style="left:' + ((s0 - t0) * px) + 'px;width:' + ((e0 - s0) * px) + 'px">' +
-                            (ed ? '<span class="cx-gd-alca is-i" data-h="i" title="Mudar o início"></span><span class="cx-gd-alca is-f" data-h="f" title="Mudar o fim"></span>' : '') +
-                            '</div>';
+                var fechada = tp === 'fase' && fechadas.has(row);
+                var acts = ed ? '<span class="cx-gd-acts">' +
+                    '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="-1" title="Subir" aria-label="Subir"><i class="ti ti-arrow-up"></i></button>' +
+                    '<button type="button" class="cx-gd-act" data-mv="' + r + '" data-dir="1" title="Descer" aria-label="Descer"><i class="ti ti-arrow-down"></i></button>' +
+                    '<button type="button" class="cx-gd-act" data-del-row="' + r + '" title="Tirar ' + (tp === 'fase' ? 'fase (as linhas dela ficam)' : (tp === 'marco' ? 'marco' : 'tarefa')) + '" aria-label="Tirar"><i class="ti ti-x"></i></button></span>' : '';
+                var vazio = { fase: 'nome da fase', marco: 'nome do marco', tarefa: 'clique para nomear' }[tp];
+                h += '<tr class="cx-gd-r-' + tp + (e.fase >= 0 ? ' cx-gd-r-filha' : '') + '">' +
+                    // Caixa flexível: ▾ e número no tamanho deles, o nome (ou o campo
+                    // de edição) com o resto da largura — sem isso o campo de 100%
+                    // era empurrado para fora da célula.
+                    '<td class="cx-grid-name"><div class="cx-gd-nome">' +
+                    (tp === 'fase' && !forPrint ? '<button type="button" class="cx-gd-fold" data-fold="' + r + '" aria-expanded="' + (fechada ? 'false' : 'true') + '" title="' + (fechada ? 'Mostrar as linhas da fase' : 'Recolher a fase') + '">' + (fechada ? '▸' : '▾') + '</button>' : '') +
+                    '<span class="cx-gd-num">' + e.num + '</span>' +
+                    '<span class="cx-gd-txt"' + (ed ? ' data-edit-name="' + r + '"' : '') + '>' + (row.name ? esc(row.name) : (ed ? '<em>' + vazio + '</em>' : '')) + '</span></div>' + acts + '</td>' +
+                    '<td class="cx-grid-owner"><span' + (ed ? ' data-edit-owner="' + r + '"' : '') + '>' + esc(row.owner || (ed ? '—' : '')) + '</span></td>';
+                if (tp === 'fase') {
+                    h += '<td class="cx-gd-date cx-gd-calc">' + (tem ? br(a) : '') + '</td><td class="cx-gd-date cx-gd-calc">' + (tem ? br(b) : '') + '</td>' +
+                        '<td class="cx-gd-days cx-gd-calc">' + (tem ? (b - a + 1) : '') + '</td>';
+                } else if (tp === 'marco') {
+                    h += '<td class="cx-gd-date"><span' + (ed ? ' data-edit-start="' + r + '"' : '') + '>' + (tem ? br(a) : (ed ? '—' : '')) + '</span></td>' +
+                        '<td class="cx-gd-date"></td><td class="cx-gd-days" title="Marco: uma data só"><span class="cx-gd-marco-ico">◆</span></td>';
+                } else {
+                    h += '<td class="cx-gd-date"><span' + (ed ? ' data-edit-start="' + r + '"' : '') + '>' + (tem ? br(a) : (ed ? '—' : '')) + '</span></td>' +
+                        '<td class="cx-gd-date"><span' + (ed ? ' data-edit-end="' + r + '"' : '') + '>' + (tem ? br(b) : (ed ? '—' : '')) + '</span></td>' +
+                        '<td class="cx-gd-days"><span' + (ed ? ' data-edit-days="' + r + '"' : '') + '>' + (tem ? (b - a + 1) : (ed ? '—' : '')) + '</span></td>';
+                }
+                h += '<td class="cx-gd-track' + (tem || tp === 'fase' ? '' : ' is-vazia') + (tp === 'fase' ? ' is-fase' : '') + '" data-r="' + r + '"><div class="cx-gd-lane" style="width:' + tw + 'px">' + seps + hojeL;
+                if (tem && tp === 'fase') {
+                    h += barra(a, b, 'cx-gd-fase-barra', '', ' title="' + esc((row.name ? row.name + ': ' : 'Fase: ') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')') + '"');
+                } else if (tem && tp === 'marco') {
+                    if (a >= t0 && a < t1) {
+                        var mx = (a - t0) * px + px / 2;
+                        h += '<div class="cx-gd-marco" data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : 'Marco: ') + br(a)) + '" style="left:' + mx + 'px"></div>' +
+                            '<span class="cx-gd-marco-data" style="left:' + mx + 'px">' + brCurto(a) + '</span>';
                     }
+                } else if (tem) {
+                    h += barra(a, b, 'cx-gd-barra',
+                        ed ? '<span class="cx-gd-alca is-i" data-h="i" title="Mudar o início"></span><span class="cx-gd-alca is-f" data-h="f" title="Mudar o fim"></span>' : '',
+                        ' data-r="' + r + '" title="' + esc((row.name ? row.name + ': ' : '') + br(a) + ' a ' + br(b) + ' (' + dias(b - a + 1) + ')') + '"');
                 }
                 h += '</div></td></tr>';
             });
@@ -385,24 +468,33 @@
             return h;
         }
         function gdResumo() {
-            var lo = null, hi = null, n = 0;
+            var lo = null, hi = null, nt = 0, nm = 0;
             S.rows.forEach(function (r) {
-                var a = dn(r.start), b = dn(r.end);
-                if (a == null || b == null) { return; }
-                n++;
+                var tp = tipo(r), a = dn(r.start), b = dn(r.end);
+                if (tp === 'fase' || a == null || b == null) { return; }
+                if (tp === 'marco') { nm++; } else { nt++; }
                 lo = lo == null ? a : Math.min(lo, a);
                 hi = hi == null ? b : Math.max(hi, b);
             });
-            if (!n) { return 'Nenhuma tarefa com datas ainda.'; }
-            return n + (n === 1 ? ' tarefa' : ' tarefas') + ' de ' + br(lo) + ' a ' + br(hi) + ' (' + dias(hi - lo + 1) + ')';
+            if (!nt && !nm) { return 'Nenhuma tarefa com datas ainda.'; }
+            var partes = [];
+            if (nt) { partes.push(nt + (nt === 1 ? ' tarefa' : ' tarefas')); }
+            if (nm) { partes.push(nm + (nm === 1 ? ' marco' : ' marcos')); }
+            return partes.join(' e ') + ', de ' + br(lo) + ' a ' + br(hi) + ' (' + dias(hi - lo + 1) + ')';
         }
         function gdLegend() {
-            return '<span><b class="cx-sched-b"></b>Tarefa, do início ao fim (dias corridos)</span><span class="cx-gd-resumo">' + esc(gdResumo()) + '</span>';
+            return '<span><b class="cx-sched-b"></b>Tarefa, do início ao fim (dias corridos)</span>' +
+                '<span><b class="cx-gd-leg-fase"></b>Fase (resumo calculado)</span>' +
+                '<span><b class="cx-gd-leg-marco">◆</b>Marco</span>' +
+                '<span><b class="cx-gd-leg-hoje"></b>Hoje (' + br(hoje()) + ')</span>' +
+                '<span class="cx-gd-resumo">' + esc(gdResumo()) + '</span>';
         }
         function renderDated() {
             var bar = '<div class="cx-grid-bar"' + (editable ? '' : ' hidden') + '>';
             if (editable) {
                 bar += '<button type="button" class="codexplus-btn" data-act="row"><i class="ti ti-row-insert-bottom"></i> Tarefa</button>' +
+                    '<button type="button" class="codexplus-btn" data-act="fase"><i class="ti ti-folder"></i> Fase</button>' +
+                    '<button type="button" class="codexplus-btn" data-act="marco"><i class="ti ti-diamond"></i> Marco</button>' +
                     '<select class="cx-gd-escala form-select" aria-label="Colunas da linha do tempo">' +
                     Object.keys(ESCALAS).map(function (u) { return '<option value="' + u + '"' + (S.scale === u ? ' selected' : '') + '>' + ESCALAS[u] + '</option>'; }).join('') +
                     '</select>' +
@@ -418,11 +510,48 @@
             // Redesenhar não pode jogar a linha do tempo de volta para o começo.
             if (sx) { root.querySelector('.cx-grid-wrap').scrollLeft = sx; }
         }
-        function novaTarefa() {
+        /** Linha nova no fim: tarefa logo depois da última data; marco no último fim; fase sem datas. */
+        function novaLinha(tp) {
+            if (tp === 'fase') { return { type: 'fase', name: '', owner: '' }; }
             var ult = null;
             S.rows.forEach(function (r) { var b = dn(r.end); if (b != null) { ult = ult == null ? b : Math.max(ult, b); } });
+            if (tp === 'marco') {
+                var m = ult == null ? hoje() : ult;
+                return { type: 'marco', name: '', owner: '', start: iso(m), end: iso(m) };
+            }
             var a = ult == null ? hoje() : ult + 1;
             return { name: '', owner: '', start: iso(a), end: iso(a + 6) };
+        }
+        /**
+         * Q7b-2: subir/descer. A fase leva as linhas dela junto (troca de lugar
+         * com o bloco vizinho); tarefa e marco trocam com a linha vizinha, e
+         * passar por cima de uma fase muda a linha de fase.
+         */
+        function moveLinha(i, dir) {
+            var rows = S.rows, est = gdEstrutura();
+            function bloco(k) {
+                if (tipo(rows[k]) !== 'fase') { return [k, k + 1]; }
+                var j = k + 1;
+                while (j < rows.length && tipo(rows[j]) !== 'fase') { j++; }
+                return [k, j];
+            }
+            if (tipo(rows[i]) === 'fase') {
+                var b = bloco(i);
+                if (dir < 0) {
+                    if (i === 0) { return false; }
+                    var ps = est[i - 1].fase >= 0 ? est[i - 1].fase : i - 1;
+                    S.rows = rows.slice(0, ps).concat(rows.slice(b[0], b[1]), rows.slice(ps, i), rows.slice(b[1]));
+                } else {
+                    if (b[1] >= rows.length) { return false; }
+                    var nb = bloco(b[1]);
+                    S.rows = rows.slice(0, b[0]).concat(rows.slice(nb[0], nb[1]), rows.slice(b[0], b[1]), rows.slice(nb[1]));
+                }
+                return true;
+            }
+            var j2 = i + dir;
+            if (j2 < 0 || j2 >= rows.length) { return false; }
+            var t = rows[i]; rows[i] = rows[j2]; rows[j2] = t;
+            return true;
         }
         /** Edição da data na tabela. Devolve texto (motivo) quando recusa. */
         function gravaData(r, campo, v) {
@@ -441,6 +570,7 @@
             }
             var d = parseBr(v);
             if (d == null) { return 'Data inválida: use dd/mm/aaaa.'; }
+            if (tipo(row) === 'marco') { row.start = row.end = iso(d); return; }
             if (campo === 'start') {
                 // Mudar o início leva a tarefa junto (a duração fica).
                 var dur = (a != null && b != null) ? b - a : 0;
@@ -452,11 +582,15 @@
             if (d < a) { return 'O fim não pode ser antes do início (' + br(a) + ').'; }
             row.end = iso(d);
         }
-        /** Cronograma antigo -> datas: cada tarefa vira barra do 1º ao último período marcado. */
+        /**
+         * Cronograma antigo -> datas: cada tarefa vira barra do 1º ao último
+         * período marcado; linha só com marcos vira marco no fim do último
+         * período marcado (Q7b-2).
+         */
         function converte() {
             var seg = hoje() - diaSemana(hoje());
             var txt = window.prompt('Usar datas reais. Data de início da primeira coluna (' + (S.periods[0] || '') + '), em dd/mm/aaaa.\n' +
-                'Cada tarefa vira uma barra do primeiro ao último período marcado. Desfazer volta ao formato atual.', br(seg));
+                'Cada tarefa vira uma barra do primeiro ao último período marcado; linha só com marco vira marco. Desfazer volta ao formato atual.', br(seg));
             if (txt == null) { return; }
             var ini = parseBr(txt);
             if (ini == null) { window.alert('Data inválida: use dd/mm/aaaa.'); return; }
@@ -469,8 +603,12 @@
             S = {
                 kind: 'cronograma', mode: 'datas', scale: u === 'S' ? 'S' : 'M',
                 rows: S.rows.map(function (row) {
-                    var i = -1, j = -1;
-                    (row.cells || []).forEach(function (v, c) { if (v) { if (i < 0) { i = c; } j = c; } });
+                    var i = -1, j = -1, temB = false;
+                    (row.cells || []).forEach(function (v, c) { if (v) { if (i < 0) { i = c; } j = c; } if (v === 'b') { temB = true; } });
+                    if (i >= 0 && !temB) {
+                        var m = iso(inicio(j + 1) - 1);
+                        return { type: 'marco', name: row.name || '', owner: row.owner || '', start: m, end: m };
+                    }
                     return {
                         name: row.name || '', owner: row.owner || '',
                         start: i < 0 ? '' : iso(inicio(i)), end: i < 0 ? '' : iso(inicio(j + 1) - 1)
@@ -479,7 +617,7 @@
             };
             changed();
         }
-        /** Arrastar: mover a barra, puxar as alças, ou desenhar a barra numa tarefa sem datas. */
+        /** Arrastar: mover barra ou marco, puxar as alças, ou criar na linha sem datas. */
         root.addEventListener('pointerdown', function (e) {
             if (!dated || !editable || e.button !== 0) { return; }
             var track = e.target.closest('.cx-gd-track');
@@ -487,9 +625,10 @@
             var tbl = track.closest('.cx-gd-table');
             var t0 = +tbl.getAttribute('data-t0'), px = +tbl.getAttribute('data-px');
             var r = +track.getAttribute('data-r'), row = S.rows[r];
-            if (!row) { return; }
+            if (!row || tipo(row) === 'fase') { return; }
+            var marco = tipo(row) === 'marco';
             var lane = track.querySelector('.cx-gd-lane');
-            var bar = e.target.closest('.cx-gd-barra');
+            var bar = e.target.closest('.cx-gd-barra,.cx-gd-marco');
             var a = dn(row.start), b = dn(row.end), modo;
             if (bar) {
                 var al = e.target.closest('[data-h]');
@@ -507,9 +646,11 @@
             if (modo === 'novo') { ns = ne = d0; }
             if (!bar) {
                 bar = document.createElement('div');
-                bar.className = 'cx-gd-barra';
+                bar.className = marco ? 'cx-gd-marco' : 'cx-gd-barra';
                 lane.appendChild(bar);
             }
+            var rot = lane.querySelector('.cx-gd-marco-data');
+            if (rot) { rot.remove(); }
             bar.classList.add('is-arrastando');
             bar.classList.remove('is-corta-i', 'is-corta-f');
             var tip = document.createElement('div');
@@ -517,10 +658,16 @@
             lane.appendChild(tip);
             var tr = track.parentNode;
             function pinta() {
-                bar.style.left = ((ns - t0) * px) + 'px';
-                bar.style.width = ((ne - ns + 1) * px) + 'px';
-                tip.style.left = ((ns - t0) * px) + 'px';
-                tip.textContent = br(ns) + ' a ' + br(ne) + ' · ' + dias(ne - ns + 1);
+                if (marco) {
+                    bar.style.left = ((ns - t0) * px + px / 2) + 'px';
+                    tip.style.left = ((ns - t0) * px) + 'px';
+                    tip.textContent = br(ns);
+                } else {
+                    bar.style.left = ((ns - t0) * px) + 'px';
+                    bar.style.width = ((ne - ns + 1) * px) + 'px';
+                    tip.style.left = ((ns - t0) * px) + 'px';
+                    tip.textContent = br(ns) + ' a ' + br(ne) + ' · ' + dias(ne - ns + 1);
+                }
                 // A tabela acompanha o arrasto.
                 var c;
                 if ((c = tr.querySelector('[data-edit-start]'))) { c.textContent = br(ns); }
@@ -533,6 +680,7 @@
                 if (modo === 'mover') { ns = a + d; ne = b + d; }
                 else if (modo === 'i') { ns = Math.min(a + d, b); ne = b; }
                 else if (modo === 'f') { ne = Math.max(b + d, a); ns = a; }
+                else if (marco) { ns = ne = diaX(ev.clientX); }
                 else { var dx = diaX(ev.clientX); ns = Math.min(d0, dx); ne = Math.max(d0, dx); }
                 pinta();
             }
@@ -578,6 +726,15 @@
         /* ---------- ações ---------- */
         root.addEventListener('click', function (e) {
             var t = e.target;
+            // Q7b-2: recolher/mostrar fase vale na leitura também; só a tela muda.
+            var fold = dated && t.closest('[data-fold]');
+            if (fold) {
+                e.preventDefault();
+                var fr = S.rows[+fold.getAttribute('data-fold')];
+                if (fr) { if (fechadas.has(fr)) { fechadas.delete(fr); } else { fechadas.add(fr); } }
+                render();
+                return;
+            }
             var act = t.closest('[data-act]');
             if (act) {
                 e.preventDefault();
@@ -588,7 +745,7 @@
                 if (a === 'datas') { if (!raci && !dated) { converte(); } return; }
                 snapshot();
                 if (dated) {
-                    if (a === 'row') { S.rows.push(novaTarefa()); }
+                    if (a === 'row' || a === 'fase' || a === 'marco') { S.rows.push(novaLinha(a === 'row' ? 'tarefa' : a)); }
                     changed();
                     return;
                 }
@@ -605,6 +762,13 @@
                 return;
             }
             if (!editable) { return; }
+            var mv = dated && t.closest('[data-mv]');
+            if (mv) {
+                e.preventDefault();
+                snapshot();
+                if (moveLinha(+mv.getAttribute('data-mv'), +mv.getAttribute('data-dir'))) { changed(); } else { hist.pop(); }
+                return;
+            }
             var del = t.closest('[data-del-row],[data-del-col]');
             if (del) {
                 e.preventDefault();
@@ -670,15 +834,18 @@
          */
         function gdPrintPlan() {
             var units = gdUnits(), px = gdPx(true), fixo = gdFixed(true);
-            var tot = units.reduce(function (t, u) { return t + u.n * px; }, 0);
-            if (fixo + tot <= W.portrait) { return { orient: 'portrait', blocos: [[0, units.length]] }; }
+            var nd = units.reduce(function (t, u) { return t + u.n; }, 0), tot = nd * px;
+            // Q7b-2: coube numa folha, a linha do tempo estica até a largura útil (até 3x).
+            function estica(larg) { return Math.min(px * 3, Math.floor((larg - fixo) / nd * 100) / 100); }
+            if (fixo + tot <= W.portrait) { return { orient: 'portrait', px: estica(W.portrait), blocos: [[0, units.length]] }; }
+            if (fixo + tot <= W.landscape) { return { orient: 'landscape', px: estica(W.landscape), blocos: [[0, units.length]] }; }
             var cabe = W.landscape - fixo, blocos = [], ini = 0, larg = 0;
             units.forEach(function (u, k) {
                 if (k > ini && larg + u.n * px > cabe) { blocos.push([ini, k]); ini = k; larg = 0; }
                 larg += u.n * px;
             });
             blocos.push([ini, units.length]);
-            return { orient: 'landscape', blocos: blocos };
+            return { orient: 'landscape', px: px, blocos: blocos };
         }
         function printGrid() {
             var plan, n, blocos = [], units = null;
@@ -708,7 +875,7 @@
                 }
                 return '<section' + (k < blocos.length - 1 ? ' style="page-break-after:always"' : '') + '>' +
                     '<div class="h"><b>' + esc(title) + '</b><span>' + esc(code + parte) + '</span></div>' +
-                    (dated ? gdTable(true, bl[0], bl[1]) + '<div class="l">' + gdLegend() + '</div>'
+                    (dated ? gdTable(true, bl[0], bl[1], plan.px) + '<div class="l">' + gdLegend() + '</div>'
                         : tableHtml(true, bl[0], bl[1]) + '<div class="l">' + legendHtml() + '</div>') + '</section>';
             }).join('');
             d.open();
@@ -729,6 +896,17 @@
                 '.cx-gd-barra{position:absolute;top:4px;height:12px;background:#9fe1cb;border:1px solid #1d9e75;border-radius:3px;box-sizing:border-box}' +
                 '.cx-gd-barra.is-corta-i{border-left-style:dashed;border-radius:0 3px 3px 0}.cx-gd-barra.is-corta-f{border-right-style:dashed;border-radius:3px 0 0 3px}' +
                 '.cx-gd-resumo{margin-left:auto}' +
+                // Q7b-2: fases, marcos, numeração e linha "hoje".
+                '.cx-gd-nome{display:flex;align-items:center;min-width:0}.cx-gd-nome>*{flex:none}.cx-gd-nome>.cx-gd-txt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
+                'td.cx-grid-name{white-space:nowrap}.cx-gd-num{color:#5a6575;margin-right:5px}.cx-gd-r-filha td.cx-grid-name{padding-left:14px}' +
+                '.cx-gd-r-fase td{background:#f1f3f6;font-weight:bold}.cx-gd-calc{color:#5a6575}' +
+                '.cx-gd-fase-barra{position:absolute;top:6px;height:6px;background:#1d2330}.cx-gd-fase-barra::before,.cx-gd-fase-barra::after{content:"";position:absolute;top:6px;border-top:4px solid #1d2330}' +
+                '.cx-gd-fase-barra::before{left:0;border-right:4px solid transparent}.cx-gd-fase-barra::after{right:0;border-left:4px solid transparent}' +
+                '.cx-gd-marco{position:absolute;top:5px;width:9px;height:9px;margin-left:-4.5px;background:#0f6e56;transform:rotate(45deg)}' +
+                '.cx-gd-marco-data{position:absolute;top:3px;margin-left:8px;font-size:8px;color:#1d2330;white-space:nowrap}.cx-gd-marco-ico{color:#0f6e56}' +
+                '.cx-gd-hoje{position:absolute;top:0;bottom:0;border-left:2px solid #d93a3a;margin-left:-1px}.cx-gd-scale .cx-gd-hoje{top:15px}' +
+                '.cx-gd-hoje-rot{position:absolute;top:15px;width:0;height:0;margin-left:-4px;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid #d93a3a}' +
+                '.cx-gd-leg-fase{background:#1d2330;height:5px!important}.cx-gd-leg-marco{color:#0f6e56}.cx-gd-leg-hoje{width:0;min-width:0!important;border-left:2px solid #d93a3a}' +
                 '.l{margin-top:6px;display:flex;gap:14px}.l span{display:inline-flex;align-items:center}.l b{display:inline-block;min-width:16px;height:12px;line-height:12px;margin-right:4px;text-align:center;border-radius:2px}' +
                 '</style></head><body>' + corpo + '</body></html>');
             d.close();
@@ -743,7 +921,7 @@
 
         if (input) { input.value = ser(); }
         render();
-        root.__cxGrid = { ser: ser, plan: printPlan, gdPlan: gdPrintPlan, gdUnits: gdUnits };
+        root.__cxGrid = { ser: ser, plan: printPlan, gdPlan: gdPrintPlan, gdUnits: gdUnits, gdEstrutura: gdEstrutura };
         return root.__cxGrid;
     }
 

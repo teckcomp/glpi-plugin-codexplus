@@ -77,9 +77,13 @@ class Diagram
      * (colunas por semana) ou 'M' (por mês), rows: [{ name, owner, start, end }] },
      * datas em AAAA-MM-DD (vazias = tarefa ainda sem datas). Sem `mode`, é o
      * cronograma antigo (S1, S2…), que continua abrindo como sempre.
+     * Q7b-2: linha pode ter `type` 'fase' ({ type, name, owner }, sem datas)
+     * ou 'marco' (start = end); sem `type`, é tarefa.
      */
     public const SCHEDULE_MODE_DATES = 'datas';
     public const SCHEDULE_SCALES     = ['S', 'M'];
+    /** Q7b-2: tipos de linha além da tarefa (sem `type`): fase e marco. */
+    public const SCHEDULE_ROW_TYPES  = ['fase', 'marco'];
 
     /**
      * Fluxograma (bloco Q5a, Claudio, 27/09/2026): subtipo de DIA sobre o
@@ -482,6 +486,14 @@ class Diagram
             if (!is_array($r)) {
                 continue;
             }
+            $name  = self::text($r['name'] ?? '', 200);
+            $owner = self::text($r['owner'] ?? '', 120);
+            $type  = in_array($r['type'] ?? '', self::SCHEDULE_ROW_TYPES, true) ? $r['type'] : '';
+            // Q7b-2: fase não guarda datas (o resumo é calculado pelo motor).
+            if ($type === 'fase') {
+                $rows[] = ['type' => 'fase', 'name' => $name, 'owner' => $owner];
+                continue;
+            }
             $start = self::isoDate($r['start'] ?? '');
             $end   = self::isoDate($r['end'] ?? '');
             if ($start === '' || $end === '') {
@@ -489,9 +501,14 @@ class Diagram
             } elseif ($end < $start) {
                 [$start, $end] = [$end, $start];
             }
+            if ($type === 'marco') {
+                // Marco: uma data só (a do início).
+                $rows[] = ['type' => 'marco', 'name' => $name, 'owner' => $owner, 'start' => $start, 'end' => $start];
+                continue;
+            }
             $rows[] = [
-                'name'  => self::text($r['name'] ?? '', 200),
-                'owner' => self::text($r['owner'] ?? '', 120),
+                'name'  => $name,
+                'owner' => $owner,
                 'start' => $start,
                 'end'   => $end,
             ];

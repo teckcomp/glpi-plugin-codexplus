@@ -2058,6 +2058,45 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-gd-table tbody tr:first-child .cx-gd-tip { bottom: auto; top: 100%; margin: -6px 0 0; }
 .cx-gd-resumo { margin-left: auto; }
 
+/* Q7b-2: fases (resumo calculado, ▾ recolhe), marcos (◆), numeração, subir/descer e linha "hoje". */
+.cx-gd-num { color: var(--cx-muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+/* Nome da linha: ▾ e número no tamanho deles, o texto (ou o campo de edição) com o resto. */
+.cx-gd-nome { display: flex; align-items: center; min-width: 0; }
+.cx-gd-nome > * { flex: none; }
+.cx-gd-nome > .cx-gd-txt { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-gd-nome > .cx-gd-txt .cx-grid-input { width: 100%; min-width: 0; box-sizing: border-box; }
+/* Editando: os botões da linha saem da frente do campo. */
+.cx-gd-table td.cx-grid-name.is-editando > .cx-gd-acts { display: none; }
+.cx-gd-table tr.cx-gd-r-filha td.cx-grid-name { padding-left: 28px; }
+.cx-gd-table tr.cx-gd-r-fase td { background: var(--cx-surface-1); font-weight: 600; }
+.cx-gd-table tr.cx-gd-r-fase td.cx-grid-name { padding-left: 4px; }
+.cx-gd-fold { border: 0; background: transparent; color: inherit; width: 20px; padding: 0; cursor: pointer; font-size: .9em; }
+.cx-gd-calc { color: var(--cx-muted); font-variant-numeric: tabular-nums; }
+.cx-gd-acts { display: none; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); background: var(--cx-surface);
+    border-radius: 4px; }
+.cx-gd-table tr.cx-gd-r-fase .cx-gd-acts { background: var(--cx-surface-1); }
+.cx-gd-table td:hover > .cx-gd-acts { display: inline-flex; }
+.cx-gd-act { border: 0; background: transparent; color: var(--cx-muted); padding: 0 3px; cursor: pointer; }
+.cx-gd-act:hover { color: var(--cx-text); }
+.cx-gd-fase-barra { position: absolute; top: 11px; height: 8px; background: #1d2330; border-radius: 1px; pointer-events: auto; }
+.cx-gd-fase-barra::before, .cx-gd-fase-barra::after { content: ''; position: absolute; top: 8px; border-top: 6px solid #1d2330; }
+.cx-gd-fase-barra::before { left: 0; border-right: 6px solid transparent; }
+.cx-gd-fase-barra::after { right: 0; border-left: 6px solid transparent; }
+.cx-gd-fase-barra.is-corta-i::before, .cx-gd-fase-barra.is-corta-f::after { display: none; }
+.cx-gd-marco { position: absolute; top: 10px; width: 14px; height: 14px; margin-left: -7px; background: #0f6e56; border: 1px solid #fff;
+    box-sizing: border-box; transform: rotate(45deg); border-radius: 2px; touch-action: none; z-index: 1; }
+[data-editable="1"] .cx-gd-marco { cursor: grab; }
+.cx-gd-marco.is-arrastando { cursor: grabbing; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); z-index: 3; }
+.cx-gd-marco-data { position: absolute; top: 9px; margin-left: 12px; font-size: .8em; color: var(--cx-muted); white-space: nowrap; pointer-events: none; }
+.cx-gd-marco-ico { color: #0f6e56; }
+.cx-gd-hoje { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #d93a3a; margin-left: -1px; pointer-events: none; z-index: 2; }
+.cx-gd-scale .cx-gd-hoje { top: 22px; }
+.cx-gd-hoje-rot { position: absolute; top: 22px; width: 0; height: 0; margin-left: -6px; z-index: 3;
+    border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #d93a3a; }
+.cx-grid-legend b.cx-gd-leg-fase { background: #1d2330; height: 6px; border-radius: 1px; }
+.cx-grid-legend b.cx-gd-leg-marco { color: #0f6e56; }
+.cx-grid-legend b.cx-gd-leg-hoje { min-width: 0; width: 0; border-left: 2px solid #d93a3a; border-radius: 0; margin-right: 8px; }
+
 /* =========================================================================
    21. BIBLIOTECA (bloco B1) — templates/library.html.twig
    Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.

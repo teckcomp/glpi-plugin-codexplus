@@ -8,9 +8,10 @@
  * documento controlado, modelos de POP).
  */
 use Glpi\Plugin\Hooks;
+use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\ProfileTab;
 use GlpiPlugin\Codexplus\Wiki;
-define('PLUGIN_CODEXPLUS_VERSION', '0.7.13');
+define('PLUGIN_CODEXPLUS_VERSION', '0.7.14');
 // Versões mínima/máxima do GLPI suportadas
 define('PLUGIN_CODEXPLUS_MIN_GLPI', '11.0.0');
 define('PLUGIN_CODEXPLUS_MAX_GLPI', '11.0.99');
@@ -63,6 +64,10 @@ function plugin_init_codexplus(): void
     // do plugin, gravada pelo formulário nativo de Perfil.
     Plugin::registerClass(ProfileTab::class, [
         'addtabon' => Profile::class,
+    ]);
+    // 7b: o documento entra em Configurar > Notificações (alerta de vencimento).
+    Plugin::registerClass(Document::class, [
+        'notificationtemplates_types' => true,
     ]);
     // Tela de configuração de marca (Etapa 4a): ícone de engrenagem ao lado
     // do Codex+ em Configurar > Plugins. O caminho é relativo à pasta do

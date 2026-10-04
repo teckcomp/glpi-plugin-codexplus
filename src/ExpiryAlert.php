@@ -32,8 +32,10 @@ use User;
  * Claudio — não existe mais gestor do setor desde o P1), só usuários
  * ativos e não excluídos, sem repetir a mesma pessoa.
  *
- * O 7a só encontra, marca e registra no log da ação automática; o e-mail
- * (notificação nativa do GLPI) entra no 7b, em deliver().
+ * O 7a encontra, marca e registra no log da ação automática; o 7b
+ * (deliver) dispara a notificação nativa do GLPI (NotificationTargetDocument),
+ * que só sai quando as notificações por e-mail estão ligadas na instalação.
+ * Na Teckcomp ficam desligadas (Claudio): pronto para terceiros.
  */
 final class ExpiryAlert extends CommonGLPI
 {
@@ -220,8 +222,9 @@ final class ExpiryAlert extends CommonGLPI
     }
 
     /**
-     * Ponto do e-mail (7b): notificação nativa do GLPI aos destinatários.
-     * No 7a não envia nada; o aviso fica marcado e no log da ação automática.
+     * 7b: notificação nativa do GLPI (vai para a fila de e-mails quando as
+     * notificações estão ligadas; desligadas, não faz nada). Os destinatários
+     * vêm da própria notificação (responsável, revisor e auditor por padrão).
      *
      * @param array<string, mixed> $row
      * @param int[] $users
@@ -229,6 +232,12 @@ final class ExpiryAlert extends CommonGLPI
      */
     private static function deliver(array $row, string $kind, string $due, array $users, array $alert): void
     {
+        $event = NotificationTargetDocument::EVENT_OF[$kind] ?? '';
+        $doc   = new Document();
+        if ($event === '' || !$doc->getFromDB((int) $row['id'])) {
+            return;
+        }
+        \NotificationEvent::raiseEvent($event, $doc, ['due' => $due, 'times' => $alert['times'], 'kind' => $kind]);
     }
 
     /** @param array<string, mixed> $row */

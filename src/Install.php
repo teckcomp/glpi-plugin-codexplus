@@ -234,6 +234,9 @@ class Install
         // --- Bloco 7a: alerta de vencimento (marcas + ação automática) ---
         self::install7a();
 
+        // --- Bloco 7b: notificações do alerta (modelo + 3 notificações) ---
+        self::install7b();
+
         $migration->executeMigration();
         return true;
     }
@@ -572,6 +575,72 @@ class Install
             'state'   => \CronTask::STATE_WAITING,
             'comment' => 'Codex+: documentos a vencer, vencidos e revisões atrasadas',
         ]);
+    }
+
+    /**
+     * 7b (Claudio, 04/10/2026): um modelo de notificação (português) e uma
+     * notificação por evento (a vencer, vencido, revisão atrasada), modo
+     * e-mail, para responsável, revisor e auditor. Só cria o que não existe:
+     * reinstalar mantém o que o administrador tiver mudado (texto, destinos,
+     * ligada/desligada). Saem só com as notificações por e-mail ligadas na
+     * instalação.
+     */
+    private static function install7b(): void
+    {
+        $itemtype = Document::class;
+        $tpl = new \NotificationTemplate();
+        $tid = 0;
+        if ($tpl->getFromDBByCrit(['itemtype' => $itemtype, 'name' => 'Codex+ - Alerta de vencimento'])) {
+            $tid = (int) $tpl->getID();
+        } else {
+            $tid = (int) $tpl->add(['name' => 'Codex+ - Alerta de vencimento', 'itemtype' => $itemtype, 'comment' => 'Codex+ (7b)']);
+            if ($tid > 0) {
+                $texto = "O documento ##document.code## - ##document.name## está ##document.situation##.\n"
+                    . "##document.datelabel##: ##document.date##\n"
+                    . "##IFdocument.reminder##Lembrete nº ##document.reminder##.\n##ENDIFdocument.reminder##"
+                    . "\nAbrir o documento: ##document.url##\n\n"
+                    . "Você recebe este aviso como responsável, revisor ou auditor do documento.";
+                $html = '<p>O documento <strong>##document.code## - ##document.name##</strong> está <strong>##document.situation##</strong>.</p>'
+                    . '<p>##document.datelabel##: ##document.date##</p>'
+                    . '##IFdocument.reminder##<p>Lembrete nº ##document.reminder##.</p>##ENDIFdocument.reminder##'
+                    . '<p><a href="##document.url##">Abrir o documento</a></p>'
+                    . '<p style="color:#666">Você recebe este aviso como responsável, revisor ou auditor do documento.</p>';
+                (new \NotificationTemplateTranslation())->add([
+                    'notificationtemplates_id' => $tid,
+                    'language'                 => '',
+                    'subject'                  => '[Codex+] ##document.code## ##document.situation##: ##document.name##',
+                    'content_text'             => $texto,
+                    'content_html'             => $html,
+                ]);
+            }
+        }
+        if ($tid <= 0) {
+            return;
+        }
+        $nomes = [
+            NotificationTargetDocument::EVENT_SOON   => 'Codex+ - Documento a vencer',
+            NotificationTargetDocument::EVENT_DUE    => 'Codex+ - Documento vencido',
+            NotificationTargetDocument::EVENT_REVIEW => 'Codex+ - Revisão atrasada',
+        ];
+        foreach ($nomes as $event => $nome) {
+            $n = new \Notification();
+            if ($n->getFromDBByCrit(['itemtype' => $itemtype, 'event' => $event])) {
+                continue;
+            }
+            $nid = (int) $n->add([
+                'name' => $nome, 'itemtype' => $itemtype, 'event' => $event,
+                'entities_id' => 0, 'is_recursive' => 1, 'is_active' => 1,
+            ]);
+            if ($nid <= 0) {
+                continue;
+            }
+            (new \Notification_NotificationTemplate())->add([
+                'notifications_id' => $nid, 'mode' => \Notification_NotificationTemplate::MODE_MAIL, 'notificationtemplates_id' => $tid,
+            ]);
+            foreach ([NotificationTargetDocument::TARGET_OWNER, NotificationTargetDocument::TARGET_REVIEWER, NotificationTargetDocument::TARGET_AUDITOR] as $alvo) {
+                (new \NotificationTarget())->add(['notifications_id' => $nid, 'type' => \Notification::USER_TYPE, 'items_id' => $alvo]);
+            }
+        }
     }
 
     /**
@@ -1059,6 +1128,9 @@ class Install
         ProfileRight::deleteProfileRights(['plugin_codexplus_wiki']);
         // 7a: a ação automática do alerta de vencimento sai junto.
         \CronTask::unregister('codexplus');
+        // 7b: notificações e modelo do documento (com traduções, destinos e modos).
+        (new \Notification())->deleteByCriteria(['itemtype' => Document::class], true);
+        (new \NotificationTemplate())->deleteByCriteria(['itemtype' => Document::class], true);
         return true;
     }
 }

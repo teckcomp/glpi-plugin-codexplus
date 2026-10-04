@@ -2020,6 +2020,44 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .cx-grid-legend b { display: inline-block; min-width: 22px; height: 18px; line-height: 18px; margin-right: 4px;
     text-align: center; border-radius: 4px; }
 
+/* Q7b-1: cronograma com datas (mesmo motor; tabela + linha do tempo). A barra
+   é desenhada pelas datas; colunas por semana (segunda a domingo) ou por mês. */
+.cx-gd-escala { width: auto; min-width: 120px; }
+/* Largura exata pela linha do tempo (sem o min-width: 100% da grade antiga). */
+.cx-gd-table { min-width: 0; }
+.cx-gd-msg { font-size: .85em; color: #a32d2d; }
+.cx-gd-table td.cx-gd-date, .cx-gd-table td.cx-gd-days { font-variant-numeric: tabular-nums; }
+.cx-gd-table td.cx-gd-days { color: var(--cx-muted); }
+[data-editable="1"] [data-edit-start], [data-editable="1"] [data-edit-end], [data-editable="1"] [data-edit-days] { cursor: pointer; }
+.cx-gd-table th.cx-gd-head, .cx-gd-table td.cx-gd-track { padding: 0; text-align: left; overflow: visible; }
+.cx-gd-table th.cx-gd-head { height: 44px; }
+.cx-gd-scale { position: relative; height: 44px; }
+.cx-gd-band, .cx-gd-unit { position: absolute; box-sizing: border-box; padding-left: 4px; overflow: hidden;
+    white-space: nowrap; text-overflow: clip; text-align: left; }
+.cx-gd-band { top: 0; height: 22px; line-height: 22px; color: var(--cx-text, inherit); border-left: 1px solid var(--cx-border);
+    border-bottom: 1px solid var(--cx-border); }
+.cx-gd-unit { top: 22px; height: 22px; line-height: 22px; font-weight: 400; font-size: .85em; }
+.cx-gd-lane { position: relative; height: 34px; user-select: none; }
+.cx-gd-sep { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--cx-border); opacity: .55; pointer-events: none; }
+.cx-gd-scale .cx-gd-sep { top: 22px; opacity: 1; }
+.cx-gd-barra { position: absolute; top: 8px; height: 18px; box-sizing: border-box; background: #9fe1cb; border: 1px solid #1d9e75;
+    border-radius: 4px; touch-action: none; min-width: 4px; }
+.cx-gd-barra.is-corta-i { border-left-style: dashed; border-radius: 0 4px 4px 0; }
+.cx-gd-barra.is-corta-f { border-right-style: dashed; border-radius: 4px 0 0 4px; }
+[data-editable="1"] .cx-gd-barra { cursor: grab; }
+[data-editable="1"] .cx-gd-track.is-vazia { cursor: crosshair; }
+[data-editable="1"] .cx-gd-track.is-vazia:hover .cx-gd-lane { background: rgba(29, 158, 117, .06); }
+.cx-gd-barra.is-arrastando { cursor: grabbing; box-shadow: 0 2px 6px rgba(0, 0, 0, .18); z-index: 3; }
+.cx-gd-alca { position: absolute; top: -1px; bottom: -1px; width: 8px; cursor: ew-resize; }
+.cx-gd-alca.is-i { left: -4px; }
+.cx-gd-alca.is-f { right: -4px; }
+.cx-gd-barra:hover .cx-gd-alca::after { content: ''; position: absolute; left: 3px; top: 3px; bottom: 3px; width: 2px;
+    border-radius: 1px; background: #0f6e56; }
+.cx-gd-tip { position: absolute; bottom: 100%; z-index: 4; margin-bottom: -6px; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    font-size: .8em; background: #1d2330; color: #fff; pointer-events: none; }
+.cx-gd-table tbody tr:first-child .cx-gd-tip { bottom: auto; top: 100%; margin: -6px 0 0; }
+.cx-gd-resumo { margin-left: auto; }
+
 /* =========================================================================
    21. BIBLIOTECA (bloco B1) — templates/library.html.twig
    Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.

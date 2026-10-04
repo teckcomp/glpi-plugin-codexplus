@@ -328,9 +328,12 @@
                              data-title="{{ name }}" data-code="{{ code }}"
                              data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
                         <div class="codexplus-form-hint">
-                            {{ diagram_kind == 'raci'
-                                ? __('Clique na célula para trocar entre R, A, C, I e vazio. Clique no nome de uma atividade ou papel para editar. Cada atividade deve ter um só A.', 'codexplus')
-                                : __('Clique na célula para trocar entre vazio, período (barra) e marco. Clique no nome de uma tarefa, responsável ou período para editar.', 'codexplus') }}
+                            {# Q7b-1: no cronograma o texto vem do motor (muda com o formato: períodos ou datas). #}
+                            {% if diagram_kind == 'raci' %}
+                                {{ __('Clique na célula para trocar entre R, A, C, I e vazio. Clique no nome de uma atividade ou papel para editar. Cada atividade deve ter um só A.', 'codexplus') }}
+                            {% else %}
+                                <span data-cx-grid-hint>{{ __('Clique na célula para trocar entre vazio, período (barra) e marco. Clique no nome de uma tarefa, responsável ou período para editar.', 'codexplus') }}</span>
+                            {% endif %}
                             {{ __('Gravado sozinho pouco depois de cada mudança.', 'codexplus') }}
                         </div>
                     </div>

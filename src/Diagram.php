@@ -71,6 +71,15 @@ class Diagram
     public const RACI_VALUES      = ['', 'R', 'A', 'C', 'I'];
     public const SCHEDULE_VALUES  = ['', 'b', 'm']; // vazio, barra, marco
     public const SCHEDULE_UNITS   = ['S', 'M', 'T', 'A'];
+    /**
+     * Q7b-1 (Claudio, 03/10/2026): cronograma com datas reais, gravado AO LADO
+     * do formato de períodos: { kind: 'cronograma', mode: 'datas', scale: 'S'
+     * (colunas por semana) ou 'M' (por mês), rows: [{ name, owner, start, end }] },
+     * datas em AAAA-MM-DD (vazias = tarefa ainda sem datas). Sem `mode`, é o
+     * cronograma antigo (S1, S2…), que continua abrindo como sempre.
+     */
+    public const SCHEDULE_MODE_DATES = 'datas';
+    public const SCHEDULE_SCALES     = ['S', 'M'];
 
     /**
      * Fluxograma (bloco Q5a, Claudio, 27/09/2026): subtipo de DIA sobre o
@@ -118,11 +127,13 @@ class Diagram
             ];
         }
         if ($subtype === self::SUBTYPE_SCHEDULE) {
+            // Q7b-1: cronograma novo já nasce com datas (uma tarefa sem datas,
+            // que ganha a barra num clique na linha do tempo).
             return [
-                'kind'    => self::SUBTYPE_SCHEDULE,
-                'unit'    => 'S',
-                'periods' => ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'],
-                'rows'    => [['name' => '', 'owner' => '', 'cells' => array_fill(0, 8, '')]],
+                'kind'  => self::SUBTYPE_SCHEDULE,
+                'mode'  => self::SCHEDULE_MODE_DATES,
+                'scale' => 'S',
+                'rows'  => [['name' => '', 'owner' => '', 'start' => '', 'end' => '']],
             ];
         }
         if ($subtype === self::SUBTYPE_RACI) {
@@ -419,6 +430,9 @@ class Diagram
     private static function validateGrid(array $data): ?array
     {
         $raci    = $data['kind'] === self::SUBTYPE_RACI;
+        if (!$raci && ($data['mode'] ?? '') === self::SCHEDULE_MODE_DATES) {
+            return self::validateDated($data);
+        }
         $colKey  = $raci ? 'roles' : 'periods';
         $allowed = $raci ? self::RACI_VALUES : self::SCHEDULE_VALUES;
 
@@ -452,6 +466,56 @@ class Diagram
             $out['unit'] = in_array($data['unit'] ?? '', self::SCHEDULE_UNITS, true) ? $data['unit'] : 'S';
         }
         return $out;
+    }
+
+    /**
+     * Q7b-1: cronograma com datas. Data só no formato AAAA-MM-DD e que exista
+     * no calendário; tarefa com uma data só fica com as duas iguais; fim antes
+     * do início troca as duas de lugar (nunca grava barra ao contrário).
+     *
+     * @return array<string, mixed>
+     */
+    private static function validateDated(array $data): array
+    {
+        $rows = [];
+        foreach (array_slice((array) ($data['rows'] ?? []), 0, self::MAX_GRID_ROWS) as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $start = self::isoDate($r['start'] ?? '');
+            $end   = self::isoDate($r['end'] ?? '');
+            if ($start === '' || $end === '') {
+                $start = $end = ($start !== '' ? $start : $end);
+            } elseif ($end < $start) {
+                [$start, $end] = [$end, $start];
+            }
+            $rows[] = [
+                'name'  => self::text($r['name'] ?? '', 200),
+                'owner' => self::text($r['owner'] ?? '', 120),
+                'start' => $start,
+                'end'   => $end,
+            ];
+        }
+        return [
+            'kind'  => self::SUBTYPE_SCHEDULE,
+            'mode'  => self::SCHEDULE_MODE_DATES,
+            'scale' => in_array($data['scale'] ?? '', self::SCHEDULE_SCALES, true) ? $data['scale'] : 'S',
+            'rows'  => $rows,
+        ];
+    }
+
+    /** AAAA-MM-DD válida (1990 a 2100) ou ''. */
+    private static function isoDate($v): string
+    {
+        $s = is_scalar($v) ? (string) $v : '';
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s, $m)) {
+            return '';
+        }
+        $y = (int) $m[1];
+        if ($y < 1990 || $y > 2100 || !checkdate((int) $m[2], (int) $m[3], $y)) {
+            return '';
+        }
+        return $s;
     }
 
     /**

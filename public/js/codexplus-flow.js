@@ -44,6 +44,8 @@
         var docId = root.getAttribute('data-doc') || '';
         var title = root.getAttribute('data-title') || '';
         var code = root.getAttribute('data-code') || '';
+        // A-2b: "Aprovadores: Ana (05/10/2026), …" abaixo do título no PDF.
+        var sign = root.getAttribute('data-sign') || '';
 
         root.classList.add('cx-flow');
         root.innerHTML = '<div class="cx-flow-bar">'
@@ -136,8 +138,9 @@
             doc.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(nome) + '</title><style>'
                 + '@page{size:A4 ' + plan.orient + ';margin:10mm}html,body{margin:0;background:#fff;font:10px Arial,sans-serif;color:#1d2330;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
                 + '.h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1d2330;padding-bottom:4px;margin-bottom:8px}.h b{font-size:15px}'
-                + '.d{text-align:center}.d svg{display:inline-block}'
+                + '.d{text-align:center}.d svg{display:inline-block}' + '.s{font:9px Arial,sans-serif;color:#5f6b7a;margin:-4px 0 6px}'
                 + '</style></head><body><div class="h"><b>' + esc(title) + '</b><span>' + esc(code) + '</span></div>'
+                + (sign ? '<div class="s">' + esc(sign) + '</div>' : '')
                 + '<div class="d">' + svg + '</div>' + linksHtml(d) + '</body></html>');
             doc.close();
             var old = document.title;

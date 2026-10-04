@@ -438,6 +438,7 @@
         var docId = root.getAttribute('data-doc') || '';
         var title = root.getAttribute('data-title') || '';
         var code = root.getAttribute('data-code') || '';
+        var sign = root.getAttribute('data-sign') || ''; // A-2b
         var hist = [], autoTimer = null, salvando = false, denovo = false;
         // Q7b-4: situação das tarefas (só na leitura do publicado). ST.map = { id: { state, start, done, user, when } }.
         var ST = null, marcadas = {}, enviando = false;
@@ -1726,6 +1727,7 @@
                 }
                 return '<section' + (k < blocos.length - 1 ? ' style="page-break-after:always"' : '') + '>' +
                     '<div class="h"><b>' + esc(title) + '</b><span>' + esc(code + parte) + '</span></div>' +
+                    (sign ? '<div class="s">' + esc(sign) + '</div>' : '') +
                     (dated ? (k === 0 && stOn() ? resumoSit(gdEstrutura(), hoje()) : '') + gdTable(true, bl[0], bl[1], plan.px) + '<div class="l">' + gdLegend() + '</div>'
                         : tableHtml(true, bl[0], bl[1]) + '<div class="l">' + legendHtml() + '</div>') + '</section>';
             }).join('');
@@ -1733,6 +1735,7 @@
             d.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(nome) + '</title><style>' +
                 '@page{size:A4 ' + plan.orient + ';margin:10mm}html,body{margin:0;background:#fff;font:10px Arial,sans-serif;color:#1d2330;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
                 '.h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1d2330;padding-bottom:4px;margin-bottom:8px}.h b{font-size:15px}' +
+                '.s{font:9px Arial,sans-serif;color:#5f6b7a;margin:-4px 0 6px}' +
                 'table{border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tr{page-break-inside:avoid}' +
                 'th,td{border:1px solid #c9ced8;height:20px;text-align:center;padding:0 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
                 'th{background:#f1f3f6;font-weight:bold}td.cx-grid-name,th.cx-grid-name{text-align:left}' +

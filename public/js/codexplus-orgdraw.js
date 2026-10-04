@@ -543,6 +543,7 @@
         var S = normalize(raw);
         S.__norm = true;
         var title = root.getAttribute('data-title') || '', code = root.getAttribute('data-code') || '';
+        var sign = root.getAttribute('data-sign') || ''; // A-2b
         // Q6d: com data-editable="1" (página de edição do documento DIA), a
         // mesma tela ganha "Abrir o organograma" (motor de quadro), a matriz
         // editável e a gravação por AJAX (ajax/diagram.save.php).
@@ -801,7 +802,9 @@
                 + '.h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1d2330;padding-bottom:4px;margin-bottom:6px;font:10px Arial,sans-serif;color:#1d2330}.h b{font-size:15px}'
                 + '.cx-org-legend{margin:0 0 6px;font-size:11px}.d{text-align:center}.d svg{display:inline-block}'
                 + '.cx-org-esc{break-before:page;margin-top:0}.cx-org-esc table{min-width:0}'
+                + '.s{font:9px Arial,sans-serif;color:#5f6b7a;margin:-4px 0 6px}'
                 + '</style></head><body class="cx-org"><div class="h"><b>' + esc(title) + '</b><span>' + esc(code) + '</span></div>'
+                + (sign ? '<div class="s">' + esc(sign) + '</div>' : '')
                 + '<div class="cx-org-legend">' + legendHtml(S) + '</div><div class="d">' + s + '</div>' + escTableHtml(S) + '</body></html>');
             d.close();
             var go = function () {

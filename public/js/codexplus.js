@@ -442,6 +442,8 @@
         if (d.client) { parts.push('Cliente: ' + d.client); }
         if (d.sector) { parts.push('Setor: ' + d.sector); }
         if (d.doctype !== 'PRP' && d.owner) { parts.push('Responsável: ' + d.owner); }
+        // A-2b: aprovadores (Diagrama e Documento Diverso).
+        if (d.approvers) { parts.push('Aprovadores: ' + d.approvers); }
         var pub = formatDate(d.date_published);
         var mod = formatDate(d.date_mod);
         if (pub) { parts.push('Publicado em ' + pub); }

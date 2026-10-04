@@ -328,7 +328,7 @@
                         </label>
                         <script type="application/json" id="cx-flow-data">{{ diagram_json|raw }}</script>
                         <input type="hidden" name="_diagram" id="cx-flow-input" value="{{ diagram_json }}">
-                        <div data-cx-flow data-editable="1" data-source="cx-flow-data" data-input="cx-flow-input"
+                        <div data-cx-flow data-editable="1" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-flow-data" data-input="cx-flow-input"
                              data-title="{{ name }}" data-code="{{ code }}"
                              data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
                         <div class="codexplus-form-hint">
@@ -345,7 +345,7 @@
                         </label>
                         <script type="application/json" id="cx-grid-data">{{ diagram_json|raw }}</script>
                         <input type="hidden" name="_diagram" id="cx-grid-input" value="">
-                        <div data-cx-grid data-editable="1" data-source="cx-grid-data" data-input="cx-grid-input"
+                        <div data-cx-grid data-editable="1" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-grid-data" data-input="cx-grid-input"
                              data-title="{{ name }}" data-code="{{ code }}"
                              data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
                         <div class="codexplus-form-hint">
@@ -370,7 +370,7 @@
                         </label>
                         <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
                         <input type="hidden" name="_diagram" id="cx-org-input" value="{{ diagram_json }}">
-                        <div data-cx-orgview data-editable="1" data-source="cx-org-data" data-input="cx-org-input"
+                        <div data-cx-orgview data-editable="1" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-org-data" data-input="cx-org-input"
                              data-title="{{ name }}" data-code="{{ code }}"
                              data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
                         <div class="codexplus-form-hint">
@@ -424,6 +424,9 @@
                     <div class="codexplus-doc-edit-zone cx-docform-roles">
                         <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                         <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
+                        {% if signers_line|default('') %}
+                            <span><strong>{{ __('Aprovadores', 'codexplus') }}:</strong> {{ signers_line }}</span>
+                        {% endif %}
                     </div>
                 {% endif %}
             </article>
@@ -459,6 +462,9 @@
                 <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
                 <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
+                {% if signers_line|default('') %}
+                    <span><strong>{{ __('Aprovadores', 'codexplus') }}:</strong> {{ signers_line }}</span>
+                {% endif %}
                 {% if client.name %}
                     <span><strong>{{ __('Cliente', 'codexplus') }}:</strong> {{ client.name }}</span>
                 {% endif %}
@@ -503,7 +509,7 @@
             </div>
             {% if is_diagram and diagram_kind == 'fluxograma' %}
                 <script type="application/json" id="cx-flow-data">{{ diagram_json|raw }}</script>
-                <div class="cx-docform-diagram" data-cx-flow data-editable="0" data-source="cx-flow-data"
+                <div class="cx-docform-diagram" data-cx-flow data-editable="0" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-flow-data"
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% elseif is_diagram and diagram_kind != 'organograma' %}
                 <script type="application/json" id="cx-grid-data">{{ diagram_json|raw }}</script>
@@ -514,7 +520,7 @@
                         <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}" form="cx-grid-status-token">
                     {% endif %}
                 {% endif %}
-                <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-source="cx-grid-data"
+                <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-grid-data"
                      data-title="{{ name }}" data-code="{{ code }}"
                      {% if schedule.on %}data-status="cx-grid-status" data-doc="{{ id }}"{% if schedule.can_mark %} data-can-mark="1" data-status-url="{{ schedule.url }}"{% endif %}{% endif %}></div>
             {% elseif is_diagram %}
@@ -522,7 +528,7 @@
                    (public/js/codexplus-orgdraw.js); a edição continua no motor
                    antigo até o Q6b. #}
                 <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
-                <div class="cx-docform-diagram" data-cx-orgview data-source="cx-org-data"
+                <div class="cx-docform-diagram" data-cx-orgview data-source="cx-org-data" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}"
                      data-title="{{ name }}" data-code="{{ code }}"></div>
             {% else %}
                 <div class="codexplus-content rich_text_container">{{ content_html|raw }}</div>

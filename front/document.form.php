@@ -1011,8 +1011,14 @@ $brandField = [
     'options' => array_map(static fn ($b) => ['id' => $b['id'], 'name' => $b['name'], 'logo' => $b['logo_url'], 'is_default' => $b['is_default']], $brandList),
 ];
 
+// A-2b: aprovadores no rodapé da edição, na linha de papéis da leitura e no
+// PDF (texto e diagramas). Na versão publicada mostrada durante a revisão,
+// só os nomes.
+$signersLine = $isNew ? '' : $doc->approverSummary(!$version['on']);
+
 TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'brand'       => $brandField,
+    'signers_line' => $signersLine,
     'glpi_root'   => $CFG_GLPI['root_doc'],
     'self'        => $self,
     'is_new'      => $isNew,
@@ -1105,6 +1111,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         'owner'          => (int) $doc->fields['users_id_owner'] > 0
             ? getUserName((int) $doc->fields['users_id_owner']) : getUserName((int) $doc->fields['users_id']),
         'sector'         => implode(', ', $sectorNames),
+        'approvers'      => $signersLine, // A-2b
         // A versão mostrada é a publicada? Então data de publicação; senão,
         // o aviso de que não é a versão vigente.
         'date_published' => $version['on'] ? $version['date']
@@ -1112,7 +1119,10 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
                 ? (string) ($doc->fields['date_published'] ?? '') : ''),
         'draft'          => $version['on'] || $status === Document::STATUS_PUBLISHED ? ''
             : ($status === Document::STATUS_OBSOLETE ? __('OBSOLETO', 'codexplus')
-                : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(Document::getStatuses()[$status] ?? $status))),
+                : sprintf(__('%s — não é a versão vigente', 'codexplus'), mb_strtoupper(
+                    // A-2b: com aprovador pendente, o aviso diz isso (como o selo da página).
+                    $doc->signersPending() ? __('Aguardando aprovadores', 'codexplus') : (Document::getStatuses()[$status] ?? $status)
+                ))),
         'header_html'    => '',
         // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
         'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,

@@ -463,6 +463,29 @@ class Document extends CommonDBTM
             && !DocumentApprover::hasApproved($id, $me) && !$this->canSign();
     }
 
+    /**
+     * A-2b: aprovadores para a tela e o PDF — "Ana (05/10/2026), Bruno
+     * (pendente)". $comStatus false = só os nomes (versão publicada mostrada
+     * durante uma revisão: as datas gravadas já são da rodada nova).
+     */
+    public function approverSummary(bool $comStatus = true): string
+    {
+        if (!$this->usesApprovers()) {
+            return '';
+        }
+        $out = [];
+        foreach (DocumentApprover::rows((int) ($this->fields['id'] ?? 0)) as $uid => $quando) {
+            $nome = getUserName((int) $uid);
+            if ($comStatus) {
+                $nome .= $quando
+                    ? ' (' . date('d/m/Y', strtotime((string) $quando)) . ')'
+                    : ' (' . __('pendente', 'codexplus') . ')';
+            }
+            $out[] = $nome;
+        }
+        return implode(', ', $out);
+    }
+
     /** Aprovador aprova. Com o último, a vez passa ao responsável. */
     public function sign(): bool
     {

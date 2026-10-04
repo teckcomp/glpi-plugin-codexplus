@@ -2,13 +2,20 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
-> Estado: **`v0.7.3`** (schema novo: marcas) · último commit de código
-> **`c4ad5ff`** · atualizado em **04/10/2026**: **3c-0 — paginação do PDF
-> corrigida** (todos os 26 documentos da homologação sem sobreposição; seção
-> 3.14) e **marcas** (M-1 cadastro com cor sugerida pela logo, M-2 marca por
-> documento; seção 3.15); ícone do plugin (`logo.png`); achados 123 a 128.
-> Próximo: **3c — modelos com conteúdo real** (decisão pendente da Proposta:
-> total geral, condições comerciais e aceite). Antes, em 03–04/10/2026
+> Estado: **`v0.7.6`** · último commit de código **`382b7de`** ·
+> atualizado em **04/10/2026 (tarde e noite)**: **3c fechada** — planilha
+> editada no lugar (3c-1), **Resumo do investimento** automático (3c-2),
+> modelo completo de Proposta como **dado** da homologação (3c-3/3c-3b);
+> **editores e aprovadores** (A-1 vários editores na Proposta e no Laudo,
+> A-2a aprovadores como etapa antes do responsável em DIA e DIV, A-2b
+> aprovadores no rodapé, leitura e PDFs); **P3 — papéis no documento**
+> (perfil só com Ler, Criar, Excluir, **Auditar**, Ver todos, Anônimo,
+> Gerenciar; quem montou não aprova nem audita); **J1** — fim do salto de
+> rolagem ao clicar em planilha/planta/topologia. Seção 3.16; achados 129
+> a 139. Próximo: **perguntar a Claudio — resto da 3c (Manual, POP, PSG
+> como dado) ou R6-b**. Antes, de manhã: **3c-0** (paginação do PDF, seção
+> 3.14) e **marcas** M-1/M-2 (seção 3.15); achados 123 a 128.
+> Antes, em 03–04/10/2026
 > (noite): **cronograma fechado (Q7b)** — datas reais, fases, marcos,
 > numeração, linha "hoje", importar/exportar (`.json` + tabela para IA,
 > também RACI), desenho do mockup aprovado, PDF e leitura em **paisagem**,
@@ -1849,6 +1856,138 @@ Chromium com as 4 logos. Twig 3.14 estrito: tela de configuração (4
 estados) e o campo Marca (4 casos). PDF com a marca Cacta no harness da
 paginação.
 
+### 3.16 Sessão de 04/10/2026 (tarde e noite) — 3c, editores, aprovadores, P3, J1
+
+Commits: `3b6cd55` (3c-1), `bff4a1c` (A-1), `2dde64c` (A-2a), `45a58b4`
+(P3), `ebc6f25` (A-2b), `c5d10bb` (3c-2 + J1, num commit só), `ae40fe3`
+(3c-3), `382b7de` (3c-3b). Versões: 0.7.4 (A-1, Install), 0.7.5 (A-2a,
+tabela nova), 0.7.6 (3c-3). Mockup aprovado à mão antes de cada bloco com
+tela nova.
+
+#### Decisões de Claudio (04/10/2026)
+
+- **Proposta (3c):** total geral sim (bloco **Resumo do investimento**,
+  logo depois da última planilha, cabeçalho **RESUMO**); **sem** condições
+  comerciais e **sem** aceite com assinatura.
+- **Planilha editada direto no documento**; colunas, tipos, fórmulas,
+  excluir e reordenar linhas pelo botão **Parâmetros** (o duplo clique não
+  abre mais a janela).
+- **Vários editores** na Proposta e no Laudo (só usuários).
+- **Aprovadores** (vários, só usuários) em **Diagrama e Documento Diverso**:
+  etapa nova antes do responsável; cada um aprova, **em qualquer ordem**;
+  qualquer um devolve e a devolução **zera** as aprovações; **sem aprovador,
+  fluxo de antes**; aparecem no rodapé da edição, na leitura e no PDF.
+- **P3 — papéis no documento:** saem do perfil "Revisar e editar" e
+  "Aprovar"; responsável, editores, revisor e aprovadores são escolhidos no
+  documento entre **quem tem Ler** (interface padrão). **Auditar continua no
+  perfil.** **Quem montou o documento (autor, editores, revisor) não aprova
+  nem audita** (o responsável também não é aprovador: já aprova a etapa
+  dele). Substitui o P1 (26/09) na parte dos bits.
+- **Modelo é dado da instalação, não código do plugin.** O modelo completo
+  de Proposta (Resolutto) fica no banco da homologação e vai para produção
+  como dado, por comando, junto com os documentos. Sem exportar/importar de
+  modelos — salvo para importar **modelos prontos distribuídos pela
+  internet**, ideia para a **galeria de Modelos** (catálogo público da
+  Teckcomp, importável pela tela Modelos; a decidir quando chegar a vez).
+- Terceiros: recebem o plugin com modelos genéricos e montam os seus pelo
+  "Salvar como modelo".
+
+#### 3c-1 — planilha no lugar (`3b6cd55`, só JS)
+
+- Ilhas `contenteditable=true` (células de texto, número e moeda) dentro do
+  bloco travado (TinyMCE 7.9, achado 132). Travadas, com fundo cinza: coluna
+  calculada, Total e célula com fórmula própria (`=`).
+- Cada tecla grava no JSON (`data-cx-sheet`) e refaz calculadas e Total;
+  ao sair, a célula é formatada. Tab/Shift+Tab, Enter desce, Backspace e
+  Delete não apagam para fora da célula, colar só texto. **"+ Linha"** e
+  **"⚙ Parâmetros"** (`data-mce-bogus="all"`, só no editor).
+- `PreProcess` refaz a tabela pelo JSON: o gravado é igual ao de antes (sem
+  migração). `parseNum`: "1.460" sem vírgula = 1460.
+
+#### A-1 — vários editores (`bff4a1c`, 0.7.4)
+
+- Tabela `documenteditors` (existia desde a R3c, sem uso; `groups_id` = 0).
+  `src/DocumentEditor.php`. `users_id_reviewer` = **espelho do primeiro
+  editor** (Histórico, busca, console). Install copia o editor antigo, uma
+  vez. Campo múltiplo `users_id_editor[]` (achado 134). Histórico: "Editores:
+  A → A, B" (mensagem simples; a aba Histórico ainda não existe — conferir
+  em `glpi_logs`).
+
+#### A-2a — aprovadores (`2dde64c`, 0.7.5)
+
+- Tabela **`glpi_plugin_codexplus_documentapprovers`** (`users_id`,
+  `date_approved` nulo = pendente). `src/DocumentApprover.php`.
+- **O status continua `aprovacao`** durante a etapa (trava, visibilidade e
+  revisão sem mudança); `signersPending()` decide se a vez é dos aprovadores
+  ou do responsável. Selo "Aguardando aprovadores" e aviso "(1 de 2 já
+  aprovaram)". Efeito colateral aceito: no filtro de status do Painel eles
+  contam como "Aguardando responsável".
+- Envio zera as aprovações e recusa aprovador sem Ler; responsável e
+  Super-Admin **não pulam** a etapa; aprovador vê o documento (visibilidade
+  por subconsulta) e aparece no "Aguardando você" do Painel.
+
+#### P3 — papéis no documento (`45a58b4`)
+
+- `Rights::roleUsers()` = quem tem Ler (o nome `approverUsers` /
+  `reviewerUsers` ficou, apontando para ela). `Document::canUpdate()` estático
+  exige só Ler; editar é do papel (`canUpdateItem`).
+- `roleConflict()`: conferido ao escolher papéis, no envio (pega documento
+  antigo com conflito) e na hora de agir (`builtByMe()` = autor, editores,
+  revisor ou quem alterou na revisão). Auditor e aprovador bloqueados ainda
+  devolvem. Exceção do A2 (setor de auditoria) mantida só para o auditor.
+- `isProducer()`: quem só tem Ler mas tem papel em algum documento entra no
+  Painel. Matriz do perfil sem "Revisar e editar" e "Aprovar"; texto da aba
+  reescrito (sai "Etapa de transição").
+- **Correção registrada:** a regra "quem editou não valida" estava citada no
+  código do auditor mas **não era conferida** desde algum bloco anterior;
+  voltou no P3 (achado 139).
+
+#### A-2b — aprovadores na tela e no PDF (`ebc6f25`)
+
+- `approverSummary()`: "Ana (05/10/2026), Bia (pendente)"; na versão
+  publicada mostrada durante revisão, só os nomes (as datas já são da rodada
+  nova — guardar quem aprovou cada versão pediria coluna na tabela de
+  versões: backlog).
+- Linha de identificação do PDF e do Word (`d.approvers`); PDFs dos três
+  motores de diagrama (`data-sign` → linha abaixo do título). Aviso do PDF
+  "AGUARDANDO APROVADORES".
+
+#### 3c-2 — Resumo do investimento e J1 (`c5d10bb`)
+
+- Botão **Resumo** (Proposta e DIV) insere `div.cx-sum` logo depois da
+  última planilha; segunda vez só avisa. Linha por planilha com o nome = a
+  **última linha** do bloco acima dela (achado 138), valor = total da última
+  coluna em moeda somada; **Total geral**. Refaz a cada tecla, ao renomear,
+  apagar, desfazer, abrir e gravar. Gravado = tabela comum.
+- Com o botão novo, em 1920 px, **Importar, <> e Tela cheia** foram para o
+  "•••" da barra.
+- **J1 — salto de rolagem** (achados 129 e 130) e clique perdido na célula
+  depois de selecionar a planilha (achado 131).
+
+#### 3c-3 e 3c-3b — modelo de Proposta como dado (`ae40fe3`, `382b7de`)
+
+- Modelo "Proposta — completa (levantamento, planilhas, resumo e escopo)":
+  seis seções, duas planilhas (Materiais, Mão de obra) gravadas só com o
+  JSON, Resumo, Atenção, Escopo com orientação (planta não cabe vazia num
+  modelo: é imagem enviada). **Está no banco da homologação** (id 5 no teste;
+  conferir o id real) e **não** no código (3c-3b).
+- Fica do 3c-3 a parte genérica: **planilha remontada pelo JSON** quando a
+  tabela não bate (`decorate`). Modelo padrão de Proposta do plugin agora é
+  genérico (Objetivo, Escopo, Investimento, Prazos, Observações) — só vale
+  em instalação nova.
+- Sobra na homologação o marcador `codexplus_3c3_prp_full` em
+  `glpi_configs` (inofensivo).
+
+#### Testes da sessão
+
+**Ambiente novo de validação** (achado 136): GLPI 11.0.6 real (tgz do
+GitHub) + MariaDB no container, plugin copiado e instalado pelo console;
+harness PHP com o Kernel do GLPI; tela pelo `php -S` com o roteador
+`public/index.php` e Chromium (login `glpi`/`glpi`). Harnesses: A-1 (21),
+A-2a + P3 (51), A-2b (5 de tela), 3c-1 (21 + roteiro 2 no TinyMCE 7.9.2),
+3c-2 (10), 3c-3 (10 de tela + Install), J1 (salto medido com e sem a
+correção, achado 133).
+
 ### 3.2 Identidade visual (`v0.6.5-alpha`)
 
 Aprovada por Claudio em 20/09/2026, sobre mockup. **Só a tela**: o PDF monta
@@ -2639,6 +2778,60 @@ depender do comportamento errático de `position: fixed` na impressão.
     fundo claro. Logo pequena (Ponto, 241×43) sai borrada: para 14 mm de
     altura, ~110 px de altura.
 
+129. **TinyMCE 7.9 + autoresize pula a página ao receber o foco.** No
+    `focusin` vindo de fora do editor (Chrome e Safari), o FocusController
+    chama `iframe.scrollIntoView({block:'center'})` se o **topo** do iframe
+    está fora da tela — com autoresize, quase sempre. A página ia para o
+    meio do documento entre apertar e soltar o botão, e o clique caía em
+    outro lugar. Correção (J1, `codexplus-editor.js`): sobrescrever o
+    `scrollIntoView` **da instância** do iframe e só rolar se ele estiver
+    inteiro fora da tela.
+130. **Bloco travado selecionado rola até o fim.** Com um `contenteditable=
+    false` selecionado, o TinyMCE dá foco ao `body` e ao
+    `.mce-offscreen-selection` sem `preventScroll`; o navegador rola até o
+    contêiner. Correção: no `HTMLElement.prototype.focus` da janela do
+    iframe, `preventScroll:true` para esses dois.
+131. **Clique em célula editável depois de selecionar o bloco se perde**
+    (cursor fora da planilha). No `click`, se o alvo é `td.cx-sheet-edit` e
+    a seleção não está nele: `focus()` + `caretRangeFromPoint` (ou
+    `select(td, true)` + `collapse`).
+132. **Ilhas editáveis no TinyMCE 7.9:** `contenteditable=true` dentro de
+    `contenteditable=false` funciona (foco e digitação no `td`). Marcas só
+    no editor; botões com `data-mce-bogus="all"` (saem do `getContent` e do
+    Desfazer); `PreProcess` recebe uma **cópia** — refazer ali a tabela pelo
+    JSON. Atalhos (Tab, Enter) no `keydown` com `prepend` +
+    `stopImmediatePropagation` (passam na frente do plugin `table`).
+133. **Medir salto de rolagem no Playwright:** `locator.click()` rola o
+    alvo para a tela antes de clicar (mascara o bug) — usar `page.mouse.click`
+    em coordenadas de algo já visível; e a página do GLPI tem rolagem suave:
+    `scroll-behavior:auto` antes de medir, senão mede no meio da animação.
+134. **`Dropdown::showFromArray` com `multiple`:** gera `name[]` e um hidden
+    `name` vazio antes do select — sem nada escolhido chega `''` (dá para
+    esvaziar a lista). Tratar `''`, id solto e array (`DocumentEditor::
+    normalize`).
+135. **`post_updateItem` roda em todo update bem-sucedido** e `$this->input`
+    ainda tem as chaves com `_` (listas como `_editors`, `_approvers`):
+    gravar listas filhas ali. Comparar listas como conjunto (ordem da tela
+    não é mudança) e manter primeiro quem já estava.
+136. **Harness com o GLPI real no container:** `define('TU_USER', …)` antes
+    do autoload (sem ele, `Session::init` quebra no `session_regenerate_id`
+    do CLI); `Kernel('development')->boot()`; MariaDB e `php -S` morrem
+    entre chamadas — subir no mesmo comando. Cache estático das nossas
+    classes (`DocumentApprover`, `DocumentEditor`) dura o processo inteiro:
+    em teste, mexer pela API, não por SQL direto.
+137. **Modelo de cenário não vai no Install.** Modelo com a cara de um
+    cliente é dado da instalação: leva-se como linha da tabela de modelos
+    (`mysqldump --where`), nunca por semente. O plugin só traz modelos
+    genéricos (3c-3b).
+138. **Texto colado de fora junta várias "linhas" num parágrafo** com `<br>`
+    ("AVALIAÇÃO; texto… <br> MATERIAIS…:"). Para pegar o título logo acima
+    de um bloco: última linha do elemento anterior, contando `<br>` e
+    blocos filhos como quebra.
+139. **Regra prometida na entrega precisa de teste.** No A-2a foi dito que
+    "quem editou não valida" valia para os aprovadores, e não estava
+    implementado — nem para o auditor (o comentário citava a regra, o código
+    não conferia). Toda regra escrita no texto da entrega entra no harness.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -2718,7 +2911,7 @@ codexplus/
 │   ├── Template.php           modelos por tipo, lista da criação, sem imagem (R3b4, M1)
 │   ├── Dashboard.php          indicadores do Painel (modelo novo)
 │   ├── Branding.php           marca, cabeçalho, JSON de impressão
-│   ├── Rights.php             bits, Super-Admin, listas por bit, isProducer (P1, B1)
+│   ├── Rights.php             bits, Super-Admin, roleUsers (quem tem Ler, P3), auditores, isProducer (P1, B1, P3)
 │   ├── ProfileTab.php         aba Codex+ em Perfis (Self-Service só Ler)
 │   ├── StructureRights.php    direitos de setores e categorias (R2)
 │   ├── Sector.php             setor (organização; setor de auditoria)
@@ -2727,6 +2920,8 @@ codexplus/
 │   ├── Document_*.php         ligações: categoria, perfil, grupo, usuário (R3a)
 │   ├── TargetRelation.php     comum aos três alvos de leitura (R3a)
 │   ├── DocumentContributor.php quem alterou cada revisão (histórico)
+│   ├── DocumentEditor.php     editores da Proposta e do Laudo (A-1)
+│   ├── DocumentApprover.php   aprovadores de DIA e DIV, data de cada aprovação (A-2a)
 │   ├── DocumentVersion.php    versões publicadas (R6-a)
 │   ├── Diagram.php            diagrama DIA: organograma, cronograma (com datas: Q7b), RACI (D1), fluxograma (Q5a)
 │   ├── ScheduleStatus.php     situação das tarefas do cronograma (Q7b-4)
@@ -2750,8 +2945,8 @@ codexplus/
 │   ├── js/codexplus.js        PDF (paginação manual)
 │   ├── js/codexplus-org.js    motor do organograma (grafo)
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1); com datas, fases, marcos, importar/exportar, tela cheia e situação (Q7b)
-│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2)
-│   ├── js/codexplus-sheet.js  planilha no editor (PL1)
+│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2), sem salto de rolagem (J1)
+│   ├── js/codexplus-sheet.js  planilha no editor (PL1), edição no lugar e Parâmetros (3c-1), Resumo do investimento (3c-2)
 │   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f); importar e exportar (cópia .json e Mermaid, Q5i)
 │   ├── js/codexplus-flow.js   fluxograma no documento DIA: leitura em SVG, abrir o motor, gravar, PNG e PDF (Q5a)
 │   ├── js/codexplus-icons.js  ícones próprios do quadro (Q1) e os criados na instalação (Q4)

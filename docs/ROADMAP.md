@@ -1,10 +1,16 @@
 # Codex+ — roadmap
 
-> Estado em **`v0.7.3`** (último commit de código **`c4ad5ff`**) ·
-> atualizado em **04/10/2026**: **3c-0 ✅** paginação do PDF (`5561ec6`),
+> Estado em **`v0.7.6`** (último commit de código **`382b7de`**) ·
+> atualizado em **04/10/2026 (tarde e noite)**: **3c-1 ✅** planilha no
+> lugar, **A-1 ✅** vários editores, **A-2a ✅** aprovadores (DIA e DIV),
+> **P3 ✅** papéis no documento (perfil só Ler + Auditar), **A-2b ✅**
+> aprovadores na tela e no PDF, **3c-2 ✅** Resumo do investimento, **J1 ✅**
+> salto de rolagem, **3c-3/3c-3b ✅** modelo de Proposta como dado — CONTEXTO,
+> seção 3.16. Próximo: **perguntar a Claudio — resto da 3c (Manual, POP e
+> PSG, como dado) ou R6-b**. Antes, de manhã:
+> **3c-0 ✅** paginação do PDF (`5561ec6`),
 > **M-1 ✅** cadastro de marcas (`1525c34`), **M-2 ✅** marca do documento
-> (`c4ad5ff`), ícone do plugin — CONTEXTO, seções 3.14 e 3.15. Próximo:
-> **3c — modelos com conteúdo real**. Antes,
+> (`c4ad5ff`), ícone do plugin — CONTEXTO, seções 3.14 e 3.15. Antes,
 > atualizado em **03–04/10/2026 (noite)**: **Q7b ✅ cronograma completo** —
 > Q7b-1 (datas, arrastar), Q7b-2 (fases, marcos, hoje), Q7b-3
 > (importar/exportar `.json` + tabela para IA, também RACI), Q7b-2b (desenho
@@ -99,7 +105,8 @@ Vale sobre a lista acima quando houver conflito.
 > conferência** desse servidor (PHP, extensões, MariaDB, espaço, acesso ao
 > GitHub), só leitura. Ordem: ~~Q5g~~ ✅ → ~~Q5h~~ ✅ → ~~Q5i~~ ✅ (03/10)
 > → ~~Q6~~ ✅ → ~~Q7a~~ ✅ (03/10) → ~~Q7b-1 a Q7b-4 (cronograma)~~ ✅
-> (03–04/10) → ~~3c-0, M-1, M-2~~ ✅ (04/10) → **3c** →
+> (03–04/10) → ~~3c-0, M-1, M-2~~ ✅ (04/10) → **3c** (Proposta ✅ 04/10;
+> falta Manual, POP e PSG — como dado, 3c-3b) →
 > R6-b → R7 → Etapa 5 → caça a bugs → produção (com a Etapa 7 logo depois)
 > → aba de Histórico e galeria de Modelos (Claudio, 03/10: "quando
 > finalizar toda a produção").
@@ -364,6 +371,16 @@ são esqueletos.
 **Aceite:** criar uma proposta a partir do modelo e ter um documento
 apresentável ao cliente com pouca edição.
 
+**Estado (04/10/2026):** Proposta ✅ — planilha no lugar (3c-1), Resumo do
+investimento (3c-2) e modelo completo, que é **dado da homologação**, não
+código (3c-3b; achado 137). Falta: **Manual** (padrão: manual de
+atendimento de chamados da Resolutto) e **POP/PSG** — também como dado
+(montados na homologação e salvos como modelo), com eventual ajuste
+genérico nas sementes do plugin (tirar a tabela "Histórico de revisão"
+escrita à mão, que a R6-b põe no PDF). **Imagem anexa no PDF da proposta**
+(decisão de 19/09) não foi feita: a Planta cobre o caso principal —
+confirmar com Claudio se ainda vale.
+
 ---
 
 ## Etapa 5 — PSG e seus POPs
@@ -553,6 +570,19 @@ real, Bibi Calçados) e o **manual de atendimento de chamados da
 Resolutto** (feito fora do Codex+), padrão para o Manual e referência para
 POP e PSG.
 
+## Sessão de 04/10/2026 (tarde e noite) — 3c, editores, aprovadores, P3 ✅
+
+| Bloco | O quê | Commit |
+|---|---|---|
+| 3c-1 | Planilha editada no documento (células de texto/número/moeda), calculadas travadas, Tab/Enter, "+ Linha", janela pelo botão Parâmetros; gravado igual ao de antes | `3b6cd55` |
+| A-1 | Vários editores na Proposta e no Laudo (tabela `documenteditors`), espelho no `users_id_reviewer`, Histórico; 0.7.4 | `bff4a1c` |
+| A-2a | Aprovadores em DIA: etapa antes do responsável, qualquer ordem, devolver zera, Painel "Aguardando você"; tabela `documentapprovers`; 0.7.5 | `2dde64c` |
+| P3 | Papéis escolhidos no documento entre quem tem Ler; perfil sem "Revisar e editar" e "Aprovar"; Auditar fica; quem montou não aprova nem audita; aprovadores também no DIV | `45a58b4` |
+| A-2b | Aprovadores no rodapé da edição, na leitura, no PDF/Word e nos PDFs dos diagramas | `ebc6f25` |
+| 3c-2 + J1 | Resumo do investimento (RESUMO, nome = título acima da planilha, Total geral, automático); página não pula ao clicar em planilha, planta ou topologia | `c5d10bb` |
+| 3c-3 | Modelo completo de Proposta (entrou pelo Install) e planilha remontada pelo JSON; 0.7.6 | `ae40fe3` |
+| 3c-3b | Modelo da Resolutto sai do código (é dado da homologação); semente de Proposta genérica | `382b7de` |
+
 ## Backlog (pequenos ajustes, revisar no fim das etapas)
 
 - PDF: partir planilha/tabela maior que uma folha, repetindo o cabeçalho
@@ -598,6 +628,15 @@ POP e PSG.
 - Imagens dentro de modelos (copiar o arquivo para cada documento novo)
 - "Autor:" vazio em documentos migrados sem autor: mostrar "—"
 - Planilha: gráficos, SE/PROCV e mesclar células ficam fora por ora
+- Aprovadores: guardar quem aprovou **cada versão publicada** (hoje, durante
+  uma revisão, a leitura da versão publicada mostra só os nomes) — coluna na
+  tabela de versões
+- Painel: filtro de status com "Aguardando aprovadores" próprio (hoje conta
+  como "Aguardando responsável"; o status gravado é `aprovacao`)
+- Barra do editor: com o botão Resumo, Importar, <> e Tela cheia foram para
+  o "•••" em 1920 px — reordenar se incomodar
+- Homologação: marcador `codexplus_3c3_prp_full` em `glpi_configs`
+  (inofensivo; apagar quando quiser)
 
 ## Decisões pendentes
 
@@ -612,14 +651,37 @@ POP e PSG.
       ficaram bons): levar por scripts nossos na etapa de produção, caso a
       caso (Claudio, 03/10/2026). Listar quais antes da subida
 
+- [ ] **Imagem anexa no PDF da proposta** (19/09): ainda vale, com a Planta
+      já cobrindo o caso principal?
+- [ ] **Galeria de Modelos** (fim da fila): proposta de escopo — catálogo
+      público de modelos da Teckcomp (ex.: repositório no GitHub), listado e
+      importado com um clique na tela Modelos (Claudio, 04/10: só faz
+      sentido exportar/importar se for isso)
+
 **Decididas:**
+
+- [x] **Papéis no documento (P3)**, substitui a parte de bits do P1:
+      responsável, editores, revisor e aprovadores entre quem tem Ler;
+      Auditar fica no perfil; quem montou (autor, editores, revisor) não
+      aprova nem audita; responsável não é aprovador — Claudio, 04/10/2026
+- [x] **Aprovadores** em DIA e DIV: etapa antes do responsável, qualquer
+      ordem, devolver zera, sem aprovador = fluxo antigo, só usuários —
+      Claudio, 04/10/2026 (A-2a, P3)
+- [x] **Vários editores** na Proposta e no Laudo, só usuários — Claudio,
+      04/10/2026 (A-1)
+- [x] **Proposta:** total geral (Resumo do investimento, cabeçalho RESUMO),
+      sem condições comerciais e sem aceite; planilha editada no lugar —
+      Claudio, 04/10/2026 (3c)
+- [x] **Modelo é dado da instalação**, nunca semente do Install; vai para
+      produção por comando junto com os documentos — Claudio, 04/10/2026
+      (3c-3b)
 
 - [x] **Q5i = importar e exportar para o uso real**: `.bpmn` no backlog;
       formato de troca = **Mermaid** (o que as IAs geram); só arquivos e
       botões, sem código à vista; PNG e PDF onde estão; imagem e PDF pela
       IA do usuário — Claudio, 03/10/2026
 
-- [x] **Papéis pelo perfil** (Responsável/Aprovar, Auditor/Auditar,
+- [x] ~~**Papéis pelo perfil**~~ (substituído pelo P3 em 04/10/2026, salvo o Auditar) (Responsável/Aprovar, Auditor/Auditar,
       Revisor/Revisar e editar), sem gestor de setor nem editores; o
       auditor não edita — Claudio, 26/09/2026 (P1)
 - [x] **Fluxo por tipo**: DTC uma etapa; PRP e LAU publicação direta;

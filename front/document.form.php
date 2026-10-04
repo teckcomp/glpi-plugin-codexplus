@@ -250,7 +250,7 @@ if ($id > 0 && isset($_POST['duplicate'])) {
             : (string) $doc->fields['name'],
         'doctype'        => $destino,
         'content'        => (string) ($doc->fields['content'] ?? ''),
-        // Responsável = quem duplica, se tiver o direito Aprovar; senão vazio.
+        // Responsável = quem duplica, se tiver Ler (P3); senão vazio.
         'users_id_owner' => in_array((int) Session::getLoginUserID(), Rights::approverUsers((int) $doc->fields['entities_id']), true)
             ? (int) Session::getLoginUserID() : 0,
         '_categories'    => $cats,
@@ -703,7 +703,7 @@ if ($canEdit) {
         $aprov   = Rights::approverUsers($ent);
         $me      = (int) Session::getLoginUserID();
         $ownerId = $isNew ? (in_array($me, $aprov, true) ? $me : 0) : (int) ($doc->fields['users_id_owner'] ?? 0);
-        $widgets['owner'] = Dropdown::showFromArray('users_id_owner', $roleOptions($aprov, $ownerId, __('(sem o direito Aprovar)', 'codexplus')), [
+        $widgets['owner'] = Dropdown::showFromArray('users_id_owner', $roleOptions($aprov, $ownerId, __('(sem o direito Ler)', 'codexplus')), [
             'value'   => $ownerId,
             'display' => false,
             'width'   => '100%',
@@ -815,7 +815,7 @@ $fmtDate = static fn ($d) => empty($d) ? '' : substr((string) $d, 0, 10);
 $auditorOptions = static fn (int $entityId, int $atual): array
     => $roleOptions(Rights::auditorUsers($entityId), $atual, __('(sem o direito Auditar)', 'codexplus'));
 $reviewerOptions = static fn (int $entityId, int $atual): array
-    => $roleOptions(Rights::reviewerUsers($entityId), $atual, __('(sem o direito Revisar e editar)', 'codexplus'));
+    => $roleOptions(Rights::reviewerUsers($entityId), $atual, __('(sem o direito Ler)', 'codexplus'));
 // A-1: editores (vários) — mesma lista de quem tem Revisar e editar; quem já é
 // editor e perdeu o bit continua na lista, marcado.
 $editorOptions = static function (int $entityId, array $atuais) use ($reviewerOptions): array {
@@ -823,7 +823,7 @@ $editorOptions = static function (int $entityId, array $atuais) use ($reviewerOp
     unset($opcoes[0]);
     foreach ($atuais as $uid) {
         if (!isset($opcoes[$uid])) {
-            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Revisar e editar)', 'codexplus');
+            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Ler)', 'codexplus');
         }
     }
     return $opcoes;
@@ -834,7 +834,7 @@ $signerOptions = static function (int $entityId, array $atuais) use ($roleOption
     unset($opcoes[0]);
     foreach ($atuais as $uid) {
         if (!isset($opcoes[$uid])) {
-            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Aprovar)', 'codexplus');
+            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Ler)', 'codexplus');
         }
     }
     return $opcoes;
@@ -972,9 +972,8 @@ if (!$isNew) {
     // perfil (bit) + papel no plugin.
     $st0 = (string) $doc->fields['status'];
     if ($doc->signerLacksRight()) {
-        $missingRight = __('Você é aprovador deste documento, mas o perfil em uso não tem o direito Aprovar do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
-    } elseif ($st0 === Document::STATUS_APPROVAL && $doc->isOwner() && !$doc->canApprove() && !$doc->signersPending()) {
-        $missingRight = __('Você é o responsável deste documento, mas o perfil em uso não tem o direito Aprovar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+        // P3: aprovador que montou o documento (papel em conflito anterior à regra).
+        $missingRight = __('Você é aprovador deste documento, mas também o montou (autor, editor ou revisor): não pode aprová-lo. Você pode devolvê-lo; quem gere o documento troca os aprovadores no rascunho.', 'codexplus');
     } elseif ($doc->validationBlocker() === 'perfil') {
         $missingRight = __('Você é o auditor responsável deste documento, mas o perfil em uso não tem o direito Auditar do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
     }
@@ -1069,6 +1068,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     // A2: auditor responsável impedido de validar (aprovou a 1ª etapa). O motivo 'perfil' vai em missing_right.
     'validation_block' => $isNew || $version['on'] ? '' : match ($doc->validationBlocker()) {
         'aprovou' => __('Você aprovou a 1ª etapa deste documento: outro auditor precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
+        'montou'  => __('Você montou este documento (autor, editor ou revisor): outro auditor precisa validá-lo. Você ainda pode devolvê-lo.', 'codexplus'),
         default   => '',
     },
     'can_obsolete' => !$isNew && $doc->canMarkObsolete(),

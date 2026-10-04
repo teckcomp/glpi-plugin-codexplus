@@ -54,10 +54,12 @@ final class Rights
     public static function getLabels(): array
     {
         return [
+            // P3 (Claudio, 04/10/2026): "Revisar e editar" e "Aprovar" saíram
+            // da matriz — editor, revisor, responsável e aprovador se escolhem
+            // no documento, entre quem tem Ler. Os bits antigos ficam
+            // gravados nos perfis e ninguém mais lê. Auditar continua.
             self::READ      => __('Ler', 'codexplus'),
             self::CREATE    => __('Criar', 'codexplus'),
-            self::UPDATE    => __('Revisar e editar', 'codexplus'),
-            self::APPROVE   => __('Aprovar', 'codexplus'),
             self::VALIDATE  => __('Auditar', 'codexplus'),
             self::DELETE    => __('Excluir', 'codexplus'),
             self::VIEWALL   => __('Ver todos', 'codexplus'),
@@ -76,9 +78,45 @@ final class Rights
         if (\Session::getCurrentInterface() === 'helpdesk') {
             return false;
         }
-        return self::isSuperAdmin() || (bool) \Session::haveRightsOr(self::NAME, [
-            self::CREATE, self::UPDATE, self::APPROVE, self::VALIDATE, self::VIEWALL, self::TEMPLATES,
-        ]);
+        if (self::isSuperAdmin() || \Session::haveRightsOr(self::NAME, [
+            self::CREATE, self::VALIDATE, self::VIEWALL, self::TEMPLATES,
+        ])) {
+            return true;
+        }
+        // P3: quem só tem Ler mas tem papel em algum documento (responsável,
+        // editor, revisor, aprovador) também produz: precisa do Painel.
+        return \Session::haveRight(self::NAME, self::READ) && self::hasDocumentRole((int) \Session::getLoginUserID());
+    }
+
+    /** P3: o usuário tem algum papel num documento não excluído? */
+    public static function hasDocumentRole(int $userId): bool
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        if ($userId <= 0) {
+            return false;
+        }
+        $t = Install::DOCUMENTS_TABLE;
+        $row = $DB->request([
+            'COUNT' => 'cpt',
+            'FROM'  => $t,
+            'WHERE' => [
+                'is_deleted' => 0,
+                'OR'         => [
+                    ['users_id_owner' => $userId],
+                    ['users_id_reviewer' => $userId],
+                    ['users_id_auditor' => $userId],
+                    ['id' => new \Glpi\DBAL\QuerySubQuery([
+                        'SELECT' => 'plugin_codexplus_documents_id', 'FROM' => Install::DOC_EDITORS_TABLE, 'WHERE' => ['users_id' => $userId],
+                    ])],
+                    ['id' => new \Glpi\DBAL\QuerySubQuery([
+                        'SELECT' => 'plugin_codexplus_documents_id', 'FROM' => Install::DOC_APPROVERS_TABLE, 'WHERE' => ['users_id' => $userId],
+                    ])],
+                ],
+            ],
+        ])->current();
+        return (int) ($row['cpt'] ?? 0) > 0;
     }
 
     /**
@@ -96,16 +134,26 @@ final class Rights
         return self::usersWithBit(self::VALIDATE, $entityId, false);
     }
 
-    /** Quem pode ser responsável (P1): bit Aprovar, ou Super-Admin. */
-    public static function approverUsers(int $entityId): array
+    /**
+     * P3 (Claudio, 04/10/2026): quem pode ter papel no documento —
+     * responsável, editor, revisor e aprovador: quem tem Ler no Codex+
+     * (perfil da interface padrão na entidade), ou Super-Admin.
+     */
+    public static function roleUsers(int $entityId): array
     {
-        return self::usersWithBit(self::APPROVE, $entityId, true);
+        return self::usersWithBit(self::READ, $entityId, true);
     }
 
-    /** Quem pode ser revisor (P1): bit Revisar e editar, ou Super-Admin. */
+    /** Responsável e aprovadores (P3: antes, bit Aprovar). */
+    public static function approverUsers(int $entityId): array
+    {
+        return self::roleUsers($entityId);
+    }
+
+    /** Revisor e editores (P3: antes, bit Revisar e editar). */
     public static function reviewerUsers(int $entityId): array
     {
-        return self::usersWithBit(self::UPDATE, $entityId, true);
+        return self::roleUsers($entityId);
     }
 
     /**

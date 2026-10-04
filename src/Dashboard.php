@@ -102,10 +102,14 @@ class Dashboard
             $bloqueio = '';
             if (!$pode) {
                 if ($etapa1) {
-                    $bloqueio = __('seu perfil atual não tem o direito Aprovar do Codex+', 'codexplus');
+                    // P3: o aprovador que montou o documento não aprova (pode devolver).
+                    $bloqueio = $assina
+                        ? __('você montou este documento (autor, editor ou revisor): não pode aprová-lo, só devolver', 'codexplus')
+                        : __('sem permissão para aprovar esta etapa', 'codexplus');
                 } else {
                     $bloqueio = match ($doc->validationBlocker()) {
                         'aprovou' => __('você aprovou a 1ª etapa: outro auditor precisa validar (você pode devolver)', 'codexplus'),
+                        'montou'  => __('você montou este documento (autor, editor ou revisor): outro auditor precisa validar (você pode devolver)', 'codexplus'),
                         default   => __('seu perfil atual não tem o direito Auditor do Codex+ (se outro perfil seu tem, troque para ele)', 'codexplus'),
                     };
                 }

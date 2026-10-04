@@ -17,7 +17,7 @@
     <label>{{ __('Aprovadores', 'codexplus') }}</label>
     {% if review.can_signers %}
         {{ review.signers_widget|raw }}
-        <div class="codexplus-form-hint">{{ __('Antes do responsável: depois do envio, cada um aprova, em qualquer ordem. Em branco, o fluxo segue direto para o responsável. Aparece quem tem o direito Aprovar.', 'codexplus') }}</div>
+        <div class="codexplus-form-hint">{{ __('Antes do responsável: depois do envio, cada um aprova, em qualquer ordem. Em branco, o fluxo segue direto para o responsável. Quem montou o documento (autor, editores, revisor) e o responsável não podem ser aprovadores. Aparece quem tem Ler no Codex+.', 'codexplus') }}</div>
     {% else %}
         <div class="cx-docform-readonly">{{ review.signers_names ?: '—' }}</div>
         <div class="codexplus-form-hint">{{ __('Os aprovadores só mudam em rascunho, por quem gere o documento.', 'codexplus') }}</div>
@@ -35,7 +35,7 @@
             {% if review.no_auditors %}
                 {{ __('Ninguém tem perfil de auditor nesta entidade. O auditor é quem tem a coluna Auditor marcada no perfil (Administração → Perfis → aba Codex+). Dá para escolher depois, antes de enviar para validação.', 'codexplus') }}
             {% else %}
-                {{ __('2ª etapa: aprova e publica, ou devolve com o que corrigir. Não edita. Aparece quem tem o direito Auditar.', 'codexplus') }}
+                {{ __('2ª etapa: aprova e publica, ou devolve com o que corrigir. Não edita. Quem montou o documento (autor, editores, revisor) não pode ser o auditor. Aparece quem tem o direito Auditar.', 'codexplus') }}
             {% endif %}
         </div>
     {% else %}
@@ -54,7 +54,7 @@
     <label>{{ __('Editores', 'codexplus') }}</label>
     {% if review.can_review %}
         {{ review.editor_widget|raw }}
-        <div class="codexplus-form-hint">{{ __('Montam o documento junto com o responsável e o autor: editam o rascunho, mas não publicam (quem publica é o responsável). Pode escolher mais de um. Aparece quem tem o direito Revisar e editar.', 'codexplus') }}</div>
+        <div class="codexplus-form-hint">{{ __('Montam o documento junto com o responsável e o autor: editam o rascunho, mas não publicam (quem publica é o responsável). Pode escolher mais de um. Aparece quem tem Ler no Codex+.', 'codexplus') }}</div>
     {% else %}
         <div class="cx-docform-readonly">{{ review.reviewer_name ?: '—' }}</div>
     {% endif %}

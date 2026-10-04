@@ -144,9 +144,14 @@ class Document extends CommonDBTM
         return self::bit(Rights::CREATE);
     }
 
+    /**
+     * P3 (Claudio, 04/10/2026): editar é do papel no documento (responsável,
+     * editor, revisor, autor), não de um bit — a camada do perfil só exige
+     * Ler. canUpdateItem decide.
+     */
     public static function canUpdate(): bool
     {
-        return self::bit(Rights::UPDATE);
+        return self::bit(Rights::READ);
     }
 
     public static function canDelete(): bool
@@ -281,7 +286,84 @@ class Document extends CommonDBTM
         if ($this->isApprover() && !$this->isAuditSectorOnly()) {
             return 'aprovou';
         }
+        if ($this->builtByMe() && !$this->isAuditSectorOnly()) {
+            return 'montou';
+        }
         return '';
+    }
+
+    /**
+     * P3 (Claudio, 04/10/2026): "quem montou não aprova nem audita". Montou =
+     * autor, editores, revisor ou quem alterou o conteúdo nesta revisão.
+     */
+    public function builtByMe(): bool
+    {
+        $me = (int) Session::getLoginUserID();
+        if ($me <= 0) {
+            return false;
+        }
+        return in_array($me, $this->builderIds(), true) || $this->isContributor();
+    }
+
+    /** @return int[] autor, editores (fluxo direto) e revisor */
+    public function builderIds(): array
+    {
+        $ids = [(int) ($this->fields['users_id'] ?? 0), (int) ($this->fields['users_id_reviewer'] ?? 0)];
+        if ($this->flow() === DocumentMeta::FLOW_DIRECT) {
+            $ids = array_merge($ids, DocumentEditor::ids((int) ($this->fields['id'] ?? 0)));
+        }
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    /**
+     * P3: confere os papéis do documento contra a regra acima, com o que vai
+     * ficar gravado ($input sobre os campos atuais). Devolve a mensagem do
+     * primeiro conflito ou null.
+     *   - aprovador não pode ser autor, editor, revisor nem o responsável
+     *     (o responsável já aprova a etapa dele);
+     *   - auditor não pode ser autor, editor nem revisor (responsável ≠
+     *     auditor continua no envio), salvo em documento só de setor de
+     *     auditoria (A2).
+     */
+    private function roleConflict(array $input, bool $novo): ?string
+    {
+        $get = function (string $k) use ($input, $novo): int {
+            if (array_key_exists($k, $input)) {
+                return (int) $input[$k];
+            }
+            return $novo ? 0 : (int) ($this->fields[$k] ?? 0);
+        };
+        $doctype = (string) ($input['doctype'] ?? $this->fields['doctype'] ?? '');
+        $autor   = $novo ? (int) Session::getLoginUserID() : (int) ($this->fields['users_id'] ?? 0);
+        $owner   = $get('users_id_owner');
+        $auditor = $get('users_id_auditor');
+        $montou  = [$autor, $get('users_id_reviewer')];
+        if (DocumentMeta::flowOf($doctype) === DocumentMeta::FLOW_DIRECT) {
+            $montou = array_merge($montou, array_key_exists('_editors', $input)
+                ? (array) $input['_editors']
+                : ($novo ? [] : DocumentEditor::ids((int) $this->fields['id'])));
+        }
+        $montou = array_values(array_unique(array_filter(array_map('intval', $montou))));
+
+        if (self::typeUsesApprovers($doctype)) {
+            $aprov = array_key_exists('_approvers', $input)
+                ? (array) $input['_approvers']
+                : ($novo ? [] : DocumentApprover::ids((int) $this->fields['id']));
+            $x = array_intersect($aprov, $montou);
+            if ($x !== []) {
+                return sprintf(__('Quem montou o documento (autor, editor ou revisor) não pode ser aprovador: %s.', 'codexplus'), DocumentEditor::names($x));
+            }
+            if ($owner > 0 && in_array($owner, $aprov, true)) {
+                return sprintf(__('O responsável já aprova a etapa dele: não pode ser também aprovador (%s).', 'codexplus'), getUserName($owner));
+            }
+        }
+        if ($auditor > 0 && in_array($auditor, $montou, true) && DocumentMeta::flowOf($doctype) === DocumentMeta::FLOW_FULL) {
+            $soAuditoria = !$novo && $this->isAuditSectorOnly();
+            if (!$soAuditoria) {
+                return sprintf(__('Quem montou o documento (autor, editor ou revisor) não pode ser o auditor: %s.', 'codexplus'), getUserName($auditor));
+            }
+        }
+        return null;
     }
 
     /**
@@ -328,7 +410,7 @@ class Document extends CommonDBTM
     // ---------------------------------------------------------------------
 
     /** Tipos com aprovadores (Claudio, 04/10/2026: os diagramas). */
-    public const APPROVER_TYPES = ['DIA'];
+    public const APPROVER_TYPES = ['DIA', 'DIV']; // P3: + Documento Diverso
 
     public static function typeUsesApprovers(string $doctype): bool
     {
@@ -366,12 +448,13 @@ class Document extends CommonDBTM
         }
         $id = (int) $this->fields['id'];
         $me = (int) Session::getLoginUserID();
+        // P3: sem o bit Aprovar; quem montou o documento não aprova.
         return DocumentApprover::has($id, $me)
             && !DocumentApprover::hasApproved($id, $me)
-            && (Rights::isSuperAdmin() || self::bit(Rights::APPROVE));
+            && !$this->builtByMe();
     }
 
-    /** O aprovador da sessão está na vez, mas o perfil em uso não tem o bit. */
+    /** O aprovador da sessão está na vez, mas montou o documento (P3). */
     public function signerLacksRight(): bool
     {
         $id = (int) ($this->fields['id'] ?? 0);
@@ -560,7 +643,7 @@ class Document extends CommonDBTM
         return $this->flow() === DocumentMeta::FLOW_DIRECT
             && $this->status() === self::STATUS_DRAFT
             && $this->checkEntity()
-            && (Rights::isSuperAdmin() || (self::bit(Rights::APPROVE) && $this->isOwner()));
+            && (Rights::isSuperAdmin() || $this->isOwner()); // P3: sem o bit Aprovar
     }
 
     /** 1ª etapa (P1): o responsável, com o bit Aprovar, aprova. */
@@ -574,7 +657,7 @@ class Document extends CommonDBTM
         if ($this->signersPending()) {
             return false;
         }
-        return Rights::isSuperAdmin() || (self::bit(Rights::APPROVE) && $this->isOwner());
+        return Rights::isSuperAdmin() || $this->isOwner(); // P3: sem o bit Aprovar
     }
 
     /**
@@ -595,7 +678,8 @@ class Document extends CommonDBTM
         }
         return self::bit(Rights::VALIDATE)
             && $this->isAuditor()
-            && (!$this->isApprover() || $this->isAuditSectorOnly());
+            && (!$this->isApprover() || $this->isAuditSectorOnly())
+            && (!$this->builtByMe() || $this->isAuditSectorOnly()); // P3
     }
 
     /**
@@ -607,7 +691,7 @@ class Document extends CommonDBTM
     public function canReject(): bool
     {
         // A-2a: aprovador na vez também devolve.
-        if ($this->canApprove() || $this->canValidate() || $this->canSign()) {
+        if ($this->canApprove() || $this->canValidate() || $this->canSign() || $this->signerLacksRight()) {
             return true;
         }
         return $this->status() === self::STATUS_VALIDATION
@@ -908,14 +992,18 @@ class Document extends CommonDBTM
         if (($erro = $this->placementError()) !== null) {
             return $this->deny($erro);
         }
-        // 1ª etapa precisa do responsável com o bit Aprovar (P1).
+        // P3: documento de antes da regra pode ter papel em conflito.
+        if (($erro = $this->roleConflict([], false)) !== null) {
+            return $this->deny($erro . ' ' . __('Ajuste os papéis e salve antes de enviar.', 'codexplus'));
+        }
+        // 1ª etapa precisa do responsável, com Ler no Codex+ (P3; antes, Aprovar).
         if (!Rights::isSuperAdmin()) {
             $owner = (int) ($this->fields['users_id_owner'] ?? 0);
             if ($owner <= 0) {
                 return $this->deny(__('Escolha o responsável antes de enviar: é ele quem aprova a 1ª etapa.', 'codexplus'));
             }
             if (!in_array($owner, Rights::approverUsers((int) $this->fields['entities_id']), true)) {
-                return $this->deny(__('O responsável escolhido não tem o direito Aprovar no perfil. Escolha outro.', 'codexplus'));
+                return $this->deny(__('O responsável escolhido não tem o direito Ler do Codex+ no perfil. Escolha outro.', 'codexplus'));
             }
         }
         // 2ª etapa precisa de alguém (só no fluxo completo, P2): o auditor responsável, que ainda tenha
@@ -950,7 +1038,7 @@ class Document extends CommonDBTM
             );
             if ($sem !== []) {
                 return $this->deny(sprintf(
-                    __('Aprovador sem o direito Aprovar no perfil: %s. Tire da lista ou peça o direito a um administrador.', 'codexplus'),
+                    __('Aprovador sem o direito Ler do Codex+ no perfil: %s. Tire da lista ou peça o direito a um administrador.', 'codexplus'),
                     DocumentEditor::names($sem)
                 ));
             }
@@ -973,7 +1061,7 @@ class Document extends CommonDBTM
     public function managerApprove(string $comment = ''): bool
     {
         if (!$this->canApprove()) {
-            return $this->deny(__('Sem direito de aprovar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
+            return $this->deny(__('Sem direito de aprovar este documento (é preciso ser o responsável).', 'codexplus'));
         }
         $comment = trim($comment);
         $aprov = [
@@ -997,7 +1085,7 @@ class Document extends CommonDBTM
     public function publishDirect(string $summary = ''): bool
     {
         if (!$this->canPublishDirect()) {
-            return $this->deny(__('Sem direito de publicar este documento (é preciso ser o responsável, com o direito Aprovar).', 'codexplus'));
+            return $this->deny(__('Sem direito de publicar este documento (é preciso ser o responsável).', 'codexplus'));
         }
         if (($erro = $this->placementError()) !== null) {
             return $this->deny($erro);
@@ -1532,13 +1620,13 @@ class Document extends CommonDBTM
         // P1: cada papel vem do bit no perfil.
         if (isset($mudou['users_id_owner']) && (int) $input['users_id_owner'] > 0
             && !in_array((int) $input['users_id_owner'], Rights::approverUsers($entityId), true)) {
-            return $this->deny(__('O responsável tem que ter o direito Aprovar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+            return $this->deny(__('O responsável tem que ter o direito Ler do Codex+ no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
         }
         if (isset($mudou['users_id_reviewer']) && (int) $input['users_id_reviewer'] > 0
             && !in_array((int) $input['users_id_reviewer'], Rights::reviewerUsers($entityId), true)) {
             return $this->deny(DocumentMeta::flowOf((string) ($input['doctype'] ?? $this->fields['doctype'] ?? '')) === DocumentMeta::FLOW_DIRECT
-                ? __('O editor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus')
-                : __('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+                ? __('O editor tem que ter o direito Ler do Codex+ no perfil (Administração → Perfis → aba Codex+).', 'codexplus')
+                : __('O revisor tem que ter o direito Ler do Codex+ no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
         }
         if (isset($mudou['_approvers']) && !$novo && $this->status() !== self::STATUS_DRAFT) {
             return $this->deny(__('Os aprovadores só mudam em rascunho.', 'codexplus'));
@@ -1546,14 +1634,14 @@ class Document extends CommonDBTM
         $semAprovar = array_diff($novosAprov, Rights::approverUsers($entityId));
         if ($semAprovar !== []) {
             return $this->deny(sprintf(
-                __('Aprovador sem o direito Aprovar no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
+                __('Aprovador sem o direito Ler do Codex+ no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
                 DocumentEditor::names($semAprovar)
             ));
         }
         $semBit = array_diff($novosEditores, Rights::reviewerUsers($entityId));
         if ($semBit !== []) {
             return $this->deny(sprintf(
-                __('Editor sem o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
+                __('Editor sem o direito Ler do Codex+ no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
                 DocumentEditor::names($semBit)
             ));
         }
@@ -1565,6 +1653,10 @@ class Document extends CommonDBTM
             if ($a > 0 && !in_array($a, Rights::auditorUsers($entityId), true)) {
                 return $this->deny(__('O auditor responsável tem que ter o direito Auditar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
             }
+        }
+        // P3: quem montou não aprova nem audita.
+        if (($erro = $this->roleConflict($input, $novo)) !== null) {
+            return $this->deny($erro);
         }
         $ini = array_key_exists('review_start', $input) ? $input['review_start'] : $old('review_start', $atual);
         $fim = array_key_exists('review_end', $input) ? $input['review_end'] : $old('review_end', $atual);

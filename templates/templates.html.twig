@@ -37,10 +37,53 @@
                 </select>
             </div>
 
+            {# MO-1: lugar do modelo. Os dois são opcionais: sem setor = Geral
+               (vale para todos); sem categoria = o setor todo. #}
+            <div class="codexplus-form-row" data-cx-tpl-place>
+                <script type="application/json" data-cx-tpl-place-data>{{ place.json|raw }}</script>
+                <label for="cx-tpl-sector">{{ __('Setor', 'codexplus') }}</label>
+                <select id="cx-tpl-sector" name="plugin_codexplus_sectors_id">
+                    <option value="0">{{ __('(todos os setores — Geral)', 'codexplus') }}</option>
+                    {% for s in place.tree %}
+                        <option value="{{ s.id }}" {{ s.id == place.sector ? 'selected' : '' }}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+                <label for="cx-tpl-category">{{ __('Categoria', 'codexplus') }}</label>
+                <select id="cx-tpl-category" name="plugin_codexplus_categories_id">
+                    <option value="0">{{ __('(o setor todo)', 'codexplus') }}</option>
+                    {% for s in place.tree %}
+                        {% for c in s.categories %}
+                            <option value="{{ c.id }}" data-sector="{{ s.id }}" {{ c.id == place.category ? 'selected' : '' }}>{{ c.name }}</option>
+                        {% endfor %}
+                    {% endfor %}
+                </select>
+                <div class="codexplus-form-hint">{{ __('Opcionais. Sem setor, o modelo aparece para todos; com categoria, vale também nas subcategorias dela.', 'codexplus') }}</div>
+            </div>
+            <script>
+            (function () {
+                var box = document.querySelector('[data-cx-tpl-place]');
+                if (!box) { return; }
+                var s = box.querySelector('#cx-tpl-sector'), c = box.querySelector('#cx-tpl-category');
+                function filtra() {
+                    var sid = s.value, ok = false;
+                    Array.prototype.forEach.call(c.options, function (o) {
+                        if (o.value === '0') { return; }
+                        var mostra = sid !== '0' && o.getAttribute('data-sector') === sid;
+                        o.hidden = !mostra; o.disabled = !mostra;
+                        if (mostra && o.selected) { ok = true; }
+                    });
+                    if (!ok) { c.value = '0'; }
+                    c.disabled = sid === '0';
+                }
+                s.addEventListener('change', filtra);
+                filtra();
+            })();
+            </script>
+
             <div class="codexplus-form-row">
                 <label>
                     <input type="checkbox" name="is_default" value="1" {{ tpl.is_default ? 'checked' : '' }}>
-                    {{ __('Modelo padrão deste tipo', 'codexplus') }}
+                    {{ __('Modelo padrão deste tipo neste lugar', 'codexplus') }}
                 </label>
             </div>
 
@@ -66,46 +109,64 @@
             {% endif %}
         </div>
 
-        {% if templates is not empty %}
-            <table class="codexplus-table">
-                <thead>
-                    <tr>
-                        <th>{{ __('Nome', 'codexplus') }}</th>
-                        <th>{{ __('Tipo', 'codexplus') }}</th>
-                        <th>{{ __('Padrão', 'codexplus') }}</th>
-                        {% if can_edit %}<th class="cx-col-actions">{{ __('Ações', 'codexplus') }}</th>{% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in templates %}
-                        <tr>
-                            <td>{{ t.name }}</td>
-                            <td><span class="codexplus-type">{{ t.doctype ?: '—' }}</span></td>
-                            <td>{% if t.is_default %}<span class="codexplus-pill-default">{{ __('Padrão', 'codexplus') }}</span>{% endif %}</td>
-                            {% if can_edit %}
-                                <td>
-                                    <div class="cx-row-actions">
-                                        <a class="cx-btn cx-btn-mini" href="templates.php?id={{ t.id }}">{{ __('Editar', 'codexplus') }}</a>
-                                        <form method="post" action="template.form.php">
-                                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
-                                            <input type="hidden" name="id" value="{{ t.id }}">
-                                            <button type="submit" name="duplicate" class="cx-btn cx-btn-mini">{{ __('Duplicar', 'codexplus') }}</button>
-                                        </form>
-                                        <form method="post" action="template.form.php"
-                                              onsubmit="return confirm('{{ __('Excluir este modelo?', 'codexplus') }}');">
-                                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
-                                            <input type="hidden" name="id" value="{{ t.id }}">
-                                            <button type="submit" name="delete" class="cx-btn cx-btn-mini cx-btn-mini-danger">{{ __('Excluir', 'codexplus') }}</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            {% endif %}
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <form method="get" action="templates.php" class="cx-tpl-filter">
+            <label for="cx-tpl-type">{{ __('Tipo', 'codexplus') }}</label>
+            <select id="cx-tpl-type" name="doctype" onchange="this.form.submit()">
+                <option value="">{{ __('Todos os tipos', 'codexplus') }}</option>
+                {% for key, label in doctypes %}
+                    <option value="{{ key }}" {{ type_filter == key ? 'selected' : '' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        {% if groups is not empty %}
+            {% for g in groups %}
+                <section class="cx-tpl-group" data-cx-tpl-group="{{ g.sector }}">
+                    <h4 class="cx-tpl-group-head">
+                        <i class="ti {{ g.sector ? 'ti-building' : 'ti-world' }}"></i>
+                        {{ g.sector ? g.name : __('Geral — todos os setores', 'codexplus') }}
+                        <span class="cx-tpl-count">{{ g.count }}</span>
+                    </h4>
+                    <table class="codexplus-table">
+                        <tbody>
+                            {% for sub in g.subs %}
+                                {% if g.sector %}
+                                    <tr class="cx-tpl-sub" data-cx-tpl-sub="{{ sub.category }}">
+                                        <td colspan="{{ can_edit ? 4 : 3 }}">{{ sub.category ? sub.name : __('Setor todo', 'codexplus') }}</td>
+                                    </tr>
+                                {% endif %}
+                                {% for t in sub.rows %}
+                                    <tr data-cx-tpl-row="{{ t.id }}">
+                                        <td class="cx-tpl-type"><span class="codexplus-type">{{ t.doctype ?: '—' }}</span></td>
+                                        <td>{{ t.name }}</td>
+                                        <td>{% if t.is_default %}<span class="codexplus-pill-default">{{ __('Padrão', 'codexplus') }}</span>{% endif %}</td>
+                                        {% if can_edit %}
+                                            <td class="cx-col-actions">
+                                                <div class="cx-row-actions">
+                                                    <a class="cx-btn cx-btn-mini" href="templates.php?id={{ t.id }}">{{ __('Editar', 'codexplus') }}</a>
+                                                    <form method="post" action="template.form.php">
+                                                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                                                        <input type="hidden" name="id" value="{{ t.id }}">
+                                                        <button type="submit" name="duplicate" class="cx-btn cx-btn-mini">{{ __('Duplicar', 'codexplus') }}</button>
+                                                    </form>
+                                                    <form method="post" action="template.form.php"
+                                                          onsubmit="return confirm('{{ __('Excluir este modelo?', 'codexplus') }}');">
+                                                        <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                                                        <input type="hidden" name="id" value="{{ t.id }}">
+                                                        <button type="submit" name="delete" class="cx-btn cx-btn-mini cx-btn-mini-danger">{{ __('Excluir', 'codexplus') }}</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </section>
+            {% endfor %}
         {% else %}
-            <p class="codexplus-empty">{{ __('Nenhum modelo cadastrado ainda.', 'codexplus') }}</p>
+            <p class="codexplus-empty">{{ type_filter ? __('Nenhum modelo deste tipo.', 'codexplus') : __('Nenhum modelo cadastrado ainda.', 'codexplus') }}</p>
         {% endif %}
     {% endif %}
 

@@ -50,10 +50,15 @@ function plugin_codexplus_getDatabaseRelations(): array
     return [
         'glpi_plugin_codexplus_sectors' => [
             'glpi_plugin_codexplus_categories' => 'plugin_codexplus_sectors_id',
+            // MO-1: apagar o setor solta o modelo para Geral (ou para o
+            // setor que substituir, se o GLPI oferecer a troca).
+            'glpi_plugin_codexplus_templates'  => 'plugin_codexplus_sectors_id',
         ],
         'glpi_plugin_codexplus_categories' => [
             'glpi_plugin_codexplus_categories'           => 'plugin_codexplus_categories_id',
             'glpi_plugin_codexplus_documents_categories' => 'plugin_codexplus_categories_id',
+            // MO-1: apagar a categoria sobe o modelo para o setor todo.
+            'glpi_plugin_codexplus_templates'            => 'plugin_codexplus_categories_id',
         ],
     ];
 }

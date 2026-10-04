@@ -6,6 +6,7 @@
  */
 
 use Glpi\Application\View\TemplateRenderer;
+use GlpiPlugin\Codexplus\Category;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\Rights;
 use GlpiPlugin\Codexplus\Template;
@@ -53,9 +54,23 @@ if (($id > 0 || $new) && $canEdit) {
         'display'           => false,
     ]);
 
+    // MO-1: setor e categoria (opcionais). A lista de categorias vem toda,
+    // com o setor de cada uma; o JS do Twig mostra só as do setor escolhido.
+    $placeTree = Category::placementTree();
+    $placeJson = json_encode(
+        $placeTree,
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+    );
+
     TemplateRenderer::getInstance()->display('@codexplus/templates.html.twig', [
         'glpi_root'   => $CFG_GLPI['root_doc'],
         'mode'        => 'edit',
+        'place'       => [
+            'tree'     => $placeTree,
+            'json'     => $placeJson ?: '[]',
+            'sector'   => (int) ($tpl->fields[Template::SECTOR_FIELD] ?? 0),
+            'category' => (int) ($tpl->fields[Template::CATEGORY_FIELD] ?? 0),
+        ],
         'can_edit'    => $canEdit,
         'tpl'         => $tpl->fields,
         'is_new'      => $id === 0,
@@ -64,22 +79,18 @@ if (($id > 0 || $new) && $canEdit) {
         'csrf'        => Session::getNewCSRFToken(),
     ]);
 } else {
-    // ---- modo lista ----
-    $templates = [];
-    foreach ($DB->request([
-        'FROM'  => Template::getTable(),
-        'ORDER' => ['doctype', 'name'],
-    ]) as $row) {
-        $templates[] = $row;
-    }
+    // ---- modo lista ---- (MO-1: agrupada por setor e categoria)
+    $tipoFiltro = isset($_GET['doctype']) && array_key_exists((string) $_GET['doctype'], $tplDoctypes)
+        ? (string) $_GET['doctype'] : '';
 
     TemplateRenderer::getInstance()->display('@codexplus/templates.html.twig', [
-        'glpi_root' => $CFG_GLPI['root_doc'],
-        'mode'      => 'list',
-        'can_edit'  => $canEdit,
-        'templates' => $templates,
-        'doctypes'  => DocumentMeta::getDoctypes(),
-        'csrf'      => Session::getNewCSRFToken(),
+        'glpi_root'   => $CFG_GLPI['root_doc'],
+        'mode'        => 'list',
+        'can_edit'    => $canEdit,
+        'groups'      => Template::listGrouped($tipoFiltro),
+        'doctypes'    => $tplDoctypes,
+        'type_filter' => $tipoFiltro,
+        'csrf'        => Session::getNewCSRFToken(),
     ]);
 }
 

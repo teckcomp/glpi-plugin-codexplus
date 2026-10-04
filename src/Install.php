@@ -219,6 +219,9 @@ class Install
         // --- Bloco AP-1: aprovadores de cada versão publicada ---
         self::installAP1();
 
+        // --- Bloco MO-1: modelos por setor e categoria ---
+        self::installMO1();
+
         $migration->executeMigration();
         return true;
     }
@@ -707,6 +710,27 @@ class Install
      * (as datas são zeradas no envio, então as que restam são da rodada que
      * publicou); as anteriores ficam sem registro (sem a linha).
      */
+    /**
+     * MO-1 (Claudio, 04/10/2026): setor e categoria no modelo, ambos
+     * opcionais (0 = Geral / setor todo). Não semeia nada (achado 137): os
+     * modelos que já existem ficam em Geral e continuam valendo para todos.
+     */
+    private static function installMO1(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::TEMPLATES_TABLE;
+        foreach (['plugin_codexplus_sectors_id', 'plugin_codexplus_categories_id'] as $col) {
+            if (!$DB->fieldExists($t, $col, false)) {
+                $DB->doQueryOrDie(
+                    "ALTER TABLE `$t` ADD `$col` int unsigned NOT NULL DEFAULT '0', ADD KEY `$col` (`$col`)",
+                    "Codex+ (MO-1): erro ao criar $t.$col"
+                );
+            }
+        }
+    }
+
     private static function installAP1(): void
     {
         /** @var \DBmysql $DB */

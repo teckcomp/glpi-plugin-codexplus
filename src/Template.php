@@ -31,34 +31,129 @@ class Template extends CommonDBTM
         return 'ti ti-layout-list';
     }
 
+    public const SECTOR_FIELD   = 'plugin_codexplus_sectors_id';
+    public const CATEGORY_FIELD = 'plugin_codexplus_categories_id';
+
     /**
-     * Modelo padrão de um tipo (para o "Novo documento" da 3b). Cai para
-     * qualquer modelo do tipo se não houver um marcado como padrão.
-     */
-    /**
-     * Modelos para a criação no modelo novo (R3b4, Claudio 26/09/2026): todos
-     * os tipos de uma vez; a tela filtra pelo tipo escolhido. Padrão primeiro.
+     * MO-1 (Claudio, 04/10/2026): lugar efetivo de um modelo. Com categoria,
+     * o setor é sempre o da categoria (ela pode ter mudado de setor depois);
+     * categoria sem setor (setor apagado) não prende o modelo: ele sobe para
+     * o setor gravado, ou para Geral.
      *
-     * @return array<int, array{id:int, name:string, doctype:string, is_default:bool, content:string}>
+     * @param array<int, int> $catSector id da categoria => id do setor
+     * @return array{0:int, 1:int} [setor, categoria]
      */
-    public static function listForCreation(): array
+    public static function placementOf(int $sector, int $category, array $catSector): array
+    {
+        if ($category > 0) {
+            $cs = $catSector[$category] ?? 0;
+            if ($cs > 0) {
+                return [$cs, $category];
+            }
+            $category = 0;
+        }
+        return [max(0, $sector), 0];
+    }
+
+    /** @return array<int, int> id da categoria => id do setor, de todas */
+    private static function allCategorySectors(): array
     {
         /** @var \DBmysql $DB */
         global $DB;
 
         $out = [];
         foreach ($DB->request([
+            'SELECT' => ['id', Category::SECTOR_FIELD],
+            'FROM'   => Category::getTable(),
+        ]) as $r) {
+            $out[(int) $r['id']] = (int) $r[Category::SECTOR_FIELD];
+        }
+        return $out;
+    }
+
+    /**
+     * Modelos para a criação (R3b4 + MO-1): todos de uma vez; a tela filtra
+     * pelo tipo, pelo setor e pelas categorias escolhidos no formulário.
+     * `scope` = a categoria do modelo e todas as subcategorias dela (o modelo
+     * de "Rede" vale em "Rede › Switches"). Setor 0 = Geral (todos).
+     *
+     * @return array<int, array{id:int, name:string, doctype:string, is_default:bool, content:string, sector:int, category:int, scope:int[]}>
+     */
+    public static function listForCreation(): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $catSector = self::allCategorySectors();
+        $out = [];
+        foreach ($DB->request([
             'FROM'  => self::getTable(),
             'ORDER' => ['doctype', 'is_default DESC', 'name'],
         ]) as $r) {
+            [$sid, $cid] = self::placementOf((int) ($r[self::SECTOR_FIELD] ?? 0), (int) ($r[self::CATEGORY_FIELD] ?? 0), $catSector);
+            $scope = $cid > 0 ? array_values(array_map('intval', getSonsOf(Category::getTable(), $cid))) : [];
             $out[] = [
                 'id'         => (int) $r['id'],
                 'name'       => (string) $r['name'],
                 'doctype'    => (string) $r['doctype'],
                 'is_default' => (bool) $r['is_default'],
                 'content'    => (string) ($r['content'] ?? ''),
+                'sector'     => $sid,
+                'category'   => $cid,
+                'scope'      => $scope,
             ];
         }
+        return $out;
+    }
+
+    /**
+     * MO-1: tela Modelos agrupada. Geral primeiro; depois cada setor (por
+     * nome) com "Setor todo" e as categorias (por nome completo).
+     *
+     * @return array<int, array{key:string, sector:int, name:string, count:int, subs:array<int, array{name:string, rows:array}>}>
+     */
+    public static function listGrouped(string $doctype = ''): array
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $catSector = self::allCategorySectors();
+        $where = $doctype !== '' ? ['doctype' => $doctype] : [];
+        $grupos = [];
+        foreach ($DB->request([
+            'FROM'  => self::getTable(),
+            'WHERE' => $where,
+            'ORDER' => ['doctype', 'is_default DESC', 'name'],
+        ]) as $r) {
+            [$sid, $cid] = self::placementOf((int) ($r[self::SECTOR_FIELD] ?? 0), (int) ($r[self::CATEGORY_FIELD] ?? 0), $catSector);
+            $grupos[$sid][$cid][] = $r;
+        }
+
+        $nomeSetor = static fn (int $id): string => $id > 0 ? (string) \Dropdown::getDropdownName(Sector::getTable(), $id) : '';
+        $nomeCat   = static function (int $id): string {
+            $c = new Category();
+            return $id > 0 && $c->getFromDB($id) ? (string) ($c->fields['completename'] ?: $c->fields['name']) : '';
+        };
+
+        $out = [];
+        foreach ($grupos as $sid => $porCat) {
+            $subs = [];
+            foreach ($porCat as $cid => $rows) {
+                $subs[] = [
+                    'category' => $cid,
+                    'name'     => $cid > 0 ? $nomeCat($cid) : '',
+                    'rows'     => $rows,
+                ];
+            }
+            usort($subs, static fn ($a, $b) => [$a['category'] > 0, $a['name']] <=> [$b['category'] > 0, $b['name']]);
+            $out[] = [
+                'sector' => $sid,
+                'name'   => $nomeSetor($sid),
+                'count'  => array_sum(array_map(static fn ($s) => count($s['rows']), $subs)),
+                'subs'   => $subs,
+            ];
+        }
+        usort($out, static fn ($a, $b) => [$a['sector'] > 0, $a['name']] <=> [$b['sector'] > 0, $b['name']]);
         return $out;
     }
 
@@ -81,6 +176,14 @@ class Template extends CommonDBTM
 
     public function prepareInputForUpdate($input)
     {
+        // MO-1: update parcial (ex.: o GLPI zerando só a categoria apagada)
+        // não pode zerar o outro campo de lugar: o que não veio fica o gravado.
+        $temS = array_key_exists(self::SECTOR_FIELD, $input);
+        $temC = array_key_exists(self::CATEGORY_FIELD, $input);
+        if ($temS xor $temC) {
+            $falta = $temS ? self::CATEGORY_FIELD : self::SECTOR_FIELD;
+            $input[$falta] = (int) ($this->fields[$falta] ?? 0);
+        }
         return $this->sanitize($input);
     }
 
@@ -91,6 +194,21 @@ class Template extends CommonDBTM
         }
         // Checkbox: ausente no POST = desmarcado.
         $input['is_default'] = !empty($input['is_default']) ? 1 : 0;
+        // MO-1: setor e categoria opcionais (0 = Geral / setor todo). Com
+        // categoria, o setor é o dela; categoria sem setor não serve.
+        if (array_key_exists(self::SECTOR_FIELD, $input) || array_key_exists(self::CATEGORY_FIELD, $input)) {
+            $sid = max(0, (int) ($input[self::SECTOR_FIELD] ?? 0));
+            $cid = max(0, (int) ($input[self::CATEGORY_FIELD] ?? 0));
+            if ($cid > 0) {
+                $sid = Category::getSectorOf($cid);
+                if ($sid === 0) {
+                    $cid = 0;
+                    $sid = max(0, (int) ($input[self::SECTOR_FIELD] ?? 0));
+                }
+            }
+            $input[self::SECTOR_FIELD]   = $sid;
+            $input[self::CATEGORY_FIELD] = $cid;
+        }
         // M1: modelo não guarda imagem. A imagem é arquivo ligado a UM
         // documento (Document_Item): num documento novo ela não abriria.
         if (isset($input['content'])) {
@@ -118,8 +236,9 @@ class Template extends CommonDBTM
     }
 
     /**
-     * Garante um único modelo padrão por tipo: ao salvar este como padrão,
-     * zera o is_default dos outros do mesmo tipo.
+     * Garante um único modelo padrão por tipo NO MESMO LUGAR (MO-1: Geral,
+     * setor todo, ou setor + categoria): ao salvar este como padrão, zera o
+     * is_default dos outros do mesmo tipo e lugar.
      */
     private function enforceSingleDefault(): void
     {
@@ -134,8 +253,10 @@ class Template extends CommonDBTM
             self::getTable(),
             ['is_default' => 0],
             [
-                'doctype' => $this->fields['doctype'],
-                'id'      => ['<>', $this->getID()],
+                'doctype'            => $this->fields['doctype'],
+                self::SECTOR_FIELD   => (int) ($this->fields[self::SECTOR_FIELD] ?? 0),
+                self::CATEGORY_FIELD => (int) ($this->fields[self::CATEGORY_FIELD] ?? 0),
+                'id'                 => ['<>', $this->getID()],
             ]
         );
     }

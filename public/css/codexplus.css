@@ -2834,3 +2834,14 @@ html.cx-board-open { overflow: hidden; }
 .cx-partof { max-width: 900px; margin: 0 auto 14px; font-size: .92em; color: var(--cx-muted); }
 .cx-partof a { text-decoration: none; }
 .cx-partof em { font-style: normal; }
+
+/* MO-1: tela Modelos agrupada por setor e categoria */
+.cx-tpl-filter { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
+.cx-tpl-filter select { min-width: 180px; }
+.cx-tpl-group { border: 1px solid var(--cx-border); border-radius: var(--cx-radius); background: var(--cx-surface); margin: 0 0 14px; overflow: hidden; }
+.cx-tpl-group-head { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; font-size: 15px; background: var(--cx-neutral-bg); color: var(--cx-text); }
+.cx-tpl-count { font-weight: 400; font-size: 12px; color: var(--cx-muted); }
+.cx-tpl-group .codexplus-table td { padding: 8px 14px; }
+.cx-tpl-group .cx-tpl-sub td { font-size: 12px; color: var(--cx-muted); background: var(--cx-surface); padding: 10px 14px 4px 30px; border-bottom: 0; }
+.cx-tpl-group .cx-tpl-sub:hover td { background: var(--cx-surface); }
+.cx-tpl-group .cx-tpl-type { width: 1%; padding-left: 30px; }

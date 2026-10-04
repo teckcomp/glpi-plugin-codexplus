@@ -30,6 +30,9 @@ if (isset($_POST['add'])) {
             'doctype'    => $src->fields['doctype'],
             'content'    => $src->fields['content'],
             'is_default' => 0,
+            // MO-1: a cópia nasce no mesmo lugar (setor/categoria).
+            Template::SECTOR_FIELD   => (int) ($src->fields[Template::SECTOR_FIELD] ?? 0),
+            Template::CATEGORY_FIELD => (int) ($src->fields[Template::CATEGORY_FIELD] ?? 0),
         ]);
     }
 }

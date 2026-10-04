@@ -45,7 +45,26 @@
     /* 2. Modelo (R3b4, Claudio 26/09/2026): lista os modelos do tipo
           escolhido (padrão primeiro, "Em branco" no fim) e preenche o corpo.
           Se já houver texto escrito à mão, pergunta antes de substituir. A
-          partir de 10 opções a lista ganha busca (Select2 do GLPI). */
+          partir de 10 opções a lista ganha busca (Select2 do GLPI).
+          MO-1 (Claudio 04/10/2026): só os modelos que cabem no setor e nas
+          categorias escolhidos (setor 0 no modelo = Geral, vale sempre; a
+          categoria do modelo vale nas subcategorias). O mais específico vem
+          primeiro: categoria > setor > Geral. Trocar setor/categoria remonta
+          a lista; o corpo só troca sozinho se ninguém mexeu nele. */
+    function cabe(t, setor, cats) {
+        if (t.sector && t.sector !== setor) { return false; }
+        if (!t.category) { return true; }
+        var esc = Array.isArray(t.scope) ? t.scope : [t.category];
+        return cats.some(function (c) { return esc.indexOf(c) >= 0; });
+    }
+    function nivel(t) { return t.category ? 2 : (t.sector ? 1 : 0); }
+    function filtraModelos(lista, tipo, setor, cats) {
+        var ops = lista.filter(function (t) { return t.doctype === tipo && cabe(t, setor, cats); });
+        return ops.map(function (t, i) { return { t: t, i: i }; }).sort(function (a, b) {
+            return (nivel(b.t) - nivel(a.t)) || ((b.t.is_default ? 1 : 0) - (a.t.is_default ? 1 : 0)) || (a.i - b.i);
+        }).map(function (x) { return x.t; });
+    }
+
     function modelos(form) {
         var sel = form.querySelector('#cx-template');
         var tipo = form.querySelector('select[name="doctype"]');
@@ -53,9 +72,13 @@
         if (!sel || !tipo || !src) { return; }
         var lista;
         try { lista = JSON.parse(src.textContent || '[]'); } catch (e) { lista = []; }
+        if (!Array.isArray(lista)) { lista = []; }
         var aplicado = '';      // corpo como o último modelo o deixou
         var atual = null;       // valor já tratado (o change pode chegar duas vezes)
-        var tipoAtual = null;
+        var chave = null;       // tipo|setor|categorias da última montagem
+        var escolhido = false;  // a pessoa escolheu o modelo à mão
+        var lugar = { setor: 0, cats: [] };
+        var pronto = false;     // o editor já nasceu
 
         function editor() { return window.tinymce ? window.tinymce.get('codexplus-doc-content') : null; }
         function vazio(h) { return !h || !String(h).replace(/<[^>]*>|&nbsp;|\s/g, ''); }
@@ -84,23 +107,37 @@
             }
         }
         function monta() {
-            if (tipo.value === tipoAtual) { return; }
-            tipoAtual = tipo.value;
-            var ops = lista.filter(function (t) { return t.doctype === tipo.value; });
+            if (!pronto) { return; }
+            var k = tipo.value + '|' + lugar.setor + '|' + lugar.cats.slice().sort().join(',');
+            if (k === chave) { return; }
+            var mudouTipo = chave === null || chave.split('|')[0] !== tipo.value;
+            chave = k;
+            if (mudouTipo) { escolhido = false; }
+            var ops = filtraModelos(lista, tipo.value, lugar.setor, lugar.cats);
             sel.innerHTML = ops.map(function (t) {
                 var o = document.createElement('option');
                 o.value = t.id;
                 o.textContent = t.name + (t.is_default ? ' (padrão)' : '');
                 return o.outerHTML;
             }).join('') + '<option value="0">Em branco</option>';
-            sel.value = ops.length ? String(ops[0].id) : '0';
+            var segue = escolhido && atual !== null && (atual === '0' || ops.some(function (t) { return String(t.id) === atual; }));
+            var alvo = segue ? atual : (ops.length ? String(ops[0].id) : '0');
+            sel.value = alvo;
             select2(ops.length + 1);
-            if (aplica(sel.value, true)) { atual = sel.value; } else { sel.value = '0'; atual = '0'; }
+            if (alvo === atual) { return; }
+            if (aplica(alvo, true)) {
+                atual = alvo;
+            } else {
+                // Recusou trocar o texto: fica "Em branco" e vale como escolha.
+                sel.value = '0'; atual = '0'; escolhido = true;
+                if (window.jQuery) { window.jQuery(sel).trigger('change.select2'); }
+            }
         }
         function troca() {
             if (sel.value === atual) { return; }
             if (aplica(sel.value, true)) {
                 atual = sel.value;
+                escolhido = true;
             } else {
                 sel.value = atual;
                 if (window.jQuery) { window.jQuery(sel).trigger('change.select2'); }
@@ -108,10 +145,15 @@
         }
         onChange(sel, troca);
         onChange(tipo, monta);
+        form.addEventListener('cx:place', function (e) {
+            var d = e.detail || {};
+            lugar = { setor: d.setor || 0, cats: Array.isArray(d.cats) ? d.cats.slice() : [] };
+            monta();
+        });
         // O editor do GLPI nasce depois do script: espera por ele (até ~15 s).
         var tent = 0;
         (function espera() {
-            if (editor() && editor().initialized) { monta(); return; }
+            if (editor() && editor().initialized) { pronto = true; monta(); return; }
             if (++tent < 60) { setTimeout(espera, 250); }
         })();
     }
@@ -169,6 +211,11 @@
             estante.innerHTML = s && sel.length
                 ? '<i class="ti ti-books"></i> Na estante: ' + sel.map(function (id) { return '<b>' + esc(s.name + ' › ' + nomeCat(id)) + '</b>'; }).join(' e ')
                 : '<i class="ti ti-books"></i> Ainda sem lugar na estante. Setor e categoria são obrigatórios para enviar.';
+            // MO-1: avisa a lista de modelos (setor e categorias escolhidos).
+            var ev;
+            try { ev = new CustomEvent('cx:place', { detail: { setor: setor, cats: sel.slice() } }); }
+            catch (e) { ev = document.createEvent('CustomEvent'); ev.initCustomEvent('cx:place', false, false, { setor: setor, cats: sel.slice() }); }
+            box.closest('form').dispatchEvent(ev);
         }
         function mini(tipo, rotulo, cria) {
             var alvo = box.querySelector('[data-cx-place-mini="' + tipo + '"]');

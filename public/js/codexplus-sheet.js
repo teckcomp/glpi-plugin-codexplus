@@ -15,6 +15,16 @@
      - "fórmula da coluna": =A*C vale para cada linha (A = coluna A da
        mesma linha).
    Números em pt-BR ("1.890,50"). Tipos de coluna: texto, número, moeda.
+
+   3c-1 (Claudio, 04/10/2026) — EDIÇÃO NO LUGAR. No editor, as células de
+   texto, número e moeda são editáveis direto no documento (ilhas
+   contenteditable=true dentro do bloco travado, TinyMCE 7.9 do GLPI
+   11.0.6). Coluna calculada, Total e célula com fórmula própria ficam
+   travadas (só pelos Parâmetros). A janela abre pelo botão "Parâmetros"
+   do bloco; o duplo clique ficou para selecionar palavra na célula.
+   Marcação de edição (contenteditable, classes cx-sheet-edit/lock, data-cx-r/c)
+   e os botões (data-mce-bogus="all") existem só no editor: o PreProcess
+   tira tudo antes de gravar, então o HTML salvo é o mesmo de antes.
    ========================================================================= */
 (function () {
     'use strict';
@@ -50,6 +60,9 @@
         var s = String(v == null ? '' : v).replace(/R\$\s?/i, '').trim();
         if (s === '') { return 0; }
         if (s.indexOf(',') >= 0) { s = s.replace(/\./g, '').replace(',', '.'); }
+        // 3c-1: "1.460" (ponto de milhar sem vírgula, como a coluna de número
+        // mostra) é mil quatrocentos e sessenta, não 1,46.
+        else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) { s = s.replace(/\./g, ''); }
         var n = parseFloat(s);
         return isNaN(n) ? 0 : n;
     }
@@ -353,6 +366,7 @@
                         editor.insertContent(html + '<p><br></p>');
                     }
                 });
+                decorateAll(editor);
                 editor.nodeChanged();
                 close();
             }
@@ -362,5 +376,274 @@
         if (first) { first.focus(); }
     }
 
-    window.CodexplusSheet = { open: open, render: tableHtml, block: blockHtml, evaluate: evaluate, starter: starter };
+    /* ---------------- 3c-1: edição no lugar (só no editor) ---------------- */
+    var EDIT_CSS = ''
+        + '.cx-sheet{position:relative;cursor:default;}'
+        + '.cx-sheet td.cx-sheet-edit{cursor:text;}'
+        + '.cx-sheet td.cx-sheet-edit:hover{box-shadow:inset 0 0 0 1px #85b7eb;}'
+        + '.cx-sheet td.cx-sheet-edit:focus{outline:2px solid #378add;outline-offset:-2px;box-shadow:none;}'
+        + '.cx-sheet tr td.cx-sheet-lock{background-color:#f1f3f5;color:#5f6b7a;cursor:not-allowed;}'
+        + '.cx-sheet-ui{font:12px/1.4 system-ui,sans-serif;user-select:none;}'
+        + '.cx-sheet-ui-top{position:absolute;top:-15px;right:6px;z-index:1;}'
+        + '.cx-sheet-ui-add{margin-top:6px;}'
+        + '.cx-sheet-ui button{font:inherit;padding:1px 10px;border:1px solid #85b7eb;border-radius:6px;'
+        + 'background:#fff;color:#185fa5;cursor:pointer;}'
+        + '.cx-sheet-ui button:hover{background:#e6f1fb;}';
+    var LOCK_TIP = 'Calculada: muda em Parâmetros';
+    var MARK_CLASSES = ['cx-sheet-edit', 'cx-sheet-lock'];
+
+    function readData(node) {
+        var d;
+        try { d = JSON.parse(node.getAttribute('data-cx-sheet') || ''); } catch (e) { return null; }
+        return d && Array.isArray(d.cols) && Array.isArray(d.rows) ? d : null;
+    }
+    function rawOf(data, r, c) {
+        var v = (data.rows[r] || [])[c];
+        return String(v == null ? '' : v).trim();
+    }
+    /* Célula com fórmula própria, ou vazia numa coluna com fórmula, é
+       calculada: editar no lugar apagaria a fórmula sem aviso. */
+    function cellEditable(data, r, c) {
+        var raw = rawOf(data, r, c);
+        if (raw.charAt(0) === '=') { return false; }
+        return !(data.cols[c] && data.cols[c].formula && raw === '');
+    }
+    function sheetOf(el) {
+        while (el && el.nodeType === 1) {
+            if (el.classList && el.classList.contains('cx-sheet')) { return el; }
+            el = el.parentNode;
+        }
+        return null;
+    }
+    function cellOf(el) {
+        while (el && el.nodeType !== 1) { el = el.parentNode; }
+        while (el) {
+            if (el.nodeName === 'TD' && el.classList.contains('cx-sheet-edit')) { return el; }
+            if (el.classList && el.classList.contains('cx-sheet')) { return null; }
+            el = el.parentNode;
+        }
+        return null;
+    }
+    function bodyRows(node) {
+        var t = node.querySelector('table');
+        return t && t.tBodies[0] ? Array.prototype.slice.call(t.tBodies[0].rows) : [];
+    }
+
+    /* Marca as células e põe os botões. Pode rodar de novo à vontade. */
+    function decorate(editor, node) {
+        var data = readData(node);
+        if (!data) { return; }
+        bodyRows(node).forEach(function (tr, r) {
+            Array.prototype.slice.call(tr.cells).forEach(function (td, c) {
+                if (c >= data.cols.length) { return; }
+                td.setAttribute('data-cx-r', r);
+                td.setAttribute('data-cx-c', c);
+                if (cellEditable(data, r, c)) {
+                    td.setAttribute('contenteditable', 'true');
+                    td.classList.add('cx-sheet-edit');
+                    td.classList.remove('cx-sheet-lock');
+                    td.removeAttribute('title');
+                } else {
+                    td.removeAttribute('contenteditable');
+                    td.classList.add('cx-sheet-lock');
+                    td.classList.remove('cx-sheet-edit');
+                    td.setAttribute('title', LOCK_TIP);
+                }
+            });
+        });
+        var doc = node.ownerDocument;
+        function ui(cls, act, label, tip) {
+            if (node.querySelector('.' + cls)) { return; }
+            var d = doc.createElement('div');
+            d.className = 'cx-sheet-ui ' + cls;
+            d.setAttribute('data-mce-bogus', 'all');
+            d.setAttribute('contenteditable', 'false');
+            d.innerHTML = '<button type="button" data-cx-act="' + act + '" title="' + esc(tip) + '">' + esc(label) + '</button>';
+            if (cls === 'cx-sheet-ui-top') { node.insertBefore(d, node.firstChild); } else { node.appendChild(d); }
+        }
+        ui('cx-sheet-ui-top', 'params', '⚙ Parâmetros', 'Colunas, tipos, fórmulas, total e excluir linhas');
+        ui('cx-sheet-ui-add', 'row', '+ Linha', 'Acrescentar uma linha vazia no fim');
+    }
+    function decorateAll(editor) {
+        var body = editor && editor.getBody && editor.getBody();
+        if (!body) { return; }
+        Array.prototype.slice.call(body.querySelectorAll('div.cx-sheet')).forEach(function (n) { decorate(editor, n); });
+    }
+
+    /* Valores recalculados nas células (menos a que está em edição). */
+    function refresh(node, data, skip) {
+        var ev = evaluate(data);
+        bodyRows(node).forEach(function (tr, r) {
+            var vazia = (data.rows[r] || []).every(function (x) { return String(x == null ? '' : x).trim() === ''; });
+            Array.prototype.slice.call(tr.cells).forEach(function (td, c) {
+                if (td === skip || c >= data.cols.length || !ev.values[r]) { return; }
+                var txt = vazia ? '\u00a0' : fmt(ev.values[r][c], data.cols[c].type);
+                if (td.textContent !== txt) { td.textContent = txt; }
+            });
+        });
+        var t = node.querySelector('table');
+        var foot = t && t.tFoot && t.tFoot.rows[0];
+        if (foot && data.total) {
+            var somar = totalCols(data);
+            Array.prototype.slice.call(foot.cells).forEach(function (td, i) {
+                if (somar.indexOf(i) < 0 || !data.cols[i]) { return; }
+                var txt = fmt(ev.totals[i], data.cols[i].type);
+                if (td.textContent !== txt) { td.innerHTML = '<strong>' + esc(txt) + '</strong>'; }
+            });
+        }
+    }
+
+    /* Texto da célula vira o valor bruto da planilha. Devolve true se mudou. */
+    function commit(td, keepText) {
+        var node = sheetOf(td);
+        var data = node && readData(node);
+        if (!data) { return false; }
+        var r = +td.getAttribute('data-cx-r'), c = +td.getAttribute('data-cx-c');
+        if (!data.rows[r] || !data.cols[c]) { return false; }
+        var txt = (td.textContent || '').replace(/[\u00a0\u200b\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
+        var raw = rawOf(data, r, c);
+        var mostrado = raw === '' ? '' : fmt(evaluate(data).values[r][c], data.cols[c].type);
+        var mudou = txt !== raw && txt !== mostrado;
+        if (mudou) {
+            data.rows[r][c] = txt;
+            node.setAttribute('data-cx-sheet', JSON.stringify(data));
+        }
+        refresh(node, data, keepText ? td : null);
+        return mudou;
+    }
+
+    function editableCells(node) {
+        return Array.prototype.slice.call(node.querySelectorAll('td.cx-sheet-edit'));
+    }
+    function goTo(editor, td) {
+        if (!td) { return; }
+        editor.__cxCell = td;
+        td.focus();
+        editor.selection.select(td, true);
+    }
+    function leave(editor) {
+        var td = editor.__cxCell;
+        editor.__cxCell = null;
+        if (td && td.isConnected && commit(td, false)) {
+            editor.setDirty(true);
+            editor.undoManager.add();
+        }
+    }
+    function caretAt(editor, td, edge) {
+        var rng = editor.selection.getRng();
+        if (!rng || !rng.collapsed) { return false; }
+        var probe = td.ownerDocument.createRange();
+        probe.selectNodeContents(td);
+        if (edge === 'start') { probe.setEnd(rng.startContainer, rng.startOffset); } else { probe.setStart(rng.endContainer, rng.endOffset); }
+        return probe.toString().replace(/[\u00a0\u200b\ufeff]/g, '') === '';
+    }
+    function addRow(editor, node) {
+        var data = readData(node);
+        if (!data) { return; }
+        leave(editor);
+        data = readData(node);
+        data.rows.push(data.cols.map(function () { return ''; }));
+        node.setAttribute('data-cx-sheet', JSON.stringify(data));
+        var old = node.querySelector('table');
+        var box = node.ownerDocument.createElement('div');
+        box.innerHTML = tableHtml(data);
+        node.replaceChild(box.firstChild, old);
+        decorate(editor, node);
+        var rows = bodyRows(node);
+        var last = rows[rows.length - 1];
+        goTo(editor, last && last.querySelector('td.cx-sheet-edit'));
+        editor.setDirty(true);
+        editor.undoManager.add();
+    }
+
+    function attach(editor) {
+        if (editor.__cxSheetInline) { return; }
+        editor.__cxSheetInline = true;
+        editor.on('init', function () {
+            editor.dom.addStyle(EDIT_CSS);
+            decorateAll(editor);
+        });
+        editor.on('SetContent', function () { decorateAll(editor); });
+
+        // Cursor saiu de uma célula: grava e mostra formatado.
+        editor.on('NodeChange', function () {
+            var td = cellOf(editor.selection.getNode());
+            if (td !== editor.__cxCell) {
+                leave(editor);
+                editor.__cxCell = td;
+            }
+        });
+        // Cada tecla: valor no JSON e total/calculadas refeitos na hora.
+        editor.on('input', function () {
+            var td = cellOf(editor.selection.getNode());
+            if (td) { editor.__cxCell = td; commit(td, true); }
+        });
+        editor.on('keydown', function (e) {
+            var td = cellOf(editor.selection.getNode());
+            if (!td) { return; }
+            var node = sheetOf(td);
+            var stop = function () { e.preventDefault(); e.stopImmediatePropagation(); };
+            if (e.key === 'Tab') {
+                stop();
+                var cells = editableCells(node);
+                var i = cells.indexOf(td) + (e.shiftKey ? -1 : 1);
+                if (cells[i]) { leave(editor); goTo(editor, cells[i]); }
+            } else if (e.key === 'Enter') {
+                stop();
+                var r = +td.getAttribute('data-cx-r') + 1, c = td.getAttribute('data-cx-c');
+                var below = node.querySelector('td.cx-sheet-edit[data-cx-r="' + r + '"][data-cx-c="' + c + '"]');
+                leave(editor);
+                if (below) { goTo(editor, below); } else { goTo(editor, td); }
+            } else if ((e.key === 'Backspace' && caretAt(editor, td, 'start')) || (e.key === 'Delete' && caretAt(editor, td, 'end'))) {
+                // Não apaga para fora da célula (levaria a planilha inteira).
+                stop();
+            }
+        }, true);
+        // Colar numa célula: só o texto, numa linha.
+        editor.on('PastePreProcess', function (e) {
+            if (!cellOf(editor.selection.getNode())) { return; }
+            var tmp = document.createElement('div');
+            // Fim de parágrafo, linha ou <br> vira espaço (senão "X" e "Y" grudam).
+            tmp.innerHTML = String(e.content || '').replace(/<\/(p|div|li|tr|td|th|h[1-6])>|<br\s*\/?>/gi, ' $&');
+            e.content = esc((tmp.textContent || '').replace(/\s+/g, ' ').trim());
+        });
+        editor.on('mousedown', function (e) {
+            if (e.target && e.target.closest && e.target.closest('[data-cx-act]')) { e.preventDefault(); }
+        });
+        editor.on('click', function (e) {
+            var b = e.target && e.target.closest ? e.target.closest('[data-cx-act]') : null;
+            var node = b && sheetOf(b);
+            if (!node) { return; }
+            e.preventDefault();
+            if (b.getAttribute('data-cx-act') === 'row') { addRow(editor, node); return; }
+            leave(editor);
+            open(editor, node);
+        });
+        // Antes de gravar: a célula em edição entra no JSON.
+        editor.on('BeforeGetContent', function () {
+            var td = editor.__cxCell;
+            if (td && td.isConnected) { commit(td, true); }
+        });
+        // O gravado é a tabela refeita pelo JSON: sem marcas de edição nem
+        // botões, e sempre formatada (mesmo com uma célula ainda em edição).
+        editor.on('PreProcess', function (e) {
+            if (!e.node || !e.node.querySelectorAll) { return; }
+            Array.prototype.slice.call(e.node.querySelectorAll('div.cx-sheet')).forEach(function (n) {
+                var d = readData(n);
+                if (d) {
+                    n.innerHTML = tableHtml(d);
+                    return;
+                }
+                Array.prototype.slice.call(n.querySelectorAll('.cx-sheet-ui')).forEach(function (u) { u.parentNode.removeChild(u); });
+                Array.prototype.slice.call(n.querySelectorAll('td')).forEach(function (td) {
+                    ['contenteditable', 'data-cx-r', 'data-cx-c', 'title'].forEach(function (a) { td.removeAttribute(a); });
+                    MARK_CLASSES.forEach(function (k) { td.classList.remove(k); });
+                    if (!td.className) { td.removeAttribute('class'); }
+                });
+            });
+        });
+    }
+
+    window.CodexplusSheet = { open: open, render: tableHtml, block: blockHtml, evaluate: evaluate, starter: starter,
+        attach: attach, decorateAll: decorateAll, parseNum: parseNum };
 })();

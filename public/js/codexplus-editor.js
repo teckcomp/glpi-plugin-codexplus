@@ -196,8 +196,9 @@
             // Tabela como na leitura e no PDF (E3): largura total e bordas.
             + 'table{border-collapse:collapse;width:100%;}'
             + 'td,th{border:1px solid #d3d9e0;padding:6px 8px;}th{background:#f6f8fa;}'
-            // PL1: a planilha é um bloco só (duplo clique edita).
-            + '.cx-sheet{outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;margin:0 0 12px;}'
+            // PL1: a planilha é um bloco só; 3c-1: células editáveis no lugar,
+            // botão Parâmetros abre a janela (codexplus-sheet.js).
+            + '.cx-sheet{outline:1px dashed #85b7eb;outline-offset:3px;margin:0 0 12px;}'
             + '.cx-sheet table{margin:0;}'
             + '.cx-board{display:inline-block;outline:1px dashed #85b7eb;outline-offset:3px;cursor:pointer;}'
             + '.cx-board-legend{display:inline-block;outline:1px dotted #b4c7dc;outline-offset:3px;cursor:pointer;}';
@@ -573,23 +574,21 @@
             scope: 'node'
         });
 
-        // PL1: planilha no corpo (codexplus-sheet.js). Duplo clique edita.
+        // PL1: planilha no corpo (codexplus-sheet.js). 3c-1: conteúdo editado
+        // direto no documento; colunas e fórmulas pelo botão Parâmetros.
+        if (window.CodexplusSheet && window.CodexplusSheet.attach) { window.CodexplusSheet.attach(editor); }
         ui.addButton('cxsheet', {
             icon: 'table-insert-column-after',
             text: 'Planilha',
-            tooltip: 'Inserir planilha (Qtd, item, valores e total). Duplo clique numa planilha edita.',
+            tooltip: 'Inserir planilha (Qtd, item, valores e total). Edite as células direto no documento; colunas e fórmulas em Parâmetros.',
             onAction: function () {
                 if (!toolAllowed('cxsheet', currentType(editor))) { return; }
                 if (window.CodexplusSheet) { window.CodexplusSheet.open(editor, null); }
             }
         });
         editor.on('dblclick', function (e) {
-            var n = e.target && editor.dom.getParent(e.target, 'div.cx-sheet');
-            if (n && window.CodexplusSheet) {
-                e.preventDefault();
-                window.CodexplusSheet.open(editor, n);
-                return;
-            }
+            // 3c-1: duplo clique na planilha não abre mais a janela (seleciona
+            // palavra na célula); a janela abre pelo botão Parâmetros.
             // Q1: quadro (planta ou topologia) — duplo clique abre o editor dele.
             var b = e.target && editor.dom.getParent(e.target, 'span.cx-board');
             // Q3b: duplo clique na legenda abre o quadro dela.

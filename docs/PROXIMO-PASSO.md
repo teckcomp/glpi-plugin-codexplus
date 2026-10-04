@@ -1,13 +1,12 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (fim da noite), depois da **reorganização para
-> produção** decidida por Claudio.
+> Gerado em 04/10/2026 (madrugada), depois da **HV-1 ✅** (`7a54900`).
 
 ## Estado
 
-- Versão: **`0.7.9`**; último commit de código **`ea02b8a`**; docs em
-  `ef1db1b` e depois este pacote. Plugin 0.7.9 habilitado na homologação.
+- Versão: **`0.7.9`**; último commit de código **`7a54900`** (HV-1); docs
+  neste pacote. Plugin 0.7.9 habilitado na homologação.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
   MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
@@ -24,12 +23,14 @@
   /tmp/<pacote>.tar.gz -C /var/www/html/glpi/plugins`, `chown -R
   www-data:www-data …/codexplus`, `grep -c` do token novo (achado 114).
   Só JS/CSS: Ctrl+F5. PHP/Twig: `cache:clear` + `systemctl restart
-  apache2`. Versão nova no `setup.php`: `plugin:install --force
+  apache2`. **Console sempre por** `su -s /bin/sh www-data -c "php
+  /var/www/html/glpi/bin/console …"` — `runuser` não está no PATH
+  (achado 149). Versão nova no `setup.php`: `plugin:install --force
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 e 3.18, achados
-  até 148) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.19, achados
+  até 153) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -51,7 +52,7 @@
 
 ## Ordem da Reta final
 
-1. **HV-1** — aba Histórico + "incluir obsoletos" na Biblioteca (sem schema)
+1. ~~**HV-1**~~ ✅ `7a54900` — aba Histórico + "incluir obsoletos" na Biblioteca
 2. **AP-1** — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
 3. **MO-1** — modelos por setor e categoria (0.7.11)
 4. **MO-2** — imagens dentro de modelos
@@ -67,12 +68,23 @@
 
 ## Próximo passo imediato
 
-**HV-1.** Clonar o `master` do GitHub. Mostrar a Claudio um mockup com as
-duas opções de lugar do Histórico (4ª aba dos dados do documento ou seção
-no fim da página) e o que entra nele (`glpi_logs` do documento; perguntar
-se revisões, prorrogações e acessos pelo link também). Com a escolha dele,
-montar o pacote junto do filtro "incluir obsoletos" da Biblioteca. Sem
-schema, sem reinstalar.
+**AP-1** (0.7.10, **com schema — reinstala**). Clonar o `master` do GitHub
+(`7a54900`). Entrega (ROADMAP, Reta final, linha 2):
+
+- **Quem aprovou cada versão publicada**: coluna/tabela que guarda os
+  aprovadores de cada revisão no momento da publicação; a tabela de
+  versões, a leitura de uma versão (`?version=N`), o PDF e o Word dessa
+  versão mostram os aprovadores **dela** (hoje leem a lista atual).
+- **Status próprio "Aguardando aprovadores"** no Painel e no filtro de
+  Situação (hoje aparece como "aguarda gestor").
+
+Antes de codar: ler `DocumentApprover`, `Document::sign()/approve()`,
+`DocumentVersion::snapshot()` e onde o Painel monta as situações; mostrar a
+Claudio a proposta de schema (tabela nova ou coluna JSON na
+`documentversions`) e o rótulo do status. Sem mockup (tela quase não muda).
+Pacote com `setup.php` em 0.7.10: `plugin:install --force` +
+`plugin:activate` + `plugin:list | grep -i codexplus`, pelo
+`su -s /bin/sh www-data -c "…"`.
 
 Ao chegar no **7b**, pedir antes: SMTP configurado na homologação. Ao
 chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de

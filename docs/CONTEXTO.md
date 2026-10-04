@@ -2,6 +2,13 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.9`** · último commit de código **`7a54900`** ·
+> atualizado em **04/10/2026 (madrugada)**: **HV-1 ✅** — aba **Histórico**
+> do documento (4ª aba dos dados na edição; na leitura, a mesma barra
+> recolhida só com ela) com toda alteração do documento, e **"Incluir
+> obsoletos"** na Biblioteca para quem só lê. Seção 3.19; achados 149 a 153.
+> Próximo: **AP-1** (0.7.10, schema).
+> Antes:
 > Estado: **`v0.7.9`** · último commit de código **`ea02b8a`** ·
 > atualizado em **04/10/2026 (noite, fim da sessão)**: **R6-b ✅** (prazo
 > da revisão, prorrogação com motivo, "Revisão vencida" unificada,
@@ -2285,6 +2292,55 @@ Commits: `96cbe2b` (3c-4), `f757c31` (R6-b1, 0.7.7), `207cda4` (R6-b2),
 - Decisões a tomar no começo de cada bloco: ROADMAP, "Decisões
   pendentes" → "Da Reta final".
 
+### 3.19 HV-1 — Histórico do documento e "Incluir obsoletos" (`7a54900`)
+
+Decisões de Claudio (04/10/2026, sobre mockup): o Histórico é a **4ª aba
+dos dados do documento** (opção A). Como a edição só abre em rascunho,
+fora dele (publicado, em validação, obsoleto) a leitura mostra **a mesma
+barra "Dados do documento", recolhida, só com a aba Histórico**. Entra
+**"toda e qualquer alteração realizada no documento"**; acesso pelo link
+público não é alteração e fica fora.
+
+- **`DocumentHistory`** (novo): junta três fontes numa lista, do mais
+  recente para o mais antigo — `glpi_logs` do documento (lido e formatado
+  pelo próprio plugin, achado 150), publicações (`DocumentVersion::listFor`)
+  e eventos da revisão (`RevisionEvent`: aberta com prazo, prorrogada com
+  motivo, sem alteração, cancelada). Até 300 linhas, com aviso se houver
+  mais.
+- **Marcas novas no `glpi_logs`** (mensagem simples, `DocumentHistory::note`):
+  corpo, cabeçalho e rodapé alterados (sem o texto); campos sem opção de
+  busca (marca — `Marca: A → B`); diagrama alterado (`Diagram::save`, só
+  quando o JSON muda); link público gerado, trocado e revogado; documento
+  vinculado, desvinculado e reordenada a lista. Mesma mensagem da mesma
+  pessoa em **10 minutos** vira uma linha (achado 151). `date_submitted` e
+  `revision_due` não viram linha: são consequência do fluxo, já contada
+  pelo status e pelos eventos da revisão. Anexos, categorias e alvos já
+  vinham do GLPI (relações) e agora saem como "Adicionado — Anexo: x.pdf".
+- **Quem vê** (`Document::canSeeHistory`): quem tem papel no documento
+  (autor, responsável, revisor, auditor, aprovador), Super-Admin e Ver
+  todos. Leitor comum e Self-Service, não. Não aparece no "Visualizar e
+  PDF", nem no PDF/Word (que só leem título e `.codexplus-content`).
+- **Tela:** `parts/doc-history.html.twig`; `codexplus-meta.js` aceita várias
+  barras (`data-default-tab`, `data-store` = chave própria no
+  localStorage, `data-label-open/closed`); a da leitura nasce recolhida
+  (`cx-hist-open`) e lembra o estado.
+- **Biblioteca:** quem só lê tem **"Incluir obsoletos"**
+  (`Library::shelf($all, $withObsolete)`, `?obsoletos=1`, levado de nível
+  para nível e na busca); rascunho e em validação continuam fora; na lista,
+  etiqueta "Obsoleto". Quem produz já tinha o filtro de Situação.
+- Marcas novas valem daqui em diante; o histórico anterior é o que o
+  `glpi_logs` já tinha. Marcações do cronograma ficam para a **Q7c-2**.
+- Sem schema, sem versão nova (segue 0.7.9).
+
+#### Testes
+
+Container (achado 136): harness com 45 verificações (colapso, texto sem
+entidades, ordem, sem duplicar campo do GLPI, publicação, revisão, link,
+vinculados, diagrama, anexo, obsoletos, quem vê em sessão de leitor
+simulada) e tela no Chromium como `glpi` e como `normal` (Observer). Na
+homologação a aba só apareceu depois do `cache:clear` de verdade (achado
+149). Aprovado por Claudio.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -2979,6 +3035,30 @@ depender do comportamento errático de `position: fixed` na impressão.
     landscape}` + `.cx-page--land{page:land}` (Chrome/Edge). Paginação de
     vários documentos: `planPages()` por palco `.cx-stage`, montagem e
     numeração depois.
+149. **`runuser` não existe no PATH de quem entrou com `su` sem hífen**
+    (`/usr/sbin` fica fora), e o `cache:clear` falha calado no meio do
+    bloco — o Twig continua servindo o template antigo e a tela nova "não
+    aparece". Console sempre por
+    `su -s /bin/sh www-data -c "php /var/www/html/glpi/bin/console …"`.
+    Se ainda assim não atualizar: `rm -rf files/_cache/*` + restart.
+150. **`Log::getHistoryData()` do GLPI 11 devolve `field`/`change` já
+    escapados para HTML** e frases genéricas ("Adicionar um relacionamento
+    com um item: X (1)"). Para mostrar em Twig (que escapa de novo), ler
+    `glpi_logs` direto e formatar: `linked_action` 0 = campo
+    (`id_search_option` → rótulo da opção), 12 mensagem simples, 15/16
+    relação, 20 criação, 13/14 lixeira. Valores de usuário vêm como
+    `"Nome (id)"`, vazio como `" (0)"`.
+151. **Gravação repetida enche o Histórico:** o quadro salva por AJAX a cada
+    Salvar e o `addFiles(force_update)` regrava o corpo dentro do mesmo
+    update. Mensagem simples igual, da mesma pessoa, na janela de 10 min
+    (`user_name` no formato `User::getNameForLog`) não é gravada de novo.
+152. **Campo sem opção de busca não vai para o `glpi_logs`** (achado 33):
+    o `post_updateItem` registra à parte as colunas de `$this->updates` que
+    não estão nas opções (`DocumentHistory::loggedByGlpi`), com
+    `$this->oldvalues` → `$this->fields`.
+153. **Container de validação:** o `mysqld_safe` em segundo plano morre no
+    meio do harness ("server has gone away"). Subir com
+    `setsid nohup mysqld --user=mysql &` no mesmo comando do teste.
 
 ## 6. Contrato de código — não quebrar
 
@@ -3028,7 +3108,7 @@ contêiner inteiro.
 |---|---|
 | Homologação | `177.87.230.179`, SSH na porta **2078** (Debian, GLPI 11.0.6) |
 | Produção (futura) | **Debian 13, SSH na porta 2022** (decisão de 02/10/2026); recebe o Codex+ só na etapa final, depois da conferência do servidor |
-| Usuário de acesso | `resolutto` (sem sudo); **todo o trabalho é feito como root** (`su -`) |
+| Usuário de acesso | `resolutto` (sem sudo); **todo o trabalho é feito como root** (`su -`). Console do GLPI por `su -s /bin/sh www-data -c "php …/bin/console …"` (achado 149) |
 | Caminho do GLPI | `/var/www/html/glpi` |
 | Dono dos arquivos do plugin | `www-data:www-data` |
 | Repositório no servidor | **a própria pasta do plugin**, `plugins/codexplus` (desde 19/09/2026, igual aos demais plugins da Teckcomp) |

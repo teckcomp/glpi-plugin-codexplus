@@ -1,5 +1,9 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.7.9`** (último commit de código **`7a54900`**) ·
+> **HV-1 ✅** (04/10/2026, madrugada): aba Histórico e "Incluir obsoletos".
+> Próximo: **AP-1**.
+> Antes:
 > Estado em **`v0.7.9`** (último commit de código **`ea02b8a`**) ·
 > **reorganizado em 04/10/2026 (fim da noite), por Claudio:** antes da
 > produção entram só os blocos da **"Reta final"** (abaixo, 12 blocos +
@@ -197,7 +201,7 @@ números entre parênteses são os da lista revisada de 04/10.
 
 | Ordem | Bloco | Entrega | Reinstalar? | Antes de começar |
 |---|---|---|---|---|
-| 1 | **HV-1** | Aba **Histórico** do documento (o `Log::history` já grava: quem, quando, o quê) (7) + filtro **"incluir obsoletos"** na Biblioteca (31) | não | mockup do Histórico |
+| 1 | ~~**HV-1**~~ ✅ `7a54900` | Aba **Histórico** do documento (o `Log::history` já grava: quem, quando, o quê) (7) + filtro **"incluir obsoletos"** na Biblioteca (31) | não | mockup do Histórico |
 | 2 | **AP-1** | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
 | 3 | **MO-1** | Modelos por **setor e categoria** (colunas no modelo, tela Modelos agrupada, criação filtrando pelo setor) (32) | **sim** (0.7.11) | mockup da tela Modelos |
 | 4 | **MO-2** | **Imagens dentro de modelos**: o modelo guarda as imagens; documento novo recebe uma cópia de cada (33) | não (prever) | decisão: reverte o M1 |
@@ -778,9 +782,9 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
 
 **Da Reta final (04/10/2026) — tomar no começo de cada bloco:**
 
-- [ ] **HV-1:** onde fica o Histórico (4ª aba dos dados do documento ou
-      seção no fim da página) e o que entra (só `glpi_logs` do documento ou
-      também revisões, prorrogações e acessos pelo link) — mockup
+- [x] **HV-1:** 4ª aba dos dados na edição; na leitura, a mesma barra
+      recolhida só com o Histórico. Entra toda alteração do documento;
+      acessos pelo link, não (Claudio, 04/10/2026)
 - [ ] **MO-2:** imagem dentro do modelo **reverte a regra do M1** (modelo
       não guardava imagem). Confirmar: a imagem é copiada para cada
       documento novo; apagar do modelo não mexe nos documentos já criados

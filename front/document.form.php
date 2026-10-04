@@ -30,6 +30,7 @@ use GlpiPlugin\Codexplus\Branding;
 use GlpiPlugin\Codexplus\Category;
 use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\DocumentContributor;
+use GlpiPlugin\Codexplus\DocumentApprover;
 use GlpiPlugin\Codexplus\DocumentEditor;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\Document_Category;
@@ -147,10 +148,10 @@ if (isset($_POST['add'])) {
     $input['plugin_codexplus_brands_id'] = (int) ($_POST['plugin_codexplus_brands_id'] ?? 0);
     // Responsável, auditor, revisor e janela já na criação; conferidos em
     // Document::prepareInputForAdd (cada um com o bit dele no perfil).
-    foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
+    foreach (['users_id_owner', 'users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'users_id_signers', 'review_start', 'review_end'] as $f) {
         if (isset($_POST[$f])) {
-            // A-1: editores vêm em lista (Dropdown múltiplo).
-            $input[$f] = $f === 'users_id_editor' ? $_POST[$f] : (string) $_POST[$f];
+            // A-1 / A-2a: editores e aprovadores vêm em lista (Dropdown múltiplo).
+            $input[$f] = in_array($f, ['users_id_editor', 'users_id_signers'], true) ? $_POST[$f] : (string) $_POST[$f];
         }
     }
     if (!$doc->can(-1, CREATE, $input)) {
@@ -414,9 +415,9 @@ if ($id > 0 && isset($_POST['update'])) {
         }
         // R3d: auditor, revisor e janela. Conferidos em Document (auditor do
         // setor, só em rascunho; janela com as duas datas).
-        foreach (['users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'review_start', 'review_end'] as $f) {
+        foreach (['users_id_auditor', 'users_id_reviewer', 'users_id_editor', 'users_id_signers', 'review_start', 'review_end'] as $f) {
             if (isset($_POST[$f])) {
-                $data[$f] = $f === 'users_id_editor' ? $_POST[$f] : (string) $_POST[$f];
+                $data[$f] = in_array($f, ['users_id_editor', 'users_id_signers'], true) ? $_POST[$f] : (string) $_POST[$f];
             }
         }
 
@@ -498,7 +499,15 @@ if ($id > 0) {
     $flow = null;
     if (isset($_POST['submit_validation'])) {
         $flow = static fn () => $doc->submit((string) ($_POST['revision_summary'] ?? ''));
-        $okMsg = __('Enviado: aguardando a aprovação do responsável.', 'codexplus');
+        $okMsg = static fn () => $doc->signersPending()
+            ? __('Enviado: aguardando os aprovadores.', 'codexplus')
+            : __('Enviado: aguardando a aprovação do responsável.', 'codexplus');
+    } elseif (isset($_POST['signer_approve'])) {
+        // A-2a: aprovador do diagrama aprova.
+        $flow = static fn () => $doc->sign();
+        $okMsg = static fn () => $doc->signersPending()
+            ? __('Aprovado. Aguardando os demais aprovadores.', 'codexplus')
+            : __('Aprovado. Todos os aprovadores aprovaram: agora é a vez do responsável.', 'codexplus');
     } elseif (isset($_POST['manager_approve'])) {
         $flow = static fn () => $doc->managerApprove((string) ($_POST['approval_comment'] ?? ''));
         $okMsg = __('Aprovado: aguardando o auditor responsável.', 'codexplus');
@@ -528,7 +537,7 @@ if ($id > 0) {
     }
     if ($flow !== null) {
         if ($flow()) {
-            Session::addMessageAfterRedirect($okMsg);
+            Session::addMessageAfterRedirect($okMsg instanceof \Closure ? $okMsg() : $okMsg);
         }
         Html::redirect($self . '?id=' . $id);
     }
@@ -819,6 +828,17 @@ $editorOptions = static function (int $entityId, array $atuais) use ($reviewerOp
     }
     return $opcoes;
 };
+// A-2a: aprovadores do diagrama — quem tem o bit Aprovar.
+$signerOptions = static function (int $entityId, array $atuais) use ($roleOptions): array {
+    $opcoes = $roleOptions(Rights::approverUsers($entityId), 0, '');
+    unset($opcoes[0]);
+    foreach ($atuais as $uid) {
+        if (!isset($opcoes[$uid])) {
+            $opcoes[$uid] = getUserName($uid) . ' ' . __('(sem o direito Aprovar)', 'codexplus');
+        }
+    }
+    return $opcoes;
+};
 $review = [
     'show'             => true,
     'is_new'           => $isNew,
@@ -842,6 +862,12 @@ $review = [
     'editor_types'     => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_DIRECT]),
     'editor_widget'    => '',
     'reviewer_types'   => DocumentMeta::typesWithFlow([DocumentMeta::FLOW_FULL, DocumentMeta::FLOW_ONE]),
+    // A-2a: aprovadores (diagramas). Mudam só em rascunho, por quem gere.
+    'show_signers'     => $isNew || $doc->usesApprovers(),
+    'signer_types'     => implode(' ', Document::APPROVER_TYPES),
+    'can_signers'      => false,
+    'signers_widget'   => '',
+    'signers_names'    => '',
 ];
 $pending = ['label' => '', 'names' => []];
 $missingRight = '';
@@ -867,12 +893,33 @@ if ($isNew) {
         'display'  => false,
         'width'    => '100%',
     ]);
+    $review['can_signers']    = true;
+    $review['signers_widget'] = Dropdown::showFromArray('users_id_signers', $signerOptions((int) Session::getActiveEntity(), []), [
+        'values'   => [],
+        'multiple' => true,
+        'display'  => false,
+        'width'    => '100%',
+    ]);
 }
 if (!$isNew) {
     $auditorId  = (int) ($doc->fields['users_id_auditor'] ?? 0);
     $reviewerId = (int) ($doc->fields['users_id_reviewer'] ?? 0);
     $review['auditor_name']    = $auditorId > 0 ? getUserName($auditorId) : '';
     $review['reviewer_name']   = $reviewerId > 0 ? getUserName($reviewerId) : '';
+    // A-2a: aprovadores.
+    if ($doc->usesApprovers()) {
+        $signerIds = DocumentApprover::ids($id);
+        $review['signers_names'] = DocumentEditor::names($signerIds);
+        $review['can_signers']   = $canManage && $canEdit && $doc->fields['status'] === Document::STATUS_DRAFT;
+        if ($review['can_signers']) {
+            $review['signers_widget'] = Dropdown::showFromArray('users_id_signers', $signerOptions((int) $doc->fields['entities_id'], $signerIds), [
+                'values'   => $signerIds,
+                'multiple' => true,
+                'display'  => false,
+                'width'    => '100%',
+            ]);
+        }
+    }
     // A-1: no fluxo direto, todos os editores.
     $editorIds = $doc->flow() === DocumentMeta::FLOW_DIRECT ? $doc->editorIds() : [];
     if ($editorIds !== []) {
@@ -924,7 +971,9 @@ if (!$isNew) {
     // porquê (antes o botão só não aparecia). Regra das duas camadas:
     // perfil (bit) + papel no plugin.
     $st0 = (string) $doc->fields['status'];
-    if ($st0 === Document::STATUS_APPROVAL && $doc->isOwner() && !$doc->canApprove()) {
+    if ($doc->signerLacksRight()) {
+        $missingRight = __('Você é aprovador deste documento, mas o perfil em uso não tem o direito Aprovar do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
+    } elseif ($st0 === Document::STATUS_APPROVAL && $doc->isOwner() && !$doc->canApprove() && !$doc->signersPending()) {
         $missingRight = __('Você é o responsável deste documento, mas o perfil em uso não tem o direito Aprovar do Codex+. Peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
     } elseif ($doc->validationBlocker() === 'perfil') {
         $missingRight = __('Você é o auditor responsável deste documento, mas o perfil em uso não tem o direito Auditar do Codex+. Se outro perfil seu tem, troque para ele; senão, peça a um administrador (Administração → Perfis → aba Codex+).', 'codexplus');
@@ -936,6 +985,15 @@ if (!$isNew) {
         $pending['label'] = $st === Document::STATUS_APPROVAL
             ? __('Aguardando a aprovação do responsável', 'codexplus')
             : __('Aguardando a validação do auditor responsável', 'codexplus');
+        // A-2a: antes do responsável, os aprovadores (quantos já aprovaram).
+        if ($doc->signersPending()) {
+            $todos = DocumentApprover::ids($id);
+            $pending['label'] = sprintf(
+                __('Aguardando os aprovadores (%1$d de %2$d já aprovaram)', 'codexplus'),
+                count($todos) - count($doc->pendingWith()),
+                count($todos)
+            );
+        }
         $pending['names'] = array_map('getUserName', $doc->pendingWith());
     }
 }
@@ -966,7 +1024,8 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'doctype'     => $isNew ? '' : (string) $doc->fields['doctype'],
     'doctype_label' => $isNew ? '' : (DocumentMeta::getDoctypes()[$doc->fields['doctype']] ?? $doc->fields['doctype']),
     'status'      => $version['on'] ? Document::STATUS_PUBLISHED : $status,
-    'status_label' => $version['on'] ? Document::getStatuses()[Document::STATUS_PUBLISHED] : (Document::getStatuses()[$status] ?? $status),
+    'status_label' => $version['on'] ? Document::getStatuses()[Document::STATUS_PUBLISHED]
+        : (!$isNew && $doc->signersPending() ? __('Aguardando aprovadores', 'codexplus') : (Document::getStatuses()[$status] ?? $status)),
     'name'        => $isNew ? '' : ($shown['name'] ?? (string) $doc->fields['name']),
     'client_name' => $isNew ? '' : (string) ($doc->fields['client_name'] ?? ''),
     'client'      => $client,
@@ -1005,6 +1064,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'flow'         => $isNew ? DocumentMeta::FLOW_FULL : $doc->flow(),
     'can_validate' => !$isNew && $doc->canValidate(),
     'can_approve'  => !$isNew && $doc->canApprove(),
+    'can_sign'     => !$isNew && !$version['on'] && $doc->canSign(),
     'can_reject'   => !$isNew && $doc->canReject(),
     // A2: auditor responsável impedido de validar (aprovou a 1ª etapa). O motivo 'perfil' vai em missing_right.
     'validation_block' => $isNew || $version['on'] ? '' : match ($doc->validationBlocker()) {

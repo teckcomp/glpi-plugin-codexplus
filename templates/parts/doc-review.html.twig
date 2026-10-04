@@ -8,6 +8,23 @@
    perfil (bit Auditor), não do setor: não depende das categorias.
    Variável: review (ver front/document.form.php). #}
 
+{# A-2a (Claudio, 04/10/2026): aprovadores do diagrama — etapa antes do
+   responsável; cada um aprova, em qualquer ordem. Só usuários com o bit
+   Aprovar. Mudam só em rascunho, por quem gere o documento. Vem antes do
+   auditor para ocupar a vaga ao lado do Responsável (a do Editor). #}
+{% if review.show_signers|default(false) %}
+<div class="cx-docform-field"{% if review.is_new %} data-cx-only-type="{{ review.signer_types }}"{% endif %}>
+    <label>{{ __('Aprovadores', 'codexplus') }}</label>
+    {% if review.can_signers %}
+        {{ review.signers_widget|raw }}
+        <div class="codexplus-form-hint">{{ __('Antes do responsável: depois do envio, cada um aprova, em qualquer ordem. Em branco, o fluxo segue direto para o responsável. Aparece quem tem o direito Aprovar.', 'codexplus') }}</div>
+    {% else %}
+        <div class="cx-docform-readonly">{{ review.signers_names ?: '—' }}</div>
+        <div class="codexplus-form-hint">{{ __('Os aprovadores só mudam em rascunho, por quem gere o documento.', 'codexplus') }}</div>
+    {% endif %}
+</div>
+{% endif %}
+
 {# P2: auditor só no fluxo completo; revisão periódica fora do fluxo direto. #}
 {% if review.show_auditor %}
 <div class="cx-docform-field cx-docform-field--wide"{% if review.is_new %} data-cx-only-type="{{ review.auditor_types }}"{% endif %}>

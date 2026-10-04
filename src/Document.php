@@ -320,7 +320,82 @@ class Document extends CommonDBTM
     /** Tem algum papel no documento (vê em qualquer status). */
     public function hasRole(): bool
     {
-        return $this->isEditor() || $this->isAuditor();
+        return $this->isEditor() || $this->isAuditor() || $this->isSigner();
+    }
+
+    // ---------------------------------------------------------------------
+    // A-2a — aprovadores do diagrama (DocumentApprover)
+    // ---------------------------------------------------------------------
+
+    /** Tipos com aprovadores (Claudio, 04/10/2026: os diagramas). */
+    public const APPROVER_TYPES = ['DIA'];
+
+    public static function typeUsesApprovers(string $doctype): bool
+    {
+        return in_array($doctype, self::APPROVER_TYPES, true);
+    }
+
+    public function usesApprovers(): bool
+    {
+        return self::typeUsesApprovers((string) ($this->fields['doctype'] ?? ''));
+    }
+
+    /** É um dos aprovadores deste documento? */
+    public function isSigner(): bool
+    {
+        return $this->usesApprovers()
+            && DocumentApprover::has((int) ($this->fields['id'] ?? 0), (int) Session::getLoginUserID());
+    }
+
+    /**
+     * A vez é dos aprovadores: documento enviado (1ª etapa) com aprovador
+     * que ainda não aprovou. Enquanto isso o responsável não aprova.
+     */
+    public function signersPending(): bool
+    {
+        return $this->status() === self::STATUS_APPROVAL
+            && $this->usesApprovers()
+            && DocumentApprover::pending((int) ($this->fields['id'] ?? 0)) !== [];
+    }
+
+    /** O aprovador da sessão pode aprovar agora (bit Aprovar, ainda não aprovou). */
+    public function canSign(): bool
+    {
+        if (!$this->signersPending() || !$this->checkEntity()) {
+            return false;
+        }
+        $id = (int) $this->fields['id'];
+        $me = (int) Session::getLoginUserID();
+        return DocumentApprover::has($id, $me)
+            && !DocumentApprover::hasApproved($id, $me)
+            && (Rights::isSuperAdmin() || self::bit(Rights::APPROVE));
+    }
+
+    /** O aprovador da sessão está na vez, mas o perfil em uso não tem o bit. */
+    public function signerLacksRight(): bool
+    {
+        $id = (int) ($this->fields['id'] ?? 0);
+        $me = (int) Session::getLoginUserID();
+        return $this->signersPending() && DocumentApprover::has($id, $me)
+            && !DocumentApprover::hasApproved($id, $me) && !$this->canSign();
+    }
+
+    /** Aprovador aprova. Com o último, a vez passa ao responsável. */
+    public function sign(): bool
+    {
+        if (!$this->canSign()) {
+            return $this->deny(__('Sem direito de aprovar este documento como aprovador.', 'codexplus'));
+        }
+        $id = (int) $this->fields['id'];
+        $me = (int) Session::getLoginUserID();
+        if (!DocumentApprover::approve($id, $me)) {
+            return $this->deny(__('Não foi possível registrar a aprovação.', 'codexplus'));
+        }
+        \Log::history($id, self::class, [0, '', sprintf(
+            __('Aprovado pelo aprovador %s', 'codexplus'),
+            getUserName($me)
+        )], '', \Log::HISTORY_LOG_SIMPLE_MESSAGE);
+        return true;
     }
 
     /**
@@ -332,6 +407,9 @@ class Document extends CommonDBTM
      */
     public function pendingWith(): array
     {
+        if ($this->signersPending()) {
+            return DocumentApprover::pending((int) $this->fields['id']);
+        }
         if ($this->status() === self::STATUS_APPROVAL) {
             $o = (int) ($this->fields['users_id_owner'] ?? 0);
             return $o > 0 ? [$o] : [];
@@ -491,6 +569,11 @@ class Document extends CommonDBTM
         if ($this->status() !== self::STATUS_APPROVAL || !$this->checkEntity()) {
             return false;
         }
+        // A-2a: com aprovador pendente, a vez não é do responsável (nem do
+        // Super-Admin: a etapa dos aprovadores não se pula).
+        if ($this->signersPending()) {
+            return false;
+        }
         return Rights::isSuperAdmin() || (self::bit(Rights::APPROVE) && $this->isOwner());
     }
 
@@ -523,7 +606,8 @@ class Document extends CommonDBTM
      */
     public function canReject(): bool
     {
-        if ($this->canApprove() || $this->canValidate()) {
+        // A-2a: aprovador na vez também devolve.
+        if ($this->canApprove() || $this->canValidate() || $this->canSign()) {
             return true;
         }
         return $this->status() === self::STATUS_VALIDATION
@@ -769,6 +853,12 @@ class Document extends CommonDBTM
                 'FROM'   => Install::DOC_EDITORS_TABLE,
                 'WHERE'  => ['users_id' => $me],
             ])],
+            // A-2a: aprovadores do diagrama.
+            [$doc . '.id' => new QuerySubQuery([
+                'SELECT' => 'plugin_codexplus_documents_id',
+                'FROM'   => Install::DOC_APPROVERS_TABLE,
+                'WHERE'  => ['users_id' => $me],
+            ])],
         ];
 
         // Leitor: Ler + alvo, só publicado/obsoleto. (canView() garante que,
@@ -850,6 +940,21 @@ class Document extends CommonDBTM
                 return $this->deny(__('Numa revisão, informe o resumo do que mudou antes de enviar.', 'codexplus'));
             }
             $extra['revision_summary'] = $summary;
+        }
+        // A-2a: aprovadores ainda com o bit Aprovar; cada envio é uma rodada
+        // nova (aprovações anteriores não valem).
+        if ($this->usesApprovers()) {
+            $sem = array_diff(
+                DocumentApprover::ids((int) $this->fields['id']),
+                Rights::approverUsers((int) $this->fields['entities_id'])
+            );
+            if ($sem !== []) {
+                return $this->deny(sprintf(
+                    __('Aprovador sem o direito Aprovar no perfil: %s. Tire da lista ou peça o direito a um administrador.', 'codexplus'),
+                    DocumentEditor::names($sem)
+                ));
+            }
+            DocumentApprover::reset((int) $this->fields['id']);
         }
         return $this->transition($extra + [
             'status'             => self::STATUS_APPROVAL,
@@ -1076,6 +1181,9 @@ class Document extends CommonDBTM
         if ($comment === '') {
             return $this->deny(__('Informe o motivo da devolução.', 'codexplus'));
         }
+        if ($this->usesApprovers()) {
+            DocumentApprover::reset((int) $this->fields['id']); // A-2a
+        }
         return $this->transition([
             'status'             => self::STATUS_DRAFT,
             'users_id_validator' => (int) Session::getLoginUserID(),
@@ -1237,6 +1345,12 @@ class Document extends CommonDBTM
             }
         }
         unset($input['users_id_editor']);
+        // A-2a: aprovadores (lista) só nos diagramas; gravados no post_add /
+        // post_update, conferidos em checkManagedFields.
+        if (self::typeUsesApprovers($doctype) && array_key_exists('users_id_signers', $input)) {
+            $input['_approvers'] = DocumentEditor::normalize($input['users_id_signers']);
+        }
+        unset($input['users_id_signers']);
         return $input;
     }
 
@@ -1391,6 +1505,24 @@ class Document extends CommonDBTM
             // O espelho só conta como mudança junto com a lista.
             unset($mudou['users_id_reviewer']);
         }
+        // A-2a: aprovadores. Mudam só em rascunho (como o auditor) e os
+        // novos precisam do bit Aprovar.
+        $novosAprov = [];
+        if (array_key_exists('_approvers', $input)) {
+            $antes = $novo ? [] : DocumentApprover::ids((int) $this->fields['id']);
+            $input['_approvers'] = array_values(array_merge(
+                array_intersect($antes, $input['_approvers']),
+                array_diff($input['_approvers'], $antes)
+            ));
+            $x = $input['_approvers'];
+            $y = $antes;
+            sort($x);
+            sort($y);
+            if ($x !== $y) {
+                $mudou['_approvers'] = true;
+                $novosAprov = array_diff($input['_approvers'], $antes);
+            }
+        }
         if ($mudou === []) {
             return $input;
         }
@@ -1407,6 +1539,16 @@ class Document extends CommonDBTM
             return $this->deny(DocumentMeta::flowOf((string) ($input['doctype'] ?? $this->fields['doctype'] ?? '')) === DocumentMeta::FLOW_DIRECT
                 ? __('O editor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus')
                 : __('O revisor tem que ter o direito Revisar e editar no perfil (Administração → Perfis → aba Codex+).', 'codexplus'));
+        }
+        if (isset($mudou['_approvers']) && !$novo && $this->status() !== self::STATUS_DRAFT) {
+            return $this->deny(__('Os aprovadores só mudam em rascunho.', 'codexplus'));
+        }
+        $semAprovar = array_diff($novosAprov, Rights::approverUsers($entityId));
+        if ($semAprovar !== []) {
+            return $this->deny(sprintf(
+                __('Aprovador sem o direito Aprovar no perfil (Administração → Perfis → aba Codex+): %s.', 'codexplus'),
+                DocumentEditor::names($semAprovar)
+            ));
         }
         $semBit = array_diff($novosEditores, Rights::reviewerUsers($entityId));
         if ($semBit !== []) {
@@ -1450,6 +1592,7 @@ class Document extends CommonDBTM
 
         DocumentContributor::record($id, 0, (int) Session::getLoginUserID());
         $this->saveEditors(true);
+        $this->saveApprovers(true);
 
         // R3b3-1: imagens coladas no corpo e arquivos anexados viram
         // documentos do GLPI ligados a este (Document_Item), como no
@@ -1528,6 +1671,7 @@ class Document extends CommonDBTM
         $this->input = $this->addFiles($this->input, ['force_update' => true, 'content_field' => 'content', '_add_link' => false]);
 
         $this->saveEditors();
+        $this->saveApprovers();
         if (array_intersect($this->updates, self::CONTENT_FIELDS)) {
             DocumentContributor::record(
                 (int) $this->fields['id'],
@@ -1543,6 +1687,23 @@ class Document extends CommonDBTM
      * já conferida em checkManagedFields) e registra no Histórico quando
      * muda. A 1ª gravação de um documento antigo copia o editor do campo.
      */
+    /** A-2a: grava a lista de aprovadores que veio em _approvers. */
+    private function saveApprovers(bool $novo = false): void
+    {
+        if (!array_key_exists('_approvers', (array) $this->input) || !$this->usesApprovers()) {
+            return;
+        }
+        $id = (int) $this->fields['id'];
+        [$antes, $depois] = DocumentApprover::set($id, (array) $this->input['_approvers']);
+        if (!$novo && $antes !== $depois) {
+            \Log::history($id, self::class, [0, '', sprintf(
+                __('Aprovadores: %1$s → %2$s', 'codexplus'),
+                $antes === [] ? '—' : DocumentEditor::names($antes),
+                $depois === [] ? '—' : DocumentEditor::names($depois)
+            )], '', \Log::HISTORY_LOG_SIMPLE_MESSAGE);
+        }
+    }
+
     private function saveEditors(bool $novo = false): void
     {
         if (!array_key_exists('_editors', (array) $this->input) || $this->flow() !== DocumentMeta::FLOW_DIRECT) {
@@ -1570,6 +1731,7 @@ class Document extends CommonDBTM
         ]);
         DocumentContributor::purgeDocument((int) $this->fields['id']);
         DocumentEditor::purgeDocument((int) $this->fields['id']);
+        DocumentApprover::purgeDocument((int) $this->fields['id']);
         Diagram::purgeDocument((int) $this->fields['id']);
         DocumentVersion::purgeDocument((int) $this->fields['id']);
         ScheduleStatus::purgeDocument((int) $this->fields['id']);

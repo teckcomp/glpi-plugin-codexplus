@@ -69,6 +69,12 @@ class Dashboard
 
         // P1: 1ª etapa espera pelo responsável.
         $or[] = [$t . '.users_id_owner' => $me, $t . '.status' => Document::STATUS_APPROVAL];
+        // A-2a: …e antes dele, pelos aprovadores do diagrama que ainda não aprovaram.
+        $or[] = [$t . '.status' => Document::STATUS_APPROVAL, $t . '.id' => new \Glpi\DBAL\QuerySubQuery([
+            'SELECT' => 'plugin_codexplus_documents_id',
+            'FROM'   => Install::DOC_APPROVERS_TABLE,
+            'WHERE'  => ['users_id' => $me, 'date_approved' => null],
+        ])];
 
         $out = [];
         foreach ($DB->request([
@@ -82,11 +88,17 @@ class Dashboard
                 continue;
             }
             $etapa1 = $doc->fields['status'] === Document::STATUS_APPROVAL;
-            $dono   = $etapa1 ? $doc->isOwner() : $doc->isAuditor();
+            // A-2a: com aprovador pendente, a vez é dele (não do responsável).
+            $assina = $etapa1 && $doc->signersPending();
+            if ($assina) {
+                $dono = in_array($me, $doc->pendingWith(), true);
+            } else {
+                $dono = $etapa1 ? $doc->isOwner() : $doc->isAuditor();
+            }
             if (!$dono) {
                 continue;
             }
-            $pode    = $etapa1 ? $doc->canApprove() : $doc->canValidate();
+            $pode    = $assina ? $doc->canSign() : ($etapa1 ? $doc->canApprove() : $doc->canValidate());
             $bloqueio = '';
             if (!$pode) {
                 if ($etapa1) {
@@ -108,7 +120,8 @@ class Dashboard
                 'name'    => (string) $doc->fields['name'],
                 'acao'    => $pode ? ($etapa1 ? __('Aprovar', 'codexplus') : __('Validar', 'codexplus')) : '',
                 'bloqueio' => $bloqueio,
-                'etapa'   => $etapa1 ? __('1ª etapa: responsável', 'codexplus') : __('2ª etapa: auditor', 'codexplus'),
+                'etapa'   => $assina ? __('aprovadores', 'codexplus')
+                    : ($etapa1 ? __('1ª etapa: responsável', 'codexplus') : __('2ª etapa: auditor', 'codexplus')),
                 'quem'    => $quem > 0
                     ? ($etapa1 ? __('enviado por', 'codexplus') : __('aprovado por', 'codexplus')) . ' ' . getUserName($quem)
                     : '',

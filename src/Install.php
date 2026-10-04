@@ -52,6 +52,8 @@ class Install
     public const SCHEDULE_TABLE       = 'glpi_plugin_codexplus_schedulestatus';
     /** M-1: marcas (logo, nome, cor) usadas no cabeçalho do PDF e do Word. */
     public const BRANDS_TABLE         = 'glpi_plugin_codexplus_brands';
+    /** A-2a: aprovadores do diagrama (DocumentApprover). */
+    public const DOC_APPROVERS_TABLE  = 'glpi_plugin_codexplus_documentapprovers';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -61,6 +63,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::DOC_APPROVERS_TABLE,
             self::BRANDS_TABLE,
             self::SCHEDULE_TABLE,
             self::ICONS_TABLE,
@@ -200,6 +203,9 @@ class Install
 
         // --- Bloco A-1: vários editores na Proposta e no Laudo ---
         self::installA1();
+
+        // --- Bloco A-2a: aprovadores do diagrama ---
+        self::installA2a();
 
         $migration->executeMigration();
         return true;
@@ -605,6 +611,31 @@ class Install
                 'groups_id'                     => 0,
                 'date_creation'                 => date('Y-m-d H:i:s'),
             ]);
+        }
+    }
+
+    /**
+     * A-2a (Claudio, 04/10/2026): diagramas com vários aprovadores, só
+     * usuários. date_approved vazio = ainda não aprovou nesta rodada; o
+     * envio para validação e a devolução zeram.
+     */
+    private static function installA2a(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::DOC_APPROVERS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+                `users_id` int unsigned NOT NULL DEFAULT '0',
+                `date_approved` timestamp NULL DEFAULT NULL,
+                `date_creation` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `doc_user` (`plugin_codexplus_documents_id`, `users_id`),
+                KEY `users_id` (`users_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (A-2a): erro ao criar $t");
         }
     }
 

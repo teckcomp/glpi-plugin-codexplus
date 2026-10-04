@@ -210,6 +210,7 @@ class Install
         // --- Bloco A-2a: aprovadores do diagrama ---
         self::installA2a();
         self::installR6b($migration);
+        self::installR7($migration);
 
         $migration->executeMigration();
         return true;
@@ -673,6 +674,21 @@ class Install
                 KEY `users_id` (`users_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (R6-b): erro ao criar $t");
         }
+    }
+
+    /**
+     * R7 (Claudio, 04/10/2026): link secreto de leitura sem login, por
+     * documento. Token vazio = desligado; gerar de novo troca o token.
+     */
+    private static function installR7(Migration $migration): void
+    {
+        $doc = self::DOCUMENTS_TABLE;
+        $migration->addField($doc, 'anon_token', 'string');
+        $migration->addField($doc, 'anon_users_id', 'fkey');
+        $migration->addField($doc, 'anon_date', 'timestamp');
+        $migration->addField($doc, 'anon_hits', 'integer');
+        $migration->addField($doc, 'anon_last', 'timestamp');
+        $migration->addKey($doc, 'anon_token');
     }
 
     private static function installA2(Migration $migration): void

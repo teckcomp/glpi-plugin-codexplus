@@ -1,0 +1,43 @@
+{# Codex+ — leitura por link secreto (R7). Página própria, sem o cabeçalho
+   nem o menu do GLPI. Variáveis: root, version, company, doc (null = link
+   indisponível; senão name, code, date, updating, html). #}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ doc ? doc.name : __('Documento indisponível', 'codexplus') }}</title>
+    <link rel="stylesheet" href="{{ root }}/plugins/codexplus/css/codexplus.css?v={{ version }}">
+    <style>body{margin:0;background:#fff;color:var(--cx-text,#17202d);font-family:'IBM Plex Sans',Arial,sans-serif;}</style>
+</head>
+<body class="codexplus-app">
+{% if doc %}
+    <main class="cx-public">
+        {% if company %}
+            <header class="cx-public-bar"><span class="cx-public-brand">{{ company }}</span></header>
+        {% endif %}
+        {% if doc.updating %}
+            <div class="cx-notice cx-notice--warn">
+                <div>
+                    <strong>{{ __('Em atualização', 'codexplus') }}</strong> —
+                    {{ __('este documento está sendo revisado. Esta é a versão publicada em vigor, %s, válida até a nova ser validada.', 'codexplus')|format(doc.code) }}
+                </div>
+            </div>
+        {% endif %}
+        <article class="codexplus-doc" id="codexplus-doc">
+            <div class="cx-public-code">{{ doc.code }}</div>
+            <h1 class="codexplus-doc-title">{{ doc.name }}</h1>
+            {% if doc.date %}
+                <div class="cx-public-meta">{{ __('Publicado em %s', 'codexplus')|format(doc.date|date('d/m/Y')) }}</div>
+            {% endif %}
+            <div class="codexplus-content rich_text_container">{{ doc.html|raw }}</div>
+        </article>
+    </main>
+{% else %}
+    <main class="cx-public-off">
+        <p>{{ __('Este documento não está disponível por este link.', 'codexplus') }}</p>
+    </main>
+{% endif %}
+</body>
+</html>

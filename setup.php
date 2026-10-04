@@ -10,7 +10,7 @@
 use Glpi\Plugin\Hooks;
 use GlpiPlugin\Codexplus\ProfileTab;
 use GlpiPlugin\Codexplus\Wiki;
-define('PLUGIN_CODEXPLUS_VERSION', '0.7.7');
+define('PLUGIN_CODEXPLUS_VERSION', '0.7.8');
 // Versões mínima/máxima do GLPI suportadas
 define('PLUGIN_CODEXPLUS_MIN_GLPI', '11.0.0');
 define('PLUGIN_CODEXPLUS_MAX_GLPI', '11.0.99');
@@ -50,6 +50,14 @@ function plugin_init_codexplus(): void
             'tools' => Wiki::class,
         ];
     }
+
+    // R7 (Claudio, 04/10/2026): leitura por link secreto, sem login. Só esta
+    // página fica fora da checagem de sessão; ela mesma confere o token.
+    \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+        'codexplus',
+        '#^/front/public\.php$#',
+        \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+    );
 
     // Aba "Codex+" em Administração > Perfis (Etapa R1): matriz de direitos
     // do plugin, gravada pelo formulário nativo de Perfil.

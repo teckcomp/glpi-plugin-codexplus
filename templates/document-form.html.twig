@@ -345,7 +345,7 @@
                     {% endif %}
                 </div>
                 {% if perm.show %}
-                    {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
+                    {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token, anon: anon} only %}
                 {% endif %}
                 </div>
 
@@ -536,7 +536,7 @@
             {% endif %}
             </div>
             {% if perm.show and not version.on and not preview %}
-                {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token} only %}
+                {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token, anon: anon} only %}
             {% endif %}
             </div>
             {% if is_diagram and diagram_kind == 'fluxograma' %}
@@ -765,5 +765,14 @@
                 </form>
             {% endif %}
         </section>
+    {% endif %}
+
+    {# R7: formulário do link anônimo, fora do formulário de edição (a
+       coluna Permissões pode estar dentro dele); os botões usam form=. #}
+    {% if anon is not null %}
+        <form method="post" action="{{ self }}" id="cx-anon-form" hidden>
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="id" value="{{ id }}">
+        </form>
     {% endif %}
 </div>

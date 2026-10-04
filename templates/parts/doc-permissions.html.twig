@@ -14,7 +14,7 @@
    mude a outra.
 
    Variáveis: perm (show, pending, can_manage, targets, widgets, url),
-   id, csrf_token. #}
+   id, csrf_token; anon (R7, null = sem a seção). #}
 {% set icone = {'group': 'ti-users', 'profile': 'ti-id-badge-2', 'user': 'ti-user', 'editor_user': 'ti-user', 'editor_group': 'ti-users'} %}
 {% set rotulo = {'group': __('Grupo', 'codexplus'), 'profile': __('Perfil', 'codexplus'), 'user': __('Usuário', 'codexplus'), 'editor_user': __('Usuário', 'codexplus'), 'editor_group': __('Grupo', 'codexplus')} %}
 {% set secoes = [
@@ -69,6 +69,44 @@
             {% endif %}
         </div>
     {% endfor %}
+
+    {# R7: link secreto de leitura sem login (anon = null: não gere o link). #}
+    {% if anon|default(null) is not null %}
+        <div class="cx-perm-block cx-anon">
+            <div class="cx-perm-sub">{{ __('Acesso anônimo', 'codexplus') }}</div>
+            {% if not anon.on %}
+                <p class="cx-perm-empty">{{ __('Desligado. Quem tiver o link lê o documento sem entrar no GLPI.', 'codexplus') }}</p>
+                <button type="submit" form="cx-anon-form" name="anon_generate" value="1" class="codexplus-btn">
+                    <i class="ti ti-link"></i> {{ __('Gerar link', 'codexplus') }}
+                </button>
+            {% else %}
+                <div class="cx-anon-url">
+                    <input type="text" readonly class="form-control" value="{{ anon.url }}" data-cx-anon-url onclick="this.select();"
+                           aria-label="{{ __('Link de acesso anônimo', 'codexplus') }}">
+                    <button type="button" class="codexplus-btn" title="{{ __('Copiar', 'codexplus') }}" aria-label="{{ __('Copiar', 'codexplus') }}"
+                            onclick="var i=this.parentNode.querySelector('[data-cx-anon-url]');i.select();if(navigator.clipboard){navigator.clipboard.writeText(i.value);}else{document.execCommand('copy');}this.querySelector('i').className='ti ti-check';">
+                        <i class="ti ti-copy"></i>
+                    </button>
+                </div>
+                <div class="codexplus-form-hint">
+                    {% if anon.date %}{{ __('Gerado em %s', 'codexplus')|format(anon.date|date('d/m/Y')) }}{% if anon.by %} {{ __('por %s', 'codexplus')|format(anon.by) }}{% endif %} · {% endif %}
+                    {{- anon.hits == 1 ? __('1 acesso', 'codexplus') : __('%d acessos', 'codexplus')|format(anon.hits) }}
+                    {%- if anon.last %}, {{ __('último em %s', 'codexplus')|format(anon.last|date('d/m/Y H:i')) }}{% endif %}
+                </div>
+                <div class="cx-anon-actions">
+                    <button type="submit" form="cx-anon-form" name="anon_generate" value="1" class="codexplus-btn"
+                            onclick="return confirm('{{ __('Gerar um link novo? O link atual para de funcionar.', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-refresh"></i> {{ __('Gerar novo link', 'codexplus') }}
+                    </button>
+                    <button type="submit" form="cx-anon-form" name="anon_revoke" value="1" class="codexplus-btn cx-btn-danger-outline"
+                            onclick="return confirm('{{ __('Revogar o link? Quem tiver o link deixa de ler o documento.', 'codexplus')|e('js') }}');">
+                        <i class="ti ti-link-off"></i> {{ __('Revogar', 'codexplus') }}
+                    </button>
+                </div>
+                <div class="codexplus-form-hint">{{ __('Gerar novo derruba o anterior. Durante uma revisão, o link mostra a versão publicada.', 'codexplus') }}</div>
+            {% endif %}
+        </div>
+    {% endif %}
 
     {% if perm.can_manage %}
         <div class="cx-perm-msg" data-cxp-msg role="status" aria-live="polite"></div>

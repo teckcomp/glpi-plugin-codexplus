@@ -2706,3 +2706,19 @@ html.cx-board-open { overflow: hidden; }
 .cx-card-list .cx-overdue-list li > span { display: block; padding: 0; font-size: .92em; color: var(--cx-danger); }
 .cx-overdue-code { font-family: 'IBM Plex Mono', monospace; color: var(--cx-muted); }
 .cx-overdue-why { color: var(--cx-danger); font-size: .92em; }
+
+/* =========================================================================
+   R7 — acesso anônimo: seção na coluna Permissões e página pública
+   ========================================================================= */
+.cx-anon .cx-anon-url { display: flex; gap: 6px; margin: 4px 0; }
+.cx-anon .cx-anon-url input { flex: 1; min-width: 0; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.cx-anon-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.cx-public { max-width: 900px; margin: 0 auto; padding: 16px; }
+.cx-public-bar { display: flex; align-items: center; gap: 12px; padding: 8px 0 12px; border-bottom: 1px solid var(--cx-border); margin-bottom: 14px; }
+.cx-public-bar img { max-height: 40px; }
+.cx-public-bar .cx-public-brand { font-weight: 600; }
+.cx-public-bar .codexplus-btn { margin-left: auto; }
+.cx-public-meta { color: var(--cx-muted); font-size: .9em; margin: 2px 0 14px; }
+.cx-public-code { font-family: 'IBM Plex Mono', monospace; color: var(--cx-muted); font-size: .9em; }
+.cx-public-off { max-width: 520px; margin: 80px auto; text-align: center; color: var(--cx-muted); font-size: 1.05em; }
+.cx-public-off i { font-size: 2em; display: block; margin-bottom: 10px; }

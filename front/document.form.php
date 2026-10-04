@@ -531,6 +531,13 @@ if ($id > 0) {
     } elseif (isset($_POST['cancel_revision'])) {
         $flow = static fn () => $doc->cancelRevision();
         $okMsg = __('Revisão cancelada: o documento voltou à versão publicada.', 'codexplus');
+    } elseif (isset($_POST['anon_generate'])) {
+        // R7
+        $flow = static fn () => $doc->anonGenerate();
+        $okMsg = __('Link de acesso anônimo gerado. Quem tiver o link lê o documento sem entrar no GLPI.', 'codexplus');
+    } elseif (isset($_POST['anon_revoke'])) {
+        $flow = static fn () => $doc->anonRevoke();
+        $okMsg = __('Link de acesso anônimo revogado.', 'codexplus');
     } elseif (isset($_POST['extend_revision'])) {
         // R6-b
         $flow = static fn () => $doc->extendRevision((string) ($_POST['revision_due'] ?? ''), (string) ($_POST['extend_reason'] ?? ''));
@@ -1053,6 +1060,16 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
     'date_validated'     => $version['on'] ? $version['date'] : ($isNew ? '' : (string) ($doc->fields['date_validated'] ?? '')),
     'widgets'     => $widgets,
     'perm'        => $perm,
+    // R7: seção "Acesso anônimo" da coluna Permissões (só para quem gere o link).
+    'anon'        => (!$isNew && $doc->canManageAnonymous()) ? [
+        'on'    => !empty($doc->fields['anon_token']),
+        'url'   => empty($doc->fields['anon_token']) ? ''
+            : rtrim((string) $CFG_GLPI['url_base'], '/') . '/plugins/codexplus/front/public.php?t=' . $doc->fields['anon_token'],
+        'by'    => (int) ($doc->fields['anon_users_id'] ?? 0) > 0 ? getUserName((int) $doc->fields['anon_users_id']) : '',
+        'date'  => (string) ($doc->fields['anon_date'] ?? ''),
+        'hits'  => (int) ($doc->fields['anon_hits'] ?? 0),
+        'last'  => (string) ($doc->fields['anon_last'] ?? ''),
+    ] : null,
     'review'      => $review,
     'preview'     => $preview,
     'pending'     => $pending,

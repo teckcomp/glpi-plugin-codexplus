@@ -611,6 +611,105 @@ class Document extends CommonDBTM
         return $this->isInRevision() && $this->checkEntity() && (Rights::isSuperAdmin() || $this->isOwner());
     }
 
+    // ---------------------------------------------------------------------
+    // R7 — acesso anônimo por link secreto
+    // ---------------------------------------------------------------------
+
+    /**
+     * O documento pode ser lido pelo link? Publicado, ou em revisão (o link
+     * mostra a versão publicada em vigor). Diagrama fica fora (Claudio,
+     * 04/10/2026). Lixeira, rascunho nunca publicado e obsoleto: não.
+     */
+    public function isAnonymousReadable(): bool
+    {
+        return empty($this->fields['is_deleted'])
+            && (string) ($this->fields['doctype'] ?? '') !== 'DIA'
+            && ($this->status() === self::STATUS_PUBLISHED || $this->isInRevision());
+    }
+
+    /** Gerar, trocar e revogar o link: responsável ou Super-Admin, com o bit Anônimo. */
+    public function canManageAnonymous(): bool
+    {
+        return $this->checkEntity()
+            && self::bit(Rights::ANONYMOUS)
+            && (Rights::isSuperAdmin() || $this->isOwner())
+            && $this->isAnonymousReadable();
+    }
+
+    /** Gera (ou troca) o link. Grava direto: não mexe em date_mod nem no fluxo. */
+    public function anonGenerate(): bool
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        if (!$this->canManageAnonymous()) {
+            return $this->deny(__('Sem direito de gerar o link de acesso anônimo deste documento.', 'codexplus'));
+        }
+        $ok = $DB->update(self::getTable(), [
+            'anon_token'    => bin2hex(random_bytes(24)),
+            'anon_users_id' => (int) Session::getLoginUserID(),
+            'anon_date'     => $_SESSION['glpi_currenttime'],
+            'anon_hits'     => 0,
+            'anon_last'     => null,
+        ], ['id' => (int) $this->fields['id']]);
+        $this->getFromDB((int) $this->fields['id']);
+        return (bool) $ok;
+    }
+
+    /** Revoga: o link antigo deixa de abrir. */
+    public function anonRevoke(): bool
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        if (!$this->checkEntity() || !self::bit(Rights::ANONYMOUS) || !(Rights::isSuperAdmin() || $this->isOwner())) {
+            return $this->deny(__('Sem direito de revogar o link de acesso anônimo deste documento.', 'codexplus'));
+        }
+        $ok = $DB->update(self::getTable(), [
+            'anon_token' => null, 'anon_users_id' => 0, 'anon_date' => null, 'anon_hits' => 0, 'anon_last' => null,
+        ], ['id' => (int) $this->fields['id']]);
+        $this->getFromDB((int) $this->fields['id']);
+        return (bool) $ok;
+    }
+
+    /**
+     * Documento do link, ou null (token mal formado, inexistente, ou
+     * documento que não pode ser lido pelo link). Não diz o motivo.
+     */
+    public static function findByAnonToken(string $token): ?self
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        if (!preg_match('/^[a-f0-9]{48}$/', $token)) {
+            return null;
+        }
+        foreach ($DB->request([
+            'SELECT' => ['id'],
+            'FROM'   => self::getTable(),
+            'WHERE'  => ['anon_token' => $token, 'knowbaseitems_id' => 0],
+            'LIMIT'  => 1,
+        ]) as $r) {
+            $doc = new self();
+            if ($doc->getFromDB((int) $r['id']) && hash_equals((string) $doc->fields['anon_token'], $token) && $doc->isAnonymousReadable()) {
+                return $doc;
+            }
+        }
+        return null;
+    }
+
+    /** Conta um acesso pelo link (sem date_mod, sem histórico). */
+    public function anonHit(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $DB->update(self::getTable(), [
+            'anon_hits' => new QueryExpression($DB->quoteName('anon_hits') . ' + 1'),
+            'anon_last' => date('Y-m-d H:i:s'),
+        ], ['id' => (int) $this->fields['id']]);
+    }
+
     /** R6-b: prorrogar (ou definir) o prazo da revisão — quem cancela. */
     public function canExtendRevision(): bool
     {
@@ -1821,6 +1920,8 @@ class Document extends CommonDBTM
         // Revisão e resumo da revisão só mudam pelo fluxo (R6-a).
         if (!$this->inTransition) {
             unset($input['revision'], $input['revision_summary'], $input['revision_due']);
+            // R7: o link só muda por anonGenerate/anonRevoke.
+            unset($input['anon_token'], $input['anon_users_id'], $input['anon_date'], $input['anon_hits'], $input['anon_last']);
         }
 
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);

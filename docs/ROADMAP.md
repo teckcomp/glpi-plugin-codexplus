@@ -1,5 +1,10 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.7.11`** (último commit de código **`fd1db9b`**) ·
+> **MO-2 ✅** (04/10/2026, noite): imagens e quadros viram marcadores nos
+> modelos ("Imagem aqui", "Planta aqui"…), planilha vai inteira, botão
+> Marcador, aviso ao enviar. Próximo: **Q7c-1**.
+> Antes:
 > Estado em **`v0.7.11`** (último commit de código **`1f46cb7`**) ·
 > **MO-1 ✅** (04/10/2026, noite): modelos por setor e categoria, tela
 > Modelos agrupada, criação só com os modelos que cabem. Próximo: **MO-2**.
@@ -212,7 +217,7 @@ números entre parênteses são os da lista revisada de 04/10.
 | 1 | ~~**HV-1**~~ ✅ `7a54900` | Aba **Histórico** do documento (o `Log::history` já grava: quem, quando, o quê) (7) + filtro **"incluir obsoletos"** na Biblioteca (31) | não | mockup do Histórico |
 | 2 | ~~**AP-1**~~ ✅ `42a84c0` | Quem aprovou **cada versão publicada** (coluna na tabela de versões; leitura, PDF e Word da versão mostram os aprovadores dela) (34) + status próprio **"Aguardando aprovadores"** no Painel e no filtro (hoje "aguarda gestor") (35) | **sim** (0.7.10) | — |
 | 3 | ~~**MO-1**~~ ✅ `1f46cb7` | Modelos por **setor e categoria** (colunas no modelo, tela Modelos agrupada, criação filtrando pelo setor) (32) | **sim** (0.7.11) | mockup da tela Modelos |
-| 4 | **MO-2** | **Imagens dentro de modelos**: o modelo guarda as imagens; documento novo recebe uma cópia de cada (33) | não (prever) | decisão: reverte o M1 |
+| 4 | ~~**MO-2**~~ ✅ `fd1db9b` | Imagens nos modelos **como marcadores** ("Imagem aqui", "Planta aqui", "Topologia aqui"), planilha inteira, botão Marcador, aviso ao enviar (33; escopo trocado por Claudio em 04/10) | não | — |
 | 5 | **Q7c-1** | Cronograma: fase que sobe leva a linha solta do topo (16) + linha do tempo esticada na tela cheia (17) | não (só JS) | — |
 | 6 | **Q7c-2** | Cronograma: **histórico das marcações** da situação (Iniciar, Concluir, Reabrir — todas, não só a última) (15) | **sim** (0.7.12) | onde mostrar |
 | 7 | **Q5k** | Fluxograma: **texto solto** com largura e quebra de linha (23) + **"mais formas"** na mini-paleta (24) | não (só JS) | — |
@@ -779,6 +784,9 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 - Mermaid: acompanhar fluxos gerados por IAs reais e ajustar o leitor ao
   que vier
 - Planilha: gráficos, SE/PROCV e mesclar células ficam fora (decisão)
+- Modelos: **imagem fixa** dentro do modelo (logo, carimbo, diagrama que se
+  repete), ligando o mesmo arquivo do GLPI ao documento novo como no
+  Duplicar — a opção C do MO-2, só se aparecer a necessidade
 - Cronograma: % por tarefa, dependências (setas), dias úteis e feriados
   ficam fora (decisão de 03/10)
 
@@ -799,9 +807,9 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
 - [x] **MO-1:** setor e categoria opcionais; sem setor = Geral (todos);
       a criação filtra pelo setor/categorias escolhidos no formulário;
       colunas no modelo, padrão por tipo + lugar (Claudio, 04/10/2026)
-- [ ] **MO-2:** imagem dentro do modelo **reverte a regra do M1** (modelo
-      não guardava imagem). Confirmar: a imagem é copiada para cada
-      documento novo; apagar do modelo não mexe nos documentos já criados
+- [x] **MO-2:** em vez da imagem real, **marcador** no lugar dela ("Imagem
+      aqui", "Planta aqui", "Topologia aqui"); planilha fica inteira; aviso
+      (sem bloquear) ao enviar com marcador sobrando (Claudio, 04/10/2026)
 - [ ] **Q7c-2:** onde aparece o histórico das marcações (na linha da
       tarefa, num balão, ou no Histórico do documento)
 - [ ] **7a/7b:** antecedência do aviso "a vencer" (sugestão: 30 dias), quem

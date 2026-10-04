@@ -1,11 +1,11 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (noite), depois do **MO-1 ✅** (`1f46cb7`).
+> Gerado em 04/10/2026 (noite), depois do **MO-2 ✅** (`fd1db9b`).
 
 ## Estado
 
-- Versão: **`0.7.11`**; último commit de código **`1f46cb7`** (MO-1); docs
+- Versão: **`0.7.11`**; último commit de código **`fd1db9b`** (MO-2); docs
   neste pacote. Plugin 0.7.11 habilitado na homologação.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
@@ -29,8 +29,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.21, achados
-  até 157) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.22, achados
+  até 158) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -56,7 +56,7 @@
 1. ~~**HV-1**~~ ✅ `7a54900` — aba Histórico + "incluir obsoletos" na Biblioteca
 2. ~~**AP-1**~~ ✅ `42a84c0` — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
 3. ~~**MO-1**~~ ✅ `1f46cb7` — modelos por setor e categoria (0.7.11)
-4. **MO-2** — imagens dentro de modelos
+4. ~~**MO-2**~~ ✅ `fd1db9b` — imagens e quadros viram marcadores nos modelos
 5. **Q7c-1** — cronograma: fase leva linha solta; tela cheia esticada
 6. **Q7c-2** — cronograma: histórico das marcações (0.7.12)
 7. **Q5k** — fluxograma: texto solto com quebra; "mais formas"
@@ -69,26 +69,26 @@
 
 ## Próximo passo imediato
 
-**MO-2** — imagens dentro de modelos (ROADMAP, Reta final, linha 4;
-**sem schema previsto**, confirmar ao ler o código). Clonar o `master` do
-GitHub (`1f46cb7` + docs).
+**Q7c-1** — cronograma (ROADMAP, Reta final, linha 5; **só JS**, sem schema,
+aplicação com Ctrl+F5). Clonar o `master` do GitHub (`fd1db9b` + docs).
 
-Antes de codar: ler `Template::sanitize()`/`stripImages()` (a regra do M1
-que este bloco reverte), o `Html::textarea` de `front/templates.php`
-(`enable_images => false`) e o de `front/document.form.php` (linha ~785,
-`enable_images => true`), e como o documento grava as imagens coladas
-(`Document_Item` ligado a UM documento — ver `src/Document.php` e o
-`document.form.php`). Levar a Claudio, numa resposta só, as decisões do
-MO-2 no ROADMAP: (1) a imagem do modelo é **copiada** para cada documento
-novo (arquivo próprio, não o mesmo `Document` do GLPI)? (2) apagar ou
-trocar a imagem no modelo **não mexe** nos documentos já criados? (3)
-"Duplicar" o modelo copia as imagens também? Mockup só se a tela mudar
-(provavelmente não muda). Sem `setup.php` novo se não houver schema:
-`cache:clear` + `systemctl restart apache2`.
+Dois itens da lista revisada de 04/10: (16) **fase que sobe leva a linha
+solta do topo** e (17) **linha do tempo esticada na tela cheia**. O texto
+da lista é curto: **antes de codar, pedir a Claudio um print (ou passo a
+passo) de cada um** — o que ele faz, o que acontece e o que esperava. Sem
+isso a certeza do comportamento é baixa (regra do projeto: não gerar JS
+"no escuro").
 
-Lembretes do container (achados 153, 154, 157): `mysqld` por `setsid
-nohup` no mesmo comando; login por script numa sessão Python só, com
-`Referer` nos POST; jsdom espera o `DOMContentLoaded`.
+Ler antes: `public/js/codexplus-grid.js` (cronograma, Q7b) e a seção do
+cronograma no CONTEXTO (Q7b, 03–04/10). Validar no Chromium do container
+(Playwright, achado 154/158): o cronograma é desenhado por JS, o HTTP não
+basta.
+
+Lembretes do container (achados 153, 154, 157, 158): `mysqld` por `setsid
+nohup` no mesmo comando; `php -S` com `< /dev/null` (senão o comando trava);
+nunca `pkill -f` com o padrão literal na linha (use `[p]hp -S`); login por
+script numa sessão Python só, com `Referer` nos POST; jsdom espera o
+`DOMContentLoaded`. Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
 
 Ao chegar no **7b**, pedir antes: SMTP configurado na homologação. Ao
 chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de

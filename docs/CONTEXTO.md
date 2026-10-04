@@ -2,6 +2,13 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.11`** · último commit de código **`fd1db9b`** ·
+> atualizado em **04/10/2026 (noite)**: **MO-2 ✅** — ao virar modelo,
+> imagem, print anotado, planta e topologia viram **marcadores** ("Imagem
+> aqui", "Planta aqui"…) no lugar de sumir; planilha vai inteira; botão
+> **Marcador** na tela Modelos; aviso ao enviar com marcador sem preencher.
+> Seção 3.22; achado 158. Próximo: **Q7c-1** (cronograma, só JS).
+> Antes:
 > Estado: **`v0.7.11`** · último commit de código **`1f46cb7`** ·
 > atualizado em **04/10/2026 (noite)**: **MO-1 ✅** — modelos por **setor e
 > categoria** (ambos opcionais; sem setor = Geral, vale para todos), tela
@@ -922,8 +929,8 @@ impressão).
   (`Template::listForCreation`, `codexplus-docform.js`).
 - **Salvar como modelo** na página do documento (quem tem Gerenciar
   modelos; não em diagrama): o corpo gravado vira modelo do mesmo tipo.
-  **Modelo não guarda imagem** (`Template::stripImages`): a imagem é arquivo
-  de um documento só.
+  **Modelo não guarda imagem**: a imagem é arquivo de um documento só.
+  Desde o MO-2 ela vira marcador ("Imagem aqui"), seção 3.22.
 - Tela **Modelos**: direito do Codex+ (Gerenciar modelos), mesmo editor dos
   documentos (sem botões de imagem), tipos sem DIA.
 - Saíram os caminhos que criavam artigo na Base de Conhecimento.
@@ -2458,6 +2465,53 @@ pergunta e recusa, lista vazia). Tela pelo `php -S` com login por script,
 com 10+ modelos não foi visto no container; Claudio validou na
 homologação.
 
+### 3.22 MO-2 — Marcadores no lugar de imagem nos modelos (`fd1db9b`, `v0.7.11`)
+
+Decisão de Claudio (04/10/2026): o MO-2 **não** guarda a imagem real no
+modelo (opção C, que exigia ligar ou copiar arquivos do GLPI). O modelo
+guarda **o lugar** da imagem: um marcador de texto. No POP o print muda a
+cada procedimento; o que se repete é onde ele vai. **Planilha fica inteira**
+no modelo (colunas, fórmulas e valores), como já era. Imagem fixa (logo,
+carimbo) ficou para a Pós-produção.
+
+- **Marcador:** `<span class="cx-ph cx-ph-{imagem|planta|topologia|quadro}"
+  contenteditable="false">Imagem aqui</span>` — só texto, sem arquivo,
+  vale em qualquer documento. Texto padrão em
+  `Template::PLACEHOLDER_KINDS` e `PH_KINDS` (`codexplus-editor.js`).
+- **`Template::toPlaceholders()`** (no `sanitize()`, troca o
+  `stripImages` do M1): por `DOMDocument`, nesta ordem — legenda de quadro
+  (`span.cx-board-legend`) sai, com o `<p>` vazio dela; `span.cx-board`
+  vira planta/topologia pelo `mode` do JSON (`data-cx-board`; JSON ilegível
+  = "Quadro aqui"); `span.cx-annot` e `<img>` soltas viram "Imagem aqui";
+  imagem dentro de `<a>` só dela troca o link inteiro. **Sem nada a trocar,
+  devolve o HTML igual, byte a byte** (não passa pelo DOM). Reserva por
+  regex (o M1) se o DOM não ler.
+- **Salvar como modelo:** a mensagem conta os marcadores criados
+  (`countPlaceholders` depois − antes). Duplicar modelo mantém os
+  marcadores.
+- **Tela Modelos:** botão **Marcador** (menu Imagem / Planta / Topologia,
+  filtrado pela tabela T2 do tipo; janela para o texto). Continua sem
+  Inserir imagem, Planta e Topologia.
+- **No documento:** um clique seleciona o marcador inteiro; colar,
+  arrastar, Inserir imagem, Planta e Topologia ocupam o lugar dele
+  (`BeforeExecCommand` tira o marcador e põe o cursor ali — achado 158).
+- **Aviso:** depois de Enviar para validação ou Publicar direto, sobrando
+  marcador, `WARNING` "ficou N marcador do modelo sem preencher". Não
+  bloqueia.
+- **Leitura e PDF:** `.cx-ph` tracejado (`codexplus.css` e `sizeCss()`,
+  que o PDF usa). No Word sai como texto simples.
+
+#### Testes
+
+Container: GLPI 11.0.6 + MariaDB + Chromium (Playwright). Harness com o
+Kernel, 17 (cada tipo trocado, planilha intacta, gravar de novo idêntico,
+duplicar, modelo só de texto idêntico, `listForCreation`, escape). Tela
+pelo `php -S` com login por script, 13 (mensagens do Salvar como modelo,
+aviso no Enviar e no Publicar direto, sem aviso sem marcador, leitura,
+JSON da criação). Chromium, 16 (menu por tipo, janela, colar, Inserir
+imagem e Planta no lugar do marcador, janela cancelada, sem erro de JS).
+Claudio aprovou na homologação (Ctrl+V real, PDF).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3203,6 +3257,17 @@ depender do comportamento errático de `position: fixed` na impressão.
     em `Html::back()` precisa do cabeçalho `Referer`, senão o redirect vai
     para outro host e o teste quebra com "Connection refused".
 
+158. **Nó travado selecionado no TinyMCE 7.9 (GLPI 11.0.6):** trocar um
+    `contenteditable=false` selecionado por `insertContent`/colar **come
+    letras do parágrafo seguinte** ("Fim" → "Fi"). E a seleção dele se perde
+    quando um botão abre janela fora do editor (quadro, arquivo): o quadro
+    ia para o fim do texto. Solução do MO-2: no `BeforeExecCommand`
+    (`mceInsertContent`, `mceInsertClipboardContent`, `mceInsertRawHTML`)
+    tirar o nó e pôr o cursor no lugar dele; o botão guarda o nó antes de
+    abrir a janela, e clique ou tecla no editor esquecem. Teste:
+    `pkill -f` com o padrão na própria linha de comando mata o shell do
+    teste — usar `[p]hp -S`, e subir o `php -S` com `< /dev/null`.
+
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF
@@ -3279,7 +3344,7 @@ codexplus/
 │   ├── Library.php            Biblioteca: Setor → Categoria, lixeira, nichos e decoração (B1, R5, B2)
 │   ├── LegacyMigration.php    migração da Base de Conhecimento (R4)
 │   ├── DocumentMeta.php       tipos, código, vencimento, fluxo por tipo (P2)
-│   ├── Template.php           modelos por tipo e lugar (setor/categoria), lista da criação e tela agrupada, sem imagem (R3b4, M1, MO-1)
+│   ├── Template.php           modelos por tipo e lugar (setor/categoria), lista da criação e tela agrupada, imagens viram marcadores (R3b4, M1, MO-1, MO-2)
 │   ├── Dashboard.php          indicadores do Painel (modelo novo)
 │   ├── Branding.php           marca, cabeçalho, JSON de impressão
 │   ├── Rights.php             bits, Super-Admin, roleUsers (quem tem Ler, P3), auditores, isProducer (P1, B1, P3)

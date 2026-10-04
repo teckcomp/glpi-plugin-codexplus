@@ -110,6 +110,12 @@
         + 'h4{font-size:11.5pt;margin:12px 0 6px;}'
         + 'p{margin:0 0 9px;}'
         + 'table{border-collapse:collapse;width:100%;margin:0 0 12px;}'
+        // R6-b2: histórico de revisões no fim do PDF.
+        + '.cx-print-history{margin-top:18px;}'
+        + '.cx-print-history table{table-layout:fixed;font-size:.9em;}'
+        + '.cx-print-history th,.cx-print-history td{text-align:left;vertical-align:top;}'
+        + '.cx-print-history .cx-h-rev{width:44px;}.cx-print-history .cx-h-date{width:84px;}'
+        + '.cx-print-history .cx-h-who{width:150px;}'
         + 'td,th{border:1px solid #d1d5db;padding:6px;font-size:10.5pt;}'
         + 'th{background:#f3f4f6;}'
         + 'img{max-width:100%;height:auto;}'
@@ -166,7 +172,9 @@
                 // R3b3-2: aviso de versão não vigente (rascunho, em validação)
                 draft: '',
                 // Q1: tipo sem revisão periódica — tira "rev. {revisao}" do texto
-                norev: 0
+                norev: 0,
+                // R6-b2: linhas do histórico de revisões (fim do PDF)
+                history: []
             }
         };
 
@@ -205,6 +213,9 @@
         // JSON, mesmo sendo gerado pelo próprio plugin (Branding::save() já
         // valida ao gravar, mas aqui é outra camada, e o valor pode vir de
         // uma config antiga persistida antes de uma validação ser adicionada).
+        if (!Array.isArray(cfg.document.history)) {
+            cfg.document.history = [];
+        }
         cfg.brand.show_logo   = !!(cfg.brand.show_logo && cfg.brand.logo_url);
         cfg.brand.repeat_logo = !!cfg.brand.repeat_logo;
         cfg.brand.logo_pos    = cfg.brand.logo_pos === 'left' ? 'left' : 'right';
@@ -666,6 +677,29 @@
         return total;
     }
 
+    /**
+     * R6-b2: tabela "Histórico de revisões" (cfg.document.history, montado
+     * pelo servidor: DocumentVersion::history). Vazia = nada.
+     */
+    function buildHistoryHtml(cfg) {
+        var rows = (cfg.document && cfg.document.history) || [];
+        if (!rows.length) {
+            return '';
+        }
+        var esc = function (t) {
+            return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        };
+        var body = '';
+        for (var i = 0; i < rows.length; i++) {
+            body += '<tr><td>' + esc(rows[i].rev) + '</td><td>' + esc(rows[i].date) + '</td><td>'
+                + esc(rows[i].what) + '</td><td>' + esc(rows[i].who) + '</td></tr>';
+        }
+        return '<div class="cx-print-history"><h2>Histórico de revisões</h2>'
+            + '<table><thead><tr><th class="cx-h-rev">Rev.</th><th class="cx-h-date">Data</th>'
+            + '<th>O que mudou</th><th class="cx-h-who">Publicado por</th></tr></thead>'
+            + '<tbody>' + body + '</tbody></table></div>';
+    }
+
     function exportPdf() {
         var doc = document.getElementById('codexplus-doc');
         if (!doc) {
@@ -741,11 +775,15 @@
             + '<div class="cx-print-meta">' + meta.replace(/</g, '&lt;') + '</div>'
             + '</div>';
 
+        // R6-b2: histórico de revisões no fim, um bloco atômico (título e
+        // tabela juntos; layoutPages não os separa).
+        var history = buildHistoryHtml(cfg);
+
         var html = '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
             + '<base href="' + window.location.origin + '/">'
             + '<title>' + fileTitle(cfg, title).replace(/</g, '&lt;') + '</title>'
             + '<style>' + PRINT_CSS + brandCss(cfg) + editorSizeCss() + buildPageCss(geo) + '</style></head><body>'
-            + '<div id="cx-stage">' + heading + clone.innerHTML + '</div>'
+            + '<div id="cx-stage">' + heading + clone.innerHTML + history + '</div>'
             + '</body></html>';
 
         var iframe = document.createElement('iframe');

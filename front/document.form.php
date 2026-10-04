@@ -1137,6 +1137,15 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
         // Tipo sem revisão periódica (fluxo direto): o "rev. 0" sai do cabeçalho.
         'norev'          => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? 1 : 0,
         'footer_text'    => (string) ($doc->fields['footer_text'] ?? ''),
+        // R6-b2: histórico de revisões no fim do PDF, até a revisão impressa
+        // (na revisão em andamento, até a publicada em vigor). Tipos de fluxo
+        // direto (proposta, laudo) não têm revisão periódica: sem histórico.
+        'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
+            : \GlpiPlugin\Codexplus\DocumentVersion::history(
+                $id,
+                $version['on'] ? (int) $version['rev'] : ((int) $doc->fields['revision'] - ($inRevision ? 1 : 0)),
+                $doc
+            ),
     ], $brandShownId),
 ]);
 

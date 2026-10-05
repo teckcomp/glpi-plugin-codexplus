@@ -22,6 +22,8 @@
                 len:{mode:'auto'|'manual', m, extra}, showM} (Q2d: metros)
           duct {pts:[{x,y}], kind:'eletrocalha'|'canaleta', label, showM, fs}
                 (Q2e: polilinha desenhada por cliques, com metragem própria).
+          wall {pts:[{x,y}], mat} (Q8-1, só na Planta: parede com material,
+                base do mapa de calor; D.wallsOn mostra ou esconde a camada).
                 (Q2a/Q2b; side = n/l/s/o, borda do ícone; cable = P-001…).
    Todos com id, lock (travado) e g (grupo). Ligação não tem x/y: a
    posição vem dos dois ícones, e ela acompanha quando eles se movem.
@@ -112,6 +114,22 @@
         eletrocalha: { label: 'Eletrocalha', c: '#888780', w: 12, o: 0.35, mid: '#5F5E5A' },
         canaleta:    { label: 'Canaleta',    c: '#B4B2A9', w: 7,  o: 0.6,  mid: '' }
     };
+    /* Q8-1 (Claudio, 05/10/2026) — paredes da Planta, base do mapa de calor.
+       Perda em dB por faixa [2,4 GHz, 5 GHz, 6 GHz]: valores de referência
+       de mercado para o modelo multiparede; a calibração (Q8-5) ajusta.
+       Material novo = uma linha aqui. A ordem é a da lista no painel. */
+    var WALL_KINDS = {
+        divisoria: { label: 'Divisória / drywall',             c: '#888780', w: 3, d: '',    loss: [3, 4, 5] },
+        vidro:     { label: 'Vidro / vitrine',                 c: '#378ADD', w: 3, d: '7 4', loss: [2, 3, 4] },
+        madeira:   { label: 'Porta / madeira',                 c: '#A0662D', w: 3, d: '',    loss: [3, 4, 5] },
+        alvenaria: { label: 'Alvenaria (tijolo / bloco)',      c: '#C0582B', w: 5, d: '',    loss: [6, 10, 12] },
+        concreto:  { label: 'Concreto / laje',                 c: '#444441', w: 6, d: '',    loss: [12, 18, 20] },
+        aco:       { label: 'Porta de aço fechada',            c: '#5F5E5A', w: 5, d: '3 3', loss: [20, 25, 28] },
+        metal:     { label: 'Metal / elevador / câmara fria',  c: '#791F1F', w: 6, d: '',    loss: [26, 32, 35] }
+    };
+    var WALL_DEFAULT = 'alvenaria';
+    var WALL_BANDS = ['2,4 GHz', '5 GHz', '6 GHz'];
+    function isPath(i) { return !!i && (i.t === 'duct' || i.t === 'wall'); }
     var LINK_DEFAULT = 'cat6';
     // Q5b: ligação de fluxo (só no fluxograma; flow tira da lista de cabos).
     LINK_KINDS.fluxo = { label: 'Fluxo', c: '#5F5E5A', w: 1.6, d: '', arrow: true, flow: true };
@@ -797,6 +815,8 @@
         // Q3b: legenda abaixo do quadro. Quadro novo nasce com ela; quadro
         // gravado antes do Q3b (sem o campo) fica sem, até marcar.
         out.legend = !!d.legend;
+        // Q8-1: camada de paredes (só Planta); quadro antigo nasce com ela à mostra.
+        if (out.mode === 'planta') { out.wallsOn = d.wallsOn === undefined ? true : !!d.wallsOn; }
         var pxm = out.pxm || PXM_DEFAULT;
         var src = Array.isArray(d.items) ? d.items : [];
         // Q5b: cada paleta com os seus elementos. Fluxograma: formas, texto,
@@ -831,6 +851,15 @@
                 out.items.push({ id: String(it.id || uid()), t: 'duct', pts: pts, kind: DUCT_KINDS[it.kind] ? it.kind : 'eletrocalha',
                     label: String(it.label || '').slice(0, 80), showM: it.showM === undefined ? true : !!it.showM,
                     fs: LINK_FS[it.fs] ? it.fs : 'm', lock: !!it.lock, g: it.g ? String(it.g) : '' });
+                return;
+            }
+            if (it && it.t === 'wall') {
+                if (out.mode !== 'planta') { return; }
+                var wp = (Array.isArray(it.pts) ? it.pts : []).slice(0, 200).filter(function (q) { return q && isFinite(+q.x) && isFinite(+q.y); })
+                    .map(function (q) { return { x: Math.round(+q.x * 10) / 10, y: Math.round(+q.y * 10) / 10 }; });
+                if (wp.length < 2) { return; }
+                out.items.push({ id: String(it.id || uid()), t: 'wall', pts: wp, mat: WALL_KINDS[it.mat] ? it.mat : WALL_DEFAULT,
+                    lock: !!it.lock, g: it.g ? String(it.g) : '' });
                 return;
             }
             if (it && it.t === 'lane') {
@@ -1169,6 +1198,17 @@
             + '<text x="' + m.x.toFixed(1) + '" y="' + (m.y - oy + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Arial,sans-serif" font-size="' + fs + '" fill="#444441">' + esc(txt) + '</text>';
         return h + '</g>';
     }
+    /* Q8-1: parede = traço na cor do material, sem rótulo (a planta já tem
+       os nomes). Na tela leva uma faixa invisível larga para o clique. */
+    function wallMeters(w) { return Math.round(polyLen(w.pts) / PXM * 10) / 10; }
+    function wallSvg(w, forExport) {
+        var k = WALL_KINDS[w.mat] || WALL_KINDS[WALL_DEFAULT], dd = linkD(w.pts), h = '<g data-id="' + w.id + '">';
+        if (!forExport) { h += '<path d="' + dd + '" fill="none" stroke="transparent" stroke-width="14" vector-effect="non-scaling-stroke"/>'; }
+        h += '<path class="cx-board-wall" d="' + dd + '" fill="none" stroke="' + k.c + '" stroke-opacity="0.9" stroke-width="' + k.w + '"'
+            + (k.d ? ' stroke-dasharray="' + k.d + '"' : '') + ' stroke-linejoin="miter" stroke-linecap="square"/>';
+        return h + '</g>';
+    }
+    function wallsShown(data) { return data.mode === 'planta' && data.wallsOn !== false; }
     function finder(items) {
         var map = {};
         items.forEach(function (i) { map[i.id] = i; });
@@ -1296,7 +1336,7 @@
         if (M.approx && (M.cables.length || M.ducts.length)) {
             h += '<p class="cx-mat-warn">Sem escala: metros aproximados (1 m = ' + PXM_DEFAULT + ' px). Use "Escala" na barra para medir pela planta.</p>';
         }
-        return h + '<p class="cx-board-none">Sem fio e Lógica/VPN não entram. Áreas e textos não contam.</p></div>';
+        return h + '<p class="cx-board-none">Sem fio e Lógica/VPN não entram. Áreas, paredes e textos não contam.</p></div>';
     }
 
     // A forma sem o nome de baixo: seleção, alças e guias usam esta.
@@ -1318,8 +1358,9 @@
             return { x: it.x, y: it.y, w: it.w, h: it.h };
         }
         if (it.t === 'zone' || it.t === 'lane') { return { x: it.x, y: it.y, w: it.w, h: it.h }; }
-        if (it.t === 'duct') {
-            var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }), pd = (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w / 2 + 2;
+        if (isPath(it)) {
+            var xs = it.pts.map(function (q) { return q.x; }), ys = it.pts.map(function (q) { return q.y; }),
+                pd = (it.t === 'wall' ? (WALL_KINDS[it.mat] || WALL_KINDS[WALL_DEFAULT]).w : (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w) / 2 + 2;
             var bx = Math.min.apply(null, xs) - pd, by = Math.min.apply(null, ys) - pd;
             return { x: bx, y: by, w: Math.max.apply(null, xs) + pd - bx, h: Math.max.apply(null, ys) + pd - by };
         }
@@ -1345,6 +1386,7 @@
             var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
             var fnd = finder(data.items);
             data.items.forEach(function (it) {
+                if (it.t === 'wall' && !wallsShown(data)) { return; }
                 if (it.t === 'link') {
                     (routePts(it, fnd) || []).forEach(function (q) { x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x); y2 = Math.max(y2, q.y); });
                     return;
@@ -1367,9 +1409,10 @@
             + (bgImg ? '<image href="' + bgImg + '" x="0" y="0" width="' + data.w + '" height="' + data.h + '" opacity="' + data.bgOpacity + '"/>' : '')
             + laneSvg(data.items, true)
             + data.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i, true); }).join('')
+            + (wallsShown(data) ? data.items.filter(function (i) { return i.t === 'wall'; }).map(function (i) { return wallSvg(i, true); }).join('') : '')
             + data.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, data.items, true); }).join('')
             + data.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, find, true); }).join('')
-            + data.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i, true); }).join('')
+            + data.items.filter(function (i) { return ['zone', 'link', 'duct', 'wall'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i, true); }).join('')
             + '</svg>';
         return { svg: svg, w: W, h: H };
     }
@@ -1409,6 +1452,12 @@
                 out.push({ t: 'duct', k: k, name: DUCT_KINDS[k].label });
             }
         });
+        // Q8-1: paredes por material, só com a camada à mostra.
+        if (wallsShown(D)) {
+            Object.keys(WALL_KINDS).forEach(function (k) {
+                if (items.some(function (i) { return i.t === 'wall' && i.mat === k; })) { out.push({ t: 'wall', k: k, name: 'Parede: ' + WALL_KINDS[k].label }); }
+            });
+        }
         var cats = Object.keys(I.CATS), icons = [];
         items.forEach(function (i) {
             if (i.t !== 'icon') { return; }
@@ -1437,6 +1486,10 @@
                 g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 32) + '" y2="' + cy + '" stroke="' + L.c + '" stroke-width="' + (L.w + 0.6) + '"'
                     + (L.d ? ' stroke-dasharray="' + L.d + '"' : '') + ' stroke-linecap="round"/>';
                 if (L.arrow) { g += '<path d="M' + (x + 34) + ' ' + cy + ' l-7 -4 v8 z" fill="' + L.c + '"/>'; }
+            } else if (e.t === 'wall') {
+                var WK = WALL_KINDS[e.k];
+                g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 34) + '" y2="' + cy + '" stroke="' + WK.c + '" stroke-opacity="0.9" stroke-width="' + WK.w + '"'
+                    + (WK.d ? ' stroke-dasharray="' + WK.d + '"' : '') + '/>';
             } else if (e.t === 'duct') {
                 var K = DUCT_KINDS[e.k];
                 g += '<line x1="' + (x + 2) + '" y1="' + cy + '" x2="' + (x + 34) + '" y2="' + cy + '" stroke="' + K.c + '" stroke-opacity="' + K.o + '" stroke-width="' + K.w + '"/>';
@@ -2432,6 +2485,7 @@
             + '<button type="button" data-tool="zone" title="Desenhar ' + (flow ? 'moldura' : 'zona / área') + ' (Z)">' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</button>'
             + '<button type="button" data-tool="text" title="Texto (T)">Texto</button>'
             + (flow ? '' : '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>'
+            + (D.mode === 'planta' ? '<button type="button" data-tool="wall" title="Parede: clique os pontos; duplo clique ou Enter termina; Esc cancela. O material vale para o mapa de calor (P)">Parede</button>' : '')
             + '<button type="button" data-tool="scale" title="Escala: clique em dois pontos da planta e informe a distância real">Escala</button>'
             + '<span class="cx-board-scale"></span>')
             + '<span class="cx-board-sep"></span>'
@@ -2469,6 +2523,7 @@
                   + '<label class="cx-board-op" title="Transparência da planta">Planta <input type="range" min="10" max="100" step="5" data-act="op" value="' + Math.round(D.bgOpacity * 100) + '"></label>'
                   + '<button type="button" data-act="rot" title="Girar a planta 90° (os itens giram junto)"' + (bgUrl ? '' : ' hidden') + '>Girar planta</button>'
                   + '<button type="button" data-act="bgdel"' + (bgUrl ? '' : ' hidden') + '>Tirar planta</button>'
+                  + '<label class="cx-board-op" title="Mostrar ou esconder as paredes no quadro, no PNG e na legenda (o mapa de calor considera as paredes mesmo escondidas)"><input type="checkbox" data-act="walls"' + (D.wallsOn !== false ? ' checked' : '') + '> Paredes</label>'
                 : '')
             // Q7a: cópia do quadro em arquivo (backup ou levar a outro documento).
             + (D.mode === 'planta' || D.mode === 'topologia'
@@ -3103,7 +3158,7 @@
             }
         });
         props.addEventListener('input', function (e) {
-            var k = org && e.target.getAttribute('data-of'), n = sel.length === 1 && orgNode(sel[0]);
+            var k = org && e.target.getAttribute('data-of'), n = org && sel.length === 1 && orgNode(sel[0]);
             if (!k || !n || ['name', 'role', 'note'].indexOf(k) < 0) { return; }
             if (!props.__snap) { snap(); props.__snap = true; }
             n[k] = String(e.target.value).slice(0, k === 'name' ? 120 : k === 'role' ? 160 : 500);
@@ -3111,7 +3166,7 @@
             orgRefresh();
         });
         props.addEventListener('change', function (e) {
-            var k = org && e.target.getAttribute('data-of'), n = sel.length === 1 && orgNode(sel[0]);
+            var k = org && e.target.getAttribute('data-of'), n = org && sel.length === 1 && orgNode(sel[0]);
             if (!k || !n) { return; }
             if (k === 'lvl') { if (n.lvl !== e.target.value) { snap(); n.lvl = e.target.value; render(); } }
             else if (k === 'boss') { orgSetBoss(n.id, e.target.value); }
@@ -3608,7 +3663,7 @@
             el.setAttribute('viewBox', B0.x + ' ' + B0.y + ' ' + B0.w + ' ' + B0.h);
             var h = '<rect x="0" y="0" width="' + D.w + '" height="' + D.h + '" fill="#fff" stroke="#D3D1C7" stroke-width="' + k + '"/>';
             D.items.forEach(function (it) {
-                if (it.t === 'link' || it.t === 'duct' || it.t === 'orow') { return; }
+                if (it.t === 'link' || isPath(it) || it.t === 'orow') { return; }
                 var b = bbox(it), f = '#B4B2A9', o = 0.9;
                 if (it.t === 'org') { f = it.color || f; o = 0.85; }
                 else if (it.t === 'lane') { f = pal(it.tone).f; o = 1; }
@@ -3681,9 +3736,10 @@
                 return;
             }
             gZones.innerHTML = laneSvg(D.items) + D.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i); }).join('');
-            gDucts.innerHTML = D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
+            gDucts.innerHTML = (wallsShown(D) ? D.items.filter(function (i) { return i.t === 'wall'; }).map(function (i) { return wallSvg(i); }).join('') : '')
+                + D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
-            gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
+            gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct', 'wall'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
         }
         function render() {
             if (org) { orgSync(); }
@@ -3868,8 +3924,9 @@
             }
             gSel.innerHTML = sel.map(function (id) {
                 var it = get(id); if (!it) { return ''; }
-                if (it.t === 'duct') {
-                    var dh = '<path d="' + linkD(it.pts) + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + ((DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w + 6 / view.z)
+                if (isPath(it)) {
+                    var pw0 = it.t === 'wall' ? (WALL_KINDS[it.mat] || WALL_KINDS[WALL_DEFAULT]).w : (DUCT_KINDS[it.kind] || DUCT_KINDS.eletrocalha).w;
+                    var dh = '<path d="' + linkD(it.pts) + '" fill="none" stroke="#378ADD" stroke-opacity="0.35" stroke-width="' + (pw0 + 6 / view.z)
                         + '" stroke-linejoin="miter" pointer-events="none"/>';
                     if (sel.length === 1 && !it.lock) {
                         var r0 = 5 / view.z;
@@ -3997,10 +4054,22 @@
                 + (gy !== null ? '<line x1="-5000" y1="' + gy + '" x2="5000" y2="' + gy + '" stroke="#D4537E" stroke-width="' + (1 / view.z) + '"/>' : '');
             return { x: Math.round((gx !== null ? gx : p.x) * 10) / 10, y: Math.round((gy !== null ? gy : p.y) * 10) / 10 };
         }
+        // Q8-1: material da próxima parede (o último escolhido no painel).
+        var wallMat = WALL_DEFAULT;
+        // Pontos de encaixe ao desenhar parede: o ponto anterior e os vértices
+        // das outras paredes (fecha canto sem caçar pixel). Alt solta.
+        function wallNb(last, skipId) {
+            var nb = [last];
+            D.items.forEach(function (i) { if (i.t === 'wall' && i.id !== skipId) { i.pts.forEach(function (q) { nb.push(q); }); } });
+            return nb;
+        }
         function draftPreview(cur) {
             if (!ductDraft) { return; }
             var pts = ductDraft.concat(cur ? [cur] : []);
-            gGuides.innerHTML += '<path d="' + linkD(pts) + '" fill="none" stroke="#888780" stroke-opacity="0.45" stroke-width="12" stroke-linejoin="miter" pointer-events="none"/>'
+            var wk = tool === 'wall' ? WALL_KINDS[wallMat] : null;
+            gGuides.innerHTML += (wk
+                ? '<path d="' + linkD(pts) + '" fill="none" stroke="' + wk.c + '" stroke-opacity="0.6" stroke-width="' + wk.w + '"' + (wk.d ? ' stroke-dasharray="' + wk.d + '"' : '') + ' stroke-linejoin="miter" pointer-events="none"/>'
+                : '<path d="' + linkD(pts) + '" fill="none" stroke="#888780" stroke-opacity="0.45" stroke-width="12" stroke-linejoin="miter" pointer-events="none"/>')
                 + '<text x="' + (pts[pts.length - 1].x + 10 / view.z) + '" y="' + (pts[pts.length - 1].y - 10 / view.z) + '" font-family="Arial,sans-serif" font-size="' + (12 / view.z) + '" fill="#444441">'
                 + fmtM(Math.round(polyLen(pts) / PXM * 10) / 10) + '</text>';
         }
@@ -4009,8 +4078,12 @@
             ductDraft = null; gGuides.innerHTML = '';
             if (pts.length >= 2) {
                 snap();
-                var dct = { id: uid(), t: 'duct', pts: pts, kind: 'eletrocalha', label: '', showM: true, fs: 'm', lock: false, g: '' };
+                var dct = tool === 'wall'
+                    ? { id: uid(), t: 'wall', pts: pts, mat: wallMat, lock: false, g: '' }
+                    : { id: uid(), t: 'duct', pts: pts, kind: 'eletrocalha', label: '', showM: true, fs: 'm', lock: false, g: '' };
                 D.items.push(dct); sel = [dct.id];
+                // Parede escondida não some do desenho que acabou de ser feito.
+                if (dct.t === 'wall' && D.wallsOn === false) { D.wallsOn = true; var wc = root.querySelector('[data-act="walls"]'); if (wc) { wc.checked = true; } }
             }
             tool = 'select'; render();
         }
@@ -4131,6 +4204,15 @@
                     + '<label class="cx-board-chk"><input type="checkbox" data-k="showM"' + (it.showM ? ' checked' : '') + '> Mostrar os metros</label>'
                     + '<label class="cx-board-f"><span>Tamanho do nome</span><select data-k="fs">' + dopt({ p: 'Pequeno', m: 'Médio', g: 'Grande' }, it.fs) + '</select></label>'
                     + '<p class="cx-board-none">Arraste o quadrado branco para mover um ponto (alinha com o vizinho; Alt solta). Duplo clique na faixa cria um ponto; Ctrl + duplo clique no ponto apaga. Arraste a faixa para mover tudo.</p>';
+            } else if (it.t === 'wall') {
+                var wk = WALL_KINDS[it.mat] || WALL_KINDS[WALL_DEFAULT], wopt = Object.keys(WALL_KINDS).map(function (k) {
+                    return '<option value="' + k + '"' + (k === it.mat ? ' selected' : '') + '>' + esc(WALL_KINDS[k].label) + '</option>';
+                }).join('');
+                h += '<p><strong>Parede</strong></p>'
+                    + '<label class="cx-board-f"><span>Material</span><select data-k="mat">' + wopt + '</select></label>'
+                    + '<p class="cx-board-none cx-board-wloss">Perda ao atravessar: ' + wk.loss.map(function (v, i) { return WALL_BANDS[i] + ' <strong>' + v + ' dB</strong>'; }).join(' · ') + '</p>'
+                    + '<p class="cx-board-none cx-board-meters">Comprimento <strong>' + fmtM(wallMeters(it)) + '</strong>' + (D.pxm ? '' : ' (aproximado: sem escala)') + '</p>'
+                    + '<p class="cx-board-none">Desenhe por cima das paredes da planta. A próxima parede nasce com o material escolhido aqui. Arraste o quadrado branco para mover um ponto (encaixa nos cantos das outras paredes; Alt solta). Duplo clique na parede cria um ponto; Ctrl + duplo clique no ponto apaga.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else if (flow) {
@@ -4145,7 +4227,7 @@
             }
             if (!flow) {
                 h += '<div class="cx-board-sw">' + COLORS.map(function (c) {
-                    return it.t === 'icon' || it.t === 'link' || it.t === 'duct' || it.t === 'shape' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
+                    return it.t === 'icon' || it.t === 'link' || isPath(it) || it.t === 'shape' ? '' : '<button type="button" data-color="' + c + '" style="background:' + c + '" title="Cor" aria-label="Cor"' + (it.color === c ? ' class="is-on"' : '') + '></button>';
                 }).join('') + '</div>';
             }
             h += '<p class="cx-board-none">' + (it.lock ? 'Travado: destrave para mover.' : '') + (it.g ? ' Em grupo.' : '') + '</p>';
@@ -4236,6 +4318,7 @@
             if (it.t === 'shape' && k === 'mk') { shapeFit(it); }
             if ((it.t === 'shape' && k === 'fs') || (it.t === 'text' && k === 'px')) { it[k] = +v; if (it.t === 'shape') { shapeFit(it); } }
             if (it.t === 'link' && k === 'kind' && LINK_KINDS[v] && LINK_KINDS[v].arrow && it.ends === 'none') { it.ends = 'arrow'; }
+            if (it.t === 'wall' && k === 'mat') { it.mat = WALL_KINDS[v] ? v : WALL_DEFAULT; wallMat = it.mat; }
             paint();
             drawSel();
             if (/^cone\.|^cat$|^size$|^rot$/.test(k) && e.type === 'change') { drawProps(); }
@@ -4685,7 +4768,7 @@
                 if (hl && hl.t === 'link' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
                     addBend(hl, p); sel = [hl.id]; drag = null; render(); return;
                 }
-                if (hl && hl.t === 'duct' && !hl.lock && !(e.ctrlKey || e.metaKey)) {
+                if (isPath(hl) && !hl.lock && !(e.ctrlKey || e.metaKey)) {
                     var bj = 0, bdd = Infinity;
                     for (var sj = 0; sj < hl.pts.length - 1; sj++) { var dq = distPoly(p, [hl.pts[sj], hl.pts[sj + 1]]); if (dq < bdd) { bdd = dq; bj = sj; } }
                     snap(); hl.pts.splice(bj + 1, 0, { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 });
@@ -4707,10 +4790,11 @@
                 drag = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
             } else if (e.target.getAttribute('data-le') && sel.length === 1) {
                 drag = { k: 'end', id: sel[0], end: e.target.getAttribute('data-le') };
-            } else if (tool === 'duct') {
-                // Eletrocalha: cada clique é um ponto; duplo clique termina.
+            } else if (tool === 'duct' || tool === 'wall') {
+                // Eletrocalha e parede: cada clique é um ponto; duplo clique termina.
                 if (dbl && ductDraft) { finishDuct(); return; }
-                var dq0 = alignTo(p, [ductDraft && ductDraft[ductDraft.length - 1]], e.altKey);
+                var lastQ = ductDraft && ductDraft[ductDraft.length - 1];
+                var dq0 = alignTo(p, tool === 'wall' ? wallNb(lastQ) : [lastQ], e.altKey);
                 if (!ductDraft) { ductDraft = [dq0]; } else { ductDraft.push(dq0); }
                 gGuides.innerHTML = ''; draftPreview(null);
                 return;
@@ -4799,7 +4883,7 @@
                     var movable = sel.filter(function (s) { var it = get(s); return it && !it.lock && it.t !== 'link' && it.t !== 'lane'; });
                     drag = { k: 'move', p: p, start: movable.map(function (s) {
                             var it = get(s);
-                            if (it.t === 'duct') { var bb = bbox(it); return { id: s, x: bb.x, y: bb.y, pts: clone(it.pts) }; }
+                            if (isPath(it)) { var bb = bbox(it); return { id: s, x: bb.x, y: bb.y, pts: clone(it.pts) }; }
                             return { id: s, x: it.x, y: it.y };
                         }), moved: false,
                         // Ligação com os dois ícones no conjunto: as dobras andam junto.
@@ -4819,8 +4903,8 @@
         });
         svg.addEventListener('pointermove', function (e) {
             if (org) { orgMove(e); return; }
-            if (tool === 'duct' && ductDraft && !drag) {
-                var pc = toBoard(e), qc = alignTo(pc, [ductDraft[ductDraft.length - 1]], e.altKey);
+            if ((tool === 'duct' || tool === 'wall') && ductDraft && !drag) {
+                var lq = ductDraft[ductDraft.length - 1], pc = toBoard(e), qc = alignTo(pc, tool === 'wall' ? wallNb(lq) : [lq], e.altKey);
                 draftPreview(qc);
                 return;
             }
@@ -4829,7 +4913,7 @@
             if (drag.k === 'dv') {
                 if (!drag.moved) { snap(); drag.moved = true; }
                 var dv = get(drag.id);
-                dv.pts[drag.j] = alignTo(p, [dv.pts[drag.j - 1], dv.pts[drag.j + 1]], e.altKey);
+                dv.pts[drag.j] = alignTo(p, dv.t === 'wall' ? wallNb(dv.pts[drag.j - 1], dv.id).concat([dv.pts[drag.j + 1]]) : [dv.pts[drag.j - 1], dv.pts[drag.j + 1]], e.altKey);
                 paint(); drawSel(); return;
             }
             if (drag.k === 'pan') {
@@ -4947,7 +5031,7 @@
                 var x = Math.min(p.x, drag.p.x), y = Math.min(p.y, drag.p.y), w = Math.abs(p.x - drag.p.x), h = Math.abs(p.y - drag.p.y);
                 marq.removeAttribute('hidden');
                 marq.setAttribute('x', x); marq.setAttribute('y', y); marq.setAttribute('width', w); marq.setAttribute('height', h);
-                var dentro = D.items.filter(function (it) { if (it.t === 'link' || it.t === 'lane') { return false; } var b = bbox(it); return b.x >= x && b.y >= y && b.x + b.w <= x + w && b.y + b.h <= y + h; })
+                var dentro = D.items.filter(function (it) { if (it.t === 'link' || it.t === 'lane' || (it.t === 'wall' && !wallsShown(D))) { return false; } var b = bbox(it); return b.x >= x && b.y >= y && b.x + b.w <= x + w && b.y + b.h <= y + h; })
                     .map(function (it) { return it.id; });
                 sel = drag.base.concat(expand(dentro).filter(function (i) { return drag.base.indexOf(i) < 0; }));
                 drawSel(); return;
@@ -4960,7 +5044,7 @@
                 var cx = drag.start[0].x + dx + b0.w / 2, cy = drag.start[0].y + dy + b0.h / 2;
                 var gx = null, gy = null;
                 D.items.forEach(function (o) {
-                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || o.t === 'duct' || o.t === 'lane') { return; }
+                    if (drag.start.some(function (s) { return s.id === o.id; }) || o.t === 'zone' || o.t === 'link' || isPath(o) || o.t === 'lane') { return; }
                     var b = coreBox(o), ox = b.x + b.w / 2, oy = b.y + b.h / 2;
                     if (gx === null && Math.abs(ox - cx) < SNAP / view.z) { gx = ox; }
                     if (gy === null && Math.abs(oy - cy) < SNAP / view.z) { gy = oy; }
@@ -5175,7 +5259,7 @@
         }, { passive: false });
         svg.addEventListener('dblclick', function (e) {
             if (org) { return; }
-            var id = hit(e.target); if (!id || ['link', 'duct'].indexOf((get(id) || {}).t) >= 0) { return; }
+            var id = hit(e.target); if (!id || ['link', 'duct', 'wall'].indexOf((get(id) || {}).t) >= 0) { return; }
             if (get(id).t === 'shape') { sel = [id]; render(); editStart(get(id)); return; }
             sel = [id]; render();
             var f = props.querySelector('[data-k="label"],[data-k="text"],[data-k="title"]'); if (f) { f.focus(); f.select(); }
@@ -5207,7 +5291,7 @@
                 }
                 return;
             }
-            if (tool === 'duct') {
+            if (tool === 'duct' || tool === 'wall') {
                 if (e.key === 'Enter') { e.preventDefault(); finishDuct(); return; }
                 if (e.key === 'Escape') { e.preventDefault(); ductDraft = null; gGuides.innerHTML = ''; tool = 'select'; render(); return; }
             }
@@ -5232,7 +5316,7 @@
                 var mapa = {}, ids = {}, novos = [];
                 src.filter(function (o) { return o.t !== 'link'; }).forEach(function (o) {
                     var n = clone(o); n.id = uid(); ids[o.id] = n.id;
-                    if (n.t === 'duct') { n.pts.forEach(function (q) { q.x += 20; q.y += 20; }); } else { n.x += 20; n.y += 20; }
+                    if (isPath(n)) { n.pts.forEach(function (q) { q.x += 20; q.y += 20; }); } else { n.x += 20; n.y += 20; }
                     if (n.g) { mapa[n.g] = mapa[n.g] || uid(); n.g = mapa[n.g]; }
                     D.items.push(n); novos.push(n.id);
                 });
@@ -5253,6 +5337,7 @@
             if (k === 'z') { tool = 'zone'; render(); return; }
             if (k === 't') { tool = 'text'; render(); return; }
             if (k === 'e' && !flow) { tool = 'duct'; ductDraft = null; render(); return; }
+            if (k === 'p' && D.mode === 'planta') { tool = 'wall'; ductDraft = null; render(); return; }
             if (k === 'r') { act('rotate'); return; }
             var mv = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }[k];
             if (mv && sel.length) {
@@ -5260,7 +5345,7 @@
                 var step = e.shiftKey ? GRID : 1;
                 sel.forEach(function (id) {
                     var it = get(id); if (it.lock || it.t === 'link' || it.t === 'lane') { return; }
-                    if (it.t === 'duct') { it.pts.forEach(function (q) { q.x += mv[0] * step; q.y += mv[1] * step; }); return; }
+                    if (isPath(it)) { it.pts.forEach(function (q) { q.x += mv[0] * step; q.y += mv[1] * step; }); return; }
                     it.x += mv[0] * step; it.y += mv[1] * step;
                 });
                 render();
@@ -5386,6 +5471,15 @@
         }
         var lgChk = root.querySelector('[data-act="legend"]');
         if (lgChk) { lgChk.addEventListener('change', function () { D.legend = lgChk.checked; }); }
+        // Q8-1: camada de paredes. Escondida, sai da tela, do PNG e da legenda.
+        var wlChk = root.querySelector('[data-act="walls"]');
+        if (wlChk) {
+            wlChk.addEventListener('change', function () {
+                snap(); D.wallsOn = wlChk.checked;
+                if (!D.wallsOn) { sel = sel.filter(function (id) { var i = get(id); return i && i.t !== 'wall'; }); if (tool === 'wall') { tool = 'select'; ductDraft = null; } }
+                render();
+            });
+        }
 
         /* Gira a planta 90° no sentido horário, com os itens junto. */
         function rotate() {
@@ -5400,7 +5494,7 @@
                 var H = D.h;
                 var ROT = { n: 'l', l: 's', s: 'o', o: 'n' };
                 D.items.forEach(function (it) {
-                    if (it.t === 'duct') {
+                    if (isPath(it)) {
                         it.pts = it.pts.map(function (q) { return { x: H - q.y, y: q.x }; });
                         return;
                     }
@@ -5638,7 +5732,7 @@
             var cards = [[n('shape'), n('shape') === 1 ? 'forma' : 'formas'], [n('lane'), n('lane') === 1 ? 'área (raia)' : 'áreas (raias)'], [n('link'), n('link') === 1 ? 'ligação' : 'ligações']];
             if (!flow && !org) {
                 cards = [[n('icon'), n('icon') === 1 ? 'ícone' : 'ícones'], [n('link'), n('link') === 1 ? 'cabo' : 'cabos'],
-                    [n('zone') + n('duct'), D.mode === 'planta' ? 'áreas e eletrocalhas' : 'zonas e eletrocalhas']];
+                    [n('zone') + n('duct') + n('wall'), D.mode === 'planta' ? 'áreas, paredes e eletrocalhas' : 'zonas e eletrocalhas']];
             }
             if (org) {
                 var oo = r.data.org, pe = oo.nodes.filter(function (x) { return !x.group; }).length, li = oo.edges.length, ma = (oo.esc || []).length;
@@ -5727,5 +5821,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

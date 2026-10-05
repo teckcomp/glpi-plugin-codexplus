@@ -1280,6 +1280,21 @@
 .cx-docbrand-logo { flex: 0 0 auto; width: 96px; height: 32px; display: flex; align-items: center; justify-content: center; }
 .cx-docbrand-logo img { max-width: 96px; max-height: 32px; object-fit: contain; }
 .cx-docbrand select { flex: 1 1 auto; min-width: 0; }
+/* Q8-2: mapa de calor — modelos de AP e perfis de aparelho (mesma base das marcas). */
+.cx-wifi-sub { margin-top: 18px; }
+.cx-wifi-sub h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.cx-wifi-btns { display: inline-flex; gap: 8px; align-items: center; }
+.cx-wifi-btns form { margin: 0; }
+.cx-wifi-off { color: var(--cx-faint); font-size: 12px; }
+.cx-wifi-names { display: grid; grid-template-columns: repeat(2, minmax(0, 260px)); gap: 14px; }
+.cx-wifi-names3 { grid-template-columns: repeat(3, minmax(0, 220px)); }
+.cx-wifi-std { margin-left: 4px; font-weight: 500; }
+.cx-wifi-bands { display: grid; grid-template-columns: 170px repeat(3, minmax(0, 120px)); gap: 8px 12px; align-items: center; margin: 4px 0 6px; }
+.cx-wifi-bands input[type="text"] { width: 100%; box-sizing: border-box; }
+.cx-wifi-h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--cx-muted); }
+.cx-wifi-l { font-size: 13px; color: var(--cx-muted); }
+.cx-wifi-chk { margin: 0; }
+@media (max-width: 760px) { .cx-wifi-names { grid-template-columns: 1fr; } .cx-wifi-bands { grid-template-columns: 120px repeat(3, minmax(0, 1fr)); } }
 
 /* =========================================================================
    13. IDENTIFICAÇÃO DO DOCUMENTO NA LEITURA (Etapa 4b)
@@ -1535,9 +1550,21 @@
 }
 .codexplus-header.cx-brand span { font-size: 13.5px; }
 
-/* ---- Menu do Codex+ ---- */
-.codexplus-nav a { padding: 10px 16px; }
-.codexplus-nav a.is-active { font-weight: 600; border-bottom-width: 2.5px; }
+/* ---- Menu do Codex+ (Claudio, 05/10/2026: ícone, área de clique maior,
+   fundo suave no ativo e no hover; a aba Configuração entra no mesmo menu) ---- */
+.codexplus-nav { gap: 2px; align-items: flex-end; }
+.codexplus-nav a {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 16px 9px;
+    border-radius: 8px 8px 0 0;
+    border-bottom-width: 2.5px;
+}
+.codexplus-nav a i { font-size: 17px; line-height: 1; opacity: .75; }
+.codexplus-nav a:hover { background: var(--cx-surface-2); }
+.codexplus-nav a:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: -2px; }
+.codexplus-nav a.is-active { font-weight: 600; background: var(--cx-accent-soft); }
+.codexplus-nav a.is-active i { opacity: 1; }
+@media (max-width: 640px) { .codexplus-nav { overflow-x: auto; } .codexplus-nav a { padding: 9px 12px 8px; white-space: nowrap; } }
 
 /* ---- Indicadores: cartão branco com borda, número grande ---- */
 .cx-stat {

@@ -131,6 +131,7 @@ TemplateRenderer::getInstance()->display('@codexplus/library.html.twig', [
     'self'      => $self,
     'csrf'      => Session::getNewCSRFToken(),
     'can_templates' => Session::haveRight(Rights::NAME, Rights::TEMPLATES),
+    'can_config'    => Session::haveRight('config', UPDATE),
     'form_url'  => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/document.form.php',
 ]);
 

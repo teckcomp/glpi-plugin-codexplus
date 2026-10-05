@@ -77,6 +77,7 @@ if (($id > 0 || $new) && $canEdit) {
         'doctypes'    => $tplDoctypes,
         'editor_html' => $editor,
         'csrf'        => Session::getNewCSRFToken(),
+        'can_config'  => Session::haveRight('config', UPDATE),
     ]);
 } else {
     // ---- modo lista ---- (MO-1: agrupada por setor e categoria)
@@ -91,6 +92,7 @@ if (($id > 0 || $new) && $canEdit) {
         'doctypes'    => $tplDoctypes,
         'type_filter' => $tipoFiltro,
         'csrf'        => Session::getNewCSRFToken(),
+        'can_config'  => Session::haveRight('config', UPDATE),
     ]);
 }
 

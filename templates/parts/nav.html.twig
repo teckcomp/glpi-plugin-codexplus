@@ -1,0 +1,18 @@
+{# Codex+ — menu de abas (Claudio, 05/10/2026): uma fonte só para Painel,
+   Biblioteca, Modelos e Configuração, com ícone. Incluído com
+   `{% include '@codexplus/parts/nav.html.twig' with {active: 'painel',
+   painel: true, modelos: true, config: true} only %}`.
+   Configuração aparece só para quem altera a configuração do GLPI
+   (config UPDATE), a mesma regra da tela. #}
+<nav class="codexplus-nav" aria-label="{{ __('Codex+', 'codexplus') }}">
+    {% if painel %}
+        <a href="dashboard.php" class="{{ active == 'painel' ? 'is-active' : '' }}"{{ active == 'painel' ? ' aria-current="page"' : '' }}><i class="ti ti-layout-dashboard" aria-hidden="true"></i>{{ __('Painel', 'codexplus') }}</a>
+    {% endif %}
+    <a href="library.php" class="{{ active == 'biblioteca' ? 'is-active' : '' }}"{{ active == 'biblioteca' ? ' aria-current="page"' : '' }}><i class="ti ti-books" aria-hidden="true"></i>{{ __('Biblioteca', 'codexplus') }}</a>
+    {% if modelos %}
+        <a href="templates.php" class="{{ active == 'modelos' ? 'is-active' : '' }}"{{ active == 'modelos' ? ' aria-current="page"' : '' }}><i class="ti ti-template" aria-hidden="true"></i>{{ __('Modelos', 'codexplus') }}</a>
+    {% endif %}
+    {% if config %}
+        <a href="config.form.php" class="{{ active == 'config' ? 'is-active' : '' }}"{{ active == 'config' ? ' aria-current="page"' : '' }}><i class="ti ti-settings" aria-hidden="true"></i>{{ __('Configuração', 'codexplus') }}</a>
+    {% endif %}
+</nav>

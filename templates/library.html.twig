@@ -68,15 +68,11 @@
         subtitle: __('Biblioteca de documentos', 'codexplus'),
     } only %}
 
-    <nav class="codexplus-nav">
-        {% if producer %}
-            <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
-        {% endif %}
-        <a href="library.php" class="is-active">{{ __('Biblioteca', 'codexplus') }}</a>
-        {% if producer %}
-            {% if can_templates %}<a href="templates.php">{{ __('Modelos', 'codexplus') }}</a>{% endif %}
-        {% endif %}
-    </nav>
+    {% include '@codexplus/parts/nav.html.twig' with {
+        active: 'biblioteca', painel: producer,
+        modelos: producer and can_templates,
+        config: producer and can_config,
+    } only %}
 
     <div class="cx-lib-bar">
         {% if cx_niche_mode %}

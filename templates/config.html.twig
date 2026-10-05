@@ -4,8 +4,12 @@
 <div class="codexplus-app">
 
     {% include '@codexplus/parts/brand.html.twig' with {
-        title: __('Codex+ — configuração', 'codexplus'),
-        subtitle: __('Marca aplicada ao PDF dos documentos', 'codexplus'),
+        title: __('Codex+', 'codexplus'),
+        subtitle: __('Configuração: marcas, PDF, clientes, revisão e mapa de calor', 'codexplus'),
+    } only %}
+
+    {% include '@codexplus/parts/nav.html.twig' with {
+        active: 'config', painel: nav.painel, modelos: nav.modelos, config: true,
     } only %}
 
     {# M-1 (Claudio, 04/10/2026): marcas. Nome da empresa, logo, altura e
@@ -122,6 +126,203 @@
                         <a href="config.form.php#marcas" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
                     </div>
                 </div>
+            </div>
+        </form>
+        {% endif %}
+    </section>
+
+    {# Q8-2 (Claudio, 05/10/2026): mapa de calor Wi-Fi. Modelos de AP e
+       perfis de aparelho usados pelo quadro Mapa de calor. Nascem vazios;
+       os perfis de referência entram pelo botão. O quadro guarda uma cópia
+       dos valores no AP: editar aqui não muda documento já feito. #}
+    <section class="cx-cfg-block cx-brands cx-wifi" id="mapa-calor">
+        <div class="cx-brands-head">
+            <h3>{{ __('Mapa de calor Wi-Fi', 'codexplus') }}</h3>
+        </div>
+        <p class="codexplus-form-hint">
+            {{ __('Modelos de AP e perfis de aparelho usados no cálculo do mapa de calor. Os valores ficam guardados em cada mapa: editar ou excluir aqui não muda documento já feito.', 'codexplus') }}
+        </p>
+
+        <div class="cx-brands-head cx-wifi-sub">
+            <h4>{{ __('Modelos de AP', 'codexplus') }} ({{ wifi.models|length }})</h4>
+            <a href="config.form.php?wifimodel=-1#mapa-calor" class="cx-btn cx-btn-primary cx-btn-sm">
+                <i class="ti ti-plus"></i> {{ __('Novo modelo', 'codexplus') }}
+            </a>
+        </div>
+        {% if wifi.models is empty %}
+            <p class="codexplus-form-hint">{{ __('Nenhum modelo ainda. Cadastre os APs que a empresa usa, com a potência máxima e o ganho da antena do datasheet.', 'codexplus') }}</p>
+        {% else %}
+        <table class="cx-brands-table cx-wifi-table">
+            <thead><tr>
+                <th>{{ __('Modelo', 'codexplus') }}</th>
+                {% for b, lbl in wifi.bands %}<th>{{ lbl }}</th>{% endfor %}
+                <th></th>
+            </tr></thead>
+            <tbody>
+            {% for m in wifi.models %}
+                <tr class="{{ wifi.model_edit == m.id ? 'is-editing' : '' }}">
+                    <td><strong>{{ m.label }}</strong> <span class="cx-brands-tag cx-wifi-std">{{ m.standard_lbl }}</span></td>
+                    {% for b, lbl in wifi.bands %}
+                        <td>{% if m.bands[b].on %}{{ m.bands[b].txf }} dBm · {{ m.bands[b].gainf }} dBi{% else %}<span class="cx-wifi-off">{{ __('não tem', 'codexplus') }}</span>{% endif %}</td>
+                    {% endfor %}
+                    <td class="cx-brands-actions">
+                        <a href="config.form.php?wifimodel={{ m.id }}#mapa-calor" class="cx-btn cx-btn-ghost cx-btn-sm">{{ __('Editar', 'codexplus') }}</a>
+                        <form method="post" action="config.form.php">
+                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                            <input type="hidden" name="id" value="{{ m.id }}">
+                            <button type="submit" name="wifimodel_delete" value="1" class="cx-btn cx-btn-mini cx-btn-mini-danger"
+                                    onclick="return confirm('{{ __('Excluir o modelo', 'codexplus')|e('js') }} {{ m.label|e('js') }}?');" title="{{ __('Excluir', 'codexplus') }}">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% set me = wifi.model_editing %}
+        {% if me is not null or wifi.model_edit == -1 %}
+        <form method="post" action="config.form.php" class="cx-brand-edit cx-wifi-edit">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+            <input type="hidden" name="id" value="{{ me is not null ? me.id : 0 }}">
+            <h4>{{ me is not null ? __('Editar modelo', 'codexplus') ~ ' — ' ~ me.label : __('Novo modelo de AP', 'codexplus') }}</h4>
+            <div class="cx-wifi-names cx-wifi-names3">
+                <div class="codexplus-form-row">
+                    <label for="cx-wifi-vendor">{{ __('Fabricante', 'codexplus') }}</label>
+                    <input type="text" id="cx-wifi-vendor" name="vendor" maxlength="80" placeholder="{{ __('ex.: Cambium', 'codexplus') }}" value="{{ me is not null ? me.vendor : '' }}">
+                </div>
+                <div class="codexplus-form-row">
+                    <label for="cx-wifi-name">{{ __('Modelo', 'codexplus') }}</label>
+                    <input type="text" id="cx-wifi-name" name="name" maxlength="120" placeholder="{{ __('ex.: XV2-2X', 'codexplus') }}" value="{{ me is not null ? me.name : '' }}">
+                </div>
+                <div class="codexplus-form-row">
+                    <label for="cx-wifi-std">{{ __('Padrão Wi-Fi', 'codexplus') }}</label>
+                    <select id="cx-wifi-std" name="standard" data-cx-wifi-std>
+                        {% for k, lbl in wifi.standards %}
+                            <option value="{{ k }}" {{ (me is not null and me.standard == k) or (me is null and k == 'wifi6') ? 'selected' : '' }}>{{ lbl }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="cx-wifi-bands">
+                <span></span>
+                {% for b, lbl in wifi.bands %}<span class="cx-wifi-h">{{ lbl }}</span>{% endfor %}
+                <span class="cx-wifi-l">{{ __('Tem a faixa', 'codexplus') }}</span>
+                {% for b, lbl in wifi.bands %}<label class="cx-wifi-chk"><input type="checkbox" name="has_{{ b }}" value="1" {{ (me is null and b != 6) or (me is not null and me.bands[b].on) ? 'checked' : '' }}></label>{% endfor %}
+                <span class="cx-wifi-l">{{ __('Potência máx. (dBm)', 'codexplus') }}</span>
+                {% for b, lbl in wifi.bands %}<input type="text" inputmode="decimal" name="tx_{{ b }}" value="{{ me is not null and me.bands[b].on ? me.bands[b].tx|number_format(1, ',', '') : '' }}">{% endfor %}
+                <span class="cx-wifi-l">{{ __('Ganho da antena (dBi)', 'codexplus') }}</span>
+                {% for b, lbl in wifi.bands %}<input type="text" inputmode="decimal" name="gain_{{ b }}" value="{{ me is not null and me.bands[b].on ? me.bands[b].gain|number_format(1, ',', '') : '' }}">{% endfor %}
+            </div>
+            <p class="codexplus-form-hint">{{ __('Valores do datasheet, por faixa. Faixa desmarcada é ignorada. Antena omnidirecional (AP de teto). Só Wi-Fi 6E, 7 e 8 operam em 6 GHz; o padrão não muda o alcance, que depende da faixa, da potência e da antena.', 'codexplus') }}</p>
+            <script>
+            (function () {
+                var f = document.currentScript.closest('form'), s = f && f.querySelector('[data-cx-wifi-std]'), c6 = f && f.querySelector('[name="has_6"]');
+                if (!s || !c6) { return; }
+                var com6 = { wifi6e: true, wifi7: true, wifi8: true };
+                s.addEventListener('change', function () { c6.checked = !!com6[s.value]; });
+            })();
+            </script>
+            <div class="codexplus-form-actions">
+                <button type="submit" name="wifimodel_save" value="1" class="cx-btn cx-btn-primary">
+                    <i class="ti ti-device-floppy"></i> {{ __('Salvar modelo', 'codexplus') }}
+                </button>
+                <a href="config.form.php#mapa-calor" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
+            </div>
+        </form>
+        {% endif %}
+
+        <div class="cx-brands-head cx-wifi-sub">
+            <h4>{{ __('Perfis de aparelho', 'codexplus') }} ({{ wifi.profiles|length }})</h4>
+            <span class="cx-wifi-btns">
+                <form method="post" action="config.form.php">
+                    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                    <button type="submit" name="wifiprofile_reference" value="1" class="cx-btn cx-btn-ghost cx-btn-sm"
+                            title="{{ __('Cria Celular, Notebook, Smart TV e Câmera / IoT Wi-Fi. Os que já existem não mudam.', 'codexplus') }}">
+                        <i class="ti ti-download"></i> {{ __('Carregar perfis de referência', 'codexplus') }}
+                    </button>
+                </form>
+                <a href="config.form.php?wifiprofile=-1#mapa-calor" class="cx-btn cx-btn-primary cx-btn-sm">
+                    <i class="ti ti-plus"></i> {{ __('Novo perfil', 'codexplus') }}
+                </a>
+            </span>
+        </div>
+        {% if wifi.profiles is empty %}
+            <p class="codexplus-form-hint">{{ __('Nenhum perfil ainda. Use "Carregar perfis de referência" para começar com celular, notebook, smart TV e câmera.', 'codexplus') }}</p>
+        {% else %}
+        <table class="cx-brands-table cx-wifi-table">
+            <thead><tr>
+                <th>{{ __('Perfil', 'codexplus') }}</th>
+                {% for b, lbl in wifi.bands %}<th>{{ lbl }}</th>{% endfor %}
+                <th>{{ __('Ganho efetivo', 'codexplus') }}</th>
+                <th></th>
+            </tr></thead>
+            <tbody>
+            {% for p in wifi.profiles %}
+                <tr class="{{ wifi.profile_edit == p.id ? 'is-editing' : '' }}">
+                    <td><strong>{{ p.name }}</strong>
+                        {% if p.is_default %}<span class="cx-brands-tag">{{ __('padrão', 'codexplus') }}</span>{% endif %}</td>
+                    {% for b, lbl in wifi.bands %}
+                        <td>{% if p.bands[b].on %}{{ p.bands[b].txf }} dBm{% else %}<span class="cx-wifi-off">{{ __('não tem', 'codexplus') }}</span>{% endif %}</td>
+                    {% endfor %}
+                    <td>{{ p.gainf }} dBi</td>
+                    <td class="cx-brands-actions">
+                        <a href="config.form.php?wifiprofile={{ p.id }}#mapa-calor" class="cx-btn cx-btn-ghost cx-btn-sm">{{ __('Editar', 'codexplus') }}</a>
+                        <form method="post" action="config.form.php">
+                            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+                            <input type="hidden" name="id" value="{{ p.id }}">
+                            {% if not p.is_default %}
+                            <button type="submit" name="wifiprofile_default" value="1" class="cx-btn cx-btn-ghost cx-btn-sm">{{ __('Tornar padrão', 'codexplus') }}</button>
+                            {% endif %}
+                            <button type="submit" name="wifiprofile_delete" value="1" class="cx-btn cx-btn-mini cx-btn-mini-danger"
+                                    onclick="return confirm('{{ __('Excluir o perfil', 'codexplus')|e('js') }} {{ p.name|e('js') }}?');" title="{{ __('Excluir', 'codexplus') }}">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <p class="codexplus-form-hint">{{ __('Ganho efetivo = antena do aparelho + perda da mão e do corpo (por isso negativo). O perfil padrão é o que o mapa abre mostrando.', 'codexplus') }}</p>
+        {% endif %}
+
+        {% set pe = wifi.profile_editing %}
+        {% if pe is not null or wifi.profile_edit == -1 %}
+        <form method="post" action="config.form.php" class="cx-brand-edit cx-wifi-edit">
+            <input type="hidden" name="_glpi_csrf_token" value="{{ csrf }}">
+            <input type="hidden" name="id" value="{{ pe is not null ? pe.id : 0 }}">
+            <h4>{{ pe is not null ? __('Editar perfil', 'codexplus') ~ ' — ' ~ pe.name : __('Novo perfil de aparelho', 'codexplus') }}</h4>
+            <div class="cx-wifi-names">
+                <div class="codexplus-form-row">
+                    <label for="cx-wifi-pname">{{ __('Nome', 'codexplus') }}</label>
+                    <input type="text" id="cx-wifi-pname" name="name" maxlength="80" placeholder="{{ __('ex.: Coletor de dados', 'codexplus') }}" value="{{ pe is not null ? pe.name : '' }}">
+                </div>
+                <div class="codexplus-form-row">
+                    <label for="cx-wifi-pgain">{{ __('Ganho efetivo (dBi)', 'codexplus') }}</label>
+                    <input type="text" inputmode="decimal" id="cx-wifi-pgain" name="gain" placeholder="{{ __('ex.: -8', 'codexplus') }}" value="{{ pe is not null ? pe.gain|number_format(1, ',', '') : '' }}">
+                </div>
+            </div>
+            <div class="cx-wifi-bands">
+                <span></span>
+                {% for b, lbl in wifi.bands %}<span class="cx-wifi-h">{{ lbl }}</span>{% endfor %}
+                <span class="cx-wifi-l">{{ __('Tem a faixa', 'codexplus') }}</span>
+                {% for b, lbl in wifi.bands %}<label class="cx-wifi-chk"><input type="checkbox" name="has_{{ b }}" value="1" {{ (pe is null and b != 6) or (pe is not null and pe.bands[b].on) ? 'checked' : '' }}></label>{% endfor %}
+                <span class="cx-wifi-l">{{ __('Potência (dBm)', 'codexplus') }}</span>
+                {% for b, lbl in wifi.bands %}<input type="text" inputmode="decimal" name="tx_{{ b }}" value="{{ pe is not null and pe.bands[b].on ? pe.bands[b].tx|number_format(1, ',', '') : '' }}">{% endfor %}
+            </div>
+            {% if pe is null or not pe.is_default %}
+            <div class="codexplus-form-row cx-cfg-check">
+                <label><input type="checkbox" name="is_default" value="1"> {{ __('Perfil padrão (o mapa abre com ele)', 'codexplus') }}</label>
+            </div>
+            {% endif %}
+            <div class="codexplus-form-actions">
+                <button type="submit" name="wifiprofile_save" value="1" class="cx-btn cx-btn-primary">
+                    <i class="ti ti-device-floppy"></i> {{ __('Salvar perfil', 'codexplus') }}
+                </button>
+                <a href="config.form.php#mapa-calor" class="cx-btn cx-btn-ghost">{{ __('Cancelar', 'codexplus') }}</a>
             </div>
         </form>
         {% endif %}

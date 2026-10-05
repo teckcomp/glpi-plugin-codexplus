@@ -62,6 +62,9 @@ class Install
     public const SCHEDULE_EVENTS_TABLE = 'glpi_plugin_codexplus_scheduleevents';
     /** 7a: marcas de "já avisado" do alerta de vencimento (ExpiryAlert). */
     public const EXPIRY_ALERTS_TABLE   = 'glpi_plugin_codexplus_expiryalerts';
+    /** Q8-2: mapa de calor — modelos de AP e perfis de aparelho (WifiCatalog). */
+    public const WIFI_MODELS_TABLE     = 'glpi_plugin_codexplus_wifimodels';
+    public const WIFI_PROFILES_TABLE   = 'glpi_plugin_codexplus_wifiprofiles';
 
     /**
      * Todas as tabelas do plugin, na ordem de remoção.
@@ -71,6 +74,8 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::WIFI_PROFILES_TABLE,
+            self::WIFI_MODELS_TABLE,
             self::EXPIRY_ALERTS_TABLE,
             self::SCHEDULE_EVENTS_TABLE,
             self::DOC_LINKS_TABLE,
@@ -236,6 +241,11 @@ class Install
 
         // --- Bloco 7b: notificações do alerta (modelo + 3 notificações) ---
         self::install7b();
+
+        // --- Bloco Q8-2: catálogo do mapa de calor (nasce vazio) ---
+        self::installQ82();
+        // Q8-2 (ajuste): padrão Wi-Fi do modelo, para tabela já criada.
+        $migration->addField(self::WIFI_MODELS_TABLE, 'standard', "varchar(8) NOT NULL DEFAULT 'wifi6'", ['after' => 'name']);
 
         $migration->executeMigration();
         return true;
@@ -1104,6 +1114,60 @@ class Install
                     ['profiles_id' => $pid, 'name' => Rights::NAME]
                 );
             }
+        }
+    }
+
+    /**
+     * Q8-2 (Claudio, 05/10/2026): catálogo do mapa de calor. As duas tabelas
+     * nascem VAZIAS (achado 137: modelo é dado da instalação). Potência e
+     * ganho em decimal(4,1): datasheet traz meio dBi.
+     */
+    private static function installQ82(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::WIFI_MODELS_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `vendor` varchar(80) NOT NULL DEFAULT '',
+                `name` varchar(120) NOT NULL DEFAULT '',
+                `standard` varchar(8) NOT NULL DEFAULT 'wifi6',
+                `has_24` tinyint NOT NULL DEFAULT '0',
+                `tx_24` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `gain_24` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `has_5` tinyint NOT NULL DEFAULT '0',
+                `tx_5` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `gain_5` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `has_6` tinyint NOT NULL DEFAULT '0',
+                `tx_6` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `gain_6` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `name` (`name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q8-2): erro ao criar $t");
+        }
+
+        $t = self::WIFI_PROFILES_TABLE;
+        if (!$DB->tableExists($t)) {
+            $DB->doQueryOrDie("CREATE TABLE `$t` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `name` varchar(80) NOT NULL DEFAULT '',
+                `gain` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `has_24` tinyint NOT NULL DEFAULT '0',
+                `tx_24` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `has_5` tinyint NOT NULL DEFAULT '0',
+                `tx_5` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `has_6` tinyint NOT NULL DEFAULT '0',
+                `tx_6` decimal(4,1) NOT NULL DEFAULT '0.0',
+                `is_default` tinyint NOT NULL DEFAULT '0',
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `is_default` (`is_default`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (Q8-2): erro ao criar $t");
         }
     }
 

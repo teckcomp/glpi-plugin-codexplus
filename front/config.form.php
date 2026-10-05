@@ -16,6 +16,9 @@
 use Glpi\Application\View\TemplateRenderer;
 use GlpiPlugin\Codexplus\Brand;
 use GlpiPlugin\Codexplus\Branding;
+use GlpiPlugin\Codexplus\Rights;
+use GlpiPlugin\Codexplus\WifiCatalog;
+use GlpiPlugin\Codexplus\Wiki;
 
 include('../../../inc/includes.php');
 
@@ -69,12 +72,50 @@ if (isset($_POST['brand_delete'])) {
     exit;
 }
 
-Html::header(
-    __('Codex+', 'codexplus'),
-    $_SERVER['PHP_SELF'],
-    'config',
-    'plugins'
-);
+// --- Q8-2: mapa de calor — modelos de AP e perfis de aparelho ---
+// Sucesso volta para a lista (fecha o formulário); erro volta ao formulário.
+$cxWifiBack = static function (bool $ok) use ($CFG_GLPI): void {
+    if ($ok) {
+        Html::redirect($CFG_GLPI['root_doc'] . '/plugins/codexplus/front/config.form.php#mapa-calor');
+    } else {
+        Html::back();
+    }
+    exit;
+};
+if (isset($_POST['wifimodel_save'])) {
+    [$ok, $msg] = WifiCatalog::saveModel($_POST);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
+    $cxWifiBack($ok);
+}
+if (isset($_POST['wifimodel_delete'])) {
+    [$ok, $msg] = WifiCatalog::deleteModel((int) $_POST['id']);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
+    $cxWifiBack(true);
+}
+if (isset($_POST['wifiprofile_save'])) {
+    [$ok, $msg] = WifiCatalog::saveProfile($_POST);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
+    $cxWifiBack($ok);
+}
+if (isset($_POST['wifiprofile_delete'])) {
+    [$ok, $msg] = WifiCatalog::deleteProfile((int) $_POST['id']);
+    Session::addMessageAfterRedirect($msg, false, $ok ? INFO : ERROR);
+    $cxWifiBack(true);
+}
+if (isset($_POST['wifiprofile_default'])) {
+    WifiCatalog::setDefaultProfile((int) $_POST['id']);
+    Session::addMessageAfterRedirect(__('Perfil padrão alterado.', 'codexplus'), false, INFO);
+    $cxWifiBack(true);
+}
+if (isset($_POST['wifiprofile_reference'])) {
+    [$ok, $msg] = WifiCatalog::loadReferenceProfiles();
+    Session::addMessageAfterRedirect($msg, false, INFO);
+    $cxWifiBack(true);
+}
+
+// Aba Configuração do Codex+ (Claudio, 05/10/2026): mesmo cabeçalho das
+// outras telas (Ferramentas > Codex+), não mais Configurar > Plugins.
+Wiki::pageHeader();
 
 TemplateRenderer::getInstance()->display('@codexplus/config.html.twig', [
     'glpi_root'      => $CFG_GLPI['root_doc'],
@@ -89,6 +130,21 @@ TemplateRenderer::getInstance()->display('@codexplus/config.html.twig', [
     'markers'        => Branding::getMarkers(),
     'client_sources' => Branding::getClientSources(),
     'max_mb'         => (int) (Branding::LOGO_MAX_BYTES / 1048576),
+    'nav'            => [
+        'painel'  => Rights::isProducer(),
+        'modelos' => Rights::isProducer() && Session::haveRight(Rights::NAME, Rights::TEMPLATES),
+    ],
+    // Q8-2: uma variável associativa com tudo (Twig estrito).
+    'wifi'           => [
+        'bands'           => WifiCatalog::BANDS,
+        'standards'       => WifiCatalog::standardOptions(),
+        'models'          => WifiCatalog::models(),
+        'profiles'        => WifiCatalog::profiles(),
+        'model_edit'      => (int) ($_GET['wifimodel'] ?? 0),
+        'model_editing'   => WifiCatalog::model((int) ($_GET['wifimodel'] ?? 0)),
+        'profile_edit'    => (int) ($_GET['wifiprofile'] ?? 0),
+        'profile_editing' => WifiCatalog::profile((int) ($_GET['wifiprofile'] ?? 0)),
+    ],
 ]);
 
-Html::footer();
+Wiki::pageFooter();

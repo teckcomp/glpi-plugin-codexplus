@@ -8,11 +8,9 @@
         subtitle: __('Documentos controlados, procedimentos e diagramas institucionais', 'codexplus'),
     } only %}
 
-    <nav class="codexplus-nav">
-        <a href="dashboard.php">{{ __('Painel', 'codexplus') }}</a>
-        <a href="library.php">{{ __('Biblioteca', 'codexplus') }}</a>
-        <a href="templates.php" class="is-active">{{ __('Modelos', 'codexplus') }}</a>
-    </nav>
+    {% include '@codexplus/parts/nav.html.twig' with {
+        active: 'modelos', painel: true, modelos: true, config: can_config,
+    } only %}
 
     {% if mode == 'edit' %}
         {# ================= EDIÇÃO / CRIAÇÃO ================= #}

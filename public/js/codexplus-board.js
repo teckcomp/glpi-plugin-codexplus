@@ -4109,10 +4109,20 @@
         var wallMat = WALL_DEFAULT;
         // Pontos de encaixe ao desenhar parede: o ponto anterior e os vértices
         // das outras paredes (fecha canto sem caçar pixel). Alt solta.
-        function wallNb(last, skipId) {
-            var nb = [last];
-            D.items.forEach(function (i) { if (i.t === 'wall' && i.id !== skipId) { i.pts.forEach(function (q) { nb.push(q); }); } });
+        function wallNb(last, skipId, links) {
+            var nb = [last], skip = {};
+            (links || []).forEach(function (l) { skip[l.id + ':' + l.j] = true; });
+            D.items.forEach(function (i) { if (i.t === 'wall' && i.id !== skipId) { i.pts.forEach(function (q, j) { if (!skip[i.id + ':' + j]) { nb.push(q); } }); } });
             return nb;
+        }
+        // Q8-1b: pontas de outras paredes no mesmo lugar (canto ligado).
+        function wallLinks(q, skipId) {
+            var out = [];
+            D.items.forEach(function (i) {
+                if (i.t !== 'wall' || i.id === skipId || i.lock) { return; }
+                i.pts.forEach(function (r, j) { if (Math.abs(r.x - q.x) < 0.6 && Math.abs(r.y - q.y) < 0.6) { out.push({ id: i.id, j: j }); } });
+            });
+            return out;
         }
         function draftPreview(cur) {
             if (!ductDraft) { return; }
@@ -4129,12 +4139,24 @@
             ductDraft = null; gGuides.innerHTML = '';
             if (pts.length >= 2) {
                 snap();
-                var dct = tool === 'wall'
-                    ? { id: uid(), t: 'wall', pts: pts, mat: wallMat, lock: false, g: '' }
-                    : { id: uid(), t: 'duct', pts: pts, kind: 'eletrocalha', label: '', showM: true, fs: 'm', lock: false, g: '' };
-                D.items.push(dct); sel = [dct.id];
+                // Q8-1b (Claudio, 06/10/2026): cada lado da parede é um item
+                // (material, mover e excluir por lado). Os cantos continuam
+                // ligados: arrastar um canto leva junto o das paredes encostadas.
+                // A parede desenhada fica toda selecionada para trocar o material de uma vez.
+                var dct;
+                if (tool === 'wall') {
+                    sel = [];
+                    for (var si = 0; si + 1 < pts.length; si++) {
+                        if (pts[si].x === pts[si + 1].x && pts[si].y === pts[si + 1].y) { continue; }
+                        dct = { id: uid(), t: 'wall', pts: [clone(pts[si]), clone(pts[si + 1])], mat: wallMat, lock: false, g: '' };
+                        D.items.push(dct); sel.push(dct.id);
+                    }
+                } else {
+                    dct = { id: uid(), t: 'duct', pts: pts, kind: 'eletrocalha', label: '', showM: true, fs: 'm', lock: false, g: '' };
+                    D.items.push(dct); sel = [dct.id];
+                }
                 // Parede escondida não some do desenho que acabou de ser feito.
-                if (dct.t === 'wall' && D.wallsOn === false) { D.wallsOn = true; var wc = root.querySelector('[data-act="walls"]'); if (wc) { wc.checked = true; } }
+                if (dct && dct.t === 'wall' && D.wallsOn === false) { D.wallsOn = true; var wc = root.querySelector('[data-act="walls"]'); if (wc) { wc.checked = true; } }
             }
             tool = 'select'; render();
         }
@@ -4189,6 +4211,16 @@
                 props.innerHTML = (flow ? '' : materialsHtml(materials(D, null), 'Materiais deste quadro'))
                     + '<p class="cx-board-none">Selecione um item para editar ' + (flow ? 'o texto.' : 'rótulo e dados.') + '</p>'
                     + '<p class="cx-board-none">Atalhos: Delete exclui · Ctrl+C / Ctrl+V · Ctrl+D duplica · Ctrl+G agrupa · setas movem.</p>';
+                return;
+            }
+            if (sel.length > 1 && sel.every(function (id) { var x = get(id); return x && x.t === 'wall'; })) {
+                var m0 = get(sel[0]).mat, same = sel.every(function (id) { return get(id).mat === m0; });
+                var tot = sel.reduce(function (a, id) { return a + wallMeters(get(id)); }, 0);
+                props.innerHTML = '<p><strong>' + sel.length + ' paredes</strong></p>'
+                    + '<label class="cx-board-f"><span>Material de todas</span><select data-wmat>' + (same ? '' : '<option value="" selected>Vários</option>')
+                    + Object.keys(WALL_KINDS).map(function (k) { return '<option value="' + k + '"' + (same && k === m0 ? ' selected' : '') + '>' + esc(WALL_KINDS[k].label) + '</option>'; }).join('') + '</select></label>'
+                    + '<p class="cx-board-none cx-board-meters">Comprimento somado <strong>' + fmtM(Math.round(tot * 10) / 10) + '</strong>' + (D.pxm ? '' : ' (aproximado: sem escala)') + '</p>'
+                    + '<p class="cx-board-none">Cada lado é uma parede: clique num lado para mudar só ele (material, mover, excluir). Arrastar um canto leva junto o canto encostado; Alt solta.</p>';
                 return;
             }
             if (sel.length > 1) {
@@ -4292,6 +4324,7 @@
                     + '<label class="cx-board-f"><span>Material</span><select data-k="mat">' + wopt + '</select></label>'
                     + '<p class="cx-board-none cx-board-wloss">Perda ao atravessar: ' + wk.loss.map(function (v, i) { return WALL_BANDS[i] + ' <strong>' + v + ' dB</strong>'; }).join(' · ') + '</p>'
                     + '<p class="cx-board-none cx-board-meters">Comprimento <strong>' + fmtM(wallMeters(it)) + '</strong>' + (D.pxm ? '' : ' (aproximado: sem escala)') + '</p>'
+                    + (it.pts.length > 2 ? '<button type="button" class="cx-board-btn" data-wsplit title="Transforma cada lado desta parede numa parede própria">Separar em ' + (it.pts.length - 1) + ' lados</button>' : '')
                     + '<p class="cx-board-none">Desenhe por cima das paredes da planta. A próxima parede nasce com o material escolhido aqui. Arraste o quadrado branco para mover um ponto (encaixa nos cantos das outras paredes; Alt solta). Duplo clique na parede cria um ponto; Ctrl + duplo clique no ponto apaga.</p>';
             } else if (it.t === 'zone') {
                 h += '<p><strong>' + (flow ? 'Moldura' : isPlan(D.mode) ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : isPlan(D.mode) ? 'Estoque' : 'VLAN 10 · Administrativo');
@@ -4407,6 +4440,26 @@
                 var mm = props.querySelector('.cx-board-meters'), lm = linkMeters(it, get);
                 if (mm) { mm.innerHTML = 'Medido ' + fmtM(lm.measured) + '<br><strong>Total ' + fmtM(lm.total) + '</strong>'; }
             }
+        });
+        // Q8-1b: material de várias paredes de uma vez; separar parede antiga em lados.
+        props.addEventListener('change', function (e) {
+            if (!e.target.hasAttribute || !e.target.hasAttribute('data-wmat') || !WALL_KINDS[e.target.value]) { return; }
+            snap();
+            sel.forEach(function (id) { var x = get(id); if (x && x.t === 'wall') { x.mat = e.target.value; } });
+            wallMat = e.target.value;
+            paint(); drawSel(); drawProps();
+        });
+        props.addEventListener('click', function (e) {
+            if (!e.target.closest || !e.target.closest('[data-wsplit]') || sel.length !== 1) { return; }
+            var it = get(sel[0]); if (!it || it.t !== 'wall' || it.pts.length < 3) { return; }
+            snap();
+            var at = D.items.indexOf(it), novos = [];
+            for (var i = 0; i + 1 < it.pts.length; i++) {
+                novos.push({ id: uid(), t: 'wall', pts: [clone(it.pts[i]), clone(it.pts[i + 1])], mat: it.mat, lock: it.lock, g: it.g });
+            }
+            D.items.splice.apply(D.items, [at, 1].concat(novos));
+            sel = novos.map(function (n) { return n.id; });
+            render();
         });
         // Q8-4a: campos do rádio (data-rf), fora do caminho genérico data-k.
         props.addEventListener('change', function (e) {
@@ -4896,7 +4949,9 @@
                 gGuides.innerHTML = ''; draftPreview(null);
                 return;
             } else if (e.target.getAttribute('data-dv') && sel.length === 1) {
-                drag = { k: 'dv', id: sel[0], j: +e.target.getAttribute('data-dv'), moved: false };
+                drag = { k: 'dv', id: sel[0], j: +e.target.getAttribute('data-dv'), moved: false, links: [] };
+                var dw = get(sel[0]);
+                if (dw && dw.t === 'wall') { drag.links = wallLinks(dw.pts[drag.j], dw.id); }
             } else if (e.target.getAttribute('data-lw') && sel.length === 1) {
                 drag = { k: 'wp', id: sel[0], j: +e.target.getAttribute('data-lw'), moved: false };
             } else if (flow && e.target.getAttribute('data-lbl') && tool === 'select' && !space) {
@@ -5010,7 +5065,9 @@
             if (drag.k === 'dv') {
                 if (!drag.moved) { snap(); drag.moved = true; }
                 var dv = get(drag.id);
-                dv.pts[drag.j] = alignTo(p, dv.t === 'wall' ? wallNb(dv.pts[drag.j - 1], dv.id).concat([dv.pts[drag.j + 1]]) : [dv.pts[drag.j - 1], dv.pts[drag.j + 1]], e.altKey);
+                dv.pts[drag.j] = alignTo(p, dv.t === 'wall' ? wallNb(dv.pts[drag.j - 1], dv.id, drag.links).concat([dv.pts[drag.j + 1]]) : [dv.pts[drag.j - 1], dv.pts[drag.j + 1]], e.altKey);
+                // Q8-1b: o canto das paredes encostadas vai junto (Alt solta).
+                if (!e.altKey) { (drag.links || []).forEach(function (l) { var o = get(l.id); if (o) { o.pts[l.j] = { x: dv.pts[drag.j].x, y: dv.pts[drag.j].y }; } }); }
                 paint(); drawSel(); return;
             }
             if (drag.k === 'pan') {

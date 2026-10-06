@@ -2,6 +2,15 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.7.15`** · último commit de código **`aef34d4`** ·
+> atualizado em **06/10/2026**: **Q8 ✅ — mapa de calor Wi-Fi** (seção
+> 3.26): paredes com material na Planta (Q8-1, Q8-1b), catálogo de modelos
+> de AP e perfis de aparelho na Configuração (Q8-2, 0.7.15), motor de
+> cálculo `codexplus-rf.js` (Q8-3), quadro próprio **Mapa de calor** (Q8-4a),
+> camada de cores na escala do Cambium (Q8-4b) e cobertura por Área com
+> texto para laudo (Q8-6). **Q8-5 (calibração) aguarda mapas do Cambium.**
+> Achados 164 a 170.
+> Antes:
 > Estado: **`v0.7.14`** · último commit de código **`7cc27fe`** ·
 > atualizado em **04/10/2026 (noite)**: **Q5k ✅** (`04ea10c`) — texto
 > solto com **largura** e quebra (alças laterais) e **"…"** na mini-paleta
@@ -2699,6 +2708,120 @@ data e link certos, revisor inativo fora, "Lembrete nº 2" no lembrete;
 desligadas, fila vazia; telas da notificação (aba Destinatários) e do modelo
 abrem. Claudio aprovou os dois na homologação.
 
+### 3.26 Q8 — Mapa de calor Wi-Fi (`ada92f4` a `aef34d4`, `v0.7.15`)
+
+Pedido de Claudio (04/10/2026): hoje a Teckcomp faz os mapas no **Cambium
+Wi-Fi Designer**; os clientes não têm padrão de equipamento e o que importa
+é mostrar o alcance **conforme o aparelho em uso no cliente**. O módulo
+deve sair "bem feito" e entrar sozinho em propostas, laudos, documentação
+técnica e documentos diversos. Depois, se der certo, algo parecido para
+**câmeras** (DORI, segundo plano — Pós-produção).
+
+Decisões de Claudio:
+
+- **Quadro próprio "Mapa de calor Wi-Fi"**, separado da Planta (a Planta
+  mostra os equipamentos dispostos; o mapa mostra a cobertura ao cliente;
+  propostas separadas). Botão no editor em **Proposta, Laudo, Documentação
+  Técnica e Documento Diverso** (`TOOLS_BY_TYPE.cxheat`); marcador "Mapa de
+  calor aqui" nos modelos.
+- **Escala de cores do Cambium** (quente = forte), tirada da legenda dos
+  mapas da Teckcomp, de 5 em 5 dB, −30 a −90; abaixo de −90 sem cor.
+- **Sem medição em campo** (Claudio não consegue medir): a referência são
+  os mapas do Cambium já feitos.
+- **Wi-Fi 4 a 8** no catálogo (o padrão é informativo: o alcance depende
+  da faixa, da potência e da antena; só 6E, 7 e 8 em 6 GHz).
+- **Aba Configuração** no menu do Codex+ (depois de Modelos), com ícones
+  nas abas (`templates/parts/nav.html.twig`, uma fonte só).
+
+#### Física (motor `public/js/codexplus-rf.js`, `window.CodexplusRF`)
+
+- **Multiparede:** perda = FSPL(1 m, f) + 10·n·log10(d) + soma das paredes
+  cruzadas + margem de projeto; `n` = 2,2; d em 3D (altura do AP − altura
+  do aparelho, 1,2 m), mínimo 1 m. Frequências 2437, 5500 e 6125 MHz.
+- **Ida e volta:** ida = AP.tx + AP.ganho + ganho efetivo do aparelho −
+  perda; volta = aparelho.tx + ganho efetivo + AP.ganho − perda + 3 dB (o AP
+  recebe melhor). Efetivo = o pior dos dois; vale o melhor AP. O valor
+  mostrado é o da **ida** (o que o celular vê num app); a cor é do efetivo.
+- **Calibração de partida (achado 169):** margem **12 dB** + perfil Celular
+  com ganho efetivo **−8 dBi** reproduzem o Cambium da LOJ0687 (mediana 0
+  dB, rms 5,4 dB = o degrau da escala dele, 86% dos pontos na mesma cor ou
+  na vizinha).
+- **Variação do ambiente** ("Aspecto natural", Claudio 06/10): ruído suave,
+  determinístico (semente = posição do AP), média zero, ±4 dB no quadro.
+  Tira os círculos perfeitos sem mudar o nível; no motor vem **desligado**
+  (a calibração e os testes não mudam).
+- `prepare()` (pesado: grade, distâncias, paredes nas 3 faixas) só refaz
+  quando APs, paredes, escala ou tamanho mudam; `solve()` (faixa, aparelho,
+  volta) é instantâneo. Grade de 0,25 m, engrossa acima de 60 mil células.
+  12 APs e 150 paredes: 260 ms para preparar, 11 ms para trocar.
+- `CodexplusRF.selfTest()` no console do navegador: 4 casos de valor
+  conhecido.
+
+#### Blocos
+
+- **Q8-1** (`ada92f4`): item `wall {pts, mat}` na Planta (depois também no
+  Mapa de calor), 7 materiais com perda por faixa (`WALL_KINDS`: divisória
+  3/4/5, vidro 2/3/4, madeira 3/4/5, alvenaria 6/10/12, concreto 12/18/20,
+  porta de aço fechada 20/25/28, metal 26/32/35 dB). Ferramenta Parede (P),
+  encaixe nos cantos, caixa **Paredes** (`D.wallsOn`): escondida sai da
+  tela, do PNG e da legenda, mas **conta no cálculo**. Fora da lista de
+  materiais. Correção de carona: `orgNode()` rodando fora do organograma
+  (erro de console em qualquer lista do painel da Planta).
+- **Q8-1b** (`6d3e026`): cada lado da parede é um item; **cantos ligados**
+  (arrastar leva o canto encostado; Alt solta); painel "N paredes" com
+  material de todas e comprimento somado; parede antiga: "Separar em N
+  lados". Eletrocalha continua uma peça.
+- **Q8-2** (`b8243e4`, **0.7.15**): `src/WifiCatalog.php`, tabelas
+  `glpi_plugin_codexplus_wifimodels` (fabricante, modelo, `standard`,
+  `has/tx/gain` por faixa) e `glpi_plugin_codexplus_wifiprofiles` (nome,
+  ganho efetivo, `has/tx` por faixa, `is_default`). Nascem **vazias**
+  (achado 137); "Carregar perfis de referência" cria Celular (padrão),
+  Notebook, Smart TV e Câmera/IoT (só 2,4) sem duplicar. Seção na
+  Configuração (padrão de Marcas); quem edita: config UPDATE. Coluna
+  `standard` por `addField` com tipo literal (achado 166).
+- **Q8-3** (no commit do Q8-4a): o motor, carregado antes do quadro
+  (`setup.php`).
+- **Q8-4a** (`3c7afd8`): modo `calor` no motor do quadro (`isPlan()` =
+  planta ou calor: fundo, escala, paredes, Áreas). Paleta só Access point;
+  sem eletrocalha. Painel **Rádio** do AP: modelo do catálogo, potência por
+  faixa até a máxima, altura (padrão 2,5 m). **Cópia no AP** (`it.rf`), não
+  referência: catálogo mudado não altera documento (achado 165). Quadro
+  vazio pergunta "Como começar?": **Trazer da Planta** copia fundo
+  (`urlToDataUrl` → arquivo novo ao salvar), escala, paredes, Áreas e APs
+  (sem modelo); ou começar do zero. `ajax/wifi.catalog.php` (GET,
+  `Document::canView`).
+- **Q8-4b** (`a432a0d`): `D.heat {on, band, ul, prof, op, nat}` gravado no
+  quadro (perfil também é cópia). Barra: Mapa de calor, Faixa, Aparelho
+  (catálogo + **referências sempre na lista**), Volta do aparelho, Aspecto
+  natural, Cores (transparência 15–95%, padrão 70%). Camada = `<image>`
+  (canvas até 1200 px) acima do fundo; hover mostra o sinal, o AP e se a
+  volta limita; avisos na dica (AP sem modelo, faixa sem AP, aparelho sem a
+  faixa, sem escala). AP sem alças de cabo. **Escala no documento** no
+  lugar da legenda de símbolos ("Escala abaixo do mapa"), também no canto do
+  quadro (clique encolhe). Opção "(deste mapa)" para perfil que saiu do
+  catálogo.
+- **Q8-6** (`aef34d4`): cobertura por **Área** (zona): voz e vídeo (≥ −67),
+  navegação (≥ −75), sinal típico (mediana), situação (Bom ≥ 80%, Atenção ≥
+  50%, Insuficiente); total = **união** das Áreas; sem Área, a planta
+  inteira. Painel (nada selecionado) com a tabela e **Copiar texto para o
+  laudo**; no documento, a tabela entra na escala.
+
+#### Testes
+
+Container: jsdom (Q8-1 47, lados 27, Q8-4a 39, Q8-4b 29 + 17 + 5, Q8-6 21),
+motor 25 (com a referência do Cambium em 16 mil pontos), regressão 18
+saídas idênticas (topologia, planta e fluxograma sem os itens novos), GLPI
+11.0.6 real para o catálogo (harness 30, instalação do zero, atualização
+sobre tabela existente, tela com login), Chromium para o editor e o PNG.
+Claudio aprovou todos na homologação.
+
+#### Pendente
+
+- **Q8-5 — calibração:** aguarda 3 a 5 mapas do Cambium de outras lojas
+  (planta, modelo, potência, altura, faixa, medida conhecida); ajusta a
+  margem e, com paredes desenhadas no Cambium, as perdas por material.
+- Antena direcional, sobreposição de canais e mapa por AP: Pós-produção.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3491,6 +3614,34 @@ depender do comportamento errático de `position: fixed` na impressão.
     0,94) numa palavra longa saía da forma. `textW()` com a tabela da Arial
     e **mínimo de 0,55** por letra: o texto comum continua quebrando igual
     (sem mudar fluxogramas existentes) e só o largo quebra antes.
+164. **jsdom não tem canvas** (`getContext` devolve `null` e escreve "not
+    implemented" no console virtual). Camada pintada em canvas: o teste
+    confere a **grade** (`heatGrid`), não a imagem; `VirtualConsole` vazio
+    silencia o aviso. A imagem se confere no Chromium.
+165. **Dado de catálogo usado em documento vai como cópia.** Rádio do AP
+    (`it.rf`) e perfil do aparelho (`D.heat.prof`) ficam no JSON do quadro:
+    catálogo editado ou apagado não muda laudo nem proposta já feitos. Na
+    tela, o que saiu do catálogo aparece como "(fora do catálogo)" ou
+    "(deste mapa)".
+166. **`Migration::addField` com tipo `'string'` cria `VARCHAR(255)`.** Para a
+    coluna nova sair igual à do `CREATE TABLE` (instalação do zero), passar
+    o tipo literal: `"varchar(8) NOT NULL DEFAULT 'wifi6'"` (o GLPI usa o
+    texto como está).
+167. **Chave numérica em texto vira inteiro no array PHP** (`'24'`, `'5'`):
+    no Twig o `for b, lbl` traz `24` inteiro e `has_{{ b }}` funciona; no
+    JSON (chaves não sequenciais) sai objeto `{"24":…}` e o JS lê por texto.
+168. **`pkill -f` com o padrão na própria linha mata o shell do comando**
+    (variação do 158): para parar `php -S`/`http.server`, guardar o PID
+    (`echo $! > /tmp/x.pid`) e `kill $(cat /tmp/x.pid)`.
+169. **O Cambium fica ~20 dB abaixo do espaço livre** (5 GHz; ~26 em 2,4 se
+    aquele mapa era 2,4). A diferença foi dividida em perfil do aparelho
+    realista (−8 dBi no celular: antena + mão) e margem de projeto de 12
+    dB. Medida pela legenda do próprio mapa: cada cor convertida em dBm,
+    ajuste da curva por mínimos quadrados.
+170. **Perfil de aparelho é o cliente, não o AP.** Na homologação foi
+    cadastrado um perfil "Access Point" (potência e ganho de AP): o mapa saiu
+    vermelho em toda a loja. Por isso as referências (Celular, Notebook…)
+    ficam sempre na lista do quadro, mesmo sem cadastro.
 
 ## 6. Contrato de código — não quebrar
 

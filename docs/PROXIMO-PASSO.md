@@ -1,12 +1,13 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 04/10/2026 (noite), depois do **7b ✅** (`7cc27fe`).
+> Gerado em 06/10/2026, depois do **Q8 ✅** (`aef34d4`).
 
 ## Estado
 
-- Versão: **`0.7.14`**; último commit de código **`7cc27fe`** (7b); docs
-  neste pacote. Plugin 0.7.14 habilitado na homologação. Ação automática
+- Versão: **`0.7.15`**; último commit de código **`aef34d4`** (Q8-6); docs
+  neste pacote. Plugin 0.7.15 habilitado na homologação. Catálogo do mapa
+  de calor com o XV2-2X e os perfis de referência. Ação automática
   `codexplusexpiry` ativa; notificações por e-mail **desligadas** na
   homologação (Claudio: a Teckcomp não usa; pronto para terceiros).
 - **Banco da homologação: `glpidb`** (achado 159) — consulta direta com
@@ -33,8 +34,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.25, achados
-  até 163) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.26, achados
+  até 170) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -66,30 +67,30 @@
 7. ~~**Q5k**~~ ✅ `04ea10c` — texto solto com largura; "…" na mini-paleta; quebra pela largura real
 8. ~~**7a**~~ ✅ `e04c5d0` — ação automática diária e marcas (0.7.13)
 9. ~~**7b**~~ ✅ `7cc27fe` — notificação nativa (0.7.14)
-10. **Q8** — DTC: mapa de calor
+10. ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` — mapa de calor Wi-Fi (Q8-5 calibração pendente)
 11. **Q5i-5** — `.bpmn`
 12. **Q5i-6** — draw.io
 13. **F-0** — 0.8.0, tag, instalação do zero, docs → **P-1 a P-4** (produção)
 
 ## Próximo passo imediato
 
-**Q8** — DTC: **mapa de calor** na Planta (ROADMAP, Reta final, linha 10).
-Clonar o `master` do GitHub (`7cc27fe` + docs). **Antes de codar:**
-decisão de abordagem com Claudio e **mockup** (ROADMAP, "Decisões
-pendentes → Da Reta final"): (a) camada **estimada** na Planta, por AP, com
-raio em metros pela escala da planta e aviso "estimativa" (sugestão: sem
-paredes nem atenuação) ou (b) só **imagem** de ferramenta de site survey
-sobre a planta. Prever campo novo no JSON do quadro (o PHP já aceita campo
-simples, `Diagram::plain`).
+**Q5i-5** — Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda)
+(ROADMAP, Reta final, linha 11). Clonar o `master` do GitHub (`aef34d4` +
+docs). **Antes de codar: pedir a Claudio arquivos `.bpmn` de exemplo**
+(Bizagi e Camunda). Sem eles, validar com exemplos públicos (bpmn.io) e
+avisar o risco. Depois: **Q5i-6** (draw.io, mesmo pedido de arquivo).
 
-Depois: **Q5i-5** (`.bpmn`) e **Q5i-6** (draw.io) — pedir arquivos de
-exemplo a Claudio; sem eles, validar com exemplos públicos e avisar o risco.
+**Pendência do Q8:** **Q8-5 (calibração)** aguarda 3 a 5 mapas do Cambium
+de outras lojas (planta, modelo, potência, altura, faixa, medida
+conhecida). Confirmar com Claudio se entra antes do F-0 ou vai para a
+Pós-produção. A conversão cor → dBm do mapa do Cambium está no achado 169.
 
-Lembretes do container (achados 153, 154, 157, 158): `mysqld` por `setsid
-nohup` no mesmo comando; `php -S` com `< /dev/null` (senão o comando trava);
-nunca `pkill -f` com o padrão literal na linha (use `[p]hp -S`); login por
-script numa sessão Python só, com `Referer` nos POST; jsdom espera o
-`DOMContentLoaded`. Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
-
-Ao chegar no **Q5i-5/Q5i-6**, pedir antes: arquivos `.bpmn` e `.drawio` de
-exemplo (sem eles, validar com exemplos públicos e avisar o risco).
+Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
+`setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar
+servidor pelo PID salvo, **nunca** `pkill -f` com o padrão na linha; login
+por script numa sessão Python só, com `Referer` nos POST; jsdom não tem
+canvas (testar a grade). Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
+Container novo pode precisar de `apt-get install php8.3-cli php8.3-mysql
+php8.3-mbstring php8.3-xml php8.3-curl php8.3-gd php8.3-intl php8.3-zip
+php8.3-bcmath php8.3-bz2 mariadb-server` (tirar o repositório do Node do
+`sources.list.d`, dá 403) e do GLPI 11.0.6 baixado do GitHub.

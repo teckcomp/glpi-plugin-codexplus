@@ -1,5 +1,11 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.7.15`** (último commit de código **`aef34d4`**) ·
+> **Q8 ✅ — mapa de calor Wi-Fi** (06/10/2026): Q8-1 paredes, Q8-1b lados,
+> Q8-2 catálogo (0.7.15), Q8-3 motor, Q8-4a quadro próprio, Q8-4b camada,
+> Q8-6 cobertura por Área. **Q8-5 (calibração) aguarda mapas do Cambium.**
+> Próximo: **Q5i-5**.
+> Antes:
 > Estado em **`v0.7.14`** (último commit de código **`7cc27fe`**) ·
 > **Q5k ✅** (`04ea10c`), **7a ✅** (`e04c5d0`, 0.7.13) e **7b ✅**
 > (`7cc27fe`, 0.7.14) — texto solto com largura, mini-paleta completa,
@@ -234,7 +240,7 @@ números entre parênteses são os da lista revisada de 04/10.
 | 7 | ~~**Q5k**~~ ✅ `04ea10c` | Fluxograma: **texto solto** com largura e quebra (alças laterais) (23) + **"…"** na mini-paleta com todas as formas e busca (24) + quebra pela largura real da letra | não (só JS) | — |
 | 8 | ~~**7a**~~ ✅ `e04c5d0` | **Etapa 7** — ação automática diária `codexplusexpiry`, marcas de "já avisado" por ciclo (6) | **sim** (0.7.13) | — |
 | 9 | ~~**7b**~~ ✅ `7cc27fe` | **Etapa 7** — notificação nativa do GLPI (3 eventos, responsável/revisor/auditor, modelo em português); desligada na Teckcomp (6) | **sim** (0.7.14) | — |
-| 10 | **Q8** | **DTC: mapa de calor** na Planta (14) | não (prever: campo novo no JSON do quadro, aceito no PHP) | decisão de abordagem + mockup |
+| 10 | ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` | **Mapa de calor Wi-Fi** (14), quadro próprio: Q8-1 paredes, Q8-1b lados, Q8-2 catálogo, Q8-3 motor, Q8-4a quadro, Q8-4b camada, Q8-6 cobertura por Área. **Q8-5 calibração pendente** (aguarda mapas do Cambium) | **sim** no Q8-2 (0.7.15) | — |
 | 11 | **Q5i-5** | Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda) (25) | não | arquivo de exemplo |
 | 12 | **Q5i-6** | Fluxograma: importar **draw.io** (XML, com posições) (26) | não | arquivo de exemplo |
 | 13 | **F-0** | Fechamento: versão **0.8.0** com tag `v0.8.0`, **instalação do zero** numa instância limpa (como em 28/09, achado 92), docs | sim (versão) | — |
@@ -746,6 +752,12 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 
 **Roadmap:**
 
+- **Mapa de calor — depois do Q8:** antena direcional, sobreposição de
+  canais, mapa por AP; **câmeras (DORI)** — o cone que já existe na Planta
+  vira faixas de detectar, observar, reconhecer e identificar pela
+  resolução e lente, com as paredes bloqueando a visão (Claudio,
+  04/10/2026: segundo plano, se o mapa de calor der certo)
+
 - (8) Galeria de Modelos: catálogo público da Teckcomp (ex.: repositório no
   GitHub), listado e importado com um clique na tela Modelos
 - (9) **Etapa 9d**: organograma ligado a Usuários e Grupos do GLPI; "gerar a
@@ -829,10 +841,13 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
       semanal; revisão atrasada também; responsável, revisor e auditor (sem
       gestor do setor desde o P1); e-mail desligado na Teckcomp, pronto para
       terceiros (Claudio, 04/10/2026)
-- [ ] **Q8 (mapa de calor):** (a) camada estimada na Planta, por AP, com
-      raio em metros pela escala e aviso "estimativa", ou (b) só imagem de
-      ferramenta de site survey sobre a planta. Sugestão: (a), sem paredes
-      nem atenuação — mockup antes
+- [x] **Q8 (mapa de calor):** quadro próprio, separado da Planta, com
+      modelo multiparede, ida e volta do aparelho e escala do Cambium
+      (Claudio, 04 a 06/10/2026; CONTEXTO 3.26)
+- [ ] **Q8-5 (calibração):** 3 a 5 mapas do Cambium de outras lojas, cada
+      um com planta, modelo do AP, potência, altura, faixa e uma medida
+      conhecida. Decidir com Claudio se entra antes do F-0 ou se vai para a
+      Pós-produção (a margem de 12 dB já reproduz a LOJ0687)
 - [ ] **Q5i-5/Q5i-6:** arquivo `.bpmn` e `.drawio` de exemplo. Sem
       arquivo real, a validação usa exemplos públicos (bpmn.io, draw.io) —
       o risco é o arquivo do primeiro cliente trazer algo que eles não têm

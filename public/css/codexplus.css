@@ -1292,6 +1292,16 @@
 .cx-board-start-op b { display: block; font-size: 13px; font-weight: 600; }
 .cx-board-start-op span { display: block; margin-top: 3px; font-size: 12px; color: var(--cx-muted); }
 .cx-board-rfwarn { color: #8a5300; background: #fff6e5; border-radius: 6px; padding: 6px 8px; }
+.cx-board-hint.cx-board-hint-warn { color: #8a5300; background: #fff6e5; }
+/* Q8-4b-2: escala do mapa no próprio quadro (canto de cima, à esquerda). */
+.cx-board-heatleg { position: absolute; top: 10px; left: 10px; z-index: 4; width: 380px; max-width: calc(100% - 20px); cursor: pointer;
+    box-shadow: 0 4px 16px rgba(16, 24, 40, .12); border-radius: 6px; background: #fff; }
+.cx-board-heatleg svg { display: block; width: 100%; height: auto; }
+.cx-board-heatleg-min { display: none; padding: 5px 10px; font-size: 12px; font-weight: 600; color: var(--cx-text); }
+.cx-board-heatleg.is-min { width: auto; }
+.cx-board-heatleg.is-min svg { display: none; }
+.cx-board-heatleg.is-min .cx-board-heatleg-min { display: block; }
+.cx-board-op input[type="range"][data-act="hop"] { width: 90px; vertical-align: middle; }
 .cx-wifi-sub h4 { margin: 0; font-size: 13px; font-weight: 600; }
 .cx-wifi-btns { display: inline-flex; gap: 8px; align-items: center; }
 .cx-wifi-btns form { margin: 0; }

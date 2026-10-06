@@ -54,8 +54,29 @@
         apAdv: 3,        // o AP recebe melhor que o aparelho, dB
         uplink: true,    // considerar a volta do aparelho
         cell: 0.25,      // lado da célula da grade, m
-        maxCells: 60000  // grade maior que isso engrossa a célula sozinha
+        maxCells: 60000, // grade maior que isso engrossa a célula sozinha
+        vary: 0,         // variação do ambiente, ±dB (0 = desligada; o quadro usa 3)
+        varyLen: 1.6     // tamanho das "manchas" da variação, m
     };
+
+    /* Variação do ambiente (Claudio, 06/10/2026): móveis, gôndolas e pessoas
+       deixam o sinal irregular; mapa de projeto mostra isso como contornos
+       orgânicos, não círculos perfeitos. Ruído suave e DETERMINÍSTICO (mesmo
+       mapa, mesmo desenho), um por AP, semeado pela posição dele. Média
+       zero: não muda o nível, só o contorno. */
+    function hash2(i, j, s) {
+        var h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041)) | 0;
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        h = h ^ (h >>> 16);
+        return ((h >>> 0) % 65536) / 32767.5 - 1;
+    }
+    function vnoise(x, y, s) {
+        var i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+        var u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+        var a = hash2(i, j, s), b = hash2(i + 1, j, s), c = hash2(i, j + 1, s), d = hash2(i + 1, j + 1, s);
+        return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+    }
+    function fbm(x, y, s) { return 0.65 * vnoise(x, y, s) + 0.35 * vnoise(x * 2.3 + 17.1, y * 2.3 + 5.7, s + 101); }
 
     /* Escala do Cambium (cores tiradas da legenda dos mapas da Teckcomp).
        Cada degrau vale o valor arredondado de 5 em 5 dB; abaixo de −90 fica
@@ -130,7 +151,17 @@
                     w0[k] = l0; w1[k] = l1; w2[k] = l2;
                 }
             }
-            return { dist: dist, wall: [w0, w1, w2] };
+            var nz = null;
+            if (o.vary > 0) {
+                nz = new Float32Array(N);
+                var seed = (Math.round(a.x / 7) * 92821 + Math.round(a.y / 7) * 68917) | 0, L = o.varyLen;
+                for (var rr = 0, kk = 0; rr < rows; rr++) {
+                    for (var cc = 0; cc < cols; cc++, kk++) {
+                        nz[kk] = o.vary * 1.6 * fbm(((cc + 0.5) * cellPx / pxm) / L, ((rr + 0.5) * cellPx / pxm) / L, seed);
+                    }
+                }
+            }
+            return { dist: dist, wall: [w0, w1, w2], noise: nz };
         });
         return { cols: cols, rows: rows, cellPx: cellPx, pxm: pxm, w: W, h: H, aps: aps, per: per, opts: o };
     }
@@ -156,7 +187,7 @@
                 used++;
                 var tx = num(ab.tx, 20), g = num(ab.gain, 0), P = geo.per[i], wl = P.wall[bi];
                 for (var k = 0; k < N; k++) {
-                    var L = base + 10 * o.n * Math.log10(P.dist[k]) + wl[k] + o.margin;
+                    var L = base + 10 * o.n * Math.log10(P.dist[k]) + wl[k] + o.margin + (P.noise ? P.noise[k] : 0);
                     var down = tx + g + devG - L;
                     var eff = down;
                     var limited = false;

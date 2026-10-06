@@ -743,6 +743,88 @@
         RF_BANDS.forEach(function (b) { var x = (m.bands || {})[b]; if (x) { o.bands[b] = { on: true, max: +x.tx, tx: +x.tx, gain: +x.gain }; } });
         return cleanRf(o);
     }
+    /* Q8-4b: estado da camada de cores, gravado no quadro. O perfil do
+       aparelho é cópia (como o rádio do AP): o documento não muda se o
+       catálogo mudar. Sem perfil: Celular de referência. */
+    var RF_PROF_FALLBACK = { name: 'Celular', gain: -8, bands: { '24': { on: true, tx: 15 }, '5': { on: true, tx: 14 }, '6': { on: true, tx: 14 } } };
+    function cleanProf(p) {
+        if (!p || typeof p !== 'object') { return null; }
+        var o = { name: String(p.name || '').slice(0, 80) || 'Aparelho', gain: rfNum(p.gain, -20, 10, 0), bands: {} };
+        RF_BANDS.forEach(function (b) { var x = (p.bands || {})[b]; if (x && (x.on || x.tx !== undefined)) { o.bands[b] = { on: true, tx: rfNum(x.tx, 0, 36, 15) }; } });
+        return Object.keys(o.bands).length ? o : null;
+    }
+    function cleanHeat(h) {
+        h = h && typeof h === 'object' ? h : {};
+        var op = parseFloat(h.op);
+        return { on: h.on === undefined ? true : !!h.on, band: RF_BANDS.indexOf(String(h.band)) >= 0 ? String(h.band) : '',
+            ul: h.ul === undefined ? true : !!h.ul, prof: cleanProf(h.prof),
+            // Q8-4b-2: transparência das cores e aspecto natural (contornos irregulares).
+            op: isFinite(op) ? Math.max(0.15, Math.min(0.95, Math.round(op * 100) / 100)) : RF_OP_DEFAULT,
+            nat: h.nat === undefined ? true : !!h.nat };
+    }
+    var RF_OP_DEFAULT = 0.7, RF_VARY = 4;
+    /* Perfis de referência (os mesmos do botão da Configuração): sempre na
+       lista do quadro, mesmo sem cadastro, para Celular e Notebook nunca faltarem. */
+    var RF_REF_PROFILES = [
+        { name: 'Celular', gain: -8, bands: { '24': { tx: 15 }, '5': { tx: 14 }, '6': { tx: 14 } } },
+        { name: 'Notebook', gain: -3, bands: { '24': { tx: 18 }, '5': { tx: 17 }, '6': { tx: 17 } } },
+        { name: 'Smart TV', gain: -5, bands: { '24': { tx: 15 }, '5': { tx: 14 } } },
+        { name: 'Câmera / IoT Wi-Fi', gain: -5, bands: { '24': { tx: 13 } } }
+    ];
+    /* Lista do seletor Aparelho: catálogo primeiro; referências que o catálogo não tem. */
+    function profOptions() {
+        var have = {}, out = [];
+        WIFI.profiles.forEach(function (p) { have[String(p.name).toLowerCase()] = true; out.push({ v: 'c' + p.id, name: p.name, p: p }); });
+        RF_REF_PROFILES.forEach(function (p, i) { if (!have[p.name.toLowerCase()]) { out.push({ v: 'r' + i, name: p.name + ' (referência)', p: p }); } });
+        return out;
+    }
+    function profFromCatalog(p) { return cleanProf({ name: p.name, gain: p.gain, bands: p.bands }); }
+    /* Entrada do motor (CodexplusRF) a partir do quadro: AP no centro do ícone;
+       paredes pela perda do material, mesmo com a camada de paredes escondida. */
+    function heatInputs(D) {
+        var aps = [], walls = [];
+        D.items.forEach(function (i) {
+            if (i.t === 'icon' && i.icon === 'access-point' && i.rf) {
+                aps.push({ x: i.x + i.size / 2, y: i.y + i.size / 2, h: i.rf.h, label: i.label || '', bands: i.rf.bands, model: i.rf.label });
+            } else if (i.t === 'wall') {
+                walls.push({ pts: i.pts, loss: (WALL_KINDS[i.mat] || WALL_KINDS[WALL_DEFAULT]).loss });
+            }
+        });
+        return { aps: aps, walls: walls };
+    }
+    function heatBandOf(D) {
+        if (D.heat && D.heat.band) { return D.heat.band; }
+        var inp = heatInputs(D);
+        return ['5', '24', '6'].filter(function (b) { return inp.aps.some(function (a) { return a.bands[b]; }); })[0] || '5';
+    }
+    /* Escala de cores para o documento (vai no lugar da legenda de símbolos). */
+    function heatLegendSvg(D) {
+        var RF = window.CodexplusRF; if (!RF) { return null; }
+        var h = D.heat || cleanHeat(null), prof = h.prof || RF_PROF_FALLBACK, band = heatBandOf(D);
+        var aps = heatInputs(D).aps.filter(function (a) { return a.bands[band]; });
+        var steps = RF.PALETTE.slice(0, 10), SW = 58, PAD = 14, w = PAD * 2 + steps.length * SW;
+        var lines = aps.slice(0, 12).map(function (a) { return (a.label || 'AP') + ': ' + (a.model || 'modelo') + ', ' + String(a.bands[band].tx).replace('.', ',') + ' dBm, ' + String(a.h).replace('.', ',') + ' m de altura'; });
+        if (aps.length > 12) { lines.push('e mais ' + (aps.length - 12) + ' APs'); }
+        var hgt = 150 + lines.length * 17 + (D.pxm ? 0 : 17);
+        var t = function (x, y, txt, sz, bold, col) { return '<text x="' + x + '" y="' + y + '" font-family="Arial,sans-serif" font-size="' + (sz || 12) + '"' + (bold ? ' font-weight="bold"' : '') + ' fill="' + (col || '#1d2330') + '">' + esc(txt) + '</text>'; };
+        var g = t(PAD, 22, 'Mapa de calor Wi-Fi', 14, true)
+            + t(PAD, 40, prof.name + ' · ' + RF_BAND_L[band] + ' · ' + (h.ul ? 'considera a volta do aparelho' : 'só o sinal do AP para o aparelho'), 12, false, '#444441');
+        steps.forEach(function (st, i) {
+            var x = PAD + i * SW;
+            g += '<rect x="' + x + '" y="52" width="' + SW + '" height="22" fill="' + st[1] + '"/>'
+                + '<text x="' + (x + SW / 2) + '" y="67" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#1d2330">' + (i === 9 ? '−75 a −90' : '−' + Math.abs(st[0])) + '</text>';
+        });
+        g += t(PAD, 90, 'Sinal em dBm: mais quente é mais forte. Abaixo de −90 fica sem cor.', 11, false, '#444441')
+            + '<line x1="' + PAD + '" y1="104" x2="' + (PAD + 36) + '" y2="104" stroke="#04342C" stroke-width="2" stroke-dasharray="4 4"/>'
+            + t(PAD + 44, 108, 'Limite para voz e vídeo (−67 dBm): dentro da linha, chamada e vídeo funcionam.', 11)
+            + t(PAD, 128, 'Estimativa por modelo de paredes, com margem de projeto de ' + String(RF.DEFAULTS.margin) + ' dB' + (h.nat ? ' e variação do ambiente' : '') + '. Não é medição em campo.', 11, false, '#444441');
+        var y = 128;
+        if (!D.pxm) { y += 17; g += t(PAD, y, 'Planta sem escala medida: distâncias aproximadas.', 11, true, '#8a5300'); }
+        lines.forEach(function (l, i) { g += t(PAD, y + 20 + i * 17, (i === 0 ? 'APs — ' : '') + l, 11); });
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + (w * 2) + '" height="' + (hgt * 2) + '" viewBox="0 0 ' + w + ' ' + hgt + '">'
+            + '<rect x="0.5" y="0.5" width="' + (w - 1) + '" height="' + (hgt - 1) + '" rx="4" fill="#ffffff" stroke="#c9d1db"/>' + g + '</svg>';
+        return { svg: svg, W: w * 2, H: hgt * 2, n: steps.length };
+    }
     function loadWifi() {
         if (WIFI.promise) { return WIFI.promise; }
         if (typeof fetch !== 'function' || !BASE) { WIFI.promise = Promise.resolve(); return WIFI.promise; }
@@ -838,8 +920,7 @@
 
     function starter(mode) {
         var m = MODES[mode] ? mode : 'topologia';
-        // Mapa de calor: a legenda dele (escala de cores) vem no Q8-4b.
-        return { v: 1, mode: m, w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: m !== 'calor', items: [] };
+        return { v: 1, mode: m, w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: true, items: [] };
     }
 
     function clean(d, mode) {
@@ -859,7 +940,10 @@
         out.pxm = Math.max(0, Math.min(1000, +d.pxm || 0));
         // Q3b: legenda abaixo do quadro. Quadro novo nasce com ela; quadro
         // gravado antes do Q3b (sem o campo) fica sem, até marcar.
-        out.legend = out.mode === 'calor' ? false : !!d.legend;
+        // Q8-4b: no Mapa de calor a "legenda" é a escala de cores; mapa do Q8-4a
+        // (gravado sem `heat`) passa a sair com ela.
+        out.legend = out.mode === 'calor' && !d.heat ? true : !!d.legend;
+        if (out.mode === 'calor') { out.heat = cleanHeat(d.heat); }
         // Q8-1: camada de paredes (Planta e Mapa de calor); quadro antigo nasce com ela à mostra.
         if (isPlan(out.mode)) { out.wallsOn = d.wallsOn === undefined ? true : !!d.wallsOn; }
         var pxm = out.pxm || PXM_DEFAULT;
@@ -1424,7 +1508,7 @@
     /* ---------------- PNG do quadro ---------------- */
     /* Q5a: o SVG do quadro inteiro (o mesmo do PNG), para a leitura do
        fluxograma desenhar vetorial na página. kMax limita a ampliação. */
-    function boardSvg(data, bgImg, kMax) {
+    function boardSvg(data, bgImg, kMax, heatImg) {
         PXM = data.pxm || PXM_DEFAULT;
         var box;
         if (bgImg) {
@@ -1454,6 +1538,7 @@
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="' + box.x + ' ' + box.y + ' ' + box.w + ' ' + box.h + '">'
             + '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.w + '" height="' + box.h + '" fill="#ffffff"/>'
             + (bgImg ? '<image href="' + bgImg + '" x="0" y="0" width="' + data.w + '" height="' + data.h + '" opacity="' + data.bgOpacity + '"/>' : '')
+            + (heatImg ? '<image href="' + heatImg + '" x="0" y="0" width="' + data.w + '" height="' + data.h + '" preserveAspectRatio="none" opacity="' + ((data.heat && data.heat.op) || RF_OP_DEFAULT) + '"/>' : '')
             + laneSvg(data.items, true)
             + data.items.filter(function (i) { return i.t === 'zone'; }).map(function (i) { return itemSvg(i, true); }).join('')
             + (wallsShown(data) ? data.items.filter(function (i) { return i.t === 'wall'; }).map(function (i) { return wallSvg(i, true); }).join('') : '')
@@ -1463,8 +1548,8 @@
             + '</svg>';
         return { svg: svg, w: W, h: H };
     }
-    function toPng(data, bgImg) {
-        var r = boardSvg(data, bgImg);
+    function toPng(data, bgImg, heatImg) {
+        var r = boardSvg(data, bgImg, undefined, heatImg);
         return rasterize(r.svg, r.w, r.h);
     }
 
@@ -1520,6 +1605,7 @@
         return out.concat(icons);
     }
     function legendSvg(D) {
+        if (D.mode === 'calor') { return heatLegendSvg(D); }
         var E = legendEntries(D);
         if (!E.length) { return null; }
         var cols = E.length > 16 ? 3 : (E.length > 6 ? 2 : 1), rows = Math.ceil(E.length / cols);
@@ -2515,11 +2601,37 @@
     }
 
     function build(editor, node, D, bgUrl, bgChanged, host) {
+        var heatKeep = null;
+        // Q8-4b: controles da camada de cores (só no Mapa de calor).
+        function heatBar() {
+            // Q8-4b-3: perfil gravado no mapa que não está mais na lista: guardado
+            // para a opção "(deste mapa)" voltar a ele depois de trocar.
+            if (D.heat.prof && !heatKeep) { heatKeep = clone(D.heat.prof); }
+            var h = D.heat, opt = function (v, l, on) { return '<option value="' + esc(v) + '"' + (on ? ' selected' : '') + '>' + esc(l) + '</option>'; };
+            var po = profOptions(), cur = h.prof ? h.prof.name.toLowerCase() : '';
+            var hit = po.filter(function (o) { return o.p.name.toLowerCase() === cur; })[0];
+            var profs = po.map(function (o) { return opt(o.v, o.name, o === hit); }).join('');
+            if (h.prof && !hit) { profs = opt('keep', h.prof.name + ' (deste mapa)', true) + profs; } else { heatKeep = null; }
+            return '<span class="cx-board-sep"></span>'
+                + '<label class="cx-board-op" title="Mostrar ou esconder as cores do sinal"><input type="checkbox" data-act="heat"' + (h.on ? ' checked' : '') + '> Mapa de calor</label>'
+                + '<label class="cx-board-op" title="Faixa de frequência calculada">Faixa <select data-act="hband">' + RF_BANDS.map(function (b) { return opt(b, RF_BAND_L[b], h.band === b); }).join('') + '</select></label>'
+                + '<label class="cx-board-op" title="Aparelho do cliente (perfis em Codex+ › Configuração)">Aparelho <select data-act="hprof">' + profs + '</select></label>'
+                + '<label class="cx-board-op" title="O aparelho também precisa ser ouvido pelo AP: celular costuma ser o limite"><input type="checkbox" data-act="hul"' + (h.ul ? ' checked' : '') + '> Volta do aparelho</label>'
+                + '<label class="cx-board-op" title="Contornos irregulares, como num ambiente real com móveis e pessoas (variação de poucos dB, sem mudar a média)"><input type="checkbox" data-act="hnat"' + (h.nat ? ' checked' : '') + '> Aspecto natural</label>'
+                + '<label class="cx-board-op" title="Transparência das cores do mapa (no quadro e no documento)">Cores <input type="range" data-act="hop" min="15" max="95" value="' + Math.round(h.op * 100) + '"></label>';
+        }
         var flow = D.mode === 'fluxograma';
         if (flow) { D.legend = false; D.pxm = 0; }
         var org = D.mode === 'organograma' && !!OD() && !!D.org;
         var heat = D.mode === 'calor';
-        if (heat) { D.legend = false; }
+        if (heat) {
+            if (!D.heat) { D.heat = cleanHeat(null); }
+            if (!D.heat.prof) {
+                var pd = WIFI.profiles.filter(function (p) { return p.default; })[0] || WIFI.profiles[0];
+                D.heat.prof = (pd && profFromCatalog(pd)) || clone(RF_PROF_FALLBACK);
+            }
+            if (!D.heat.band) { D.heat.band = heatBandOf(D); }
+        }
         var saveLabel = host ? 'Salvar ' + MODES[D.mode].toLowerCase() : (node ? 'Salvar quadro' : 'Inserir no documento');
         var hist = [], redo = [], sel = [], tool = 'select', clip = null;
         var view = { z: 1, x: 40, y: 40 };
@@ -2574,6 +2686,7 @@
                   + '<button type="button" data-act="rot" title="Girar a planta 90° (os itens giram junto)"' + (bgUrl ? '' : ' hidden') + '>Girar planta</button>'
                   + '<button type="button" data-act="bgdel"' + (bgUrl ? '' : ' hidden') + '>Tirar planta</button>'
                   + '<label class="cx-board-op" title="Mostrar ou esconder as paredes no quadro, no PNG e na legenda (o mapa de calor considera as paredes mesmo escondidas)"><input type="checkbox" data-act="walls"' + (D.wallsOn !== false ? ' checked' : '') + '> Paredes</label>'
+                  + (heat ? heatBar() : '')
                 : '')
             // Q7a: cópia do quadro em arquivo (backup ou levar a outro documento).
             + (D.mode === 'planta' || D.mode === 'topologia'
@@ -2582,6 +2695,7 @@
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
+            + (heat ? '<label class="cx-board-op" title="Gera, ao salvar, a escala de cores (faixa, aparelho, limite de −67 dBm e os APs), logo abaixo do mapa no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Escala abaixo do mapa</label>' : '')
             + (flow || heat ? '' : '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>')
             + '<button type="button" data-act="png" title="Baixar o quadro como imagem PNG (como está agora, mesmo sem salvar)">Baixar PNG</button>'
             + '<button type="button" data-act="cancel">Cancelar</button>'
@@ -2592,12 +2706,13 @@
             + (LIB.canCreate && !heat ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
             + '</div>') + '<div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
-            + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
+            + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/><image class="cx-board-heat" preserveAspectRatio="none" pointer-events="none" display="none"/>'
             + '<g class="cx-board-zones"></g><g class="cx-board-ducts"></g><g class="cx-board-links"></g><g class="cx-board-items"></g><g class="cx-board-find"></g><g class="cx-board-sel"></g><g class="cx-board-guides"></g>'
             + '<rect class="cx-board-marq" hidden/></g></svg>'
             + '<div class="cx-board-mm" title="Minimapa: clique ou arraste para mover a vista"><svg xmlns="' + NS + '" preserveAspectRatio="xMidYMid meet"></svg></div>'
             + '<div class="cx-board-hint">' + (flow
                 ? 'Arraste uma forma da paleta para o quadro. Duplo clique na forma (ou comece a digitar) escreve nela. Com a forma selecionada, puxe uma alça azul até outra forma para ligar: a 1ª saída da decisão nasce Sim, a 2ª Não. Arraste o fundo para mover a vista; roda do mouse dá zoom.'
+                : D.mode === 'calor' ? 'Arraste um AP da paleta para o quadro e escolha o modelo no painel. Passe o mouse no mapa para ver o sinal. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom.'
                 : 'Arraste um ícone da paleta para o quadro. Segure e arraste o fundo para mover a vista; roda do mouse dá zoom; Shift + arrastar seleciona em área. Com um ícone selecionado, puxe uma das alças azuis até outro ícone para ligar.') + '</div></div>'
             + '<aside class="cx-board-props"></aside>'
             + '</div>';
@@ -3791,6 +3906,7 @@
                 + D.items.filter(function (i) { return i.t === 'duct'; }).map(function (i) { return ductSvg(i, D.items); }).join('');
             gLinks.innerHTML = D.items.filter(function (i) { return i.t === 'link'; }).map(function (i) { return linkSvg(i, get); }).join('');
             gItems.innerHTML = D.items.filter(function (i) { return ['zone', 'link', 'duct', 'wall'].indexOf(i.t) < 0; }).map(function (i) { return itemSvg(i); }).join('');
+            if (heat) { heatSoon(); }
         }
         function render() {
             if (org) { orgSync(); }
@@ -4024,6 +4140,7 @@
         }
         // Alças de ligação nas quatro bordas (um pouco para fora, longe da alça de tamanho).
         function handles(it) {
+            if (heat) { return ''; }   // Q8-4b: no Mapa de calor não há cabos.
             var plus = flow && it.t === 'shape';
             var o = (it.t === 'shape' ? 24 : 10) / view.z, r = (plus ? 7 : 5) / view.z;
             return SIDES.map(function (sd) {
@@ -5706,7 +5823,8 @@
                 });
                 return;
             }
-            toPng(D, bgUrl || null).then(function (png) {
+            if (heat) { heatUpdate(); }
+            toPng(D, bgUrl || null, heat && D.heat.on ? heatUrl || null : null).then(function (png) {
                 return (D.legend ? legendPng(D) : Promise.resolve(null)).then(function (lp) { return [png, lp]; });
             }).then(function (r) {
                 var png = r[0];
@@ -5728,7 +5846,8 @@
             if (btn.disabled) { return; }
             btn.disabled = true; btn.textContent = 'Gerando…';
             var done = function () { btn.disabled = false; btn.textContent = 'Baixar PNG'; };
-            toPng(D, bgUrl || null).then(function (blob) {
+            if (heat) { heatUpdate(); }
+            toPng(D, bgUrl || null, heat && D.heat.on ? heatUrl || null : null).then(function (blob) {
                 var a = document.createElement('a');
                 var url = URL.createObjectURL(blob);
                 a.href = url;
@@ -5966,6 +6085,95 @@
         // Ligações feitas no Q2a nasceram sem número: numera ao abrir.
         if (!flow) { D.items.forEach(function (i) { if (i.t === 'link' && !i.cable) { i.cable = nextCable(D.items); } }); }
 
+        /* Q8-4b: camada de cores. A parte pesada (prepare) só refaz quando APs,
+           paredes, escala ou tamanho mudam; faixa, aparelho e volta só
+           refazem o solve. Pinta num canvas de até 1200 px e vira <image>. */
+        var heatEl = root.querySelector('.cx-board-heat'), heatGeo = null, heatSig = '', heatGrid = null, heatUrl = '', heatT = 0;
+        function heatSoon() { clearTimeout(heatT); heatT = setTimeout(heatUpdate, 180); }
+        function heatUpdate() {
+            clearTimeout(heatT);
+            var RF = window.CodexplusRF;
+            if (!heat || !heatEl) { return; }
+            if (!RF || !D.heat.on) { heatEl.setAttribute('display', 'none'); heatGrid = null; heatUrl = ''; heatLeg(); return; }
+            var inp = heatInputs(D), sig = JSON.stringify([D.w, D.h, D.pxm, D.heat.nat, inp.aps, inp.walls]);
+            if (sig !== heatSig) { heatGeo = RF.prepare({ w: D.w, h: D.h, pxm: D.pxm || PXM_DEFAULT, aps: inp.aps, walls: inp.walls, opts: { vary: D.heat.nat ? RF_VARY : 0 } }); heatSig = sig; }
+            heatGrid = RF.solve(heatGeo, { band: D.heat.band, profile: D.heat.prof || RF_PROF_FALLBACK, opts: { uplink: D.heat.ul } });
+            heatLeg();
+            heatUrl = '';
+            var k = Math.min(1, 1200 / Math.max(D.w, D.h)), W = Math.max(1, Math.round(D.w * k)), H = Math.max(1, Math.round(D.h * k));
+            var cv = document.createElement('canvas'), g2 = null;
+            try { g2 = cv.getContext && cv.getContext('2d'); } catch (e) { g2 = null; }
+            if (g2 && heatGrid.aps) {
+                cv.width = W; cv.height = H;
+                var im = g2.createImageData(W, H);
+                im.data.set(RF.paint(heatGrid, W, H, { alpha: 255 }));
+                g2.putImageData(im, 0, 0);
+                heatUrl = cv.toDataURL('image/png');
+            }
+            if (heatUrl) {
+                heatEl.setAttribute('href', heatUrl); heatEl.setAttribute('width', D.w); heatEl.setAttribute('height', D.h); heatEl.setAttribute('opacity', D.heat.op); heatEl.removeAttribute('display');
+            } else { heatEl.setAttribute('display', 'none'); }
+            heatHint();
+        }
+        /* Escala no próprio quadro (a mesma que vai abaixo do mapa no documento);
+           clique encolhe e abre. */
+        var legBox = null;
+        function heatLeg() {
+            if (!heat) { return; }
+            if (!legBox) {
+                legBox = document.createElement('div'); legBox.className = 'cx-board-heatleg';
+                legBox.title = 'Clique para encolher ou abrir a escala';
+                legBox.addEventListener('click', function () { legBox.classList.toggle('is-min'); });
+                root.querySelector('.cx-board-stage').appendChild(legBox);
+            }
+            var L = D.heat.on ? heatLegendSvg(D) : null;
+            legBox.hidden = !L;
+            if (L) { legBox.innerHTML = '<span class="cx-board-heatleg-min">Escala ▸</span>' + L.svg.replace(/ width="\d+" height="\d+"/, ''); }
+        }
+        var hintEl = root.querySelector('.cx-board-hint'), hintBase = hintEl ? hintEl.textContent : '';
+        function heatHint(txt) {
+            if (!hintEl) { return; }
+            if (txt) { hintEl.textContent = txt; return; }
+            var semModelo = D.items.filter(function (i) { return i.t === 'icon' && i.icon === 'access-point' && !i.rf; }).length;
+            var nAp = heatInputs(D).aps.filter(function (a) { return a.bands[D.heat.band]; }).length;
+            var avisos = [];
+            if (semModelo) { avisos.push(semModelo + (semModelo === 1 ? ' AP sem modelo fica' : ' APs sem modelo ficam') + ' fora do mapa'); }
+            if (D.heat.on && !nAp) { avisos.push('nenhum AP com modelo em ' + RF_BAND_L[D.heat.band]); }
+            var pf = D.heat.prof || RF_PROF_FALLBACK;
+            if (D.heat.on && !(pf.bands || {})[D.heat.band]) { avisos.push(pf.name + ' não usa ' + RF_BAND_L[D.heat.band] + ': escolha outra faixa ou outro aparelho'); }
+            if (D.heat.on && !D.pxm) { avisos.push('planta sem escala: distâncias aproximadas (use Escala)'); }
+            hintEl.textContent = avisos.length ? 'Atenção: ' + avisos.join('; ') + '.' : hintBase;
+            hintEl.classList.toggle('cx-board-hint-warn', avisos.length > 0);
+        }
+        if (heat) {
+            svg.addEventListener('pointermove', function (e) {
+                if (drag || !heatGrid || !heatGrid.aps || !D.heat.on) { return; }
+                var p = toBoard(e);
+                if (p.x < 0 || p.y < 0 || p.x > D.w || p.y > D.h) { heatHint(); return; }
+                var r = window.CodexplusRF.at(heatGrid, p.x, p.y), ap = heatInputs(D).aps.filter(function (a) { return a.bands[D.heat.band]; })[r.ap];
+                if (r.v < -200) { heatHint((D.heat.prof || RF_PROF_FALLBACK).name + ': sem sinal aqui.'); return; }
+                heatHint((D.heat.prof || RF_PROF_FALLBACK).name + ' aqui: ' + String(r.dl).replace('-', '−') + ' dBm' + (ap ? ' de ' + (ap.label || 'AP sem nome') : '')
+                    + (r.limited ? ' · a volta do aparelho limita a ' + String(r.v).replace('-', '−') + ' dBm efetivos' : '')
+                    + (r.v >= -67 ? ' · voz e vídeo ok' : r.v >= -75 ? ' · só navegação' : ' · instável'));
+            });
+            svg.addEventListener('pointerleave', function () { heatHint(); });
+            var hb = function (q) { return root.querySelector('[data-act="' + q + '"]'); };
+            hb('heat').addEventListener('change', function () { snap(); D.heat.on = hb('heat').checked; heatUpdate(); });
+            hb('hband').addEventListener('change', function () { snap(); D.heat.band = hb('hband').value; heatUpdate(); hb('hband').blur(); });
+            hb('hul').addEventListener('change', function () { snap(); D.heat.ul = hb('hul').checked; heatUpdate(); });
+            hb('hprof').addEventListener('change', function () {
+                var v = hb('hprof').value, o = profOptions().filter(function (x) { return x.v === v; })[0];
+                if (o) { snap(); D.heat.prof = profFromCatalog(o.p); heatUpdate(); }
+                else if (v === 'keep' && heatKeep) { snap(); D.heat.prof = clone(heatKeep); heatUpdate(); }
+                hb('hprof').blur();
+            });
+            hb('hnat').addEventListener('change', function () { snap(); D.heat.nat = hb('hnat').checked; heatUpdate(); });
+            hb('hop').addEventListener('input', function () {
+                D.heat.op = Math.max(0.15, Math.min(0.95, +hb('hop').value / 100));
+                if (heatEl) { heatEl.setAttribute('opacity', D.heat.op); }
+            });
+        }
+
         /* Q8-4a: Mapa de calor vazio pergunta como começar. "Trazer da Planta"
            copia fundo, escala, paredes, Áreas e APs (nome e posição) de uma
            Planta do documento; depois os dois quadros ficam independentes. */
@@ -6040,8 +6248,8 @@
 
         // Exposto para os testes (jsdom).
         root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, miniOpen: miniOpen, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
-            setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, fromPlanta: fromPlanta, bg: function () { return bgUrl; }, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
+            setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, fromPlanta: fromPlanta, bg: function () { return bgUrl; }, heatGrid: function () { return heatGrid; }, heatUpdate: heatUpdate, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _cleanHeat: cleanHeat, _heatInputs: heatInputs, _heatLegendSvg: heatLegendSvg, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

@@ -1302,6 +1302,14 @@
 .cx-board-heatleg.is-min svg { display: none; }
 .cx-board-heatleg.is-min .cx-board-heatleg-min { display: block; }
 .cx-board-op input[type="range"][data-act="hop"] { width: 90px; vertical-align: middle; }
+/* Q8-6: cobertura por Área no painel do Mapa de calor. */
+.cx-board-cov { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 8px; }
+.cx-board-cov th { text-align: left; font-weight: 600; color: var(--cx-muted); padding: 3px 4px; border-bottom: 1px solid var(--cx-border); }
+.cx-board-cov td { padding: 4px; border-bottom: 1px solid var(--cx-surface-2); }
+.cx-board-cov td + td, .cx-board-cov th + th { text-align: right; font-weight: 600; }
+.cx-board-cov .is-ok { color: #0F6E56; } .cx-board-cov .is-at { color: #8a5300; } .cx-board-cov .is-ru { color: #A32D2D; }
+.cx-board-cov .is-tot td { font-weight: 700; border-bottom: 0; }
+.cx-board-covcopy { width: 100%; }
 .cx-wifi-sub h4 { margin: 0; font-size: 13px; font-weight: 600; }
 .cx-wifi-btns { display: inline-flex; gap: 8px; align-items: center; }
 .cx-wifi-btns form { margin: 0; }

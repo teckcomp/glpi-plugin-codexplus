@@ -797,15 +797,75 @@
         var inp = heatInputs(D);
         return ['5', '24', '6'].filter(function (b) { return inp.aps.some(function (a) { return a.bands[b]; }); })[0] || '5';
     }
+    /* Q8-6: grade do mapa (a mesma do quadro: perfil, faixa, volta e aspecto
+       natural gravados no mapa). Usada pela escala do documento. */
+    function heatGridOf(D) {
+        var RF = window.CodexplusRF; if (!RF || !D.heat) { return null; }
+        var inp = heatInputs(D);
+        var geo = RF.prepare({ w: D.w, h: D.h, pxm: D.pxm || PXM_DEFAULT, aps: inp.aps, walls: inp.walls, opts: { vary: D.heat.nat ? RF_VARY : 0 } });
+        return RF.solve(geo, { band: heatBandOf(D), profile: D.heat.prof || RF_PROF_FALLBACK, opts: { uplink: D.heat.ul } });
+    }
+    /* Q8-6 (Claudio, 06/10/2026): cobertura por Área. Célula conta na Área
+       quando o centro está dentro; o total é a UNIÃO das Áreas (sobreposição
+       conta uma vez). Sem Área: a planta inteira. Situação pela fração com
+       voz e vídeo (−67): ≥ 80% Bom, ≥ 50% Atenção, abaixo Insuficiente. */
+    var COV_VOZ = -67, COV_NAV = -75, COV_BOM = 80, COV_ATN = 50;
+    function covSit(p) { return p >= COV_BOM ? 'Bom' : p >= COV_ATN ? 'Atenção' : 'Insuficiente'; }
+    function heatCoverage(D, g) {
+        if (!g) { return null; }
+        var zones = D.items.filter(function (i) { return i.t === 'zone'; });
+        var rects = zones.length ? zones.map(function (z) { return { label: String(z.label || '').trim() || 'Área sem nome', x: z.x, y: z.y, w: z.w, h: z.h }; })
+            : [{ label: 'Planta inteira', x: 0, y: 0, w: D.w, h: D.h }];
+        var acc = rects.map(function () { return []; }), tot = [];
+        for (var r = 0; r < g.rows; r++) {
+            var cy = (r + 0.5) * g.cellPx;
+            for (var c = 0; c < g.cols; c++) {
+                var cx = (c + 0.5) * g.cellPx, v = g.v[r * g.cols + c], any = false;
+                for (var i = 0; i < rects.length; i++) {
+                    var q = rects[i];
+                    if (cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h) { acc[i].push(v); any = true; }
+                }
+                if (any) { tot.push(v); }
+            }
+        }
+        var stat = function (label, vs) {
+            if (!vs.length) { return null; }
+            var voz = 0, nav = 0;
+            vs.forEach(function (v) { if (v >= COV_VOZ) { voz++; } if (v >= COV_NAV) { nav++; } });
+            var srt = vs.slice().sort(function (a, b) { return a - b; }), med = srt[srt.length >> 1];
+            var pv = Math.round(voz / vs.length * 100);
+            return { label: label, voz: pv, nav: Math.round(nav / vs.length * 100), med: med < -200 ? null : Math.round(med), sit: covSit(pv) };
+        };
+        var rows = rects.map(function (q, i) { return stat(q.label, acc[i]); }).filter(Boolean);
+        return { zones: zones.length > 0, rows: rows, total: zones.length > 1 ? stat('Total', tot) : null };
+    }
+    /* Parágrafo pronto para o laudo e a proposta. */
+    function heatCoverageText(D, cov) {
+        if (!cov || !cov.rows.length) { return ''; }
+        var h = D.heat || {}, prof = (h.prof || RF_PROF_FALLBACK).name, band = heatBandOf(D);
+        var aps = heatInputs(D).aps.filter(function (a) { return a.bands[band]; });
+        var mods = []; aps.forEach(function (a) { if (a.model && mods.indexOf(a.model) < 0) { mods.push(a.model); } });
+        var all = cov.total || cov.rows[0], fracas = cov.rows.filter(function (r) { return r.sit !== 'Bom'; });
+        var lista = function (rs) { var p = rs.map(function (r) { return r.label + ' (' + r.voz + '%)'; }); return p.length > 1 ? p.slice(0, -1).join(', ') + ' e ' + p[p.length - 1] : p[0]; };
+        return 'Com ' + aps.length + (aps.length === 1 ? ' AP' : ' APs') + (mods.length ? ' ' + mods.join(' e ') : '') + ', '
+            + all.voz + '% da ' + (cov.zones ? 'área avaliada' : 'planta') + ' tem sinal para voz e vídeo em ' + prof.toLowerCase() + ' (' + RF_BAND_L[band] + ')'
+            + (all.nav > all.voz ? ' e ' + all.nav + '% tem sinal para navegação' : '') + '.'
+            + (cov.zones ? (fracas.length ? ' Ficam abaixo do ideal: ' + lista(fracas) + '.' : ' Todas as Áreas ficam com sinal bom.') : '')
+            + ' Estimativa por modelo de paredes, não medição em campo.';
+    }
+
     /* Escala de cores para o documento (vai no lugar da legenda de símbolos). */
-    function heatLegendSvg(D) {
+    function heatLegendSvg(D, grid) {
         var RF = window.CodexplusRF; if (!RF) { return null; }
         var h = D.heat || cleanHeat(null), prof = h.prof || RF_PROF_FALLBACK, band = heatBandOf(D);
         var aps = heatInputs(D).aps.filter(function (a) { return a.bands[band]; });
-        var steps = RF.PALETTE.slice(0, 10), SW = 58, PAD = 14, w = PAD * 2 + steps.length * SW;
+        var steps = RF.PALETTE.slice(0, 10), SW = 66, PAD = 14, w = PAD * 2 + steps.length * SW;
         var lines = aps.slice(0, 12).map(function (a) { return (a.label || 'AP') + ': ' + (a.model || 'modelo') + ', ' + String(a.bands[band].tx).replace('.', ',') + ' dBm, ' + String(a.h).replace('.', ',') + ' m de altura'; });
         if (aps.length > 12) { lines.push('e mais ' + (aps.length - 12) + ' APs'); }
-        var hgt = 150 + lines.length * 17 + (D.pxm ? 0 : 17);
+        // Q8-6: tabela de cobertura por Área, abaixo dos APs.
+        var cov = D.heat && D.heat.on !== false ? heatCoverage(D, grid || heatGridOf(D)) : null;
+        var crow = cov ? cov.rows.slice(0, 15).concat(cov.total ? [cov.total] : []) : [];
+        var hgt = 150 + lines.length * 17 + (D.pxm ? 0 : 17) + (crow.length ? 44 + crow.length * 18 + (cov.rows.length > 15 ? 18 : 0) : 0);
         var t = function (x, y, txt, sz, bold, col) { return '<text x="' + x + '" y="' + y + '" font-family="Arial,sans-serif" font-size="' + (sz || 12) + '"' + (bold ? ' font-weight="bold"' : '') + ' fill="' + (col || '#1d2330') + '">' + esc(txt) + '</text>'; };
         var g = t(PAD, 22, 'Mapa de calor Wi-Fi', 14, true)
             + t(PAD, 40, prof.name + ' · ' + RF_BAND_L[band] + ' · ' + (h.ul ? 'considera a volta do aparelho' : 'só o sinal do AP para o aparelho'), 12, false, '#444441');
@@ -821,6 +881,20 @@
         var y = 128;
         if (!D.pxm) { y += 17; g += t(PAD, y, 'Planta sem escala medida: distâncias aproximadas.', 11, true, '#8a5300'); }
         lines.forEach(function (l, i) { g += t(PAD, y + 20 + i * 17, (i === 0 ? 'APs — ' : '') + l, 11); });
+        if (crow.length) {
+            var ty = y + 20 + lines.length * 17 + 16, CX = [PAD, 260, 395, 515, 600], SITC = { 'Bom': '#0F6E56', 'Atenção': '#8a5300', 'Insuficiente': '#A32D2D' };
+            var cut = function (x) { x = String(x); return x.length > 30 ? x.slice(0, 29) + '…' : x; };
+            g += t(PAD, ty, 'Cobertura por Área — ' + prof.name + ', ' + RF_BAND_L[band], 12, true)
+                + ['Área', 'Voz e vídeo (≥ −67)', 'Navegação (≥ −75)', 'Sinal típico', 'Situação'].map(function (hd, i) { return t(CX[i], ty + 20, hd, 10, true, '#5F5E5A'); }).join('')
+                + '<line x1="' + PAD + '" y1="' + (ty + 25) + '" x2="' + (w - PAD) + '" y2="' + (ty + 25) + '" stroke="#c9d1db"/>';
+            crow.forEach(function (r, i) {
+                var yy = ty + 40 + i * 18, isT = r.label === 'Total' && i === crow.length - 1 && cov.total;
+                g += t(CX[0], yy, cut(r.label), 11, isT) + t(CX[1], yy, r.voz + '%', 11, isT) + t(CX[2], yy, r.nav + '%', 11, isT)
+                    + t(CX[3], yy, r.med === null ? 'sem sinal' : String(r.med).replace('-', '−') + ' dBm', 11, isT)
+                    + (isT ? '' : t(CX[4], yy, r.sit, 11, true, SITC[r.sit]));
+            });
+            if (cov.rows.length > 15) { g += t(PAD, ty + 40 + crow.length * 18, 'e mais ' + (cov.rows.length - 15) + ' Áreas', 11, false, '#5F5E5A'); }
+        }
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + (w * 2) + '" height="' + (hgt * 2) + '" viewBox="0 0 ' + w + ' ' + hgt + '">'
             + '<rect x="0.5" y="0.5" width="' + (w - 1) + '" height="' + (hgt - 1) + '" rx="4" fill="#ffffff" stroke="#c9d1db"/>' + g + '</svg>';
         return { svg: svg, W: w * 2, H: hgt * 2, n: steps.length };
@@ -4323,6 +4397,22 @@
 
         function drawProps() {
             if (org) { orgProps(); return; }
+            if (!sel.length && heat) {
+                // Q8-6: no Mapa de calor, o painel vazio mostra a cobertura por Área.
+                var cov = D.heat.on ? heatCoverage(D, heatGrid) : null, pf = (D.heat.prof || RF_PROF_FALLBACK).name;
+                var cls = { 'Bom': 'is-ok', 'Atenção': 'is-at', 'Insuficiente': 'is-ru' };
+                props.innerHTML = '<p><strong>Cobertura por Área</strong></p>'
+                    + (!D.heat.on ? '<p class="cx-board-none">Ligue o Mapa de calor para ver a cobertura.</p>'
+                    : !cov ? '<p class="cx-board-none">Calculando…</p>'
+                    : '<p class="cx-board-none">' + esc(pf) + ' · ' + RF_BAND_L[D.heat.band] + (D.heat.ul ? ' · com a volta do aparelho' : '') + '</p>'
+                        + '<table class="cx-board-cov"><tr><th>Área</th><th>Voz/vídeo</th></tr>'
+                        + cov.rows.map(function (r) { return '<tr><td>' + esc(r.label) + '</td><td class="' + cls[r.sit] + '" title="' + r.sit + ' · navegação ' + r.nav + '% · sinal típico ' + (r.med === null ? 'sem sinal' : r.med + ' dBm') + '">' + r.voz + '%</td></tr>'; }).join('')
+                        + (cov.total ? '<tr class="is-tot"><td>Total das Áreas</td><td>' + cov.total.voz + '%</td></tr>' : '') + '</table>'
+                        + (cov.zones ? '' : '<p class="cx-board-none">Sem Área desenhada: total da planta. Desenhe Áreas (Estoque, Salão…) para ver cada ambiente.</p>')
+                        + '<button type="button" class="cx-board-btn cx-board-covcopy">Copiar texto para o laudo</button>')
+                    + '<p class="cx-board-none">Selecione um AP para escolher o modelo. Atalhos: Delete exclui · Ctrl+D duplica · setas movem.</p>';
+                return;
+            }
             if (!sel.length) {
                 // Q5a-2: fluxograma não tem lista de materiais (cabos, metros).
                 props.innerHTML = (flow ? '' : materialsHtml(materials(D, null), 'Materiais deste quadro'))
@@ -4557,6 +4647,19 @@
                 var mm = props.querySelector('.cx-board-meters'), lm = linkMeters(it, get);
                 if (mm) { mm.innerHTML = 'Medido ' + fmtM(lm.measured) + '<br><strong>Total ' + fmtM(lm.total) + '</strong>'; }
             }
+        });
+        // Q8-6: copiar o parágrafo da cobertura.
+        props.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('.cx-board-covcopy'); if (!b || !heatGrid) { return; }
+            var txt = heatCoverageText(D, heatCoverage(D, heatGrid));
+            var done = function () { b.textContent = 'Texto copiado'; setTimeout(function () { b.textContent = 'Copiar texto para o laudo'; }, 2000); };
+            var fallback = function () {
+                var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (er) { /* sem cópia */ }
+                ta.remove(); done();
+            };
+            props.__lastCopy = txt;
+            if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, fallback); } else { fallback(); }
         });
         // Q8-1b: material de várias paredes de uma vez; separar parede antiga em lados.
         props.addEventListener('change', function (e) {
@@ -6094,11 +6197,12 @@
             clearTimeout(heatT);
             var RF = window.CodexplusRF;
             if (!heat || !heatEl) { return; }
-            if (!RF || !D.heat.on) { heatEl.setAttribute('display', 'none'); heatGrid = null; heatUrl = ''; heatLeg(); return; }
+            if (!RF || !D.heat.on) { heatEl.setAttribute('display', 'none'); heatGrid = null; heatUrl = ''; heatLeg(); if (!sel.length) { drawProps(); } return; }
             var inp = heatInputs(D), sig = JSON.stringify([D.w, D.h, D.pxm, D.heat.nat, inp.aps, inp.walls]);
             if (sig !== heatSig) { heatGeo = RF.prepare({ w: D.w, h: D.h, pxm: D.pxm || PXM_DEFAULT, aps: inp.aps, walls: inp.walls, opts: { vary: D.heat.nat ? RF_VARY : 0 } }); heatSig = sig; }
             heatGrid = RF.solve(heatGeo, { band: D.heat.band, profile: D.heat.prof || RF_PROF_FALLBACK, opts: { uplink: D.heat.ul } });
             heatLeg();
+            if (!sel.length) { drawProps(); }
             heatUrl = '';
             var k = Math.min(1, 1200 / Math.max(D.w, D.h)), W = Math.max(1, Math.round(D.w * k)), H = Math.max(1, Math.round(D.h * k));
             var cv = document.createElement('canvas'), g2 = null;
@@ -6126,7 +6230,7 @@
                 legBox.addEventListener('click', function () { legBox.classList.toggle('is-min'); });
                 root.querySelector('.cx-board-stage').appendChild(legBox);
             }
-            var L = D.heat.on ? heatLegendSvg(D) : null;
+            var L = D.heat.on && heatGrid ? heatLegendSvg(D, heatGrid) : null;
             legBox.hidden = !L;
             if (L) { legBox.innerHTML = '<span class="cx-board-heatleg-min">Escala ▸</span>' + L.svg.replace(/ width="\d+" height="\d+"/, ''); }
         }
@@ -6251,5 +6355,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, fromPlanta: fromPlanta, bg: function () { return bgUrl; }, heatGrid: function () { return heatGrid; }, heatUpdate: heatUpdate, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _cleanHeat: cleanHeat, _heatInputs: heatInputs, _heatLegendSvg: heatLegendSvg, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _cleanHeat: cleanHeat, _heatInputs: heatInputs, _heatLegendSvg: heatLegendSvg, _heatGridOf: heatGridOf, _heatCoverage: heatCoverage, _heatCoverageText: heatCoverageText, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

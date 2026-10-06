@@ -77,7 +77,16 @@
     var GRID = 10;
     var SNAP = 6;
     var COLORS = ['#185FA5', '#1D9E75', '#D85A30', '#534AB7', '#A32D2D', '#5F5E5A'];
-    var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma', organograma: 'Organograma' };
+    var MODES = { topologia: 'Topologia', planta: 'Planta de execução', fluxograma: 'Fluxograma', organograma: 'Organograma', calor: 'Mapa de calor Wi-Fi' };
+    /* Q8-4a (Claudio, 05/10/2026): o Mapa de calor é quadro próprio, separado
+       da Planta, mas "de planta": imagem de fundo, escala, paredes e Áreas.
+       Na paleta, só Access point; cada AP leva o rádio (rf) copiado do
+       catálogo da Configuração (WifiCatalog). A camada de cores é o Q8-4b. */
+    function isPlan(m) { return m === 'planta' || m === 'calor'; }
+    var RF_BANDS = ['24', '5', '6'];
+    var RF_BAND_L = { '24': '2,4 GHz', '5': '5 GHz', '6': '6 GHz' };
+    var RF_H_DEFAULT = 2.5;
+    var WIFI = { models: [], profiles: [], promise: null };
     // Q6b-1 (Claudio, 03/10/2026): organograma no motor. O desenho e as regras
     // (chefia, linha x cartão, arranjo) vêm de codexplus-orgdraw.js.
     function OD() { return window.CodexplusOrgDraw || null; }
@@ -712,6 +721,40 @@
     // Busca sem acento e sem maiúscula ("tecnico" acha "Técnico").
     function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
     function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+    /* Q8-4a: rádio do AP guardado no quadro (cópia do catálogo; o catálogo
+       mudar depois não mexe no documento). Sem faixa ligada = sem rádio. */
+    function rfNum(v, a, b, d) { v = parseFloat(String(v).replace(',', '.')); return isFinite(v) ? Math.max(a, Math.min(b, Math.round(v * 2) / 2)) : d; }
+    function cleanRf(r) {
+        if (!r || typeof r !== 'object') { return null; }
+        var o = { model: Math.max(0, parseInt(r.model, 10) || 0), label: String(r.label || '').slice(0, 200), std: String(r.std || '').slice(0, 8),
+            stdl: String(r.stdl || '').slice(0, 20), h: rfNum(r.h, 0.5, 30, RF_H_DEFAULT), bands: {} };
+        RF_BANDS.forEach(function (b) {
+            var x = (r.bands || {})[b];
+            if (!x || !x.on) { return; }
+            var max = rfNum(x.max, 0, 36, 20);
+            o.bands[b] = { on: true, max: max, tx: Math.min(max, rfNum(x.tx, 0, 36, max)), gain: rfNum(x.gain, -10, 20, 0) };
+        });
+        return Object.keys(o.bands).length ? o : null;
+    }
+    /* Do catálogo para o AP: potência nasce com a máxima; altura mantém a do AP. */
+    function rfFromModel(m, prev) {
+        var o = { model: m.id, label: m.label, std: m.std || '', stdl: m.std_l || '', h: prev && prev.h ? prev.h : RF_H_DEFAULT, bands: {} };
+        RF_BANDS.forEach(function (b) { var x = (m.bands || {})[b]; if (x) { o.bands[b] = { on: true, max: +x.tx, tx: +x.tx, gain: +x.gain }; } });
+        return cleanRf(o);
+    }
+    function loadWifi() {
+        if (WIFI.promise) { return WIFI.promise; }
+        if (typeof fetch !== 'function' || !BASE) { WIFI.promise = Promise.resolve(); return WIFI.promise; }
+        WIFI.promise = fetch(BASE + '/ajax/wifi.catalog.php', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : {}; })
+            .then(function (j) {
+                WIFI.models = Array.isArray(j && j.models) ? j.models : [];
+                WIFI.profiles = Array.isArray(j && j.profiles) ? j.profiles : [];
+            })
+            .catch(function () {});
+        return WIFI.promise;
+    }
     function Icons() { return window.CodexplusIcons; }
 
     /* Q4a — ícones criados na instalação. Carregados uma vez por página
@@ -794,7 +837,9 @@
     }
 
     function starter(mode) {
-        return { v: 1, mode: MODES[mode] ? mode : 'topologia', w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: true, items: [] };
+        var m = MODES[mode] ? mode : 'topologia';
+        // Mapa de calor: a legenda dele (escala de cores) vem no Q8-4b.
+        return { v: 1, mode: m, w: 1400, h: 900, bgOpacity: 0.6, pxm: 0, legend: m !== 'calor', items: [] };
     }
 
     function clean(d, mode) {
@@ -814,9 +859,9 @@
         out.pxm = Math.max(0, Math.min(1000, +d.pxm || 0));
         // Q3b: legenda abaixo do quadro. Quadro novo nasce com ela; quadro
         // gravado antes do Q3b (sem o campo) fica sem, até marcar.
-        out.legend = !!d.legend;
-        // Q8-1: camada de paredes (só Planta); quadro antigo nasce com ela à mostra.
-        if (out.mode === 'planta') { out.wallsOn = d.wallsOn === undefined ? true : !!d.wallsOn; }
+        out.legend = out.mode === 'calor' ? false : !!d.legend;
+        // Q8-1: camada de paredes (Planta e Mapa de calor); quadro antigo nasce com ela à mostra.
+        if (isPlan(out.mode)) { out.wallsOn = d.wallsOn === undefined ? true : !!d.wallsOn; }
         var pxm = out.pxm || PXM_DEFAULT;
         var src = Array.isArray(d.items) ? d.items : [];
         // Q5b: cada paleta com os seus elementos. Fluxograma: formas, texto,
@@ -854,7 +899,7 @@
                 return;
             }
             if (it && it.t === 'wall') {
-                if (out.mode !== 'planta') { return; }
+                if (!isPlan(out.mode)) { return; }
                 var wp = (Array.isArray(it.pts) ? it.pts : []).slice(0, 200).filter(function (q) { return q && isFinite(+q.x) && isFinite(+q.y); })
                     .map(function (q) { return { x: Math.round(+q.x * 10) / 10, y: Math.round(+q.y * 10) / 10 }; });
                 if (wp.length < 2) { return; }
@@ -887,6 +932,8 @@
                     var m = +c.m || (c.range ? c.range / pxm : 8);
                     n.cone = { on: !!c.on, dir: (+c.dir || 0) % 360, fov: Math.max(10, Math.min(180, +c.fov || 70)), m: Math.max(0.5, Math.min(200, Math.round(m * 2) / 2)) };
                 }
+                // Q8-4a: rádio do AP, só no Mapa de calor.
+                if (out.mode === 'calor' && n.icon === 'access-point') { var rf = cleanRf(it.rf); if (rf) { n.rf = rf; } }
             } else if (it.t === 'zone') {
                 n.w = Math.max(20, +it.w || 200); n.h = Math.max(20, +it.h || 120);
                 n.label = String(it.label || '').slice(0, 80);
@@ -1208,7 +1255,7 @@
             + (k.d ? ' stroke-dasharray="' + k.d + '"' : '') + ' stroke-linejoin="miter" stroke-linecap="square"/>';
         return h + '</g>';
     }
-    function wallsShown(data) { return data.mode === 'planta' && data.wallsOn !== false; }
+    function wallsShown(data) { return isPlan(data.mode) && data.wallsOn !== false; }
     function finder(items) {
         var map = {};
         items.forEach(function (i) { map[i.id] = i; });
@@ -1668,6 +1715,7 @@
             bgUrl = bgEl ? (bgEl.getAttribute('src') || '') : '';
         }
         var ready = loadLibrary();
+        if ((raw && raw.mode || mode) === 'calor') { ready = ready.then(loadWifi); }
         if (bgUrl) {
             if (/^blob:|^data:/.test(bgUrl) && !/docid=/.test(bgUrl)) {
                 notify(editor, 'Salve o documento antes de editar este quadro de novo: a planta ainda está sendo enviada.', 'error');
@@ -2452,7 +2500,7 @@
         var slug = String(title || (t && t.value) || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
         var d = now || new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
-        return (MODES[mode] && mode !== 'planta' ? mode : 'planta') + (slug ? '-' + slug : '')
+        return (mode === 'calor' ? 'mapa-de-calor' : MODES[mode] && mode !== 'planta' ? mode : 'planta') + (slug ? '-' + slug : '')
             + '-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.png';
     }
 
@@ -2470,6 +2518,8 @@
         var flow = D.mode === 'fluxograma';
         if (flow) { D.legend = false; D.pxm = 0; }
         var org = D.mode === 'organograma' && !!OD() && !!D.org;
+        var heat = D.mode === 'calor';
+        if (heat) { D.legend = false; }
         var saveLabel = host ? 'Salvar ' + MODES[D.mode].toLowerCase() : (node ? 'Salvar quadro' : 'Inserir no documento');
         var hist = [], redo = [], sel = [], tool = 'select', clip = null;
         var view = { z: 1, x: 40, y: 40 };
@@ -2482,10 +2532,10 @@
             + '<strong class="cx-board-title">' + esc(MODES[D.mode]) + '</strong>'
             + '<div class="cx-board-tools">'
             + '<button type="button" data-tool="select" title="Selecionar e mover (V)">Selecionar</button>'
-            + '<button type="button" data-tool="zone" title="Desenhar ' + (flow ? 'moldura' : 'zona / área') + ' (Z)">' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</button>'
+            + '<button type="button" data-tool="zone" title="Desenhar ' + (flow ? 'moldura' : 'zona / área') + ' (Z)">' + (flow ? 'Moldura' : isPlan(D.mode) ? 'Área' : 'Zona') + '</button>'
             + '<button type="button" data-tool="text" title="Texto (T)">Texto</button>'
-            + (flow ? '' : '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>'
-            + (D.mode === 'planta' ? '<button type="button" data-tool="wall" title="Parede: clique os pontos; duplo clique ou Enter termina; Esc cancela. O material vale para o mapa de calor (P)">Parede</button>' : '')
+            + (flow ? '' : (heat ? '' : '<button type="button" data-tool="duct" title="Eletrocalha / canaleta: clique os pontos; duplo clique ou Enter termina; Esc cancela (E)">Eletrocalha</button>')
+            + (isPlan(D.mode) ? '<button type="button" data-tool="wall" title="Parede: clique os pontos; duplo clique ou Enter termina; Esc cancela. O material vale para o mapa de calor (P)">Parede</button>' : '')
             + '<button type="button" data-tool="scale" title="Escala: clique em dois pontos da planta e informe a distância real">Escala</button>'
             + '<span class="cx-board-scale"></span>')
             + '<span class="cx-board-sep"></span>'
@@ -2518,7 +2568,7 @@
                 + '<button type="button" role="menuitem" data-act="expjson"><b>Guardar uma cópia do fluxo</b><span>Arquivo do Codex+ com tudo: cores, links e ícones. Serve de backup ou para levar o fluxo a outro documento.</span></button>'
                 + '<button type="button" role="menuitem" data-act="expmd"><b>Levar para uma IA</b><span>Arquivo que ChatGPT, Claude e Gemini entendem. Anexe na IA, peça os ajustes e importe a resposta de volta (o Codex+ refaz as posições).</span></button>'
                 + '</div></span>' : '')
-            + (D.mode === 'planta'
+            + (isPlan(D.mode)
                 ? '<span class="cx-board-sep"></span><button type="button" data-act="bg">' + (bgUrl ? 'Trocar planta' : 'Enviar planta') + '</button>'
                   + '<label class="cx-board-op" title="Transparência da planta">Planta <input type="range" min="10" max="100" step="5" data-act="op" value="' + Math.round(D.bgOpacity * 100) + '"></label>'
                   + '<button type="button" data-act="rot" title="Girar a planta 90° (os itens giram junto)"' + (bgUrl ? '' : ' hidden') + '>Girar planta</button>'
@@ -2532,14 +2582,14 @@
                 : '')
             + '</div>'
             + '<span class="cx-board-spacer"></span>'
-            + (flow ? '' : '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>')
+            + (flow || heat ? '' : '<label class="cx-board-op" title="Gera, ao salvar, uma imagem com os símbolos usados, logo abaixo do quadro no documento"><input type="checkbox" data-act="legend"' + (D.legend ? ' checked' : '') + '> Legenda abaixo do quadro</label>')
             + '<button type="button" data-act="png" title="Baixar o quadro como imagem PNG (como está agora, mesmo sem salvar)">Baixar PNG</button>'
             + '<button type="button" data-act="cancel">Cancelar</button>'
             + '<button type="button" data-act="save" class="cx-board-ok">' + saveLabel + '</button>'
             + '</div>'
             + '<div class="cx-board-body">'
             + '<aside class="cx-board-pal">' + (flow ? '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar forma ou ícone"></div>' : '<div class="cx-board-pal-top"><input type="search" class="cx-board-q" placeholder="Buscar ícone">'
-            + (LIB.canCreate ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
+            + (LIB.canCreate && !heat ? '<button type="button" class="cx-board-newic" title="Criar um ícone a partir de uma imagem (Super-Admin)">+ Ícone</button>' : '')
             + '</div>') + '<div class="cx-board-icons"></div></aside>'
             + '<div class="cx-board-stage"><svg class="cx-board-svg" xmlns="' + NS + '"><g class="vp">'
             + '<rect class="cx-board-paper"/><image class="cx-board-bgimg" preserveAspectRatio="none"/>'
@@ -2647,7 +2697,7 @@
             var q = (root.querySelector('.cx-board-q').value || '').trim().toLowerCase();
             var h = '';
             Object.keys(I.CATS).forEach(function (ck) {
-                var ls = I.LIST.filter(function (r) { return r[2] === ck && (!q || (r[1] + ' ' + r[3]).toLowerCase().indexOf(q) >= 0); });
+                var ls = I.LIST.filter(function (r) { return r[2] === ck && (!heat || r[0] === 'access-point') && (!q || (r[1] + ' ' + r[3]).toLowerCase().indexOf(q) >= 0); });
                 if (!ls.length) { return; }
                 h += '<div class="cx-board-cat">' + esc(I.CATS[ck].label) + '</div><div class="cx-board-grid">';
                 ls.forEach(function (r) {
@@ -2658,7 +2708,8 @@
                 h += '</div>';
             });
             root.querySelector('.cx-board-icons').innerHTML = (h || '<p class="cx-board-none">Nenhum ícone. Use o Equipamento genérico.</p>')
-                + (LIB.canCreate && I.customs().length ? '<button type="button" class="cx-board-mgic">Gerenciar ícones criados (' + I.customs().length + ')</button>' : '');
+                + (heat ? '<p class="cx-board-none">Só APs. Cabos, câmeras e os demais equipamentos ficam na Planta.</p>' : '')
+                + (LIB.canCreate && !heat && I.customs().length ? '<button type="button" class="cx-board-mgic">Gerenciar ícones criados (' + I.customs().length + ')</button>' : '');
         }
         root.querySelector('.cx-board-q').addEventListener('input', paleta);
 
@@ -4105,6 +4156,32 @@
         function field(label, key, val, ph) {
             return '<label class="cx-board-f"><span>' + label + '</span><input type="text" data-k="' + key + '" value="' + esc(val) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '></label>';
         }
+        /* Q8-4a: painel do rádio (Mapa de calor). Modelo do catálogo; potência
+           por faixa até a máxima do modelo; altura de instalação. */
+        function rfPanel(it) {
+            var R = it.rf, cur = R ? R.model : 0, known = false;
+            var opts = WIFI.models.map(function (m) {
+                if (m.id === cur) { known = true; }
+                return '<option value="' + m.id + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.label + (m.std_l ? ' (' + m.std_l + ')' : '')) + '</option>';
+            }).join('');
+            if (R && !known) { opts = '<option value="' + cur + '" selected>' + esc(R.label + ' (fora do catálogo)') + '</option>' + opts; }
+            var h = '<p class="cx-board-sub">Rádio</p>'
+                + '<label class="cx-board-f"><span>Modelo do catálogo</span><select data-rf="model"><option value="0"' + (R ? '' : ' selected') + '>Sem modelo (fica fora do mapa)</option>' + opts + '</select></label>';
+            if (!R) {
+                return h + '<p class="cx-board-none cx-board-rfwarn">' + (WIFI.models.length
+                    ? 'Sem modelo, este AP fica fora do mapa de calor.'
+                    : 'Nenhum modelo cadastrado. Cadastre em Codex+ › Configuração › Mapa de calor Wi-Fi.') + '</p>';
+            }
+            RF_BANDS.forEach(function (b) {
+                var x = R.bands[b]; if (!x) { return; }
+                h += '<label class="cx-board-f"><span>Potência ' + RF_BAND_L[b] + ' (máx. ' + fmtNum(x.max) + ' dBm)</span>'
+                    + '<input type="number" data-rf="tx" data-b="' + b + '" min="0" max="' + x.max + '" step="0.5" value="' + x.tx + '"></label>';
+            });
+            return h + '<label class="cx-board-f"><span>Altura de instalação (m)</span><input type="number" data-rf="h" min="0.5" max="30" step="0.1" value="' + R.h + '"></label>'
+                + '<p class="cx-board-none">Valores do modelo copiados para este mapa: mudar o catálogo depois não altera este documento.' + (R.label ? ' Antena de ' + esc(R.label) + ': ' + RF_BANDS.filter(function (b) { return R.bands[b]; }).map(function (b) { return fmtNum(R.bands[b].gain) + ' dBi em ' + RF_BAND_L[b]; }).join(', ') + '.' : '') + '</p>';
+        }
+        function fmtNum(v) { return String(v).replace('.', ','); }
+
         function drawProps() {
             if (org) { orgProps(); return; }
             if (!sel.length) {
@@ -4166,9 +4243,12 @@
                         + Object.keys(I.CATS).map(function (k) { return '<option value="' + k + '"' + ((it.cat || 'infra') === k ? ' selected' : '') + '>' + esc(I.CATS[k].label) + '</option>'; }).join('')
                         + '</select></label>';
                 }
+                if (heat && it.icon === 'access-point') { h += rfPanel(it); }
+                else {
                 h += field('Modelo', 'f.modelo', it.f.modelo) + field('IP', 'f.ip', it.f.ip, '10.0.0.10') + field('VLAN', 'f.vlan', it.f.vlan)
-                    + '<label class="cx-board-f"><span>Observação</span><textarea data-k="f.obs" rows="2">' + esc(it.f.obs) + '</textarea></label>'
-                    + '<label class="cx-board-f"><span>Tamanho</span><input type="range" min="24" max="120" step="4" data-k="size" value="' + it.size + '"></label>'
+                    + '<label class="cx-board-f"><span>Observação</span><textarea data-k="f.obs" rows="2">' + esc(it.f.obs) + '</textarea></label>';
+                }
+                h += '<label class="cx-board-f"><span>Tamanho</span><input type="range" min="24" max="120" step="4" data-k="size" value="' + it.size + '"></label>'
                     + (it.cone ? '' : '<label class="cx-board-f"><span>Girar (' + (it.rot || 0) + '°)</span><input type="range" min="0" max="345" step="15" data-k="rot" value="' + (it.rot || 0) + '"></label>');
                 if (it.cone) {
                     h += '<p class="cx-board-sub">Visão da câmera</p>'
@@ -4214,7 +4294,7 @@
                     + '<p class="cx-board-none cx-board-meters">Comprimento <strong>' + fmtM(wallMeters(it)) + '</strong>' + (D.pxm ? '' : ' (aproximado: sem escala)') + '</p>'
                     + '<p class="cx-board-none">Desenhe por cima das paredes da planta. A próxima parede nasce com o material escolhido aqui. Arraste o quadrado branco para mover um ponto (encaixa nos cantos das outras paredes; Alt solta). Duplo clique na parede cria um ponto; Ctrl + duplo clique no ponto apaga.</p>';
             } else if (it.t === 'zone') {
-                h += '<p><strong>' + (flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : D.mode === 'planta' ? 'Estoque' : 'VLAN 10 · Administrativo');
+                h += '<p><strong>' + (flow ? 'Moldura' : isPlan(D.mode) ? 'Área' : 'Zona') + '</strong></p>' + field('Nome', 'label', it.label, flow ? 'Etapa 1 · Triagem' : isPlan(D.mode) ? 'Estoque' : 'VLAN 10 · Administrativo');
             } else if (flow) {
                 h += '<p><strong>Texto</strong></p><label class="cx-board-f"><span>Texto</span><textarea data-k="text" rows="3">' + esc(it.text) + '</textarea></label>'
                     + '<label class="cx-board-f"><span>Tamanho da letra</span><select data-k="px">' + FS_LIST.concat([36, 48]).map(function (v) { return '<option value="' + v + '"' + (v === (it.px || TEXT_PX[it.size] || 15) ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>'
@@ -4327,6 +4407,23 @@
                 var mm = props.querySelector('.cx-board-meters'), lm = linkMeters(it, get);
                 if (mm) { mm.innerHTML = 'Medido ' + fmtM(lm.measured) + '<br><strong>Total ' + fmtM(lm.total) + '</strong>'; }
             }
+        });
+        // Q8-4a: campos do rádio (data-rf), fora do caminho genérico data-k.
+        props.addEventListener('change', function (e) {
+            var f = e.target.getAttribute && e.target.getAttribute('data-rf');
+            if (!f || sel.length !== 1) { return; }
+            var it = get(sel[0]); if (!it || it.t !== 'icon') { return; }
+            snap();
+            if (f === 'model') {
+                var id = parseInt(e.target.value, 10) || 0, m = WIFI.models.filter(function (x) { return x.id === id; })[0];
+                if (!id) { delete it.rf; } else if (m) { it.rf = rfFromModel(m, it.rf); }
+            } else if (it.rf && f === 'tx') {
+                var bx = it.rf.bands[e.target.getAttribute('data-b')];
+                if (bx) { bx.tx = Math.min(bx.max, rfNum(e.target.value, 0, 36, bx.tx)); }
+            } else if (it.rf && f === 'h') {
+                it.rf.h = rfNum(e.target.value, 0.5, 30, it.rf.h);
+            }
+            paint(); drawSel(); drawProps();
         });
         props.addEventListener('change', function (e) {
             props.__snap = false;
@@ -4852,7 +4949,7 @@
             } else if (tool === 'zone') {
                 snap();
                 var z = { id: uid(), t: 'zone', x: Math.round(p.x / GRID) * GRID, y: Math.round(p.y / GRID) * GRID, w: 20, h: 20,
-                    label: flow ? 'Moldura' : D.mode === 'planta' ? 'Área' : 'Zona', color: COLORS[D.items.filter(function (i) { return i.t === 'zone'; }).length % COLORS.length], lock: false, g: '' };
+                    label: flow ? 'Moldura' : isPlan(D.mode) ? 'Área' : 'Zona', color: COLORS[D.items.filter(function (i) { return i.t === 'zone'; }).length % COLORS.length], lock: false, g: '' };
                 D.items.push(z); sel = [z.id];
                 drag = { k: 'zone', id: z.id, ox: z.x, oy: z.y };
             } else if (tool === 'text') {
@@ -5336,8 +5433,8 @@
             if (k === 'v') { tool = 'select'; render(); return; }
             if (k === 'z') { tool = 'zone'; render(); return; }
             if (k === 't') { tool = 'text'; render(); return; }
-            if (k === 'e' && !flow) { tool = 'duct'; ductDraft = null; render(); return; }
-            if (k === 'p' && D.mode === 'planta') { tool = 'wall'; ductDraft = null; render(); return; }
+            if (k === 'e' && !flow && !heat) { tool = 'duct'; ductDraft = null; render(); return; }
+            if (k === 'p' && isPlan(D.mode)) { tool = 'wall'; ductDraft = null; render(); return; }
             if (k === 'r') { act('rotate'); return; }
             var mv = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }[k];
             if (mv && sel.length) {
@@ -5812,14 +5909,82 @@
         // Ligações feitas no Q2a nasceram sem número: numera ao abrir.
         if (!flow) { D.items.forEach(function (i) { if (i.t === 'link' && !i.cable) { i.cable = nextCable(D.items); } }); }
 
+        /* Q8-4a: Mapa de calor vazio pergunta como começar. "Trazer da Planta"
+           copia fundo, escala, paredes, Áreas e APs (nome e posição) de uma
+           Planta do documento; depois os dois quadros ficam independentes. */
+        function plantasDoc() {
+            var body = editor && editor.getBody && editor.getBody();
+            if (!body) { return []; }
+            return Array.prototype.filter.call(body.querySelectorAll('span.cx-board'), function (b) {
+                try { return (JSON.parse(b.getAttribute('data-cx-board') || 'null') || {}).mode === 'planta'; } catch (e) { return false; }
+            });
+        }
+        function fromPlanta(pn) {
+            var pd = null; try { pd = JSON.parse(pn.getAttribute('data-cx-board') || 'null'); } catch (e) { pd = null; }
+            pd = clean(pd, 'planta');
+            var be = bgOf(pn), src = be ? (be.getAttribute('src') || '') : '';
+            if (src && /^blob:|^data:/.test(src) && !/docid=/.test(src)) {
+                notify(editor, 'Salve o documento antes: a imagem dessa Planta ainda está sendo enviada.', 'error');
+                return Promise.resolve(false);
+            }
+            snap();
+            D.w = pd.w; D.h = pd.h; D.pxm = pd.pxm; D.bgOpacity = pd.bgOpacity; D.wallsOn = pd.wallsOn !== false;
+            var n = 0;
+            pd.items.forEach(function (i) {
+                if (i.t !== 'wall' && i.t !== 'zone' && !(i.t === 'icon' && i.icon === 'access-point')) { return; }
+                var c = clone(i); c.id = uid(); c.g = ''; delete c.rf;
+                D.items.push(c); n++;
+            });
+            var wc = root.querySelector('[data-act="walls"]'); if (wc) { wc.checked = D.wallsOn; }
+            var done = function () { render(); fit(); return true; };
+            if (!src) { return Promise.resolve(done()); }
+            return urlToDataUrl(src).then(function (u) {
+                bgUrl = u; bgChanged = true;
+                root.querySelector('[data-act="bg"]').textContent = 'Trocar planta';
+                root.querySelector('[data-act="bgdel"]').hidden = false;
+                root.querySelector('[data-act="rot"]').hidden = false;
+                return done();
+            }).catch(function () {
+                notify(editor, 'Não foi possível copiar a imagem da Planta. O resto veio; use Enviar planta para pôr a imagem.', 'error');
+                return done();
+            });
+        }
+        function startChooser() {
+            if (!heat || D.items.length || bgUrl) { return; }
+            var ps = plantasDoc();
+            var box = document.createElement('div');
+            box.className = 'cx-board-start';
+            var resumo = function (b) {
+                var d = null; try { d = JSON.parse(b.getAttribute('data-cx-board') || 'null'); } catch (e) { d = null; }
+                var it = (d && d.items) || [], c = function (f) { return it.filter(f).length; };
+                var aps = c(function (i) { return i.t === 'icon' && i.icon === 'access-point'; }), ws = c(function (i) { return i.t === 'wall'; });
+                return aps + (aps === 1 ? ' AP' : ' APs') + ', ' + ws + (ws === 1 ? ' parede' : ' paredes') + (bgOf(b) ? ', com imagem' : ', sem imagem');
+            };
+            box.innerHTML = '<div class="cx-board-start-card"><p class="cx-board-start-t">Como começar?</p>'
+                + '<p class="cx-board-none">' + (ps.length ? 'Este documento tem ' + ps.length + (ps.length === 1 ? ' Planta.' : ' Plantas.') : 'Este documento ainda não tem Planta.') + '</p>'
+                + ps.map(function (b, i) {
+                    return '<button type="button" class="cx-board-start-op is-main" data-from="' + i + '"><b>Trazer da Planta ' + (ps.length > 1 ? (i + 1) : '') + '</b>'
+                        + '<span>' + esc(resumo(b)) + '. Copia a imagem, a escala, as paredes, as Áreas e os APs; depois os dois quadros ficam independentes.</span></button>';
+                }).join('')
+                + '<button type="button" class="cx-board-start-op" data-from="-1"><b>Começar do zero</b><span>Enviar uma planta e marcar a escala.</span></button></div>';
+            root.querySelector('.cx-board-stage').appendChild(box);
+            box.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-from]'); if (!b) { return; }
+                var i = +b.getAttribute('data-from');
+                box.remove();
+                if (i >= 0 && ps[i]) { fromPlanta(ps[i]); }
+            });
+        }
+
         paleta();
         render();
         setTimeout(fit, 0);
+        startChooser();
 
         // Exposto para os testes (jsdom).
         root.__cx = { data: function () { return D; }, sel: function () { return sel; }, act: act, addIcon: addIcon, addShape: addShape, quickAdd: quickAdd, alignSel: alignSel, mini: function () { return mini; }, miniOpen: miniOpen, editStart: editStart, editEnd: editEnd, setTool: function (t) { tool = t; },
-            setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
+            setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, fromPlanta: fromPlanta, bg: function () { return bgUrl; }, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

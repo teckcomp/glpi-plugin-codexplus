@@ -86,6 +86,7 @@
          PRP           -> + Planilha e Planta
          LAU, DTC      -> + Planta e Topologia
          DIV           -> tudo
+         Mapa de calor (Q8-4a) -> PRP, LAU, DTC e DIV
        (DIA tem editor próprio e não usa este corpo.) Tipo fora da tabela ou
        ainda não escolhido mostra tudo. Esconder o botão não mexe no que já
        está no texto: planilha e quadro existentes continuam abrindo com
@@ -96,7 +97,8 @@
         cxsheet:    ['PRP', 'DIV'],
         cxsum:      ['PRP', 'DIV'], // 3c-2: Resumo do investimento
         cxplant:    ['PRP', 'LAU', 'DTC', 'DIV'],
-        cxtopology: ['LAU', 'DTC', 'DIV']
+        cxtopology: ['LAU', 'DTC', 'DIV'],
+        cxheat:     ['PRP', 'LAU', 'DTC', 'DIV']
     };
     var KNOWN_TYPES = ['POP', 'PSG', 'MAN', 'PRP', 'LAU', 'DTC', 'DIV'];
     function toolAllowed(btn, type) {
@@ -191,12 +193,13 @@
     var PH_KINDS = [
         { key: 'imagem',    label: 'Imagem',    text: 'Imagem aqui',    tool: '' },
         { key: 'planta',    label: 'Planta',    text: 'Planta aqui',    tool: 'cxplant' },
-        { key: 'topologia', label: 'Topologia', text: 'Topologia aqui', tool: 'cxtopology' }
+        { key: 'topologia', label: 'Topologia', text: 'Topologia aqui', tool: 'cxtopology' },
+        { key: 'calor',     label: 'Mapa de calor', text: 'Mapa de calor aqui', tool: 'cxheat' }
     ];
     var PH_CSS = '.cx-ph{display:inline-block;box-sizing:border-box;min-width:240px;max-width:100%;padding:28px 18px;margin:4px 0;'
         + 'border:2px dashed #9aa7b6;border-radius:6px;background-color:#f6f8fa;color:#5f6b7a;font-style:italic;text-align:center;'
         + '-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
-        + '.cx-ph-planta,.cx-ph-topologia{min-width:360px;padding:48px 18px;}';
+        + '.cx-ph-planta,.cx-ph-topologia,.cx-ph-calor{min-width:360px;padding:48px 18px;}';
     function placeholderHtml(kind, text) {
         var k = PH_KINDS.filter(function (x) { return x.key === kind; })[0] || PH_KINDS[0];
         var t = String(text || '').replace(/[\r\n]+/g, ' ').trim() || k.text;
@@ -696,6 +699,17 @@
                 window.CodexplusBoard.open(editor, b);
             }
         });
+        // Q8-4a: Mapa de calor Wi-Fi, quadro próprio (separado da Planta).
+        ui.addButton('cxheat', {
+            icon: 'highlight-bg-color',
+            text: 'Mapa de calor',
+            tooltip: 'Mapa de calor Wi-Fi: a cobertura do sinal para o cliente, separado da Planta. Duplo clique num quadro edita.',
+            onAction: function () {
+                if (!toolAllowed('cxheat', currentType(editor))) { return; }
+                rememberPh(editor);
+                if (window.CodexplusBoard) { window.CodexplusBoard.open(editor, null, 'calor'); }
+            }
+        });
         ['topologia', 'planta'].forEach(function (m) {
             ui.addButton(m === 'planta' ? 'cxplant' : 'cxtopology', {
                 icon: m === 'planta' ? 'home' : 'code-sample',
@@ -830,7 +844,7 @@
         if (layout === 'classic') {
             // Sem cor e tamanho livres (padronização, Claudio 22/09/2026).
             cfg.toolbar = 'cxstyles | cxsizesm cxsizemd cxsizelg | bold italic underline cxcolor cxmark'
-                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? ' cxph' : ' cxtopology cxplant') + ' link' + (isTpl ? '' : ' cxdocref cxinsertimage cxannotate') + ' | cximport | code fullscreen';
+                + ' | bullist numlist outdent indent | table cxsheet cxsum' + (isTpl ? ' cxph' : ' cxtopology cxplant cxheat') + ' link' + (isTpl ? '' : ' cxdocref cxinsertimage cxannotate') + ' | cximport | code fullscreen';
         } else if (typeof cfg.quickbars_selection_toolbar === 'string') {
             cfg.quickbars_selection_toolbar = 'bold italic cxcolor cxmark | cxstyles | cxsizesm cxsizemd cxsizelg';
             if (typeof cfg.quickbars_insert_toolbar === 'string') {

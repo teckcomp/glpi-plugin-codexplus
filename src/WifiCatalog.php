@@ -419,6 +419,40 @@ class WifiCatalog
         return false;
     }
 
+    /**
+     * Q8-4a: o que o quadro Mapa de calor precisa, enxuto (ajax/wifi.catalog.php).
+     * Faixas com chave texto ('24', '5', '6'), só as que existem.
+     */
+    public static function forBoard(): array
+    {
+        $bandsOf = static function (array $bands, bool $withGain): array {
+            $o = [];
+            foreach ($bands as $b => $v) {
+                if (!$v['on']) {
+                    continue;
+                }
+                $o[(string) $b] = $withGain ? ['tx' => $v['tx'], 'gain' => $v['gain']] : ['tx' => $v['tx']];
+            }
+            return $o;
+        };
+        return [
+            'models' => array_map(static fn ($m) => [
+                'id'    => $m['id'],
+                'label' => $m['label'],
+                'std'   => $m['standard'],
+                'std_l' => $m['standard_lbl'],
+                'bands' => $bandsOf($m['bands'], true),
+            ], self::models()),
+            'profiles' => array_map(static fn ($p) => [
+                'id'      => $p['id'],
+                'name'    => $p['name'],
+                'gain'    => $p['gain'],
+                'default' => $p['is_default'],
+                'bands'   => $bandsOf($p['bands'], false),
+            ], self::profiles()),
+        ];
+    }
+
     private static function now(): string
     {
         return $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s');

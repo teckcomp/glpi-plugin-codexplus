@@ -224,6 +224,7 @@ class Template extends CommonDBTM
         'imagem'    => 'Imagem aqui',
         'planta'    => 'Planta aqui',
         'topologia' => 'Topologia aqui',
+        'calor'     => 'Mapa de calor aqui',
         'quadro'    => 'Quadro aqui',
     ];
 
@@ -294,7 +295,7 @@ class Template extends CommonDBTM
         foreach (iterator_to_array($xp->query('.//span[' . $cls('cx-board') . ']', $root)) as $b) {
             $data = json_decode((string) $b->getAttribute('data-cx-board'), true);
             $mode = is_array($data) ? (string) ($data['mode'] ?? '') : '';
-            $swap($b, in_array($mode, ['planta', 'topologia'], true) ? $mode : 'quadro');
+            $swap($b, in_array($mode, ['planta', 'topologia', 'calor'], true) ? $mode : 'quadro');
         }
         // 3. Prints anotados.
         foreach (iterator_to_array($xp->query('.//span[' . $cls('cx-annot') . ']', $root)) as $a) {

@@ -1282,6 +1282,16 @@
 .cx-docbrand select { flex: 1 1 auto; min-width: 0; }
 /* Q8-2: mapa de calor — modelos de AP e perfis de aparelho (mesma base das marcas). */
 .cx-wifi-sub { margin-top: 18px; }
+/* Q8-4a: Mapa de calor — "Como começar?" e aviso do AP sem modelo. */
+.cx-board-start { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(246, 248, 250, .82); z-index: 5; }
+.cx-board-start-card { width: min(380px, 92%); background: #fff; border: 1px solid var(--cx-border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 6px 24px rgba(16, 24, 40, .08); }
+.cx-board-start-t { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--cx-text); }
+.cx-board-start-op { display: block; width: 100%; text-align: left; margin-top: 10px; padding: 10px 12px; background: #fff; border: 1px solid var(--cx-border); border-radius: 8px; cursor: pointer; font: inherit; color: var(--cx-text); }
+.cx-board-start-op.is-main { border: 1.5px solid var(--cx-accent); }
+.cx-board-start-op:hover { background: var(--cx-accent-soft); }
+.cx-board-start-op b { display: block; font-size: 13px; font-weight: 600; }
+.cx-board-start-op span { display: block; margin-top: 3px; font-size: 12px; color: var(--cx-muted); }
+.cx-board-rfwarn { color: #8a5300; background: #fff6e5; border-radius: 6px; padding: 6px 8px; }
 .cx-wifi-sub h4 { margin: 0; font-size: 13px; font-weight: 600; }
 .cx-wifi-btns { display: inline-flex; gap: 8px; align-items: center; }
 .cx-wifi-btns form { margin: 0; }

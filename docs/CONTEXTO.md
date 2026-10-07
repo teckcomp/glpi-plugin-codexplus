@@ -9,7 +9,8 @@
 > cálculo `codexplus-rf.js` (Q8-3), quadro próprio **Mapa de calor** (Q8-4a),
 > camada de cores na escala do Cambium (Q8-4b) e cobertura por Área com
 > texto para laudo (Q8-6). **Q8-5 (calibração) aguarda mapas do Cambium.**
-> Achados 164 a 170.
+> Achados 164 a 170. **Mudança de rumo (06/10):** Q8-5, Q5i-5 e Q5i-6
+> para a Pós-produção; a Reta final fica só com o **F-0**.
 > Antes:
 > Estado: **`v0.7.14`** · último commit de código **`7cc27fe`** ·
 > atualizado em **04/10/2026 (noite)**: **Q5k ✅** (`04ea10c`) — texto
@@ -2817,9 +2818,19 @@ Claudio aprovou todos na homologação.
 
 #### Pendente
 
-- **Q8-5 — calibração:** aguarda 3 a 5 mapas do Cambium de outras lojas
-  (planta, modelo, potência, altura, faixa, medida conhecida); ajusta a
-  margem e, com paredes desenhadas no Cambium, as perdas por material.
+- **Q8-5 — calibração:** **Pós-produção** (Claudio, 06/10/2026). Aguarda 3
+  a 5 mapas do Cambium de outras lojas (planta, modelo, potência, altura,
+  faixa, medida conhecida); ajusta a margem e, com paredes desenhadas no
+  Cambium, as perdas por material.
+
+#### Mudança de rumo (Claudio, 06/10/2026)
+
+- **Q5i-5 (`.bpmn`) e Q5i-6 (draw.io) saem da Reta final** para a
+  Pós-produção: o importar e exportar em Mermaid (Q5i), com a IA montando o
+  fluxo, já cobre o uso real, inclusive trazer modelos de processo prontos
+  (a IA converte de qualquer fonte). Só voltam se um cliente chegar com
+  arquivos do Bizagi, Camunda ou draw.io.
+- Com isso, a Reta final fica só com o **F-0**.
 - Antena direcional, sobreposição de canais e mapa por AP: Pós-produção.
 
 ## 4. Decisões de arquitetura que já custaram caro

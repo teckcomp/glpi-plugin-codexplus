@@ -4,7 +4,10 @@
 > **Q8 ✅ — mapa de calor Wi-Fi** (06/10/2026): Q8-1 paredes, Q8-1b lados,
 > Q8-2 catálogo (0.7.15), Q8-3 motor, Q8-4a quadro próprio, Q8-4b camada,
 > Q8-6 cobertura por Área. **Q8-5 (calibração) aguarda mapas do Cambium.**
-> Próximo: **Q5i-5**.
+> **Mudança de rumo (Claudio, 06/10/2026):** Q8-5, Q5i-5 (`.bpmn`) e
+> Q5i-6 (draw.io) saem da Reta final para a **Pós-produção**. O importar e
+> exportar em Mermaid, com a IA montando o fluxo, já cobre trazer modelos
+> prontos. Próximo: **F-0**.
 > Antes:
 > Estado em **`v0.7.14`** (último commit de código **`7cc27fe`**) ·
 > **Q5k ✅** (`04ea10c`), **7a ✅** (`e04c5d0`, 0.7.13) e **7b ✅**
@@ -240,9 +243,9 @@ números entre parênteses são os da lista revisada de 04/10.
 | 7 | ~~**Q5k**~~ ✅ `04ea10c` | Fluxograma: **texto solto** com largura e quebra (alças laterais) (23) + **"…"** na mini-paleta com todas as formas e busca (24) + quebra pela largura real da letra | não (só JS) | — |
 | 8 | ~~**7a**~~ ✅ `e04c5d0` | **Etapa 7** — ação automática diária `codexplusexpiry`, marcas de "já avisado" por ciclo (6) | **sim** (0.7.13) | — |
 | 9 | ~~**7b**~~ ✅ `7cc27fe` | **Etapa 7** — notificação nativa do GLPI (3 eventos, responsável/revisor/auditor, modelo em português); desligada na Teckcomp (6) | **sim** (0.7.14) | — |
-| 10 | ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` | **Mapa de calor Wi-Fi** (14), quadro próprio: Q8-1 paredes, Q8-1b lados, Q8-2 catálogo, Q8-3 motor, Q8-4a quadro, Q8-4b camada, Q8-6 cobertura por Área. **Q8-5 calibração pendente** (aguarda mapas do Cambium) | **sim** no Q8-2 (0.7.15) | — |
-| 11 | **Q5i-5** | Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda) (25) | não | arquivo de exemplo |
-| 12 | **Q5i-6** | Fluxograma: importar **draw.io** (XML, com posições) (26) | não | arquivo de exemplo |
+| 10 | ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` | **Mapa de calor Wi-Fi** (14), quadro próprio: Q8-1 paredes, Q8-1b lados, Q8-2 catálogo, Q8-3 motor, Q8-4a quadro, Q8-4b camada, Q8-6 cobertura por Área. Q8-5 (calibração) → Pós-produção | **sim** no Q8-2 (0.7.15) | — |
+| 11 | ~~**Q5i-5**~~ → Pós-produção | Fluxograma: `.bpmn` (25). Saiu em 06/10: o Mermaid pela IA já resolve | — | — |
+| 12 | ~~**Q5i-6**~~ → Pós-produção | Fluxograma: draw.io (26). Saiu em 06/10, mesmo motivo | — | — |
 | 13 | **F-0** | Fechamento: versão **0.8.0** com tag `v0.8.0`, **instalação do zero** numa instância limpa (como em 28/09, achado 92), docs | sim (versão) | — |
 
 **Produção (depois do F-0):**
@@ -752,6 +755,11 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 
 **Roadmap:**
 
+- **Q8-5 — calibração do mapa de calor** pelos mapas do Cambium de outras
+  lojas (3 a 5, cada um com planta, modelo, potência, altura, faixa e uma
+  medida conhecida): ajusta a margem e as perdas por material
+- **Q5i-5 / Q5i-6 — `.bpmn` e draw.io** (só se algum cliente chegar com
+  arquivos do Bizagi, Camunda ou draw.io; hoje a IA converte para Mermaid)
 - **Mapa de calor — depois do Q8:** antena direcional, sobreposição de
   canais, mapa por AP; **câmeras (DORI)** — o cone que já existe na Planta
   vira faixas de detectar, observar, reconhecer e identificar pela
@@ -844,13 +852,11 @@ marco; "apagar `documenteditors`" (a tabela está em uso).
 - [x] **Q8 (mapa de calor):** quadro próprio, separado da Planta, com
       modelo multiparede, ida e volta do aparelho e escala do Cambium
       (Claudio, 04 a 06/10/2026; CONTEXTO 3.26)
-- [ ] **Q8-5 (calibração):** 3 a 5 mapas do Cambium de outras lojas, cada
-      um com planta, modelo do AP, potência, altura, faixa e uma medida
-      conhecida. Decidir com Claudio se entra antes do F-0 ou se vai para a
-      Pós-produção (a margem de 12 dB já reproduz a LOJ0687)
-- [ ] **Q5i-5/Q5i-6:** arquivo `.bpmn` e `.drawio` de exemplo. Sem
-      arquivo real, a validação usa exemplos públicos (bpmn.io, draw.io) —
-      o risco é o arquivo do primeiro cliente trazer algo que eles não têm
+- [x] **Q8-5 (calibração):** vai para a Pós-produção (Claudio,
+      06/10/2026); a margem de 12 dB já reproduz a LOJ0687
+- [x] **Q5i-5/Q5i-6:** saem da Reta final (Claudio, 06/10/2026): o
+      importar e exportar em Mermaid, com a IA montando o fluxo, já cobre o
+      uso real, inclusive trazer modelos de processo prontos
 
 - [ ] **Logo definitiva** — arquivo original (vetor ou PNG grande da versão
       escura). A enviada em 09/2026 era prévia do remove.bg: 487×92 px úteis,

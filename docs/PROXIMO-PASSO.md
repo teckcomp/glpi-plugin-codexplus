@@ -1,7 +1,8 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 06/10/2026, depois do **Q8 ✅** (`aef34d4`).
+> Gerado em 06/10/2026, depois do **Q8 ✅** (`aef34d4`) e da mudança de
+> rumo: Q8-5, Q5i-5 e Q5i-6 para a Pós-produção.
 
 ## Estado
 
@@ -67,23 +68,18 @@
 7. ~~**Q5k**~~ ✅ `04ea10c` — texto solto com largura; "…" na mini-paleta; quebra pela largura real
 8. ~~**7a**~~ ✅ `e04c5d0` — ação automática diária e marcas (0.7.13)
 9. ~~**7b**~~ ✅ `7cc27fe` — notificação nativa (0.7.14)
-10. ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` — mapa de calor Wi-Fi (Q8-5 calibração pendente)
-11. **Q5i-5** — `.bpmn`
-12. **Q5i-6** — draw.io
+10. ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` — mapa de calor Wi-Fi (Q8-5 → Pós-produção)
+11. ~~**Q5i-5**~~ → Pós-produção (06/10: o Mermaid pela IA já resolve)
+12. ~~**Q5i-6**~~ → Pós-produção (mesmo motivo)
 13. **F-0** — 0.8.0, tag, instalação do zero, docs → **P-1 a P-4** (produção)
 
 ## Próximo passo imediato
 
-**Q5i-5** — Fluxograma: importar e exportar **`.bpmn`** (Bizagi, Camunda)
-(ROADMAP, Reta final, linha 11). Clonar o `master` do GitHub (`aef34d4` +
-docs). **Antes de codar: pedir a Claudio arquivos `.bpmn` de exemplo**
-(Bizagi e Camunda). Sem eles, validar com exemplos públicos (bpmn.io) e
-avisar o risco. Depois: **Q5i-6** (draw.io, mesmo pedido de arquivo).
-
-**Pendência do Q8:** **Q8-5 (calibração)** aguarda 3 a 5 mapas do Cambium
-de outras lojas (planta, modelo, potência, altura, faixa, medida
-conhecida). Confirmar com Claudio se entra antes do F-0 ou vai para a
-Pós-produção. A conversão cor → dBm do mapa do Cambium está no achado 169.
+**F-0** — fechamento antes da produção (ROADMAP, Reta final, linha 13):
+versão **0.8.0** no `setup.php` (reinstalação), tag `v0.8.0`, **instalação
+do zero** numa instância limpa conferida pelo `information_schema` contra a
+homologação atualizada (achado 92), docs. Depois: **P-1 a P-4** (produção,
+Debian 13, SSH 2022).
 
 Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
 `setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar

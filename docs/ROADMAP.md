@@ -1,5 +1,9 @@
 # Codex+ — roadmap
 
+> Estado em **`v0.8.0`** · tag **`v0.8.0`** · **F-0 ✅ (06/10/2026): Reta
+> final fechada.** Instalação do zero idêntica à homologação (23 tabelas,
+> 209 colunas, 98 índices). Próximo: **P-1** (produção).
+> Antes:
 > Estado em **`v0.7.15`** (último commit de código **`aef34d4`**) ·
 > **Q8 ✅ — mapa de calor Wi-Fi** (06/10/2026): Q8-1 paredes, Q8-1b lados,
 > Q8-2 catálogo (0.7.15), Q8-3 motor, Q8-4a quadro próprio, Q8-4b camada,
@@ -246,7 +250,7 @@ números entre parênteses são os da lista revisada de 04/10.
 | 10 | ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` | **Mapa de calor Wi-Fi** (14), quadro próprio: Q8-1 paredes, Q8-1b lados, Q8-2 catálogo, Q8-3 motor, Q8-4a quadro, Q8-4b camada, Q8-6 cobertura por Área. Q8-5 (calibração) → Pós-produção | **sim** no Q8-2 (0.7.15) | — |
 | 11 | ~~**Q5i-5**~~ → Pós-produção | Fluxograma: `.bpmn` (25). Saiu em 06/10: o Mermaid pela IA já resolve | — | — |
 | 12 | ~~**Q5i-6**~~ → Pós-produção | Fluxograma: draw.io (26). Saiu em 06/10, mesmo motivo | — | — |
-| 13 | **F-0** | Fechamento: versão **0.8.0** com tag `v0.8.0`, **instalação do zero** numa instância limpa (como em 28/09, achado 92), docs | sim (versão) | — |
+| 13 | ~~**F-0**~~ ✅ tag `v0.8.0` | Fechamento: versão **0.8.0**, **instalação do zero** conferida pelo `information_schema` (23 tabelas, 209 colunas, 98 índices iguais à homologação), docs | sim (versão) | — |
 
 **Produção (depois do F-0):**
 

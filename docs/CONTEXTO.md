@@ -2,6 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.0`** · tag **`v0.8.0`** · atualizado em **06/10/2026**:
+> **F-0 ✅ — Reta final fechada** (seção 3.27). Instalação do zero conferida
+> contra a homologação pelo `information_schema`: **23 tabelas, 209
+> colunas e 98 índices idênticos**. Próximo: **P-1** (produção). Achado 171.
+> Antes:
 > Estado: **`v0.7.15`** · último commit de código **`aef34d4`** ·
 > atualizado em **06/10/2026**: **Q8 ✅ — mapa de calor Wi-Fi** (seção
 > 3.26): paredes com material na Planta (Q8-1, Q8-1b), catálogo de modelos
@@ -2833,6 +2838,37 @@ Claudio aprovou todos na homologação.
 - Com isso, a Reta final fica só com o **F-0**.
 - Antena direcional, sobreposição de canais e mapa por AP: Pós-produção.
 
+### 3.27 F-0 — fechamento da Reta final (`v0.8.0`, 06/10/2026)
+
+- **Versão 0.8.0** no `setup.php` (só ela muda), reinstalada na
+  homologação; **tag `v0.8.0`** no commit que leva também estes docs. A
+  produção (P-2) instala por `git clone --branch v0.8.0`.
+- **Instalação do zero no container:** GLPI 11.0.6 novo
+  (`database:install --reconfigure`), Codex+ do `master` com 0.8.0,
+  `plugin:install` e `plugin:activate` sem erro; catálogo do mapa de calor
+  vazio e a ação automática `codexplusexpiry` registrada. Fumaça no
+  Chromium com login: Painel, Biblioteca, Modelos, Configuração e documento
+  novo abrem; Planta, Topologia e Mapa de calor abrem no editor;
+  `CodexplusRF.selfTest()` ok; log de erros PHP vazio.
+- **Conferência do banco (achado 92):** colunas (tabela, coluna, tipo, nulo,
+  padrão) e índices (tabela, índice, colunas, único) das tabelas
+  `glpi_plugin_codexplus%`, tirados do `information_schema` nos dois
+  bancos e comparados por `diff`: **23 tabelas, 209 colunas e 98 índices,
+  sem nenhuma diferença**. O banco da homologação, que passou por todas as
+  atualizações desde a 0.6, chega ao mesmo resultado do instalador novo
+  (homologação: PHP 8.4, MariaDB 11.8; container: PHP 8.3, MariaDB 10.11 —
+  mesma saída).
+- Comandos da conferência, para repetir em produção depois do P-2:
+
+```bash
+DBN=$(grep -oP "dbdefault\s*=\s*'\K[^']+" /var/www/html/glpi/config/config_db.php)
+mysql -N "$DBN" -e "SELECT table_name, column_name, column_type, is_nullable, IFNULL(column_default,'NULL') FROM information_schema.columns WHERE table_schema='$DBN' AND table_name LIKE 'glpi\_plugin\_codexplus%' ORDER BY 1,2" > /tmp/cx-colunas.txt
+mysql -N "$DBN" -e "SELECT table_name, index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index), non_unique FROM information_schema.statistics WHERE table_schema='$DBN' AND table_name LIKE 'glpi\_plugin\_codexplus%' GROUP BY 1,2,4 ORDER BY 1,2" > /tmp/cx-indices.txt
+```
+
+- Reta final, resumo: HV-1, AP-1, MO-1, MO-2, Q7c-1, Q7c-2, Q5k, 7a, 7b e
+  Q8 feitos; Q8-5, Q5i-5 e Q5i-6 para a Pós-produção (06/10).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3653,6 +3689,10 @@ depender do comportamento errático de `position: fixed` na impressão.
     cadastrado um perfil "Access Point" (potência e ganho de AP): o mapa saiu
     vermelho em toda a loja. Por isso as referências (Celular, Notebook…)
     ficam sempre na lista do quadro, mesmo sem cadastro.
+171. **`scp` do servidor para o Windows: sem barra antes da aspa.** No cmd,
+    `"%USERPROFILE%\Downloads\"` faz o `\"` virar parte do nome
+    (`open local "C:/Users/Pc/Downloads"": No such file`). Usar o caminho
+    com o nome do arquivo: `"%USERPROFILE%\Downloads\cx-colunas.txt"`.
 
 ## 6. Contrato de código — não quebrar
 

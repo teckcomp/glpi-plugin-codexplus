@@ -1,13 +1,13 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 06/10/2026, depois do **Q8 ✅** (`aef34d4`) e da mudança de
-> rumo: Q8-5, Q5i-5 e Q5i-6 para a Pós-produção.
+> Gerado em 06/10/2026, depois do **F-0 ✅** (tag `v0.8.0`): Reta final
+> fechada; próximo é a **produção (P-1)**.
 
 ## Estado
 
-- Versão: **`0.7.15`**; último commit de código **`aef34d4`** (Q8-6); docs
-  neste pacote. Plugin 0.7.15 habilitado na homologação. Catálogo do mapa
+- Versão: **`0.8.0`**, tag **`v0.8.0`** (commit do F-0 com estes docs).
+  Plugin 0.8.0 habilitado na homologação. Catálogo do mapa
   de calor com o XV2-2X e os perfis de referência. Ação automática
   `codexplusexpiry` ativa; notificações por e-mail **desligadas** na
   homologação (Claudio: a Teckcomp não usa; pronto para terceiros).
@@ -35,8 +35,8 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.26, achados
-  até 170) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.27, achados
+  até 171) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
   **"Pós-produção"** e "Decisões pendentes → Da Reta final".
 
 ## Regras de trabalho (Claudio)
@@ -71,15 +71,19 @@
 10. ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` — mapa de calor Wi-Fi (Q8-5 → Pós-produção)
 11. ~~**Q5i-5**~~ → Pós-produção (06/10: o Mermaid pela IA já resolve)
 12. ~~**Q5i-6**~~ → Pós-produção (mesmo motivo)
-13. **F-0** — 0.8.0, tag, instalação do zero, docs → **P-1 a P-4** (produção)
+13. ~~**F-0**~~ ✅ tag `v0.8.0` — instalação do zero idêntica à homologação → **P-1 a P-4** (produção)
 
 ## Próximo passo imediato
 
-**F-0** — fechamento antes da produção (ROADMAP, Reta final, linha 13):
-versão **0.8.0** no `setup.php` (reinstalação), tag `v0.8.0`, **instalação
-do zero** numa instância limpa conferida pelo `information_schema` contra a
-homologação atualizada (achado 92), docs. Depois: **P-1 a P-4** (produção,
-Debian 13, SSH 2022).
+**P-1** — conferência do servidor de produção (Debian 13, SSH na porta
+2022), **só leitura**: PHP e extensões, MariaDB, espaço em disco, acesso ao
+GitHub, versão do GLPI (ROADMAP, Produção). Gerar um script único de
+leitura para Claudio rodar e devolver a saída; nada é instalado nem
+alterado no P-1. Depois: **P-2** (`git clone --branch v0.8.0`,
+`plugin:install`, `plugin:activate`, direitos nos perfis), **P-3** (dados
+escolhidos da homologação por `mysqldump --where`; fechar a lista antes) e
+**P-4** (ponta a ponta com documento real e cron da Etapa 7). Depois do
+P-2, repetir a conferência do banco da seção 3.27 na produção.
 
 Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
 `setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar

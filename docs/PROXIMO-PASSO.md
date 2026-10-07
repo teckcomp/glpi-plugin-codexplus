@@ -1,8 +1,8 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 06/10/2026, depois do **F-0 ✅** (tag `v0.8.0`): Reta final
-> fechada; próximo é a **produção (P-1)**.
+> Gerado em 06/10/2026 (noite), depois do **P-2 ✅**: Codex+ 0.8.0 em
+> produção. Validação com uso real por ~15 dias (até ~21/10/2026).
 
 ## Estado
 
@@ -75,15 +75,19 @@
 
 ## Próximo passo imediato
 
-**P-1** — conferência do servidor de produção (Debian 13, SSH na porta
-2022), **só leitura**: PHP e extensões, MariaDB, espaço em disco, acesso ao
-GitHub, versão do GLPI (ROADMAP, Produção). Gerar um script único de
-leitura para Claudio rodar e devolver a saída; nada é instalado nem
-alterado no P-1. Depois: **P-2** (`git clone --branch v0.8.0`,
-`plugin:install`, `plugin:activate`, direitos nos perfis), **P-3** (dados
-escolhidos da homologação por `mysqldump --where`; fechar a lista antes) e
-**P-4** (ponta a ponta com documento real e cron da Etapa 7). Depois do
-P-2, repetir a conferência do banco da seção 3.27 na produção.
+**Validação em produção (~15 dias, até ~21/10/2026)** — Claudio usa o
+Codex+ 0.8.0 nas rotinas reais. Correções que surgirem: pacote validado na
+homologação primeiro, commit, e na produção atualizar pela nova tag (CONTEXTO
+3.28). Produção: `ssh -i %USERPROFILE%\.ssh\id_ed25519 -p 2022
+resolutto@177.87.230.179` + `su -`; backup do banco antes de qualquer
+mudança, em `/root/backup` (não em `/var`).
+
+Depois da validação, como pós-produção: **P-3a** (cadastros da homologação;
+começar por um script de leitura nos dois servidores — usuários, grupos e o
+que existe de cada lado; correspondência por login e nome de grupo),
+**P-3b** (documentos escolhidos, lista com Claudio) e **P-4** (ponta a ponta
+e ação automática de vencimento). Em paralelo, a lista **Pós-produção** do
+ROADMAP.
 
 Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
 `setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar

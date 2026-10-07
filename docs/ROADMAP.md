@@ -1,5 +1,9 @@
 # Codex+ — roadmap
 
+> **Em produção desde 06/10/2026** (P-1 e P-2 ✅, banco idêntico ao da
+> homologação). Validação com uso real por ~15 dias; P-3a, P-3b e P-4
+> depois, como pós-produção (Claudio, 06/10).
+> Antes:
 > Estado em **`v0.8.0`** · tag **`v0.8.0`** · **F-0 ✅ (06/10/2026): Reta
 > final fechada.** Instalação do zero idêntica à homologação (23 tabelas,
 > 209 colunas, 98 índices). Próximo: **P-1** (produção).
@@ -256,10 +260,11 @@ números entre parênteses são os da lista revisada de 04/10.
 
 | Bloco | Entrega |
 |---|---|
-| P-1 | Conferência do servidor Debian 13 (SSH 2022), **só leitura**: PHP, extensões, MariaDB, espaço, acesso ao GitHub, versão do GLPI |
-| P-2 | Instalação do Codex+ em produção pelo `git clone` na tag `v0.8.0`, `plugin:install` e `plugin:activate`, direitos nos perfis |
-| P-3 | Dados: marcas, setores, categorias, **modelos** e os **documentos escolhidos** da homologação por `mysqldump --where` (lista a fechar antes — Decisões pendentes) |
-| P-4 | Conferência de ponta a ponta com um documento real (criar, validar, publicar, PDF, link público) e ativação do cron da Etapa 7 |
+| ~~P-1~~ ✅ 06/10 | Conferência do servidor (só leitura): pronto; atenção a `/var` 83% e OPcache ausente (CONTEXTO 3.28) |
+| ~~P-2~~ ✅ 06/10 | Instalação pela tag `v0.8.0` (backup antes em `/root/backup`); banco idêntico à homologação (md5) |
+| P-3a | **Depois dos ~15 dias de uso.** Cadastros da homologação: setores e membros, categorias, modelos, ícones, catálogo do mapa de calor (membros por login e nome de grupo) |
+| P-3b | **Depois, com calma.** Documentos escolhidos da homologação (lista com Claudio); código e histórico próprios, sem conflito com os criados na produção |
+| P-4 | **Depois dos ~15 dias.** Ponta a ponta com documento real (criar, validar, publicar, PDF, link público) e ação automática de vencimento |
 
 Depois da produção, as atualizações seguem por `git pull` na pasta do
 plugin, com o mesmo método (pacote validado na homologação primeiro), a

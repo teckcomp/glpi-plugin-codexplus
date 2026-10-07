@@ -2,6 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.0` em produção** desde **06/10/2026** (seção 3.28):
+> P-1 e P-2 concluídos, banco da produção idêntico ao da homologação.
+> **Validação com uso real por ~15 dias** (até ~21/10/2026); P-3 (dados da
+> homologação) e P-4 (ponta a ponta) depois, como pós-produção.
+> Antes:
 > Estado: **`v0.8.0`** · tag **`v0.8.0`** · atualizado em **06/10/2026**:
 > **F-0 ✅ — Reta final fechada** (seção 3.27). Instalação do zero conferida
 > contra a homologação pelo `information_schema`: **23 tabelas, 209
@@ -2869,6 +2874,46 @@ mysql -N "$DBN" -e "SELECT table_name, index_name, GROUP_CONCAT(column_name ORDE
 - Reta final, resumo: HV-1, AP-1, MO-1, MO-2, Q7c-1, Q7c-2, Q5k, 7a, 7b e
   Q8 feitos; Q8-5, Q5i-5 e Q5i-6 para a Pós-produção (06/10).
 
+### 3.28 Produção (P-1 e P-2, 06/10/2026)
+
+- **Servidor:** `ssh -i %USERPROFILE%\.ssh\id_ed25519 -p 2022
+  resolutto@177.87.230.179`, depois `su -` (hostname `glpi`). Debian 13.4,
+  PHP 8.4.16 (Apache, sem FPM), MariaDB 11.8.6, GLPI 11.0.6 em
+  `/var/www/html/glpi`, banco `glpidb`, 4 CPUs, 7,8 GB. Outros plugins
+  manuais da Teckcomp no mesmo GLPI (dgoplus, painelixc, projectplus,
+  qrservice, shopmap, taskplus) e o **UI Branding** (`mod`). Cron do GLPI
+  em `/etc/cron.d/glpi` (sem crontab do `www-data`).
+- **P-1 (só leitura):** extensões exigidas presentes; `system:check_requirements`
+  sem erro; GitHub alcançável (tag `v0.8.0` visível).
+  Pontos de atenção (não bloqueiam, são do servidor):
+  - **`/var` com 83% (1,4 GB livres)** — `files/` do GLPI e o banco
+    (2,4 GB) ficam em `/var`; o Codex+ grava PDFs, plantas e imagens.
+    Planejar ampliação ou mover `files/`. Backups vão para `/` (12 GB).
+  - **OPcache ausente** (`php8.4-opcache`): deixa todo o GLPI mais lento.
+  - `session.cookie_httponly` vazio no `php.ini` do Apache.
+- **P-2 (instalação):** backup antes
+  (`/root/backup/glpidb-antes-codexplus-20261006-2116.sql.gz`, 60 MB,
+  `gzip -t` ok); `git clone --branch v0.8.0` em `plugins/codexplus`
+  (detached HEAD em `066c412`); `plugin:install` e `plugin:activate` sem
+  erro; `git config --global --add safe.directory …/codexplus` para o Git
+  do root (dono `www-data`, achado 172). **Banco conferido por md5** das
+  listas do `information_schema` (seção 3.27): idêntico à homologação e à
+  instalação do zero (`d0fef563…` colunas, `f07086fa…` índices).
+- **Logo:** a marca da Resolutto foi levada da homologação (`files/_plugins/
+  codexplus/brands/brand-N.png`); a logo definitiva (vetor ou PNG grande
+  da versão preta) segue pendente com Claudio.
+- **Decisão de Claudio (06/10/2026):** usar a produção por **~15 dias** com
+  as rotinas reais antes de seguir. **P-3a** (cadastros: setores e membros,
+  categorias, modelos, ícones, catálogo do mapa de calor), **P-3b**
+  (documentos escolhidos — lista a fechar com calma) e **P-4** (ponta a
+  ponta e ação automática de vencimento) passam a ser pós-produção.
+  Membros de setor e responsáveis: correspondência por **login** e **nome
+  do grupo**, nunca por id (os ids diferem entre os servidores).
+- Atualizações daqui em diante: pacote validado na homologação, commit,
+  e na produção `git fetch --tags && git checkout <tag>` (ou `git pull`
+  se a produção passar a seguir o `master`) + o bloco de reinstalação quando
+  a versão mudar.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3693,6 +3738,11 @@ depender do comportamento errático de `position: fixed` na impressão.
     `"%USERPROFILE%\Downloads\"` faz o `\"` virar parte do nome
     (`open local "C:/Users/Pc/Downloads"": No such file`). Usar o caminho
     com o nome do arquivo: `"%USERPROFILE%\Downloads\cx-colunas.txt"`.
+172. **`git clone` como root numa pasta que depois vira do `www-data`:** o
+    Git do root recusa a pasta (`fatal: detected dubious ownership`) —
+    `git describe`, `pull` etc. Liberar uma vez por servidor:
+    `git config --global --add safe.directory <pasta do plugin>`. Não afeta
+    o GLPI nem o plugin.
 
 ## 6. Contrato de código — não quebrar
 

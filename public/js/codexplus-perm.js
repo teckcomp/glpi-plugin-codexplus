@@ -17,6 +17,9 @@
    A marcação dos itens repete a de templates/parts/doc-permissions.html.twig:
    mudou uma, mude a outra.
 
+   PL-2: caixa "Todos" ([data-cxp-all]) na Leitura — acao=all no endpoint;
+   na criação, "all:1" no _cxn_perm[]. A resposta traz o estado em `todos`.
+
    CSRF (achado 43): cada POST consome o token. O token novo da resposta vai
    para TODOS os campos _glpi_csrf_token da página — senão o Salvar, os botões
    do fluxo ou o salvamento automático do diagrama quebram em seguida.
@@ -49,6 +52,7 @@
         var pendente = box.getAttribute('data-pending') === '1';
         var guarda = box.querySelector('[data-cxp-pending]');
         var msg = box.querySelector('[data-cxp-msg]');
+        var todos = box.querySelector('[data-cxp-all]');
         var ocupado = false;
 
         function secao(nome) { return box.querySelector('[data-cxp-sec="' + nome + '"]'); }
@@ -78,14 +82,16 @@
             var sec = secao(nome);
             if (!sec) { return; }
             sec.querySelector('[data-cxp-list]').innerHTML = itens.map(itemHtml).join('');
-            var vazio = sec.querySelector('[data-cxp-empty]');
-            if (vazio) { vazio.hidden = itens.length > 0; }
+            atualizaVazio(nome);
         }
         function atualizaVazio(nome) {
             var sec = secao(nome);
             if (!sec) { return; }
             var vazio = sec.querySelector('[data-cxp-empty]');
-            if (vazio) { vazio.hidden = sec.querySelectorAll('[data-cxp-list] > li').length > 0; }
+            if (vazio) {
+                vazio.hidden = sec.querySelectorAll('[data-cxp-list] > li').length > 0
+                    || (nome === 'leitura' && !!todos && todos.checked);
+            }
         }
         function selecao(tipo) {
             var s = box.querySelector('[data-cxp-sel="' + tipo + '"] select');
@@ -99,7 +105,7 @@
             if (window.jQuery) { window.jQuery(el).val(null).trigger('change'); } else { el.value = ''; }
         }
 
-        function envia(campos, depois) {
+        function envia(campos, depois, falhou) {
             if (ocupado) { return; }
             ocupado = true;
             box.classList.add('is-busy');
@@ -117,8 +123,10 @@
                     rotaciona(res.j.csrf);
                     if (!res.ok || !res.j.ok) {
                         avisa(ERRO[res.j.erro] || 'Não foi possível concluir. Recarregue a página e tente de novo.', true);
+                        if (falhou) { falhou(); }
                         return;
                     }
+                    if (todos && typeof res.j.todos === 'boolean') { todos.checked = res.j.todos; }
                     mostra('leitura', res.j.alvos || []);
                     mostra('edicao', res.j.editores || []);
                     if (depois) { depois(); }
@@ -127,6 +135,7 @@
                     ocupado = false;
                     box.classList.remove('is-busy');
                     avisa('Sem resposta do servidor. Recarregue a página e tente de novo.', true);
+                    if (falhou) { falhou(); }
                 });
         }
 
@@ -184,6 +193,36 @@
                 });
             }
         });
+
+        // PL-2: "Todos" na Leitura.
+        if (todos) {
+            todos.addEventListener('change', function () {
+                var on = todos.checked;
+                if (pendente) {
+                    var campo = guarda.querySelector('input[value="all:1"]');
+                    if (on && !campo) {
+                        campo = document.createElement('input');
+                        campo.type = 'hidden';
+                        campo.name = '_cxn_perm[]';
+                        campo.value = 'all:1';
+                        guarda.appendChild(campo);
+                    } else if (!on && campo) {
+                        campo.parentNode.removeChild(campo);
+                    }
+                    atualizaVazio('leitura');
+                    avisa(on ? 'Todos vão ler a versão publicada.' : 'Leitura de todos desligada.', false);
+                    return;
+                }
+                if (ocupado) { todos.checked = !on; return; }
+                envia({ acao: 'all', valor: on ? 1 : 0 }, function () {
+                    atualizaVazio('leitura');
+                    avisa(on ? 'Todos que têm "Ler" no Codex+ leem a versão publicada.' : 'Leitura de todos desligada.', false);
+                }, function () {
+                    todos.checked = !on;
+                    atualizaVazio('leitura');
+                });
+            });
+        }
 
         var api = {
             add: function (tipo, alvo, cb) { envia({ acao: 'add', tipo: tipo, alvo: alvo }, cb); },

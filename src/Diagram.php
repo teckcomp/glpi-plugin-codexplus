@@ -320,6 +320,11 @@ class Diagram
             if ($shape !== '') {
                 $node['shape'] = $shape;
             }
+            // PL-3a: referência da foto (OrgPhoto, 32 hex). A foto em si fica
+            // fora do JSON.
+            if (OrgPhoto::isToken($n['photo'] ?? null)) {
+                $node['photo'] = $n['photo'];
+            }
             // Posição: só entra se as DUAS coordenadas vierem. Sem posição, o
             // elemento é ancorado e quem decide onde fica é o layout.
             if (isset($n['x'], $n['y']) && is_numeric($n['x']) && is_numeric($n['y'])) {

@@ -2933,6 +2933,63 @@ sobe só para a produção atualizar pela tag.
 - **Ficaram para os próximos pacotes:** Leitura "Todos" (PL-2, schema) e
   foto no organograma (PL-3, mockup antes).
 
+### 3.30 PL-2 — Leitura "Todos" (`v0.8.2`, 08/10/2026)
+
+Pedido de Claudio: documentos que todos leem, sem cadastrar grupo por grupo.
+
+- **Coluna `read_all`** (tinyint, 0) em `glpi_plugin_codexplus_documents`,
+  criada no Install (`addField`, idempotente). Nasce desligada em todos os
+  documentos.
+- **Regra:** "Todos" = quem tem **Ler** no Codex+ e enxerga a **entidade
+  do documento** (com recursividade) — Self-Service incluído —, e sempre só
+  a versão publicada (durante a revisão, a anterior, como os outros
+  leitores). Grupos, perfis e usuários continuam valendo. Item
+  (`haveVisibilityAccess`) e SQL (`getVisibilityCriteria`, `read_all = 1`
+  entre os alvos) mudaram juntos; `document:visibility` sem DIVERGE.
+- **Quem liga:** quem gere o documento (`canManage`: responsável; autor em
+  rascunho; Super-Admin), em qualquer status, como os alvos.
+  `Document::setReadAll()` grava direto e registra no Histórico ("Leitura:
+  Todos ligado/desligado"); `read_all` sai do input de `add()`/`update()`
+  (POST forjado não liga).
+- **Tela:** caixa **Todos** no topo da Leitura (coluna Permissões); quem não
+  gere vê só a linha quando ligada. Endpoint `ajax/document.targets.php`,
+  `acao=all`, toda resposta com `todos`. Na criação, `all:1` no
+  `_cxn_perm[]`. Resumo dos dados: "Leitura todos".
+- **Duplicar não leva** (como os outros alvos de leitura).
+
+### 3.31 PL-3a — Foto das pessoas no organograma (`v0.8.3`, 08/10/2026)
+
+Decisões de Claudio (08/10/2026, mockup 2 aprovado): **opção B** (foto no
+cartão e miniatura nas linhas) e **opção 2** (foto fora do JSON, para
+organogramas de 100+ pessoas). O balão da foto ampliada e as fotos no PDF e
+no PNG ficam para o **PL-3b**.
+
+- **Tabela `glpi_plugin_codexplus_orgphotos`** (`OrgPhoto`): documento,
+  `token` (32 hex, único por documento), `thumb` (JPEG 96 px), `image` (JPEG
+  400 px), quem e quando. Foto nunca é sobrescrita: trocar gera token novo,
+  e a versão publicada antiga continua com a foto dela. Purga do documento
+  apaga; Duplicar copia (mesmos tokens). Fotos sem uso: limpeza na
+  Pós-produção.
+- **No organograma:** o nó guarda só `photo` (token), aceito por
+  `Diagram::validate` e pelo `normalize` (lixo sai).
+- **Envio:** `ajax/orgphoto.php` (DIA + `can UPDATE`, como o
+  `diagram.save.php`); o servidor confere JPEG, pixels (miniatura até 128,
+  ampliada até 400) e peso. **Entrega:** `front/orgphoto.send.php?doc=&t=&s=t|f`,
+  só para quem lê o documento (inclusive Leitura "Todos") e só foto dele;
+  cache longo (tira o `no-store` da sessão).
+- **Recorte:** `public/js/codexplus-orgphoto.js` — janela com escolher ou
+  arrastar a imagem, quadrado arrastável com alça, círculo tracejado da
+  miniatura; as duas imagens são geradas no navegador (fundo branco para PNG
+  transparente). Com a janela aberta as teclas não chegam ao quadro.
+- **Desenho** (`codexplus-orgdraw.js`): foto de 38 px à direita do nome
+  (cabeçalho nunca mais baixo que ela); nas linhas, miniatura de 20 px no
+  lugar da bolinha e, com alguma foto na lista, todas as linhas usam a vaga
+  de 20 px (nomes alinhados). Sem foto o desenho é **idêntico** ao anterior
+  (teste contra os 5 modelos). Endereço das fotos pelo `data-photo` da
+  página; sem ele (arquivo importado de fora), só o círculo.
+- **Painel da pessoa** (quadro): campo **Foto** com Escolher/Trocar e Tirar,
+  no desfazer.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

@@ -13,7 +13,11 @@
    A marcação dos itens da lista é repetida no JS (itemHtml): mudou uma,
    mude a outra.
 
-   Variáveis: perm (show, pending, can_manage, targets, widgets, url),
+   PL-2 (Claudio, 08/10/2026): "Todos" na Leitura (perm.read_all) — quem
+   tem Ler no Codex+ e enxerga a entidade do documento. Caixa para quem gere;
+   para os outros, só a linha quando ligada. No JS: [data-cxp-all].
+
+   Variáveis: perm (show, pending, can_manage, targets, read_all, widgets, url),
    id, csrf_token; anon (R7, null = sem a seção). #}
 {% set icone = {'group': 'ti-users', 'profile': 'ti-id-badge-2', 'user': 'ti-user', 'editor_user': 'ti-user', 'editor_group': 'ti-users'} %}
 {% set rotulo = {'group': __('Grupo', 'codexplus'), 'profile': __('Perfil', 'codexplus'), 'user': __('Usuário', 'codexplus'), 'editor_user': __('Usuário', 'codexplus'), 'editor_group': __('Grupo', 'codexplus')} %}
@@ -24,7 +28,7 @@
         'itens': perm.targets,
         'tipos': ['group', 'profile', 'user'],
         'vazio': __('Nenhum leitor. Só quem tem papel no documento o vê.', 'codexplus'),
-        'dica': __('Leitores só veem a versão publicada. Grupo e perfil valem em todas as entidades.', 'codexplus'),
+        'dica': __('Leitores só veem a versão publicada. Grupo e perfil valem em todas as entidades. "Todos" vale para quem tem "Ler" no Codex+ e enxerga a entidade do documento.', 'codexplus'),
     }
 ] %}
 <aside class="cx-perm{{ perm.pending ? ' cx-perm--pending' : '' }}" data-cx-perm data-url="{{ perm.url }}" data-doc="{{ id }}"
@@ -37,6 +41,17 @@
     {% for sec in secoes %}
         <div class="cx-perm-block" data-cxp-sec="{{ sec.chave }}">
             <div class="cx-perm-sub">{{ sec.titulo }}</div>
+            {% set todos = sec.chave == 'leitura' and perm.read_all|default(false) %}
+            {% if sec.chave == 'leitura' %}
+                {% if perm.can_manage %}
+                    <label class="cx-perm-all">
+                        <input type="checkbox" class="form-check-input" data-cxp-all{{ todos ? ' checked' : '' }}>
+                        <span><b>{{ __('Todos', 'codexplus') }}</b> — {{ __('quem tem "Ler" no Codex+ lê a versão publicada', 'codexplus') }}</span>
+                    </label>
+                {% elseif todos %}
+                    <p class="cx-perm-all is-on"><i class="ti ti-world"></i> <b>{{ __('Todos', 'codexplus') }}</b> — {{ __('quem tem "Ler" no Codex+', 'codexplus') }}</p>
+                {% endif %}
+            {% endif %}
             <ul class="cx-perm-list" data-cxp-list>
                 {% for t in sec.itens %}
                     <li class="cx-perm-item" data-tipo="{{ t.tipo }}" data-ligacao="{{ t.ligacao }}">
@@ -51,7 +66,7 @@
                     </li>
                 {% endfor %}
             </ul>
-            <p class="cx-perm-empty" data-cxp-empty {% if sec.itens %}hidden{% endif %}>{{ sec.vazio }}</p>
+            <p class="cx-perm-empty" data-cxp-empty {% if sec.itens or todos %}hidden{% endif %}>{{ sec.vazio }}</p>
 
             {% if perm.can_manage %}
                 <div class="cx-perm-add">

@@ -60,6 +60,7 @@ class Install
     public const DOC_LINKS_TABLE      = 'glpi_plugin_codexplus_documentlinks';
     /** Q7c-2: histórico das marcações do cronograma (Iniciar, Concluir, Reabrir). */
     public const SCHEDULE_EVENTS_TABLE = 'glpi_plugin_codexplus_scheduleevents';
+    public const ORG_PHOTOS_TABLE      = 'glpi_plugin_codexplus_orgphotos';
     /** 7a: marcas de "já avisado" do alerta de vencimento (ExpiryAlert). */
     public const EXPIRY_ALERTS_TABLE   = 'glpi_plugin_codexplus_expiryalerts';
     /** Q8-2: mapa de calor — modelos de AP e perfis de aparelho (WifiCatalog). */
@@ -74,6 +75,7 @@ class Install
     public static function getTables(): array
     {
         return [
+            self::ORG_PHOTOS_TABLE,
             self::WIFI_PROFILES_TABLE,
             self::WIFI_MODELS_TABLE,
             self::EXPIRY_ALERTS_TABLE,
@@ -246,6 +248,12 @@ class Install
         self::installQ82();
         // Q8-2 (ajuste): padrão Wi-Fi do modelo, para tabela já criada.
         $migration->addField(self::WIFI_MODELS_TABLE, 'standard', "varchar(8) NOT NULL DEFAULT 'wifi6'", ['after' => 'name']);
+
+        // --- Bloco PL-2: Leitura "Todos" (nasce desligada) ---
+        $migration->addField(self::DOCUMENTS_TABLE, 'read_all', 'bool');
+
+        // --- Bloco PL-3a: fotos do organograma ---
+        self::installPL3a();
 
         $migration->executeMigration();
         return true;
@@ -664,6 +672,33 @@ class Install
      * por tarefa, com quem e quando da própria linha), para o balão não
      * nascer vazio nas tarefas já marcadas.
      */
+    /**
+     * PL-3a (Claudio, 08/10/2026): fotos das pessoas do organograma, fora do
+     * JSON do diagrama (ver OrgPhoto). Nasce vazia.
+     */
+    private static function installPL3a(): void
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $t = self::ORG_PHOTOS_TABLE;
+        if ($DB->tableExists($t)) {
+            return;
+        }
+        $DB->doQueryOrDie("CREATE TABLE `$t` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `plugin_codexplus_documents_id` int unsigned NOT NULL DEFAULT '0',
+            `token` char(32) NOT NULL DEFAULT '',
+            `thumb` mediumblob NULL,
+            `image` mediumblob NULL,
+            `users_id` int unsigned NOT NULL DEFAULT '0',
+            `date_creation` timestamp NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `doc_token` (`plugin_codexplus_documents_id`, `token`),
+            KEY `users_id` (`users_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC", "Codex+ (PL-3a): erro ao criar $t");
+    }
+
     private static function installQ7c2(): void
     {
         /** @var \DBmysql $DB */

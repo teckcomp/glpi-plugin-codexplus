@@ -15,6 +15,10 @@
  * entidade informada, perfil e grupo entram "sem restrição de entidade"
  * (TargetRelation::prepareInputForAdd, achado 34).
  *
+ * PL-2 (Claudio, 08/10/2026): acao=all liga ou desliga a Leitura "Todos"
+ * (Document::setReadAll, quem gere o documento). Toda resposta leva o
+ * estado em `todos`.
+ *
  * CSRF: o núcleo valida sozinho e CONSOME o token (achado 43); a resposta
  * devolve um novo, que o JS espalha por todos os campos da página.
  */
@@ -94,8 +98,15 @@ if ($acao === 'add') {
     if (!$rel->delete(['id' => $lig], true)) {
         return $responder(['erro' => 'nao_gravou'], 500);
     }
+} elseif ($acao === 'all') {
+    if (!$doc->canManage()) {
+        return $responder(['erro' => 'sem_permissao'], 403);
+    }
+    if (!$doc->setReadAll(!empty($_POST['valor']))) {
+        return $responder(['erro' => 'nao_gravou'], 500);
+    }
 } elseif ($acao !== 'list') {
     return $responder(['erro' => 'acao_invalida'], 422);
 }
 
-return $responder(['ok' => true, 'alvos' => Document::listTargets($id)]);
+return $responder(['ok' => true, 'alvos' => Document::listTargets($id), 'todos' => $doc->readAll()]);

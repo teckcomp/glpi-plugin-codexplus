@@ -307,7 +307,7 @@
                             {% endif %}
                             {% if perm.show %}
                                 <span class="cx-meta-item"><span>{{ __('Leitura', 'codexplus') }}</span>
-                                    {{ meta.readers == 0 ? __('só quem tem papel', 'codexplus') : (meta.readers == 1 ? __('1 alvo', 'codexplus') : __('%d alvos', 'codexplus')|format(meta.readers)) }}</span>
+                                    {{ meta.read_all|default(false) ? __('todos', 'codexplus') : (meta.readers == 0 ? __('só quem tem papel', 'codexplus') : (meta.readers == 1 ? __('1 alvo', 'codexplus') : __('%d alvos', 'codexplus')|format(meta.readers))) }}</span>
                             {% endif %}
                             {% if meta.brand %}<span class="cx-meta-item"><span>{{ __('Marca', 'codexplus') }}</span> {{ meta.brand }}</span>{% endif %}
                         {% endif %}
@@ -477,7 +477,9 @@
                         <input type="hidden" name="_diagram" id="cx-org-input" value="{{ diagram_json }}">
                         <div data-cx-orgview data-editable="1" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-org-data" data-input="cx-org-input"
                              data-title="{{ name }}" data-code="{{ code }}"
-                             data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"></div>
+                             data-doc="{{ id }}" data-save="{{ glpi_root }}/plugins/codexplus/ajax/diagram.save.php"
+                             data-photo="{{ glpi_root }}/plugins/codexplus/front/orgphoto.send.php?doc={{ id }}"
+                             data-photo-up="{{ glpi_root }}/plugins/codexplus/ajax/orgphoto.php"></div>
                         <div class="codexplus-form-hint">
                             {{ __('Clique em "Abrir o organograma" para editar em tela cheia; "Salvar organograma", dentro dele, grava na hora. A matriz de escalonamento se edita aqui e é gravada sozinha pouco depois de cada mudança; o resto do documento, ao clicar em Salvar.', 'codexplus') }}
                         </div>
@@ -664,7 +666,8 @@
                    antigo até o Q6b. #}
                 <script type="application/json" id="cx-org-data">{{ diagram_json|raw }}</script>
                 <div class="cx-docform-diagram" data-cx-orgview data-source="cx-org-data" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}"
-                     data-title="{{ name }}" data-code="{{ code }}"></div>
+                     data-title="{{ name }}" data-code="{{ code }}"
+                     data-photo="{{ glpi_root }}/plugins/codexplus/front/orgphoto.send.php?doc={{ id }}"></div>
             {% else %}
                 <div class="codexplus-content rich_text_container">{{ content_html|raw }}</div>
                 {# 5b: na tela; nas folhas e no PDF quem desenha é o JS (cfg.document.complements). #}

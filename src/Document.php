@@ -922,6 +922,11 @@ class Document extends CommonDBTM
      */
     public function haveVisibilityAccess(): bool
     {
+        // PL-2 (Claudio, 08/10/2026): "Todos" — quem tem Ler no Codex+ e
+        // enxerga a entidade do documento (conferidos em canViewItem).
+        if ($this->readAll()) {
+            return true;
+        }
         $me = Session::getLoginUserID();
         if ($me && isset($this->users[$me])) {
             return true;
@@ -956,6 +961,41 @@ class Document extends CommonDBTM
         }
 
         return false;
+    }
+
+    /** PL-2: leitura liberada para todos que têm Ler no Codex+? */
+    public function readAll(): bool
+    {
+        return (int) ($this->fields['read_all'] ?? 0) === 1;
+    }
+
+    /**
+     * PL-2 (Claudio, 08/10/2026): liga ou desliga a Leitura "Todos". É
+     * acesso, não conteúdo: muda em qualquer status, por quem gere o
+     * documento (a mesma regra dos alvos de leitura). Grava direto, sem
+     * passar pelo update() (que não aceita a coluna, para ela não mudar por
+     * um POST do formulário), e registra no Histórico.
+     */
+    public function setReadAll(bool $on): bool
+    {
+        /** @var \DBmysql $DB */
+        global $DB;
+
+        $id = (int) ($this->fields['id'] ?? 0);
+        if ($id <= 0 || !$this->canManage()) {
+            return false;
+        }
+        if ($this->readAll() === $on) {
+            return true;
+        }
+        if (!$DB->update(static::getTable(), ['read_all' => $on ? 1 : 0], ['id' => $id])) {
+            return false;
+        }
+        $this->fields['read_all'] = $on ? 1 : 0;
+        \Log::history($id, self::class, [0, '', $on
+            ? __('Leitura: Todos ligado (quem tem Ler no Codex+)', 'codexplus')
+            : __('Leitura: Todos desligado', 'codexplus')], '', \Log::HISTORY_LOG_SIMPLE_MESSAGE);
+        return true;
     }
 
     /**
@@ -1151,6 +1191,8 @@ class Document extends CommonDBTM
                     + getEntitiesRestrictCriteria($tg, '', '', true, true),
             ];
         }
+        // PL-2: "Todos" — espelho de haveVisibilityAccess().
+        $targets['OR'][] = [$doc . '.read_all' => 1];
         $profile = $_SESSION['glpiactiveprofile']['id'] ?? -1;
         $targets['OR'][] = [
             $tp . '.profiles_id' => $profile,
@@ -1612,6 +1654,8 @@ class Document extends CommonDBTM
 
     public function prepareInputForAdd($input)
     {
+        // PL-2: Leitura "Todos" só por setReadAll().
+        unset($input['read_all']);
         $input = DocumentMeta::sanitizeFields($input, self::STATUS_KEYS);
         if (isset($input['content'])) {
             $input['content'] = self::unwrapImageLinks((string) $input['content']);
@@ -1948,6 +1992,8 @@ class Document extends CommonDBTM
         // Tipo e sequencial formam o código: não mudam depois de criado.
         // Revisão sobe só na R6 (revisão de documento publicado).
         unset($input['doctype'], $input['sequence'], $input['knowbaseitems_id'], $input['users_id']);
+        // PL-2: Leitura "Todos" só por setReadAll().
+        unset($input['read_all']);
         // Revisão e resumo da revisão só mudam pelo fluxo (R6-a).
         if (!$this->inTransition) {
             unset($input['revision'], $input['revision_summary'], $input['revision_due']);
@@ -2088,6 +2134,7 @@ class Document extends CommonDBTM
         ExpiryAlert::purgeDocument((int) $this->fields['id']);
         RevisionEvent::purgeDocument((int) $this->fields['id']);
         DocumentLink::purgeDocument((int) $this->fields['id']);
+        OrgPhoto::purgeDocument((int) $this->fields['id']); // PL-3a
     }
 
     /** Conteúdo e cabeçalho não vão para o Histórico (texto longo). */

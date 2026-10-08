@@ -179,6 +179,14 @@ if (isset($_POST['add'])) {
         $falhas = [];
         foreach (array_unique((array) ($_POST['_cxn_perm'] ?? [])) as $par) {
             [$tipo, $alvo] = array_pad(explode(':', (string) $par, 2), 2, '0');
+            // PL-2: "all:1" = Leitura "Todos" marcada na criação.
+            if ($tipo === 'all') {
+                $criado = new Document();
+                if (!$criado->getFromDB((int) $newId) || !$criado->setReadAll(true)) {
+                    $falhas[] = __('Todos', 'codexplus');
+                }
+                continue;
+            }
             $linha = Document::permRow($tipo, (int) $newId, (int) $alvo);
             if ($linha === null || (int) $alvo <= 0) {
                 continue;
@@ -313,6 +321,8 @@ if ($id > 0 && isset($_POST['duplicate'])) {
     if ($copia['doctype'] === 'DIA') {
         $d = Diagram::load($id);
         Diagram::save((int) $newId, $d['data'] ?? Diagram::starter());
+        // PL-3a: as fotos do organograma vão junto (mesmos tokens).
+        \GlpiPlugin\Codexplus\OrgPhoto::copyDocument($id, (int) $newId);
     }
     if ($destino === $origem) {
         Session::addMessageAfterRedirect(sprintf(
@@ -841,6 +851,7 @@ $perm = [
     'pending'    => false,
     'can_manage' => false,
     'targets'    => [],
+    'read_all'   => false,
     'widgets'    => ['group' => '', 'profile' => '', 'user' => ''],
     'url'        => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/document.targets.php',
 ];
@@ -850,6 +861,7 @@ if ($manageNew || (!$isNew && ($canManage || $doc->hasRole() || Session::haveRig
     $perm['pending']    = $isNew;
     $perm['can_manage'] = $manageNew || $canManage;
     $perm['targets']    = $isNew ? [] : Document::listTargets($id);
+    $perm['read_all']   = !$isNew && $doc->readAll();
     if ($perm['can_manage']) {
         // Nomes com "_cxt_": o Salvar do formulário não os lê. Os três vão
         // pelo endpoint, que confere de novo quem pode (TargetRelation).
@@ -1215,6 +1227,7 @@ TemplateRenderer::getInstance()->display('@codexplus/document-form.html.twig', [
             'owner'    => (int) $doc->fields['users_id_owner'] > 0 ? getUserName((int) $doc->fields['users_id_owner']) : '',
             'auditor'  => $full ? ($auditor !== '' ? $auditor : null) : false,
             'readers'  => count($perm['targets'] ?? []),
+            'read_all' => (bool) ($perm['read_all'] ?? false),
             'brand'    => (string) ($brandShown['name'] ?? ''),
             // Só pesa em rascunho: é o que impede enviar.
             'missing'  => $draft && (!$lugar || ($full && $auditor === '')),

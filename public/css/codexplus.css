@@ -1456,6 +1456,16 @@
 .cx-perm-del { border: 0; background: none; padding: 0 2px; color: var(--cx-muted); cursor: pointer; line-height: 1; }
 .cx-perm-del:hover { color: var(--cx-danger); }
 .cx-perm-empty { margin: 0 0 8px; color: var(--cx-muted); font-style: italic; }
+/* PL-2: Leitura "Todos" */
+.cx-perm-all {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 0 8px; padding: 7px 10px;
+    border: 1px solid var(--cx-border); border-radius: 6px;
+    background: var(--cx-surface-2); cursor: pointer; font-size: 13px;
+}
+.cx-perm-all input { margin: 0; flex: none; }
+.cx-perm-all:has(input:checked), .cx-perm-all.is-on { border-color: var(--cx-accent); background: var(--cx-accent-soft); }
+.cx-perm-all.is-on { cursor: default; }
 .cx-perm-add { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cx-border); }
 .cx-perm-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
 .cx-perm-lbl { font-weight: 600; margin: 0; }
@@ -2941,3 +2951,23 @@ html.cx-board-open { overflow: hidden; }
 .cx-tpl-group .cx-tpl-sub td { font-size: 12px; color: var(--cx-muted); background: var(--cx-surface); padding: 10px 14px 4px 30px; border-bottom: 0; }
 .cx-tpl-group .cx-tpl-sub:hover td { background: var(--cx-surface); }
 .cx-tpl-group .cx-tpl-type { width: 1%; padding-left: 30px; }
+
+
+/* =========================================================================
+   PL-3a — foto da pessoa no organograma (painel e janela de recorte)
+   ========================================================================= */
+.cx-oph-field { display: flex; align-items: center; gap: 10px; }
+.cx-oph-prev { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; border: 2px solid var(--cx-border); }
+.cx-oph-back { z-index: 100000; }
+.cx-oph { width: 380px; max-width: calc(100vw - 32px); }
+.cx-oph-title { margin: 0 0 10px; font-size: 15px; }
+.cx-oph-drop { border: 1.5px dashed #b9c3cf; border-radius: 8px; padding: 22px 12px; text-align: center; }
+.cx-oph-drop p { margin: 0 0 8px; }
+.cx-oph-hint { font-size: 12px; color: var(--cx-muted); margin: 6px 0 0; }
+.cx-oph-err { min-height: 1em; margin: 6px 0 0; font-size: 12.5px; color: var(--cx-danger); }
+.cx-oph-acts { display: flex; gap: 6px; align-items: center; margin: 10px 0 0; }
+.cx-oph-stage { position: relative; width: 320px; height: 320px; margin: 0 auto; background: #5d6878; border-radius: 6px; overflow: hidden; user-select: none; touch-action: none; }
+.cx-oph-stage img { position: absolute; max-width: none; pointer-events: none; }
+.cx-oph-sq { position: absolute; box-sizing: border-box; border: 2px solid #fff; box-shadow: 0 0 0 999px rgba(0, 0, 0, .45); cursor: move; touch-action: none; }
+.cx-oph-ci { position: absolute; inset: 0; border: 1px dashed rgba(255, 255, 255, .85); border-radius: 50%; pointer-events: none; }
+.cx-oph-h { position: absolute; right: -7px; bottom: -7px; width: 12px; height: 12px; background: #fff; border: 1px solid var(--cx-accent); cursor: nwse-resize; }

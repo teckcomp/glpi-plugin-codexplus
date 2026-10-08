@@ -3367,6 +3367,7 @@
             props.innerHTML = '<p><strong>' + (n.group ? 'Área ou equipe' : !n.name.trim() ? 'Vaga em aberto' : 'Pessoa') + '</strong></p>'
                 + '<label class="cx-board-f"><span>' + (n.group ? 'Nome da área ou equipe' : 'Nome (vazio = vaga em aberto)') + '</span><input type="text" maxlength="120" style="box-sizing:border-box" data-of="name" value="' + esc(n.name) + '" autocomplete="off"></label>'
                 + '<label class="cx-board-f"><span>Cargo ou função</span><input type="text" maxlength="160" style="box-sizing:border-box" data-of="role" value="' + esc(n.role) + '" autocomplete="off"></label>'
+                + orgPhotoField(n)
                 + '<label class="cx-board-f"><span>Nível</span><select data-of="lvl">' + lvls + '</select></label>'
                 + '<label class="cx-board-f"><span>Responde a (chefia)</span><select data-of="boss">' + boss + '</select></label>'
                 + '<div class="cx-board-f"><span>Também reporta a (linha tracejada)</span>' + (repList ? '<div>' + repList + '</div>' : '')
@@ -3382,6 +3383,18 @@
                 + '<p class="cx-board-none" style="margin:4px 0">Equipe direta: ' + (T.kids[n.id] || []).length + ' · '
                 + (free ? 'solto: fica onde foi largado.' : it && it.t === 'orow' ? 'na lista do cartão do chefe.' : 'no arranjo automático.') + '</p>';
         }
+        /* PL-3a: foto da pessoa (codexplus-orgphoto.js). Só com o envio
+           disponível (página de edição do documento: host.photo). */
+        function orgPhotoField(n) {
+            if (!(host && host.photo && window.CodexplusOrgPhoto)) { return ''; }
+            var url = n.photo ? OD().photoUrl(n.photo, 't') : '';
+            var pic = url
+                ? '<img src="' + esc(url) + '" alt="" class="cx-oph-prev">'
+                : '<svg class="cx-oph-prev" viewBox="0 0 56 56" aria-hidden="true"><rect width="56" height="56" fill="#d6dde6"/><circle cx="28" cy="22" r="11" fill="#8fa0b5"/><ellipse cx="28" cy="52" rx="20" ry="15" fill="#8fa0b5"/></svg>';
+            return '<div class="cx-board-f"><span>Foto</span><div class="cx-oph-field">' + pic
+                + '<span><button type="button" class="cx-board-btn" data-oa="photo">' + (n.photo ? 'Trocar foto' : 'Escolher foto') + '</button>'
+                + (n.photo ? ' <button type="button" class="cx-board-btn" data-oa="nophoto">Tirar</button>' : '') + '</span></div></div>';
+        }
         props.addEventListener('click', function (e) {
             if (!org) { return; }
             var n = sel.length === 1 && orgNode(sel[0]);
@@ -3390,6 +3403,16 @@
             var b = e.target.closest('[data-oa]');
             if (!b || !n || b.disabled) { return; }
             var a = b.getAttribute('data-oa');
+            if (a === 'photo' && host && host.photo && window.CodexplusOrgPhoto) {
+                var alvo = n.id;
+                window.CodexplusOrgPhoto.pick({ parent: root, url: host.photo.up, doc: host.photo.doc }).then(function (tok) {
+                    var m = tok && orgNode(alvo);
+                    if (!m) { return; }
+                    snap(); m.photo = tok; render();
+                });
+                return;
+            }
+            if (a === 'nophoto') { snap(); delete n.photo; render(); return; }
             if (a === 'back') { snap(); delete n.x; delete n.y; render(); }
             else if (a === 'sub') { orgAdd(n.id); }
             else if (a === 'del') {

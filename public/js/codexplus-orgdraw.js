@@ -47,9 +47,30 @@
         tagFs: 11, tagH: 17, tagGap: 5,
         rowFs: 13.5, rowLh: 18.25, rowPadY: 3, rowsPadTop: 4, rowsPadBot: 5,
         dot: 7, dotGap: 8,
+        // PL-3a: foto no cartão (redonda, à direita do nome) e miniatura nas
+        // linhas (no lugar da bolinha; com alguma foto na lista, todas as
+        // linhas usam a vaga de 20 px, para os nomes ficarem alinhados).
+        ph: 38, phGap: 10, mini: 20, miniGap: 6,
         HGAP: 14, VGAP: 48, pad: { t: 28, r: 24, b: 40, l: 24 }
     };
     var INK = '#17202d', MUTED = '#5a6575', BORDER = '#d3d9e0', SURF = '#ffffff', LINE = '#8e9aaa', WARN = '#8a5500';
+
+    /* PL-3a: fotos das pessoas. O nó guarda só o token (32 hex); a imagem vem
+       de front/orgphoto.send.php?doc=ID (data-photo da página). Sem endereço
+       (arquivo importado de fora, teste), desenha só o círculo vazio. */
+    var PHOTO_BASE = '', phSeq = 0;
+    function isPhoto(t) { return typeof t === 'string' && /^[a-f0-9]{32}$/.test(t); }
+    function photoUrl(t, size) {
+        return PHOTO_BASE && isPhoto(t) ? PHOTO_BASE + (PHOTO_BASE.indexOf('?') < 0 ? '?' : '&') + 't=' + t + '&s=' + (size === 'f' ? 'f' : 't') : '';
+    }
+    function avatarSvg(cx, cy, r, ring, n) {
+        var id = 'cxph' + (++phSeq) + Math.random().toString(36).slice(2, 6), url = photoUrl(n.photo, 't');
+        return '<g data-photo="' + esc(n.photo) + '" data-pid="' + esc(n.id) + '" style="cursor:pointer">'
+            + '<clipPath id="' + id + '"><circle cx="' + r1(cx) + '" cy="' + r1(cy) + '" r="' + r + '"/></clipPath>'
+            + '<circle cx="' + r1(cx) + '" cy="' + r1(cy) + '" r="' + r + '" fill="#d6dde6"/>'
+            + (url ? '<image href="' + esc(url) + '" x="' + r1(cx - r) + '" y="' + r1(cy - r) + '" width="' + (2 * r) + '" height="' + (2 * r) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + id + ')"/>' : '')
+            + '<circle cx="' + r1(cx) + '" cy="' + r1(cy) + '" r="' + (r - 0.75) + '" fill="none" stroke="' + ring + '" stroke-width="1.5"/></g>';
+    }
     var F_NAME = '"IBM Plex Sans Condensed", "IBM Plex Sans", Arial, sans-serif';
     var F_TEXT = '"IBM Plex Sans", Arial, sans-serif';
 
@@ -94,6 +115,7 @@
         s.nodes.forEach(function (n) {
             n.id = String(n.id);
             n.name = String(n.name || ''); n.role = String(n.role || ''); n.note = String(n.note || '');
+            if (!isPhoto(n.photo)) { delete n.photo; } // PL-3a
             if (keys.indexOf(n.lvl) < 0) { n.lvl = last; }
             if (legacy && n.lvl === 'noc' && n.dashed === undefined) { n.dashed = true; }
             if (!(typeof n.x === 'number' && typeof n.y === 'number' && isFinite(n.x) && isFinite(n.y))) { delete n.x; delete n.y; }
@@ -182,12 +204,16 @@
     // quebradas na largura final, altura somada.
     function measureCard(n, leaves) {
         var vaga = !n.name.trim(), tags = tagList(n);
+        // PL-3a: a foto ocupa a direita do nome e do cargo.
+        var phW = isPhoto(n.photo) ? C.ph + C.phGap : 0;
+        var mini = leaves.some(function (k) { return isPhoto(k.photo); });
+        var slot = mini ? C.mini + C.miniGap : C.dot + C.dotGap;
         var inner = 0;
-        inner = Math.max(inner, textW(label(n), FONTS.name(vaga), C.nameFs));
-        if (n.role) { inner = Math.max(inner, textW(n.role, FONTS.role(), C.roleFs)); }
+        inner = Math.max(inner, textW(label(n), FONTS.name(vaga), C.nameFs) + phW);
+        if (n.role) { inner = Math.max(inner, textW(n.role, FONTS.role(), C.roleFs) + phW); }
         if (tags.length) { inner = Math.max(inner, tags.reduce(function (a, t) { return a + tagW(t) + 4; }, -4)); }
         leaves.forEach(function (k) {
-            var tk = tagList(k), w = C.dot + C.dotGap + textW(label(k), FONTS.row(!k.name.trim()), C.rowFs);
+            var tk = tagList(k), w = slot + textW(label(k), FONTS.row(!k.name.trim()), C.rowFs);
             if (tk.length) { w += C.dotGap + tk.reduce(function (a, t) { return a + tagW(t) + 4; }, -4); }
             inner = Math.max(inner, w);
         });
@@ -196,19 +222,22 @@
         var pads = C.padL + C.padR, bords = C.bar + C.bord;
         var w = Math.min(C.maxW, Math.max(C.minW, Math.ceil(inner) + pads)) + bords;
         var max = w - pads - bords;
-        var nameL = wrap(label(n), FONTS.name(vaga), C.nameFs, max);
-        var roleL = n.role ? wrap(n.role, FONTS.role(), C.roleFs, max) : [];
-        var h = C.bord + C.padTop + nameL.length * C.nameLh + C.roleGap + roleL.length * C.roleLh;
-        if (tags.length) { h += C.tagGap + C.tagH; }
+        var nameL = wrap(label(n), FONTS.name(vaga), C.nameFs, max - phW);
+        var roleL = n.role ? wrap(n.role, FONTS.role(), C.roleFs, max - phW) : [];
+        var head = nameL.length * C.nameLh + C.roleGap + roleL.length * C.roleLh;
+        if (tags.length) { head += C.tagGap + C.tagH; }
+        // PL-3a: cabeçalho nunca mais baixo que a foto.
+        var phExtra = phW && head < C.ph ? C.ph - head : 0;
+        var h = C.bord + C.padTop + head + phExtra;
         h += C.padBot;
         var rows = leaves.map(function (k) {
             var tk = tagList(k), tw = tk.length ? C.dotGap + tk.reduce(function (a, t) { return a + tagW(t) + 4; }, -4) : 0;
-            var lines = wrap(label(k), FONTS.row(!k.name.trim()), C.rowFs, max - C.dot - C.dotGap - tw);
+            var lines = wrap(label(k), FONTS.row(!k.name.trim()), C.rowFs, max - slot - tw);
             return { n: k, lines: lines, tags: tk, h: lines.length * C.rowLh + 2 * C.rowPadY };
         });
         if (rows.length) { h += 1 + C.rowsPadTop + rows.reduce(function (a, r) { return a + r.h; }, 0) + C.rowsPadBot; }
         h += C.bord;
-        return { w: w, h: Math.ceil(h), nameL: nameL, roleL: roleL, tags: tags, rows: rows };
+        return { w: w, h: Math.ceil(h), nameL: nameL, roleL: roleL, tags: tags, rows: rows, phExtra: phExtra, mini: mini };
     }
 
     /* ---------------- arranjo ---------------- */
@@ -336,7 +365,10 @@
             b.tags.forEach(function (t) { g += pill(px, top, t); px += tagW(t) + 4; });
             top += C.tagH;
         }
-        top += C.padBot;
+        top += (b.phExtra || 0) + C.padBot;
+        if (isPhoto(n.photo)) {
+            g += avatarSvg(x + w - C.bord - C.padR - C.ph / 2, y + C.bord + C.padTop + C.ph / 2 - 1, C.ph / 2, lc, n);
+        }
         if (b.rows.length) {
             g += '<path d="M' + r1(bx) + ' ' + r1(top + 0.5) + 'H' + r1(x + w - C.bord) + '" stroke="' + BORDER + '"/>';
             top += 1 + C.rowsPadTop;
@@ -348,12 +380,15 @@
                 var rb = { id: k.id, x: bx, y: top, w: x + w - C.bord - bx, h: r.h };
                 b.rowBoxes.push(rb);
                 g += '<g data-id="' + esc(k.id) + '"><rect x="' + r1(rb.x) + '" y="' + r1(rb.y) + '" width="' + r1(rb.w) + '" height="' + r1(rb.h) + '" fill="transparent"/>';
-                g += (kv || k.dashed)
-                    ? '<circle cx="' + r1(tx + C.dot / 2) + '" cy="' + r1(cy) + '" r="' + r1(C.dot / 2 - 0.75) + '" fill="none" stroke="' + kc + '" stroke-width="1.5" stroke-dasharray="2 1.6"/>'
-                    : '<circle cx="' + r1(tx + C.dot / 2) + '" cy="' + r1(cy) + '" r="' + (C.dot / 2) + '" fill="' + kc + '"/>';
+                // PL-3a: com miniatura na lista, a bolinha fica no centro da vaga de 20 px.
+                var dcx = b.mini ? tx + C.mini / 2 : tx + C.dot / 2, ltx = tx + (b.mini ? C.mini + C.miniGap : C.dot + C.dotGap);
+                g += isPhoto(k.photo) ? avatarSvg(dcx, cy, C.mini / 2, kc, k)
+                    : (kv || k.dashed)
+                    ? '<circle cx="' + r1(dcx) + '" cy="' + r1(cy) + '" r="' + r1(C.dot / 2 - 0.75) + '" fill="none" stroke="' + kc + '" stroke-width="1.5" stroke-dasharray="2 1.6"/>'
+                    : '<circle cx="' + r1(dcx) + '" cy="' + r1(cy) + '" r="' + (C.dot / 2) + '" fill="' + kc + '"/>';
                 var ly = top + C.rowPadY;
                 r.lines.forEach(function (l) {
-                    g += '<text x="' + r1(tx + C.dot + C.dotGap) + '" y="' + base(ly, C.rowLh, C.rowFs) + '" font-family=\'' + F_TEXT + '\' font-size="' + C.rowFs + '"'
+                    g += '<text x="' + r1(ltx) + '" y="' + base(ly, C.rowLh, C.rowFs) + '" font-family=\'' + F_TEXT + '\' font-size="' + C.rowFs + '"'
                         + (kv ? ' font-style="italic" fill="' + MUTED + '"' : ' fill="' + INK + '"') + '>' + esc(l) + '</text>';
                     ly += C.rowLh;
                 });
@@ -550,6 +585,9 @@
         var editable = root.getAttribute('data-editable') === '1';
         var input = document.getElementById(root.getAttribute('data-input') || '');
         var saveUrl = root.getAttribute('data-save') || '', docId = root.getAttribute('data-doc') || '';
+        // PL-3a: endereço das fotos deste documento e do envio (só na edição).
+        if (root.getAttribute('data-photo')) { PHOTO_BASE = root.getAttribute('data-photo'); }
+        var photoUp = root.getAttribute('data-photo-up') || '';
 
         root.classList.add('cx-org', 'cx-orgview');
         // Barra da leitura: a mesma do motor antigo (classes cx-org-*), sem a
@@ -709,6 +747,7 @@
             var B = window.CodexplusBoard; if (!B) { return; }
             clearTimeout(autoT);
             B.open(null, null, 'organograma', { data: { mode: 'organograma', org: JSON.parse(ser()) }, title: title, self: docId,
+                photo: photoUp && docId ? { up: photoUp, doc: docId } : null,
                 save: function (D) {
                     var o = JSON.parse(JSON.stringify(D.org || {}));
                     delete o.__norm;
@@ -871,6 +910,7 @@
         legendHtml: legendHtml, escHtml: escTableHtml, mount: mount, boot: boot, fontCss: fontCss, parts: parts, tree: tree, label: label,
         templates: function () { return TEMPLATES.map(function (t) { return { key: t.key, name: t.name, desc: t.desc }; }); },
         fromTemplate: fromTemplate, levelUsed: levelUsed, SWATCHES: SWATCHES,
+        photoUrl: photoUrl, setPhotoBase: function (u) { PHOTO_BASE = String(u || ''); },
         measure: function (s) { var S = normalize(s), L = layout(S), o = {}; L.list.forEach(function (n) { var b = L.box[n.id]; o[n.id] = { x: b.x, y: b.y, w: b.w, h: b.h }; }); return o; },
         _reset: ctxReset, C: C
     };

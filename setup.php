@@ -11,7 +11,7 @@ use Glpi\Plugin\Hooks;
 use GlpiPlugin\Codexplus\Document;
 use GlpiPlugin\Codexplus\ProfileTab;
 use GlpiPlugin\Codexplus\Wiki;
-define('PLUGIN_CODEXPLUS_VERSION', '0.8.1');
+define('PLUGIN_CODEXPLUS_VERSION', '0.8.3');
 // Versões mínima/máxima do GLPI suportadas
 define('PLUGIN_CODEXPLUS_MIN_GLPI', '11.0.0');
 define('PLUGIN_CODEXPLUS_MAX_GLPI', '11.0.99');
@@ -79,7 +79,7 @@ function plugin_init_codexplus(): void
     // Os estáticos ficam em public/ — no GLPI 11 o roteador só serve
     // arquivos não-PHP a partir dessa pasta.
     $PLUGIN_HOOKS[Hooks::ADD_CSS]['codexplus']        = 'css/codexplus.css';
-    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = ['js/codexplus.js', 'js/codexplus-orgdraw.js', 'js/codexplus-grid.js', 'js/codexplus-perm.js', 'js/codexplus-docform.js', 'js/codexplus-editor.js', 'js/codexplus-sheet.js', 'js/codexplus-icons.js', 'js/codexplus-lucide.js', 'js/codexplus-rf.js', 'js/codexplus-board.js', 'js/codexplus-flow.js', 'js/codexplus-export.js', 'js/codexplus-annotate.js', 'js/codexplus-brand.js', 'js/codexplus-links.js', 'js/codexplus-meta.js', 'js/codexplus-docref.js'];
+    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['codexplus'] = ['js/codexplus.js', 'js/codexplus-orgdraw.js', 'js/codexplus-grid.js', 'js/codexplus-perm.js', 'js/codexplus-docform.js', 'js/codexplus-editor.js', 'js/codexplus-sheet.js', 'js/codexplus-icons.js', 'js/codexplus-lucide.js', 'js/codexplus-rf.js', 'js/codexplus-orgphoto.js', 'js/codexplus-board.js', 'js/codexplus-flow.js', 'js/codexplus-export.js', 'js/codexplus-annotate.js', 'js/codexplus-brand.js', 'js/codexplus-links.js', 'js/codexplus-meta.js', 'js/codexplus-docref.js'];
 }
 /**
  * Metadados do plugin.

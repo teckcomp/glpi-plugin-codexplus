@@ -533,6 +533,15 @@
             });
         });
 
+        // PL-1: invólucro da anotação só com a imagem dele (achado 173). No
+        // gravado (cópia do PreProcess) e na tela, ao abrir e a cada mudança.
+        editor.on('PreProcess', function (e) {
+            if (window.CodexplusAnnotate && e.node) { window.CodexplusAnnotate.tidyAll(e.node); }
+        });
+        editor.on('SetContent NodeChange', function () {
+            if (window.CodexplusAnnotate) { window.CodexplusAnnotate.tidy(editor); }
+        });
+
         editor.on('PreInit', function () {
             editor.formatter.register('cxsize_sm', { inline: 'span', classes: 'cx-size-sm' });
             editor.formatter.register('cxsize_lg', { inline: 'span', classes: 'cx-size-lg' });

@@ -1640,11 +1640,13 @@
 div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border); }
 .cx-stat-accent { color: var(--cx-accent); }
 .cx-dot-emrevisao { background: var(--cx-accent); }
-.cx-recent-table--new th:nth-child(3), .cx-recent-table--new td:nth-child(3) { width: 18%; }
-.cx-recent-table--new th:nth-child(4), .cx-recent-table--new td:nth-child(4) { width: 13%; }
-.cx-recent-table--new th:nth-child(5), .cx-recent-table--new td:nth-child(5) { width: 14%; }
-.cx-recent-table--new th:nth-child(6), .cx-recent-table--new td:nth-child(6) { width: 96px; }
-.cx-recent-table--new th:nth-child(7), .cx-recent-table--new td:nth-child(7) { width: 104px; }
+/* Coluna nova na posição 6 (PL-1: Revisor / Editor): Quando e Situação andam uma. */
+.cx-recent-table--new th:nth-child(3), .cx-recent-table--new td:nth-child(3) { width: 15%; }
+.cx-recent-table--new th:nth-child(4), .cx-recent-table--new td:nth-child(4) { width: 10%; }
+.cx-recent-table--new th:nth-child(5), .cx-recent-table--new td:nth-child(5) { width: 13%; }
+.cx-recent-table--new th:nth-child(6), .cx-recent-table--new td:nth-child(6) { width: 13%; }
+.cx-recent-table--new th:nth-child(7), .cx-recent-table--new td:nth-child(7) { width: 96px; }
+.cx-recent-table--new th:nth-child(8), .cx-recent-table--new td:nth-child(8) { width: 120px; }
 
 /* =========================================================================
    16. ORGANOGRAMA (Etapa 9, 0.6.7)

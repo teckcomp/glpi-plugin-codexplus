@@ -4,7 +4,9 @@
  * Codex+ — criar setor ou categoria pelo seletor do formulário (bloco SC1).
  *
  * Decisão de Claudio (27/09/2026): só o Super-Admin cria pelo "+" do
- * formulário; os outros escolhem da lista. A categoria nasce raiz, já no
+ * formulário; os outros escolhem da lista. Desde o PL-1 (08/10/2026) cria
+ * também quem tem "Gerenciar modelos, setores e categorias"
+ * (Rights::canCreatePlacement). A categoria nasce raiz, já no
  * setor escolhido. Nome repetido no mesmo lugar devolve o que já existe (não
  * cria duplicado). Renomear e excluir continuam em Configurar > Listas
  * suspensas > Codex+.
@@ -34,8 +36,8 @@ if (!Document::canView() || ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 
 $csrf = Session::getNewCSRFToken(true);
 
-if (!Rights::isSuperAdmin()) {
-    return $responder(['erro' => __('Só o Super-Admin cria setor e categoria.', 'codexplus'), 'csrf' => $csrf], 403);
+if (!Rights::canCreatePlacement()) {
+    return $responder(['erro' => __('Seu perfil não pode criar setor e categoria (falta "Gerenciar modelos, setores e categorias").', 'codexplus'), 'csrf' => $csrf], 403);
 }
 
 $nome = trim((string) ($_POST['name'] ?? ''));

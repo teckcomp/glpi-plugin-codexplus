@@ -11,7 +11,7 @@
 
    3. Setor / Categorias (bloco SC1, Claudio 27/09/2026): o setor filtra as
       categorias (só as dele, várias); trocar de setor tira as do anterior;
-      "+" do Super-Admin cria setor ou categoria ali mesmo
+      "+" (Super-Admin ou Gerenciar setores e categorias) cria setor ou categoria ali mesmo
       (ajax/placement.php); a linha "Na estante" mostra onde o documento
       mora. O servidor confere de novo ao gravar e ao sair do rascunho.
 

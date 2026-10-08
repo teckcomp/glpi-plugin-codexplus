@@ -165,7 +165,7 @@ class Dashboard
             'SELECT'    => [
                 $t . '.id', $t . '.name', $t . '.date_mod', $t . '.doctype',
                 $t . '.sequence', $t . '.revision', $t . '.status',
-                $t . '.users_id_owner', $t . '.validity_months',
+                $t . '.users_id_owner', $t . '.users_id_reviewer', $t . '.validity_months',
                 $t . '.client_name', $t . '.date_published', $t . '.review_end',
                 $t . '.revision_due',
             ],
@@ -206,6 +206,8 @@ class Dashboard
                 'sector'       => '',
                 'owner_id'     => $ownerId,
                 'owner'        => '',
+                // PL-1: revisor (ou 1º editor, no fluxo direto — espelho da A-1).
+                'reviewer_id'  => (int) ($r['users_id_reviewer'] ?? 0),
                 'expiry'       => $expiry['state'],
                 // R6-b: prazo da revisão aberta ('' = sem prazo ou fora de revisão).
                 'revision_due' => $emRevisao ? substr((string) ($r['revision_due'] ?? ''), 0, 10) : '',
@@ -541,11 +543,32 @@ class Dashboard
                 ? $d['client_name']
                 : $d['category'];
 
-            $d['ago'] = self::relativeTime($d['date_mod']);
-            $out[]    = $d;
+            $d['ago']    = self::relativeTime($d['date_mod']);
+            $d['helper'] = self::helperLabel($d);
+            $out[]       = $d;
         }
 
         return $out;
+    }
+
+    /**
+     * PL-1 (Claudio, 08/10/2026): coluna "Revisor / Editor" dos recentes.
+     * Proposta e Laudo (fluxo direto) mostram os editores da A-1 — o primeiro
+     * e "+N"; os demais tipos, o revisor. '' = ninguém escolhido.
+     */
+    public static function helperLabel(array $d): string
+    {
+        $id = (int) ($d['id'] ?? 0);
+        if (DocumentMeta::flowOf((string) ($d['doctype'] ?? '')) === DocumentMeta::FLOW_DIRECT) {
+            $ids = DocumentEditor::ids($id);
+            if (!$ids) {
+                return '';
+            }
+            $nome = (string) getUserName((int) $ids[0]);
+            return count($ids) > 1 ? $nome . ' +' . (count($ids) - 1) : $nome;
+        }
+        $rev = (int) ($d['reviewer_id'] ?? 0);
+        return $rev > 0 ? (string) getUserName($rev) : '';
     }
 
     /**

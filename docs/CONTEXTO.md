@@ -2914,6 +2914,25 @@ mysql -N "$DBN" -e "SELECT table_name, index_name, GROUP_CONCAT(column_name ORDE
   se a produção passar a seguir o `master`) + o bloco de reinstalação quando
   a versão mudar.
 
+### 3.29 PL-1 — ajustes do uso em produção (`v0.8.1`, 08/10/2026)
+
+Pedidos de Claudio no uso real (validação de 15 dias). Sem schema; versão
+sobe só para a produção atualizar pela tag.
+
+- **"+" de Setor e Categorias** segue a coluna **"Gerenciar modelos,
+  setores e categorias"** (antes, só o Super-Admin). Fonte única:
+  `Rights::canCreatePlacement()` (Super-Admin **ou** bit 4096), usada pelo
+  `ajax/placement.php` e pelo `can_create` do formulário. Texto da aba de
+  Perfis atualizado.
+- **Painel, "Atualizados recentemente":** coluna **Revisor / Editor**
+  (`Dashboard::helperLabel`): Proposta e Laudo (fluxo direto) mostram os
+  editores da A-1 — o primeiro e "+N"; os outros tipos, o revisor
+  (`users_id_reviewer`, agora lido no `loadAllNew`). Coluna Situação mais
+  larga ("aguarda auditor" cortava).
+- **Anotar abria a 1ª imagem ao clicar na 2ª:** achado 173.
+- **Ficaram para os próximos pacotes:** Leitura "Todos" (PL-2, schema) e
+  foto no organograma (PL-3, mockup antes).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3743,6 +3762,15 @@ depender do comportamento errático de `position: fixed` na impressão.
     `git describe`, `pull` etc. Liberar uma vez por servidor:
     `git config --global --add safe.directory <pasta do plugin>`. Não afeta
     o GLPI nem o plugin.
+173. **Invólucro em linha "engole" o que vem depois.** O `span.cx-annot`
+    (E4) é em linha: com o cursor logo depois da imagem anotada, o texto
+    digitado e a próxima imagem colada caem DENTRO do span, e o Salvar
+    mantém isso. O Anotar procurava o invólucro com `getParent` e abria o
+    original da 1ª imagem ao clicar na 2ª (DOC 10, "Manual de Instalação do
+    GLPI Agent", 08/10/2026). PL-1: `tidyWrap` deixa no invólucro só a 1ª
+    `<img>` — no `PreProcess` (gravado), no `SetContent`/`NodeChange` (tela,
+    com bookmark do TinyMCE para o cursor não pular) e no `open()`.
+    Documento já gravado assim se conserta ao abrir a edição e salvar.
 
 ## 6. Contrato de código — não quebrar
 

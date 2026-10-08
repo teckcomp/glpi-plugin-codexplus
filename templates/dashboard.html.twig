@@ -386,6 +386,7 @@
                         <th>{{ __('Categoria', 'codexplus') }}</th>
                         <th>{{ __('Setor', 'codexplus') }}</th>
                         <th>{{ __('Responsável', 'codexplus') }}</th>
+                        <th>{{ __('Revisor / Editor', 'codexplus') }}</th>
                         <th>{{ __('Quando', 'codexplus') }}</th>
                         <th>{{ __('Situação', 'codexplus') }}</th>
                     </tr>
@@ -405,6 +406,9 @@
                             </td>
                             <td class="cx-cell-clip">
                                 {% if d.owner %}{{ d.owner }}{% else %}<span class="codexplus-muted">—</span>{% endif %}
+                            </td>
+                            <td class="cx-cell-clip">
+                                {% if d.helper|default('') %}{{ d.helper }}{% else %}<span class="codexplus-muted">—</span>{% endif %}
                             </td>
                             <td class="cx-cell-when">{{ d.ago }}</td>
                             <td>

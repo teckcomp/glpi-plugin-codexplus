@@ -128,6 +128,17 @@ final class Rights
         return (bool) \Session::haveRight('config', UPDATE);
     }
 
+    /**
+     * "+" do Setor e das Categorias no formulário do documento (SC1).
+     * Desde o PL-1 (Claudio, 08/10/2026) segue a coluna "Gerenciar modelos,
+     * setores e categorias" — a mesma regra das Listas suspensas
+     * (StructureRights) — e continua valendo para o Super-Admin.
+     */
+    public static function canCreatePlacement(): bool
+    {
+        return self::isSuperAdmin() || (bool) \Session::haveRight(self::NAME, self::TEMPLATES);
+    }
+
     /** Quem pode ser auditor: bit Auditar; o Super-Admin fica fora (A2). */
     public static function auditorUsers(int $entityId): array
     {

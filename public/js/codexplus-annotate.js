@@ -650,6 +650,63 @@
         }
     }
 
+    /* PL-1 (Claudio, 08/10/2026): o invólucro span.cx-annot é SÓ da imagem
+       anotada — a primeira <img> dele. Como o span é em linha, o cursor logo
+       depois da imagem fica dentro dele: texto e imagens colados ali entravam
+       no invólucro, e ao clicar na 2ª imagem o Anotar abria o original (e as
+       marcas) da 1ª. tidyWrap devolve para fora, na mesma ordem, tudo o que
+       não é a imagem do invólucro; sem imagem, o invólucro sai. */
+    function tidyWrap(wrap) {
+        var parent = wrap.parentNode;
+        if (!parent) { return false; }
+        var img = wrap.querySelector('img');
+        if (!img) {
+            while (wrap.firstChild) { parent.insertBefore(wrap.firstChild, wrap); }
+            parent.removeChild(wrap);
+            return true;
+        }
+        var own = img, changed = false;
+        while (own.parentNode !== wrap) { own = own.parentNode; }
+        while (wrap.firstChild !== own) { parent.insertBefore(wrap.firstChild, wrap); changed = true; }
+        var ref = wrap.nextSibling;
+        while (own.nextSibling) { parent.insertBefore(own.nextSibling, ref); changed = true; }
+        return changed;
+    }
+    function needsTidy(wrap) {
+        var img = wrap.querySelector('img');
+        if (!img) { return true; }
+        var own = img;
+        while (own.parentNode !== wrap) { own = own.parentNode; }
+        return wrap.firstChild !== own || own.nextSibling !== null;
+    }
+    /** Arruma todos os invólucros de um trecho (o PreProcess recebe uma cópia). */
+    function tidyAll(root) {
+        var n = 0;
+        if (!root || !root.querySelectorAll) { return 0; }
+        Array.prototype.slice.call(root.querySelectorAll('span.cx-annot')).forEach(function (w) {
+            if (tidyWrap(w)) { n++; }
+        });
+        return n;
+    }
+    /** No editor aberto: arruma mantendo o cursor (marcadores do TinyMCE
+       andam junto com o que sai do invólucro). */
+    function tidy(editor) {
+        var body = editor && editor.getBody && editor.getBody();
+        if (!body || editor.__cxTidying) { return 0; }
+        var bad = Array.prototype.filter.call(body.querySelectorAll('span.cx-annot'), needsTidy);
+        if (!bad.length) { return 0; }
+        editor.__cxTidying = true;
+        var bm = null, n = 0;
+        try {
+            try { bm = editor.selection.getBookmark(); } catch (e) { bm = null; }
+            bad.forEach(function (w) { if (tidyWrap(w)) { n++; } });
+            if (bm) { try { editor.selection.moveToBookmark(bm); } catch (e) { /* cursor fica onde estiver */ } }
+        } finally {
+            editor.__cxTidying = false;
+        }
+        return n;
+    }
+
     function open(editor, imgEl) {
         imgEl = imgEl || editor.selection.getNode();
         if (!imgEl || imgEl.nodeName !== 'IMG') {
@@ -657,6 +714,12 @@
             return null;
         }
         var wrap = editor.dom.getParent(imgEl, 'span.cx-annot');
+        // PL-1: imagem que caiu dentro do invólucro de outra não é a anotada.
+        if (wrap && wrap.querySelector('img') !== imgEl) {
+            tidy(editor);
+            wrap = editor.dom.getParent(imgEl, 'span.cx-annot');
+            if (wrap && wrap.querySelector('img') !== imgEl) { wrap = null; }
+        }
         var orig = wrap ? wrap.getAttribute('data-cx-orig') : '';
         var raw = null;
         if (wrap) {
@@ -700,6 +763,7 @@
 
     window.CodexplusAnnotate = {
         open: open,
+        tidy: tidy, tidyAll: tidyAll,
         // Expostos para os testes (jsdom).
         _renderPng: renderPng, _cleanData: cleanData, _openEditor: openEditor,
         _applyToEditor: applyToEditor, _isSaved: isSaved, _pending: pendingUploads

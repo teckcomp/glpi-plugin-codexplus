@@ -739,7 +739,7 @@ if ($canEdit) {
     }
     $placement = [
         'can_change' => $catCanChange,
-        'can_create' => Rights::isSuperAdmin(),
+        'can_create' => Rights::canCreatePlacement(),
         'ajax'       => $CFG_GLPI['root_doc'] . '/plugins/codexplus/ajax/placement.php',
         'json'       => json_encode([
             'tree'     => Category::placementTree(),

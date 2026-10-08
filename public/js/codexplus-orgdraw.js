@@ -63,9 +63,43 @@
     function photoUrl(t, size) {
         return PHOTO_BASE && isPhoto(t) ? PHOTO_BASE + (PHOTO_BASE.indexOf('?') < 0 ? '?' : '&') + 't=' + t + '&s=' + (size === 'f' ? 'f' : 't') : '';
     }
+    /* PL-3b: PNG e PDF — a imagem de SVG (e o iframe de impressão) não deve
+       depender de buscar a foto depois: as miniaturas entram no SVG como data
+       URL. Foto que não vier (sem acesso, apagada) fica como o círculo vazio. */
+    var inlineCache = {};
+    function toDataUrl(url) {
+        if (!inlineCache[url]) {
+            inlineCache[url] = fetch(url, { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.blob() : null; })
+                .then(function (b) {
+                    if (!b) { return ''; }
+                    return new Promise(function (ok) {
+                        var fr = new FileReader();
+                        fr.onload = function () { ok(String(fr.result || '')); };
+                        fr.onerror = function () { ok(''); };
+                        fr.readAsDataURL(b);
+                    });
+                }).catch(function () { return ''; });
+        }
+        return inlineCache[url];
+    }
+    function inlinePhotos(svgText) {
+        var re = /<image href="([^"]+)"/g, urls = {}, m;
+        while ((m = re.exec(svgText))) { urls[m[1]] = true; }
+        var list = Object.keys(urls);
+        if (!list.length || !window.fetch || !window.FileReader) { return Promise.resolve(svgText); }
+        return Promise.all(list.map(function (u) { return toDataUrl(u.replace(/&amp;/g, '&')); })).then(function (datas) {
+            var map = {};
+            list.forEach(function (u, i) { map[u] = datas[i]; });
+            return svgText.replace(/<image href="([^"]+)"([^>]*)\/>/g, function (all, u, rest) {
+                return map[u] ? '<image href="' + map[u] + '"' + rest + '/>' : '';
+            });
+        });
+    }
+
     function avatarSvg(cx, cy, r, ring, n) {
         var id = 'cxph' + (++phSeq) + Math.random().toString(36).slice(2, 6), url = photoUrl(n.photo, 't');
-        return '<g data-photo="' + esc(n.photo) + '" data-pid="' + esc(n.id) + '" style="cursor:pointer">'
+        return '<g data-photo="' + esc(n.photo) + '" data-pid="' + esc(n.id) + '">'
             + '<clipPath id="' + id + '"><circle cx="' + r1(cx) + '" cy="' + r1(cy) + '" r="' + r + '"/></clipPath>'
             + '<circle cx="' + r1(cx) + '" cy="' + r1(cy) + '" r="' + r + '" fill="#d6dde6"/>'
             + (url ? '<image href="' + esc(url) + '" x="' + r1(cx - r) + '" y="' + r1(cy - r) + '" width="' + (2 * r) + '" height="' + (2 * r) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + id + ')"/>' : '')
@@ -598,7 +632,9 @@
                 ? '<button type="button" class="codexplus-btn codexplus-btn-primary" data-act="edit"><i class="ti ti-pencil"></i> Abrir o organograma</button>'
                   + '<span class="cx-flow-state" aria-live="polite"></span>'
                 : '')
-            + '<button type="button" class="codexplus-btn" data-act="png" title="Baixar o organograma como imagem PNG (o que está salvo)"><i class="ti ti-photo-down"></i> Baixar PNG</button>'
+            // PL-3b-2 (Claudio, 08/10/2026): sem "Baixar PNG" no organograma —
+            // com as fotos das pessoas, a imagem solta circularia fora do
+            // Codex+. O PDF continua (impresso a partir da página).
             + '<button type="button" class="codexplus-btn" data-act="pdf"' + (editable ? '' : ' hidden style="display:none"') + ' title="Exportar o organograma em PDF (o que está salvo)"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>'
             + '</div>'
             + '<div class="cx-org-tools">'
@@ -765,11 +801,12 @@
            data URL (as mesmas usadas para medir os textos). */
         function png() {
             var btn = root.querySelector('[data-act="png"]');
-            if (btn.disabled) { return; }
-            btn.disabled = true;
-            fontCss().then(function (css) {
-                var r = svg(S, { bg: '#ffffff' }), k = 2;
-                var s2 = r.svg.replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1 width="' + r.w * k + '" height="' + r.h * k + '"')
+            if (btn && btn.disabled) { return; }
+            if (btn) { btn.disabled = true; }
+            var r = svg(S, { bg: '#ffffff' }), k = 2;
+            Promise.all([fontCss(), inlinePhotos(r.svg)]).then(function (got) {
+                var css = got[0];
+                var s2 = got[1].replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1 width="' + r.w * k + '" height="' + r.h * k + '"')
                     .replace(/(<svg[^>]*>)/, '$1<defs><style>' + css + '</style></defs>');
                 return new Promise(function (ok, fail) {
                     var im = new Image(), url = URL.createObjectURL(new Blob([s2], { type: 'image/svg+xml' }));
@@ -792,7 +829,7 @@
                 setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
             }).catch(function () {
                 window.alert('Não foi possível gerar a imagem do organograma.');
-            }).then(function () { btn.disabled = false; });
+            }).then(function () { if (btn) { btn.disabled = false; } });
         }
 
         // A medida só vale com a fonte carregada: redesenha quando chegar.
@@ -823,6 +860,10 @@
         var MM = 96 / 25.4;
         function pdf() {
             var r = svg(S, { pad: false });
+            // PL-3b: fotos embutidas antes de montar a página de impressão.
+            inlinePhotos(r.svg).then(function (txt) { r.svg = txt; pdfPrint(r); });
+        }
+        function pdfPrint(r) {
             var land = r.w > r.h * 0.9;
             var aw = (land ? 277 : 190) * MM, ah = ((land ? 190 : 277) - 24) * MM;
             var k = Math.min(aw / r.w, ah / r.h, 1.5);
@@ -859,6 +900,67 @@
             var ready = function () { if (d.fonts && d.fonts.ready) { d.fonts.ready.then(go, go); } else { go(); } };
             if (link && !link.sheet) { link.addEventListener('load', ready); link.addEventListener('error', go); } else { ready(); }
         }
+
+        /* PL-3b (Claudio, 08/10/2026, mockup 2): clicar na foto do cartão ou
+           na miniatura de uma linha abre o balão com a foto ampliada (400 px
+           guardada, 220 na tela), o nome e o cargo. Só na página (leitura e
+           tela cheia); no quadro o clique seleciona a pessoa. Fecha com Esc,
+           ×, clique fora ou clicando de novo na mesma foto; ao rolar,
+           acompanha a foto e fecha se ela sair de vista (achado 160). */
+        var pop = null;
+        function popClose() {
+            if (!pop) { return; }
+            pop.el.remove();
+            pop = null;
+            document.removeEventListener('keydown', popKey, true);
+            document.removeEventListener('pointerdown', popOutside, true);
+            window.removeEventListener('scroll', popPlace, true);
+            window.removeEventListener('resize', popPlace);
+        }
+        function popKey(e) { if (e.key === 'Escape') { e.stopPropagation(); popClose(); } }
+        function popOutside(e) {
+            if (pop && !pop.el.contains(e.target) && !(e.target.closest && e.target.closest('[data-photo]') === pop.anchor)) { popClose(); }
+        }
+        function popPlace() {
+            if (!pop) { return; }
+            if (!pop.anchor.isConnected) { popClose(); return; }
+            var a = pop.anchor.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+            if (a.bottom < 0 || a.top > vh || a.right < 0 || a.left > vw) { popClose(); return; }
+            var w = pop.el.offsetWidth || 250, h = pop.el.offsetHeight || 300, gap = 12;
+            var x = a.right + gap + w <= vw - 8 ? a.right + gap : Math.max(8, a.left - gap - w);
+            var y = Math.min(Math.max(8, a.top + a.height / 2 - 40), Math.max(8, vh - h - 8));
+            pop.el.style.left = Math.round(x) + 'px';
+            pop.el.style.top = Math.round(y) + 'px';
+        }
+        function popOpen(anchor) {
+            var tok = anchor.getAttribute('data-photo'), pid = anchor.getAttribute('data-pid');
+            if (pop && pop.anchor === anchor) { popClose(); return; }
+            popClose();
+            var n = S.nodes.filter(function (x) { return x.id === pid; })[0];
+            var url = photoUrl(tok, 'f');
+            if (!n || !url) { return; }
+            var el = document.createElement('div');
+            el.className = 'cx-org-photo-pop';
+            el.setAttribute('role', 'dialog');
+            el.setAttribute('aria-label', 'Foto de ' + label(n));
+            el.innerHTML = '<button type="button" class="cx-org-photo-x" aria-label="Fechar">×</button>'
+                + '<img src="' + esc(url) + '" alt="' + esc(label(n)) + '" width="220" height="220">'
+                + '<div class="cx-org-photo-n">' + esc(label(n)) + '</div>'
+                + (n.role ? '<div class="cx-org-photo-r">' + esc(n.role) + '</div>' : '');
+            (document.fullscreenElement || document.body).appendChild(el); // achado 121
+            pop = { el: el, anchor: anchor };
+            el.querySelector('.cx-org-photo-x').addEventListener('click', popClose);
+            popPlace();
+            document.addEventListener('keydown', popKey, true);
+            document.addEventListener('pointerdown', popOutside, true);
+            window.addEventListener('scroll', popPlace, true);
+            window.addEventListener('resize', popPlace);
+        }
+        stage.addEventListener('click', function (e) {
+            var ph = e.target.closest && e.target.closest('[data-photo]');
+            if (ph && stage.contains(ph)) { e.stopPropagation(); popOpen(ph); }
+        });
+        document.addEventListener('fullscreenchange', popClose);
 
         root.addEventListener('click', function (e) {
             var b = e.target.closest('button[data-act]');

@@ -2971,3 +2971,19 @@ html.cx-board-open { overflow: hidden; }
 .cx-oph-sq { position: absolute; box-sizing: border-box; border: 2px solid #fff; box-shadow: 0 0 0 999px rgba(0, 0, 0, .45); cursor: move; touch-action: none; }
 .cx-oph-ci { position: absolute; inset: 0; border: 1px dashed rgba(255, 255, 255, .85); border-radius: 50%; pointer-events: none; }
 .cx-oph-h { position: absolute; right: -7px; bottom: -7px; width: 12px; height: 12px; background: #fff; border: 1px solid var(--cx-accent); cursor: nwse-resize; }
+
+/* PL-3b — foto ampliada (balão) na leitura do organograma */
+.cx-orgview-stage [data-photo] { cursor: zoom-in; }
+.cx-org-photo-pop {
+    position: fixed; z-index: 100001; width: 244px; box-sizing: border-box;
+    background: #fff; border: 1px solid var(--cx-border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, .18); padding: 12px;
+    font-family: "IBM Plex Sans", Arial, sans-serif; color: #17202d;
+}
+.cx-org-photo-pop img { display: block; width: 220px; height: 220px; object-fit: cover; border-radius: 8px; background: #d6dde6; }
+.cx-org-photo-n { margin-top: 8px; font-weight: 600; font-size: 15px; }
+.cx-org-photo-r { font-size: 12.5px; color: var(--cx-muted); }
+.cx-org-photo-x {
+    position: absolute; right: 4px; top: 2px; border: 0; background: transparent;
+    font-size: 18px; line-height: 1; color: var(--cx-muted); cursor: pointer; padding: 4px 6px;
+}

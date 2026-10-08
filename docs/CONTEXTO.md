@@ -2990,6 +2990,31 @@ no PNG ficam para o **PL-3b**.
 - **Painel da pessoa** (quadro): campo **Foto** com Escolher/Trocar e Tirar,
   no desfazer.
 
+### 3.32 PL-3b — Foto ampliada, PNG e PDF com as fotos (`v0.8.3`, 08/10/2026)
+
+Só JS e CSS (`codexplus-orgdraw.js`, `codexplus.css`); sem versão nova.
+
+- **Balão:** na página do organograma (leitura, edição fora do quadro e
+  tela cheia), clicar na foto do cartão ou na miniatura de uma linha abre a
+  foto ampliada (220 px na tela; a guardada tem até 400 px — recorte menor
+  que isso fica no tamanho do recorte, sem ampliar), o nome e o cargo. Fecha
+  com Esc, ×, clique fora ou clicando de novo na mesma foto; acompanha a
+  rolagem e fecha se a foto sair de vista (achado 160); dentro da tela cheia
+  vai para o `fullscreenElement` (achado 121) e fecha ao sair dela. No
+  quadro o clique continua selecionando.
+- **Sem "Baixar PNG" no organograma** (PL-3b-2, Claudio, 08/10/2026): com
+  as fotos, a imagem solta circularia fora do Codex+. O botão saiu da barra
+  da página (no quadro ele já não existia para o organograma); `png()` fica
+  só na API, sem botão. Fluxograma, Planta e Topologia continuam com o PNG.
+- **PNG e PDF:** `inlinePhotos()` troca o endereço de cada miniatura pela
+  data URL antes de rasterizar ou imprimir (com cache por endereço). Foto
+  que não vier fica como o círculo vazio.
+- **Commit único do PL-2 e do PL-3a** (`5e00b84`): o PL-2 foi validado mas
+  não commitado antes do PL-3a (achados 75 e 99 de novo).
+- **Limite conhecido:** o PDF completo em cascata (5d) desenha o
+  organograma vinculado sem as fotos (só os círculos) — fica com o item (3)
+  da Pós-produção.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

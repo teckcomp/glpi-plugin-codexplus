@@ -2,6 +2,12 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.3` em produção** desde **08/10/2026** (seção 3.33):
+> ajustes do uso real — PL-1 ("+" pelo direito Gerenciar, coluna Revisor /
+> Editor, Anotar), PL-2 (Leitura "Todos"), PL-3a/3b (foto no organograma,
+> balão, PDF com fotos, sem PNG). Commits `7264ffa`, `5e00b84`, `a71a149`;
+> tag `v0.8.3`. Seções 3.29 a 3.33; achados 173 e 174.
+> Antes:
 > Estado: **`v0.8.0` em produção** desde **06/10/2026** (seção 3.28):
 > P-1 e P-2 concluídos, banco da produção idêntico ao da homologação.
 > **Validação com uso real por ~15 dias** (até ~21/10/2026); P-3 (dados da
@@ -3015,6 +3021,21 @@ Só JS e CSS (`codexplus-orgdraw.js`, `codexplus.css`); sem versão nova.
   organograma vinculado sem as fotos (só os círculos) — fica com o item (3)
   da Pós-produção.
 
+### 3.33 Produção em 0.8.3 (08/10/2026)
+
+- Homologação: PL-1 `7264ffa`, PL-2 + PL-3a `5e00b84` (um commit só: o PL-2
+  foi validado e não commitado antes do PL-3a), PL-3b `a71a149`. Tag
+  **`v0.8.3`** criada na homologação.
+- **Decisão de Claudio (08/10/2026):** tudo validado na homologação primeiro
+  e **uma subida só** para a produção, pela tag final (não uma tag por
+  pacote).
+- Produção: backup `/root/backup/glpi-antes-0.8.3-2026-10-08-1720.sql.gz`
+  (62 MB, dump completo), `git fetch --tags && git checkout v0.8.3`,
+  `plugin:install --force` + `activate` (0.8.3 Habilitado), tabela
+  `orgphotos` e coluna `read_all` criadas. Conferido no navegador por
+  Claudio: coluna Revisor / Editor, "+", Anotar (documento do GLPI Agent
+  consertado ao salvar), Leitura Todos, organograma.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3853,6 +3874,14 @@ depender do comportamento errático de `position: fixed` na impressão.
     `<img>` — no `PreProcess` (gravado), no `SetContent`/`NodeChange` (tela,
     com bookmark do TinyMCE para o cursor não pular) e no `open()`.
     Documento já gravado assim se conserta ao abrir a edição e salvar.
+174. **Caminho com espaço no cmd do Windows** (PC "Analista Resolutto"):
+    `ssh -i %USERPROFILE%\.ssh\id_ed25519 …` quebra no espaço do nome do
+    usuário ("Identity file C:\Users\Analista not accessible"). Sempre entre
+    aspas: `ssh -i "%USERPROFILE%\.ssh\id_ed25519" -p 2022 …` (vale para
+    `scp` também). Listagem do backup: `ls | tail` em ordem alfabética
+    esconde o arquivo novo ("glpi-antes…" vem antes de "glpidb…"); conferir
+    pelo nome e pelo `-- Dump completed` no fim.
+
 
 ## 6. Contrato de código — não quebrar
 

@@ -1,5 +1,9 @@
 # Codex+ — roadmap
 
+> **Produção em `v0.8.3` desde 08/10/2026** — ajustes do uso real, seção
+> "Ajustes do uso em produção" abaixo (PL-1, PL-2, PL-3a, PL-3b). Segue a
+> validação com uso real até ~21/10/2026.
+> Antes:
 > **Em produção desde 06/10/2026** (P-1 e P-2 ✅, banco idêntico ao da
 > homologação). Validação com uso real por ~15 dias; P-3a, P-3b e P-4
 > depois, como pós-produção (Claudio, 06/10).
@@ -744,6 +748,18 @@ POP e PSG.
 | 5c/5e | Faz parte de; aviso ao pai; Painel de vínculos | `7315adf` |
 | 5d | PDF completo em cascata com sumário | `ea02b8a` |
 
+## Ajustes do uso em produção (08/10/2026) ✅ `v0.8.3`
+
+Pedidos de Claudio no uso real; tudo na homologação primeiro e uma subida
+só pela tag `v0.8.3` (CONTEXTO 3.29 a 3.33).
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| PL-1 | "+" de Setor e Categorias pela coluna "Gerenciar modelos, setores e categorias"; coluna **Revisor / Editor** nos recentes do Painel; **Anotar** abria a 1ª imagem ao clicar na 2ª (achado 173) | `7264ffa` |
+| PL-2 | Leitura **"Todos"** (quem tem Ler no Codex+ na entidade do documento), coluna `read_all` | `5e00b84` |
+| PL-3a | **Foto das pessoas no organograma** (opção B: cartão + miniatura nas linhas; opção 2: tabela própria `orgphotos`, para 100+ pessoas) | `5e00b84` |
+| PL-3b | **Balão** com a foto ampliada, PDF com as fotos, **sem "Baixar PNG"** no organograma | `a71a149` |
+
 ## Pós-produção (Claudio, 04/10/2026)
 
 Tudo o que não entrou na Reta final. Atualizações já em produção, por
@@ -758,7 +774,9 @@ depois. Números da lista revisada de 04/10 entre parênteses.
   complementares (`codexplus-export.js` não os monta)
 - (3) PDF completo em cascata: matriz RACI e cronograma saem como nota
   (`diagramSvg` só desenha fluxograma e organograma); conferir a folha
-  deitada em outros navegadores. Segue só interno (não no link público)
+  deitada em outros navegadores. Segue só interno (não no link público).
+  **Desde o PL-3b:** o organograma vinculado sai sem as fotos (só os
+  círculos) — embutir as do documento vinculado
 - (4) Leitura comum (sem Visualizar) ainda no formato antigo: decidir se
   vira folhas também
 
@@ -811,6 +829,11 @@ depois. Números da lista revisada de 04/10 entre parênteses.
   (inofensivo; não vai para produção)
 - (30) "Autor:" vazio em documentos migrados sem autor: mostrar "—"
   (confirmar na tela)
+- (38) Fotos do organograma sem uso (trocadas, ou de pessoas excluídas) que
+  nenhuma versão guardada cita: limpeza em `orgphotos` (PL-3a)
+- (39) Seção "Acesso anônimo" visível já no rascunho, desativada, com o
+  aviso "disponível depois de publicar" (sugestão de 08/10; só se fizer
+  falta)
 
 **Outros:**
 

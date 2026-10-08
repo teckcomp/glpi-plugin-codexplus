@@ -1,13 +1,14 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 06/10/2026 (noite), depois do **P-2 ✅**: Codex+ 0.8.0 em
-> produção. Validação com uso real por ~15 dias (até ~21/10/2026).
+> Gerado em 08/10/2026 (noite), depois da subida da **`v0.8.3`** para a
+> produção (PL-1, PL-2, PL-3a, PL-3b — CONTEXTO 3.29 a 3.33). Validação com
+> uso real segue até ~21/10/2026.
 
 ## Estado
 
-- Versão: **`0.8.0`**, tag **`v0.8.0`** (commit do F-0 com estes docs).
-  Plugin 0.8.0 habilitado na homologação. Catálogo do mapa
+- Versão: **`0.8.3`**, tag **`v0.8.3`** (`a71a149`), **na homologação e na
+  produção**. Os commits de docs depois da tag não precisam de subida. Catálogo do mapa
   de calor com o XV2-2X e os perfis de referência. Ação automática
   `codexplusexpiry` ativa; notificações por e-mail **desligadas** na
   homologação (Claudio: a Teckcomp não usa; pronto para terceiros).
@@ -16,7 +17,13 @@
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
   (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
   MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
-- **Produção (futura): Debian 13, SSH porta 2022.** Depois do F-0.
+- **Produção: Debian 13, SSH porta 2022**, chave do PC "Analista Resolutto"
+  — **com aspas** (achado 174):
+  `ssh -i "%USERPROFILE%\.ssh\id_ed25519" -p 2022 resolutto@177.87.230.179`
+  + `su -`. Repositório em tag (`git describe --tags`); atualizar por
+  `git fetch --tags && git checkout <tag>` + reinstalação + `cache:clear` +
+  restart. Backup antes, em `/root/backup`, conferido pelo nome e pelo
+  `-- Dump completed`.
 - Envio do PC (cmd do Windows) — **sempre as duas linhas**, uma por PC
   (achado 98):
   ```
@@ -73,21 +80,25 @@
 12. ~~**Q5i-6**~~ → Pós-produção (mesmo motivo)
 13. ~~**F-0**~~ ✅ tag `v0.8.0` — instalação do zero idêntica à homologação → **P-1 a P-4** (produção)
 
+## Regra para as próximas mudanças (Claudio, 08/10/2026)
+
+Tudo na **homologação primeiro**, um pacote por bloco com commit (sem tag)
+antes do pacote seguinte; quando o conjunto estiver validado, **uma subida
+só** para a produção pela tag final (backup → checkout da tag →
+reinstalação → conferência no navegador).
+
 ## Próximo passo imediato
 
-**Validação em produção (~15 dias, até ~21/10/2026)** — Claudio usa o
-Codex+ 0.8.0 nas rotinas reais. Correções que surgirem: pacote validado na
-homologação primeiro, commit, e na produção atualizar pela nova tag (CONTEXTO
-3.28). Produção: `ssh -i %USERPROFILE%\.ssh\id_ed25519 -p 2022
-resolutto@177.87.230.179` + `su -`; backup do banco antes de qualquer
-mudança, em `/root/backup` (não em `/var`).
+**Validação em produção até ~21/10/2026** — Claudio usa o Codex+ 0.8.3 nas
+rotinas reais. O que surgir vira um novo conjunto PL-n (mesma regra acima).
 
 Depois da validação, como pós-produção: **P-3a** (cadastros da homologação;
 começar por um script de leitura nos dois servidores — usuários, grupos e o
 que existe de cada lado; correspondência por login e nome de grupo),
 **P-3b** (documentos escolhidos, lista com Claudio) e **P-4** (ponta a ponta
 e ação automática de vencimento). Em paralelo, a lista **Pós-produção** do
-ROADMAP.
+ROADMAP (novos: (3) fotos no PDF em cascata, (38) limpeza de fotos sem uso,
+(39) seção de acesso anônimo no rascunho).
 
 Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
 `setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar

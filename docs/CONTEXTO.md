@@ -3036,6 +3036,29 @@ Só JS e CSS (`codexplus-orgdraw.js`, `codexplus.css`); sem versão nova.
   Claudio: coluna Revisor / Editor, "+", Anotar (documento do GLPI Agent
   consertado ao salvar), Leitura Todos, organograma.
 
+### 3.34 PL-4 — Barra do editor presa e link público no diagrama (19/10/2026)
+
+Feedback da produção (Claudio, 19/10/2026), primeiro bloco da lista PL-4 a
+PL-9 (ROADMAP, "Ajustes do uso em produção — 2ª rodada"). Sem reinstalar.
+
+- **Barra do editor acompanha a rolagem** (`codexplus-editor.js`):
+  `toolbar_sticky` do TinyMCE no layout clássico; `toolbar_sticky_offset`
+  medido na página por `topOffset()` (desce pelo meio da tela enquanto o
+  elemento for `fixed`/`sticky`). Medido de novo no `setup`. O cabeçalho do
+  GLPI é `sticky-lg-top`: 56 px no menu lateral, 135 px no horizontal (barra
+  + trilha); abaixo de 992 px não gruda e a medida dá 0 (achado 175).
+- **Link público no diagrama** (`Document::isAnonymousReadable()` sem a
+  exclusão do DIA; `front/public.php`; `templates/public.html.twig`): a
+  página pública desenha a versão mostrada (na revisão, a publicada em
+  vigor) com os motores da leitura interna — fluxograma, organograma, RACI e
+  cronograma, só leitura. "Exportar PDF" do topo aciona o PDF do motor.
+  Cronograma com datas: situação das tarefas, **sem o histórico** (traz nomes
+  de quem marcou). Fotos do organograma pela mesma rota, **`?p=<link>&t=<foto>`**
+  (o `t` do motor é o da foto), só fotos citadas no desenho mostrado; o resto
+  é 404. Texto que cita um DIA com link passa a apontar para o link dele.
+- Ícones criados na instalação não entram: o fluxograma só desenha os
+  Lucide embutidos (`_clean` descarta ícone solto).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3882,6 +3905,11 @@ depender do comportamento errático de `position: fixed` na impressão.
     esconde o arquivo novo ("glpi-antes…" vem antes de "glpidb…"); conferir
     pelo nome e pelo `-- Dump completed` no fim.
 
+175. **Cabeçalho do GLPI 11 gruda só em tela larga** (`header.navbar
+    sticky-lg-top`). No menu horizontal a trilha (breadcrumb) gruda junto:
+    medir na página, não fixar 56 px. TinyMCE 7: `tinymce.get()`, não
+    `tinymce.editors` (sumiu). No container, `printf 'a%.0s' {1..48}` não
+    expande (o shell é `sh`): gerar token de teste em Python.
 
 ## 6. Contrato de código — não quebrar
 

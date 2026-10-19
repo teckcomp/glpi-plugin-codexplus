@@ -2,7 +2,10 @@
    nem o menu do GLPI. Variáveis: root, version, company, doc (null = link
    indisponível; senão name, code, date, updating, html), print_config.
    R7-2: as folhas do PDF são montadas por public/js/codexplus.js
-   (renderSheets) a partir do artigo, que some quando elas ficam prontas. #}
+   (renderSheets) a partir do artigo, que some quando elas ficam prontas.
+   PL-4: doc.diagram (null = documento de texto; senão kind, json, status,
+   photo, sign) desenha o diagrama com os motores da leitura
+   interna, só leitura; o Exportar PDF aciona o PDF do próprio motor. #}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -18,7 +21,12 @@
     <main class="cx-public">
         <header class="cx-public-bar">
             {% if company %}<span class="cx-public-brand">{{ company }}</span>{% endif %}
-            <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">{{ __('Exportar PDF', 'codexplus') }}</button>
+            {% if doc.diagram %}
+                <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-dia-pdf"
+                        onclick="var b = document.querySelector('#codexplus-doc [data-cx-grid] [data-act=pdf], #codexplus-doc [data-cx-orgview] [data-act=pdf], #codexplus-doc [data-cx-flow] [data-act=pdf]'); if (b) { b.click(); }">{{ __('Exportar PDF', 'codexplus') }}</button>
+            {% else %}
+                <button type="button" class="codexplus-btn codexplus-btn-primary" id="codexplus-pdf">{{ __('Exportar PDF', 'codexplus') }}</button>
+            {% endif %}
         </header>
         {% if doc.updating %}
             <div class="cx-notice cx-notice--warn">
@@ -34,10 +42,37 @@
             {% if doc.date %}
                 <div class="cx-public-meta">{{ __('Publicado em %s', 'codexplus')|format(doc.date|date('d/m/Y')) }}</div>
             {% endif %}
-            <div class="codexplus-content rich_text_container">{{ doc.html|raw }}</div>
-            <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
+            {% if doc.diagram %}
+                {% set dia = doc.diagram %}
+                {% if dia.kind == 'fluxograma' %}
+                    <script type="application/json" id="cx-flow-data">{{ dia.json|raw }}</script>
+                    <div class="cx-docform-diagram" data-cx-flow data-editable="0" data-source="cx-flow-data"
+                         data-sign="{{ dia.sign ? __('Aprovadores', 'codexplus') ~ ': ' ~ dia.sign : '' }}"
+                         data-title="{{ doc.name }}" data-code="{{ doc.code }}"></div>
+                {% elseif dia.kind == 'organograma' %}
+                    <script type="application/json" id="cx-org-data">{{ dia.json|raw }}</script>
+                    <div class="cx-docform-diagram" data-cx-orgview data-source="cx-org-data"
+                         data-sign="{{ dia.sign ? __('Aprovadores', 'codexplus') ~ ': ' ~ dia.sign : '' }}"
+                         data-title="{{ doc.name }}" data-code="{{ doc.code }}" data-photo="{{ dia.photo }}"></div>
+                {% else %}
+                    <script type="application/json" id="cx-grid-data">{{ dia.json|raw }}</script>
+                    {% if dia.status %}
+                        <script type="application/json" id="cx-grid-status">{{ dia.status|raw }}</script>
+                        <script type="application/json" id="cx-grid-hist">{}</script>
+                    {% endif %}
+                    <div class="cx-docform-diagram" data-cx-grid data-editable="0" data-source="cx-grid-data"
+                         data-sign="{{ dia.sign ? __('Aprovadores', 'codexplus') ~ ': ' ~ dia.sign : '' }}"
+                         data-title="{{ doc.name }}" data-code="{{ doc.code }}"
+                         {% if dia.status %}data-status="cx-grid-status" data-hist="cx-grid-hist"{% endif %}></div>
+                {% endif %}
+            {% else %}
+                <div class="codexplus-content rich_text_container">{{ doc.html|raw }}</div>
+                <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
+            {% endif %}
         </article>
-        <div class="cx-sheets" data-cx-sheets></div>
+        {% if not doc.diagram %}
+            <div class="cx-sheets" data-cx-sheets></div>
+        {% endif %}
         {# R7-2b: anexos (fora das folhas, como na página interna). #}
         {% if doc.files %}
             <section class="cx-public-files">
@@ -57,6 +92,12 @@
 {% endif %}
 {% if doc %}
     <script src="{{ root }}/plugins/codexplus/js/codexplus.js?v={{ version }}"></script>
+    {% if doc.diagram %}
+        {# PL-4: os motores da leitura interna, na mesma ordem do setup.php. #}
+        {% for js in ['orgdraw', 'grid', 'icons', 'lucide', 'rf', 'orgphoto', 'board', 'flow'] %}
+            <script src="{{ root }}/plugins/codexplus/js/codexplus-{{ js }}.js?v={{ version }}"></script>
+        {% endfor %}
+    {% endif %}
 {% endif %}
 </body>
 </html>

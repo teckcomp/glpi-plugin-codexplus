@@ -639,13 +639,13 @@ class Document extends CommonDBTM
 
     /**
      * O documento pode ser lido pelo link? Publicado, ou em revisão (o link
-     * mostra a versão publicada em vigor). Diagrama fica fora (Claudio,
-     * 04/10/2026). Lixeira, rascunho nunca publicado e obsoleto: não.
+     * mostra a versão publicada em vigor). PL-4 (Claudio, 19/10/2026): o
+     * diagrama também tem link (antes ficava fora). Lixeira, rascunho nunca
+     * publicado e obsoleto: não.
      */
     public function isAnonymousReadable(): bool
     {
         return empty($this->fields['is_deleted'])
-            && (string) ($this->fields['doctype'] ?? '') !== 'DIA'
             && ($this->status() === self::STATUS_PUBLISHED || $this->isInRevision());
     }
 

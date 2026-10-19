@@ -14,6 +14,11 @@
  * A4, mesmo motor do "Visualizar"), com Exportar PDF. A logo da marca vem
  * por esta mesma rota (?t=…&logo=1): só a do documento do link. Imagens do
  * corpo e anexos: R7-2b.
+ *
+ * PL-4 (Claudio, 19/10/2026): o diagrama (DIA) também tem link. A página
+ * desenha a versão mostrada com os mesmos motores da leitura interna
+ * (fluxograma, organograma, matriz RACI e cronograma), só leitura. Fotos do
+ * organograma por esta rota (?p=<link>&t=<foto>), só as do desenho mostrado.
  */
 
 use Glpi\Application\View\TemplateRenderer;
@@ -21,9 +26,14 @@ use Glpi\RichText\RichText;
 use Glpi\Exception\Http\NotFoundHttpException;
 use GlpiPlugin\Codexplus\Brand;
 use GlpiPlugin\Codexplus\Branding;
+use GlpiPlugin\Codexplus\Diagram;
 use GlpiPlugin\Codexplus\Document;
+use GlpiPlugin\Codexplus\DocumentApprover;
 use GlpiPlugin\Codexplus\DocumentMeta;
 use GlpiPlugin\Codexplus\DocumentVersion;
+use GlpiPlugin\Codexplus\OrgPhoto;
+use GlpiPlugin\Codexplus\ScheduleStatus;
+use Symfony\Component\HttpFoundation\Response;
 
 /** @var array $CFG_GLPI */
 global $CFG_GLPI;
@@ -51,6 +61,54 @@ $shownContent = static function (Document $d): ?string {
     $v = DocumentVersion::get((int) $d->fields['id'], (int) $d->fields['revision'] - 1);
     return $v === null ? null : (string) $v['content'];
 };
+
+// PL-4: diagrama mostrado (na revisão, o da versão publicada em vigor).
+$shownDiagram = static function (Document $d): ?array {
+    if ((string) $d->fields['doctype'] !== 'DIA') {
+        return null;
+    }
+    if ($d->isInRevision()) {
+        $v = DocumentVersion::get((int) $d->fields['id'], (int) $d->fields['revision'] - 1);
+        return $v === null ? null : DocumentVersion::diagramOf($v);
+    }
+    $l = Diagram::load((int) $d->fields['id']);
+    return $l === null ? null : $l['data'];
+};
+
+// PL-4: fotos citadas no desenho mostrado (chave "photo" em qualquer nível).
+$photoTokens = static function (array $data): array {
+    $out = [];
+    array_walk_recursive($data, static function ($v, $k) use (&$out) {
+        if ($k === 'photo' && OrgPhoto::isToken($v)) {
+            $out[] = $v;
+        }
+    });
+    return $out;
+};
+
+// PL-4: foto do organograma pelo link. ?p = token do link, ?t = foto.
+if (isset($_GET['p'])) {
+    $pdoc = Document::findByAnonToken((string) $_GET['p']);
+    $ptok = (string) ($_GET['t'] ?? '');
+    $data = $pdoc === null ? null : $shownDiagram($pdoc);
+    if ($data === null || !OrgPhoto::isToken($ptok) || !in_array($ptok, $photoTokens($data), true)) {
+        throw new NotFoundHttpException();
+    }
+    $bin = OrgPhoto::get((int) $pdoc->fields['id'], $ptok, ($_GET['s'] ?? 't') !== 'f');
+    if ($bin === null) {
+        throw new NotFoundHttpException();
+    }
+    header_remove('Cache-Control');
+    header_remove('Pragma');
+    header_remove('Expires');
+    return new Response($bin, 200, [
+        'Content-Type'           => 'image/jpeg',
+        'Content-Length'         => (string) strlen($bin),
+        'Cache-Control'          => 'private, max-age=31536000, immutable',
+        'X-Content-Type-Options' => 'nosniff',
+        'X-Robots-Tag'           => 'noindex, nofollow',
+    ]);
+}
 
 /**
  * R7-2b: arquivos que o link entrega — os ligados a ESTE documento E (citados
@@ -129,6 +187,7 @@ if ($doc === null) {
     $code    = $doc->getCode();
     $date    = (string) ($doc->fields['date_published'] ?? '');
     $updating = false;
+    $v        = null;
     if ($doc->isInRevision()) {
         // Durante a revisão, a versão publicada em vigor (como para o leitor).
         $prev = (int) $doc->fields['revision'] - 1;
@@ -182,6 +241,34 @@ if ($doc === null) {
             'history'        => DocumentMeta::flowOf((string) $doc->fields['doctype']) === DocumentMeta::FLOW_DIRECT ? []
                 : DocumentVersion::history((int) $doc->fields['id'], $rev, $doc),
         ], $brandId, $self . '&logo=1');
+        // PL-4: diagrama — os dados vão para os motores da leitura interna.
+        $diagram = null;
+        $dData   = $shownDiagram($doc);
+        if ((string) $doc->fields['doctype'] === 'DIA' && $dData !== null) {
+            $jflags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE; // achado 14
+            $dJson  = (string) json_encode($dData, $jflags);
+            $kind   = Diagram::subtypeOf($dData);
+            // Cronograma com datas: a situação das tarefas, só para ver (sem
+            // o histórico, que traz nomes de quem marcou).
+            $status = '';
+            if ($kind === Diagram::SUBTYPE_SCHEDULE && ($dData['mode'] ?? '') === Diagram::SCHEDULE_MODE_DATES) {
+                $status = (string) json_encode((object) ScheduleStatus::load((int) $doc->fields['id']), $jflags);
+            }
+            $diagram = [
+                'kind'   => $kind,
+                'json'   => $dJson,
+                'status' => $status,
+                'photo'  => $CFG_GLPI['root_doc'] . '/plugins/codexplus/front/public.php?p=' . $token,
+                'sign'   => $updating
+                    ? ($doc->usesApprovers() && $v !== null ? DocumentApprover::format(DocumentVersion::approversOf($v)) : '')
+                    : $doc->approverSummary(),
+            ];
+        } elseif ((string) $doc->fields['doctype'] === 'DIA') {
+            http_response_code(404);
+            $doc = null;
+        }
+    }
+    if ($doc !== null) {
         $vars['doc'] = [
             'name'     => $name,
             'code'     => $code,
@@ -200,6 +287,7 @@ if ($doc === null) {
                 'name' => $a['name'],
                 'url'  => $self . '&f=' . $a['docid'],
             ], Document::listAttachments((int) $doc->fields['id'], $content)),
+            'diagram'  => $diagram,
         ];
     }
 }

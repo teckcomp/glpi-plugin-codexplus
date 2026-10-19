@@ -844,6 +844,31 @@
         });
     }
 
+    /* PL-4 (Claudio, 19/10/2026): a barra do editor acompanha a rolagem.
+       Desconta o que fica preso no topo da página (o cabeçalho do GLPI é
+       sticky só em tela larga, e a altura muda com o layout do menu):
+       desce pelo meio da tela enquanto o elemento ali for fixo ou grudado. */
+    function topOffset() {
+        try {
+            var y = 0;
+            for (var k = 0; k < 6; k++) {
+                var el = document.elementFromPoint(Math.round(window.innerWidth / 2), y + 1);
+                var hit = null;
+                for (var a = el; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+                    var pos = window.getComputedStyle(a).position;
+                    if (pos === 'fixed' || pos === 'sticky') { hit = a; break; }
+                }
+                if (!hit) { break; }
+                var r = hit.getBoundingClientRect();
+                if (r.top > y + 1 || r.bottom <= y) { break; }
+                y = r.bottom;
+            }
+            return Math.max(0, Math.round(y));
+        } catch (e) {
+            return 0;
+        }
+    }
+
     function customize(cfg) {
         if (!cfg || cfg.__cxCustomized) { return cfg; }
         cfg.__cxCustomized = true;
@@ -872,11 +897,19 @@
             cfg.quickbars_insert_toolbar = cfg.quickbars_insert_toolbar.replace(/\bquickimage\b/, 'cxinsertimage');
         }
         cfg.invalid_styles = { '*': 'font-family font-size color background-color' };
+        if (layout === 'classic') {
+            cfg.toolbar_sticky = true;
+            cfg.toolbar_sticky_offset = topOffset();
+        }
         cfg.content_style = (cfg.content_style || '') + contentCss();
 
         var original = cfg.setup;
         cfg.setup = function (editor) {
             if (typeof original === 'function') { original.call(this, editor); }
+            // PL-4: mede de novo na hora de montar (a página já desenhada).
+            if (layout === 'classic') {
+                try { editor.options.set('toolbar_sticky_offset', topOffset()); } catch (e) { /* fica a medida da configuração */ }
+            }
             register(editor);
             guardSyntheticClicks(editor);
         };

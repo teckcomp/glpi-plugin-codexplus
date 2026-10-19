@@ -760,6 +760,23 @@ só pela tag `v0.8.3` (CONTEXTO 3.29 a 3.33).
 | PL-3a | **Foto das pessoas no organograma** (opção B: cartão + miniatura nas linhas; opção 2: tabela própria `orgphotos`, para 100+ pessoas) | `5e00b84` |
 | PL-3b | **Balão** com a foto ampliada, PDF com as fotos, **sem "Baixar PNG"** no organograma | `a71a149` |
 
+## Ajustes do uso em produção — 2ª rodada (19/10/2026)
+
+Feedback de Claudio no uso real; **prioridade sobre a Pós-produção**. Mesma
+regra: homologação primeiro, um pacote por bloco com commit, uma subida só
+para a produção pela tag no fim.
+
+| Bloco | Entrega | Situação |
+|---|---|---|
+| PL-4 | Barra do editor presa ao rolar; **link público no diagrama** (fotos do organograma pela rota do link) | pacote `codexplus-pl4-1` |
+| PL-5 | **Auditor que é o responsável** faz todos os papéis e publica direto (Claudio: só nos documentos em que é o responsável, com Auditor no perfil) | a fazer |
+| PL-6 | Realce com as **mesmas 5 cores fortes** do texto, texto branco automático; cor do texto ganha **Branco**; realces antigos continuam valendo nos gravados | a fazer |
+| PL-7 | **Quebra de página no padrão do Word** (Ctrl+Enter e botão; linha "Quebra de página" no editor; folha nova no Visualizar e no PDF) | a fazer |
+| PL-8 | **Tabela como no Word** (linhas e colunas uma a uma; cabeçalho escuro com texto branco) | aguarda 2 prints de Claudio |
+| PL-9 | Biblioteca: busca e filtros Tipo / Setor / Categoria na linha das abas; chips de situação embaixo, alinhados | mockup antes |
+
+Depois: subida única (`v0.8.4`), P-3a, P-3b, P-4, Pós-produção.
+
 ## Pós-produção (Claudio, 04/10/2026)
 
 Tudo o que não entrou na Reta final. Atualizações já em produção, por

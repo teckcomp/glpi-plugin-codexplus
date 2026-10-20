@@ -1235,6 +1235,13 @@
                 body.insertBefore(gap, list[idx]);
             });
             body.style.setProperty('padding-bottom', ((plan.left[last] || 0) + mb) + 'px', 'important');
+            // Correção (Claudio, 20/10/2026: "ao clicar, o documento volta ao
+            // início"): as faixas mudam a altura do texto e o autoresize só
+            // recalcula no próximo clique ou tecla; até lá o editor rola por
+            // dentro, e o reajuste no clique zera essa rolagem. Avisa já.
+            try {
+                if (typeof editor.dispatch === 'function') { editor.dispatch('ResizeContent'); } else { editor.fire('ResizeContent'); }
+            } catch (e) { /* sem autoresize: nada a ajustar */ }
         }
         function measure() {
             timer = null;
@@ -1260,6 +1267,11 @@
                 // e sem padding lateral, com seletores mais fortes.
                 + 'html body.cx-sheets{box-sizing:content-box!important;width:' + geo.contentW + 'px!important;'
                 + 'max-width:none!important;margin:16px auto!important;'
+                // PL-10c: o cursor falso do TinyMCE (traço ao lado de planilha,
+                // planta…) é posicionado em coordenadas da página, mas o tema do
+                // GLPI põe position:relative no body — com a folha centralizada
+                // (margem lateral), o traço saía deslocado, no meio do bloco.
+                + 'position:static!important;'
                 + 'padding-top:' + mt + 'px!important;padding-left:' + mx + 'px!important;padding-right:' + mx + 'px!important;'
                 + 'background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.18);min-height:' + geo.contentH + 'px;}'
                 + '.cx-sheet-head{color:#9aa3af;font:600 19pt/1.2 Arial,sans-serif;overflow:hidden;'
@@ -1273,6 +1285,93 @@
             later();
         });
         editor.on('SetContent input change Undo Redo ExecCommand keyup', later);
+
+        // PL-10b (Claudio, 20/10/2026: "clico na parte cinza e fica um traço
+        // vertical"): o título cinza, o espaço de fim de folha e a faixa são
+        // desenho (contenteditable=false) — o TinyMCE selecionava o bloco
+        // inteiro (o traço da altura do espaço). Clique ali leva o cursor ao
+        // texto mais próximo: acima da faixa, fim do último bloco da folha;
+        // na faixa ou abaixo dela, começo do primeiro bloco da folha seguinte.
+        // Setas atravessam a faixa (cursor nunca para num desenho).
+        var deco = function (n) {
+            var el = n && n.nodeType === 1 ? n : (n && n.parentNode);
+            return el && el.closest ? el.closest('.cx-sheet-gap,.cx-sheet-head') : null;
+        };
+        var realBlock = function (el, dir) {
+            var n = el;
+            do { n = dir < 0 ? n.previousElementSibling : n.nextElementSibling; } while (n && n.getAttribute('data-mce-bogus') !== null);
+            return n;
+        };
+        var caretIn = function (blk, atEnd) {
+            if (!blk) { return false; }
+            // Recolhe o cursor falso do TinyMCE (o traço ao lado de um bloco
+            // travado): ao lado de um desenho das folhas ele não faz sentido.
+            try { if (editor._selectionOverrides && editor._selectionOverrides.hideFakeCaret) { editor._selectionOverrides.hideFakeCaret(); } } catch (e) { /* versão sem a API */ }
+            editor.selection.select(blk, true);
+            editor.selection.collapse(!atEnd);
+            return true;
+        };
+        var lastKey = 0;
+        editor.on('keydown', function (e) { lastKey = e.keyCode; });
+        // Setas ↑/↓ na primeira/última linha de um bloco cujo vizinho é um
+        // desenho: pula o desenho (o TinyMCE pararia "antes da faixa", com o
+        // cursor falso da altura do espaço).
+        var skipSib = function (el, dir) {
+            var n = el;
+            do { n = dir < 0 ? n.previousElementSibling : n.nextElementSibling; }
+            while (n && n.hasAttribute('data-mce-caret'));
+            return n;
+        };
+        editor.on('keydown', function (e) {
+            if ((e.keyCode !== 38 && e.keyCode !== 40) || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) { return; }
+            var rng = editor.selection.getRng();
+            var body = editor.getBody();
+            if (!rng || !rng.collapsed || !body) { return; }
+            var blk = rng.startContainer;
+            while (blk && blk.parentNode !== body) { blk = blk.parentNode; }
+            if (!blk || blk.nodeType !== 1) { return; }
+            var up = e.keyCode === 38;
+            var sib = skipSib(blk, up ? -1 : 1);
+            if (!sib || !deco(sib)) { return; }
+            var rects = rng.getClientRects();
+            var cr = rects.length ? rects[0] : null;
+            var br = blk.getBoundingClientRect();
+            if (cr) {
+                var lh = Math.max(cr.height, 12);
+                if (up && cr.top - br.top > lh * 1.2) { return; }       // não está na 1ª linha
+                if (!up && br.bottom - cr.bottom > lh * 1.2) { return; } // não está na última
+            }
+            var alvo = up ? realBlock(sib, -1) : realBlock(sib, 1);
+            if (!alvo) { return; }
+            e.preventDefault();
+            if (e.stopImmediatePropagation) { e.stopImmediatePropagation(); }
+            caretIn(alvo, up);
+            if (alvo.scrollIntoView) { editor.selection.scrollIntoView(); }
+        }, true);
+        editor.on('mousedown', function (e) {
+            var g = deco(e.target);
+            if (!g) { return; }
+            e.preventDefault();
+            if (e.stopImmediatePropagation) { e.stopImmediatePropagation(); }
+            var band = g.querySelector('.cx-sheet-band');
+            var acima = band && e.clientY < band.getBoundingClientRect().top;
+            editor.focus();
+            if (g.classList.contains('cx-sheet-head')) {
+                caretIn(realBlock(g, 1), false);
+            } else if (acima) {
+                caretIn(realBlock(g, -1), true) || caretIn(realBlock(g, 1), false);
+            } else {
+                caretIn(realBlock(g, 1), false) || caretIn(realBlock(g, -1), true);
+            }
+        }, true);
+        editor.on('NodeChange', function () {
+            var g = deco(editor.selection.getNode());
+            if (!g) { return; }
+            // Seta para cima/esquerda: volta ao bloco de cima; senão, segue.
+            var up = lastKey === 37 || lastKey === 38 || lastKey === 33;
+            if (g.classList.contains('cx-sheet-head')) { caretIn(realBlock(g, 1), false); return; }
+            if (up) { caretIn(realBlock(g, -1), true) || caretIn(realBlock(g, 1), false); } else { caretIn(realBlock(g, 1), false) || caretIn(realBlock(g, -1), true); }
+        });
         var name = document.querySelector('input[name="name"]');
         if (name) { name.addEventListener('input', later); }
     }

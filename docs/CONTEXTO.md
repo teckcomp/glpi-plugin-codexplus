@@ -3224,6 +3224,37 @@ Estilos de tabela", com personalização de cor e estilo. Sem reinstalar.
   células (o Word não lê borda da tabela); tabela com estilo não recebe o
   cinza padrão no `th`.
 
+### 3.41 PL-10 — Clique fazia o documento voltar ao início (20/10/2026)
+
+Relato de Claudio, 20/10/2026, antes da subida: "ao clicar em uma parte do
+documento automaticamente o documento volta ao início". Causa: o editor em
+folhas (PL-7, 3.37) acrescenta as faixas e os espaços de fim de folha, a
+altura do texto cresce, mas o **autoresize** do TinyMCE só recalcula em
+NodeChange/SetContent/keyup/ResizeContent — até lá o editor ficava menor
+que o texto (medido: 4.510 px para 6.857) e rolava **por dentro**. No
+clique, o autoresize crescia o editor de uma vez, a rolagem interna voltava
+a 0 e o que estava na tela saltava para o começo (parágrafo clicado foi de
+y=596 para y=2.943). Correção: `paint()` termina com
+`editor.dispatch('ResizeContent')` (achado 179). Com ela: editor = texto
+(6.858 = 6.858), sem rolagem interna, parágrafo parado no lugar do clique.
+
+**PL-10b/c** (mesmo dia, "clico na parte cinza e fica um traço vertical" e
+"aparece em todo documento"): o traço era o **cursor falso** do TinyMCE
+(`.mce-visual-caret`, 1 px × altura do bloco), mostrado ao lado de bloco
+travado (planilha, planta, desenhos das folhas) ao clicar ao lado ou chegar
+pelas setas. O TinyMCE o posiciona em coordenadas da página, mas o tema do
+GLPI põe `position: relative` no body do editor — com a folha centralizada
+(margem lateral de 208 px no teste), o traço saía **no meio do bloco**
+(planilha em x=268, traço em x=476). Correção: `position: static` no body
+da folha (achado 180) → traço na borda do bloco (x=268 antes, x=942 depois)
+e alinhado em cima; as alças de redimensionar imagem também passam a cair
+nos cantos. Nos desenhos das folhas (título cinza, espaço de fim de folha,
+faixa — `contenteditable=false`): clique acima da faixa → fim do último
+bloco da folha; na faixa ou abaixo → começo da folha seguinte (pode ser a
+1ª célula de tabela); no título → começo do texto; setas ↑/↓ na 1ª/última
+linha pulam o desenho (keydown com prioridade); `hideFakeCaret()` ao levar
+o cursor de volta ao texto.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -4102,6 +4133,12 @@ seletores. Desde a R3b3-2 eles existem em dois templates: `article.html.twig`
 (modelo antigo) e a visão de `document-form.html.twig` (modelo novo). **São interface, não decoração.** Renomear qualquer um quebra a
 exportação silenciosamente, sem erro no console:
 
+179. **Mudou a altura do conteúdo do TinyMCE por código (sem tecla, sem
+    setContent)? Dispare `ResizeContent`.** O autoresize só escuta
+    NodeChange/SetContent/keyup/FullscreenStateChanged/ResizeContent; sem o
+    aviso o editor fica menor que o texto e ganha rolagem interna, que zera
+    no próximo clique (o "pulo para o início"). Teste de pulo: medir a
+    posição NA TELA do bloco clicado antes e depois do clique.
 ```
 #codexplus-doc            contêiner do que vai para o PDF
 .codexplus-doc-title      vira o <h1>
@@ -4110,6 +4147,13 @@ exportação silenciosamente, sem erro no console:
 #codexplus-pdf            o botão que dispara a exportação
 ```
 
+180. **Cursor falso do TinyMCE (`.mce-visual-caret`) e alças de imagem**
+    são posicionados em coordenadas da PÁGINA quando a raiz é o body
+    (`getAbsoluteClientRect`). O tema do GLPI deixa o body do editor com
+    `position: relative`; com margem no body (folha centralizada) eles
+    deslocam pela margem. Body com margem → `position: static`. O traço
+    pisca trocando `mce-visual-caret-hidden`: esconder por essa classe não
+    funciona; para recolher, `editor._selectionOverrides.hideFakeCaret()`.
 Desde a 0.5.8, a linha de identificação da 1ª página vem de
 `#codexplus-print-config` (`buildIdentLine()`), não da raspagem de
 `.codexplus-doc-meta` — que trazia a contagem de visualizações.

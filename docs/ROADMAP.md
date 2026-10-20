@@ -773,8 +773,9 @@ para a produção pela tag no fim.
 | PL-6 | Realce com as **mesmas 5 cores fortes** do texto, texto branco automático; cor do texto ganha **Branco**; realces antigos continuam valendo nos gravados; link público volta a ter cor | ✅ `f81470b` |
 | PL-7 | **Editor sempre em folhas** como o Google Docs (Claudio, 20/10/2026, com print): a folha vira onde o PDF vira; a quebra manual Ctrl+Enter foi descartada | ✅ `1410eaf` |
 | PL-8a | Tabela como no Word: **cor, fundo e bordas (pontilhada, tracejada…) por célula, linha ou coluna**, cor livre; **botão direito** com Linha/Coluna/Célula; **colar do Word mantém as cores**; Word gerado com as cores | ✅ `2734581` |
-| PL-8b | Galeria dos **estilos 1 a 5** (mockup aprovado) com personalização: cor do cabeçalho (paleta ou livre), claro/escuro, linhas alternadas, bordas | pacote `codexplus-pl8b-1` |
+| PL-8b | Galeria dos **estilos 1 a 5** (mockup aprovado) com personalização: cor do cabeçalho (paleta ou livre), claro/escuro, linhas alternadas, bordas | ✅ `8856734` |
 | PL-9 | Biblioteca: **Setor, Categoria, Tipo e busca na linha das abas** (mockup aprovado); chips de tipo saem; Setor e Categoria abrem a estante | ✅ `97e0fbb` |
+| PL-10 | Correção: clicar no documento fazia ele **voltar ao início** (editor em folhas sem avisar o autoresize) e **traço vertical** (cursor falso do TinyMCE deslocado pela margem da folha) | pacote `codexplus-pl10-3` |
 
 Depois: subida única (`v0.8.4`), P-3a, P-3b, P-4, Pós-produção.
 

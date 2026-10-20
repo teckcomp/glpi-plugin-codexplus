@@ -780,16 +780,40 @@ para a produção pela tag no fim.
 **Rodada fechada em 20/10/2026** (homologação em `c873357`). Ordem
 combinada com Claudio para a próxima sessão:
 
-1. **Subida única `v0.8.4`** — versão no `setup.php` + tag na homologação;
+1. **Subida única `v0.8.4`** — leva a 2ª rodada **e o reskin (UI-1 a
+   UI-6, seção seguinte)**: versão no `setup.php` + tag na homologação;
    produção: backup → `git fetch --tags && git checkout v0.8.4` →
-   reinstalação → `cache:clear` + restart → conferência (um item por bloco
-   PL-4 a PL-10; roteiro em docs/PROXIMO-PASSO.md).
+   reinstalação → `cache:clear` + restart → conferência (um item por bloco;
+   roteiro em docs/PROXIMO-PASSO.md).
 2. **P-3a** — cadastros da homologação (script de leitura nos dois
    servidores; usuários e grupos por login e nome de grupo).
 3. **P-3b** — documentos escolhidos (lista com Claudio).
 4. **P-4** — ponta a ponta na produção e ação automática de vencimento.
 5. **Pós-produção**, começando pelos bugs que o usuário vê todo dia:
    (1), (2), (3), (4) e (12).
+
+## Identidade petróleo — reskin (20/10/2026) ✅
+
+Pedido de Claudio em 20/10/2026, depois do fechamento da 2ª rodada: layout
+"mais sério, sóbrio e profissional", nos moldes do **Painel IXC** e do
+**Task+** (cores do tema escuro do Task+ 16q), com **tema claro e escuro**.
+Mockup aprovado no canvas "Codex+ — Nova identidade (casca petróleo)"
+(Painel escuro, Painel claro, Biblioteca em estante, tokens), com duas
+ressalvas dele: **não mexer na logo** e **manter as 3 fileiras da estante**.
+Um pacote por bloco, validado no container (CSS parseado, JS em jsdom,
+Twig balanceado, telas no Chromium) e na homologação; commits antes do
+seguinte. Nada no banco nem no instalador.
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| UI-1 | Tokens petróleo nos dois temas; **casca** `parts/shell.html.twig` (marca · abas · slot · sol/lua); tema por cookie + localStorage (`codexplus-shell.js`); escuro na tela inteira; filtros da Biblioteca no slot; estante no escuro (lombadas, tábua, montantes, rolos) | `c08252e` (com o UI-2) |
+| UI-2 | **Painel** igual ao mockup: busca e botões na barra, linha de contexto (data por extenso, total, entidade), indicadores sem ícone, roscas finas, legenda em 2 colunas, atenção com pílula só > 0, **miniaturas em traço por subtipo**, chips mono com ponto de cor, tabela; botão de tema sempre por último | `c08252e` |
+| UI-3 | Estante em **grafite no claro**; editor em folhas **sem o título cinza** na folha 1 (Claudio: "não vejo necessidade") | `1b00ce4` |
+| UI-4 | Modelos e Configuração já seguiam os tokens; logo da marca sobre **cartão branco** no escuro | `532edec` |
+| UI-5 | **Cancelado** (Claudio, 20/10): a página do documento fica sempre clara, sem casca e sem tema | — |
+| UI-6 | **Tema escuro como padrão** para quem nunca escolheu | `7466510` |
+
+Homologação em `7466510`. Sobe junto com a 2ª rodada na `v0.8.4`.
 
 ## Pós-produção (Claudio, 04/10/2026)
 
@@ -877,6 +901,14 @@ depois. Números da lista revisada de 04/10 entre parênteses.
   formatação de célula; hoje o caminho é copiar e colar do Word, PL-8a)
 - (41) Editor: guias tracejadas do TinyMCE na tabela "sem bordas" — só se
   incomodar (não saem no PDF nem no Word)
+- (42) Decoração dos nichos vazios **em traço** no escuro (hoje é a mesma
+  decoração colorida, dessaturada por filtro; o mockup tinha desenhos em
+  linha — 8 SVGs novos, só se Claudio quiser igual ao mockup)
+- (43) Tema por **usuário no servidor** (tabela `user_prefs` + `ajax/prefs.php`,
+  padrão do Task+), em vez de por navegador (cookie) — se a troca de PC
+  incomodar
+- (44) `migrate.html.twig` ainda com o cabeçalho antigo (tela de uso único,
+  fora do reskin)
 - Q5i-2b — importador Mermaid com "colunas pelo fluxo inteiro" (+
   `flowchart TD` para jornadas longas): **parado** enquanto as raias por fase
   atenderem (achado 181)

@@ -2,6 +2,13 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **homologação em `7466510`** (20/10/2026, noite) — **reskin
+> "identidade petróleo" fechado** (UI-1 a UI-6, seção 3.43): casca única com
+> abas e botão sol/lua, tema claro/escuro por cookie (padrão escuro),
+> Painel igual ao mockup, estante recolorida nos dois temas, página do
+> documento sempre clara. Sem banco, sem instalador. Próximo: **subida
+> única `v0.8.4`** com a 2ª rodada + o reskin (docs/PROXIMO-PASSO.md).
+> Antes:
 > Estado: **homologação em `c873357`** (20/10/2026) — **2ª rodada de ajustes
 > do uso real (PL-4 a PL-10) validada e commitada**: barra do editor presa,
 > link público no diagrama, responsável com Auditor faz todos os papéis,
@@ -3315,6 +3322,89 @@ no importador) fica parado enquanto o padrão por fase atender.
 as cores da tabela (o mammoth não lê; copiar e colar traz); no editor, a
 tabela "sem bordas" mostra as guias tracejadas do TinyMCE (não saem no PDF
 nem no Word).
+
+### 3.43 Reskin "identidade petróleo" — UI-1 a UI-6 (20/10/2026)
+
+Pedido de Claudio na mesma sessão da 2ª rodada: layout **sério, sóbrio e
+profissional**, nos moldes do Painel IXC e do Task+ (16q), com **tema claro e
+escuro**. Mockup aprovado no canvas "Codex+ — Nova identidade (casca
+petróleo)" — Painel escuro e claro, Biblioteca em estante, prancha de tokens
+— com duas ressalvas dele: **a logo não muda** (monograma C+ atual) e **a
+estante mantém as 3 fileiras**. Commits `c08252e` (UI-1 + UI-2),
+`1b00ce4` (UI-3), `532edec` (UI-4), `7466510` (UI-6). Nada no banco nem
+no instalador; só CSS, Twig, um JS novo e o controller do Painel.
+
+**Princípio** (do Task+): "o documento é o produto" — cromo em neutro, uma
+cor de marca (petróleo `#0B5F6B` no claro, ciano `#5FC3CD` no escuro), cor
+semântica só para situação e prazo; cor por tipo vira um **ponto** ao lado
+do código mono.
+
+- **Tokens** (seção 1 do CSS): os mesmos nomes `--cx-*` de antes, com os
+  valores do claro em `:root` e o escuro sob
+  `html[data-codexplus-theme="dark"]` (vence `:root` por especificidade).
+  Novos: `--cx-page`, `--cx-bar`, `--cx-ink-2`, `--cx-accent-ink`,
+  `--cx-on-accent`, `--cx-info`. `--cx-text-read` não muda (papel branco).
+  `--cx-radius` 8 px, `-sm` 6 px.
+- **Casca** `templates/parts/shell.html.twig` (seção 24 do CSS): barra
+  única com a marca (`brand.html.twig`, intocado), as abas
+  (`nav.html.twig`), um **bloco `slot`** e, por último, o botão sol/lua.
+  Telas comuns fazem `include`; Painel e Biblioteca fazem **`embed`** e
+  preenchem o `slot` (busca e botões / filtros do PL-9). `embed` sem `only`
+  leva o contexto inteiro (as variáveis da tela continuam valendo dentro do
+  bloco). O script inline da casca lê o cookie e põe o atributo no `<html>`
+  **antes** de a área pintar.
+- **Tema**: `public/js/codexplus-shell.js` troca o atributo, grava o cookie
+  `codexplus_theme` (1 ano, caminho do GLPI) e copia no localStorage. **Por
+  navegador**, sem endpoint e sem schema (por usuário no servidor é o item
+  43 da Pós-produção). Padrão **escuro** (UI-6). O atributo só existe nas
+  páginas que incluem a casca, então `html[data-codexplus-theme="dark"]
+  body, .page-wrapper, .page-body, #page, main` pintados de `--cx-page`
+  escurecem a tela inteira **só no Codex+**; cabeçalho e trilha do GLPI
+  ficam. `.codexplus-app` redefine `--tblr-bg-forms / -body-color /
+  -border-color` para os campos do core seguirem o tema (lição do Task+).
+- **Página do documento** (`document.form.php`) **fica sempre clara**
+  (Claudio, 20/10): não inclui a casca, o cookie não a afeta. O editor em
+  folhas continua papel branco; o PDF e o Word não mudaram.
+- **Painel** (seção 25): busca, Novo diagrama e Novo documento no slot;
+  linha de contexto (`context`: data por extenso via `IntlDateFormatter` no
+  idioma da sessão, total, entidade ativa); indicadores sem ícone, número
+  colorido só quando A vencer/Vencidos > 0; legenda "Por tipo" em duas
+  colunas; atenção com pílula só acima de zero; diagramas com **miniatura
+  em traço por subtipo** (`kind` lido da coluna `subtype` da tabela de
+  diagramas, uma consulta para os 6; sem linha = organograma) e "Ver os N";
+  chips de código mono com ponto de cor (`::before`, vale em todo
+  `.codexplus-app`).
+- **Biblioteca**: filtros do PL-9 no slot; chips de situação logo abaixo da
+  barra. Estante com o **mesmo layout**: no escuro (UI-1c) lombada
+  publicada com a cor **saturada** do tipo e texto branco, rascunho
+  transparente tracejado, tábua `#17353C→#122A30`, montantes com relevo,
+  rolos petróleo com etiqueta rosa; no claro (UI-3) tábua e montantes em
+  grafite `#3B4754`/`#D9DEE4`. Decoração dos nichos vazios dessaturada por
+  filtro no escuro (desenhar em traço = item 42).
+- **Editor em folhas** (UI-3): o título cinza do PL-7 saiu da folha 1; a
+  conta do `planBreaks` não mudou (a folha 1 fica mais curta na altura do
+  título e vira no mesmo bloco do PDF).
+- **Modelos e Configuração** já seguiam os tokens; a logo da marca ganhou
+  cartão branco no escuro (UI-4, lista, prévia e campo Marca).
+
+Achados da rodada (continuação da seção 5):
+
+182. **Regra genérica de link no escuro pintou lombada, rolo e tábua** (são
+    `<a>`): o texto ficou ilegível. Regras de "qualquer link" usam
+    `:where()` para a especificidade ficar baixa e as regras de componente
+    vencerem.
+183. **`.slot:empty + .right { margin-left: 0 }` vale mesmo com o slot
+    escondido** — o irmão existe. Para "o botão de tema sempre por último",
+    `.cx-shell-slot:not(:empty) + .cx-shell-right`.
+184. **Token `-ink` igual ao token de fundo**: no escuro `--cx-type-X-ink`
+    foi definido igual a `--cx-type-X` (pensado para texto sobre `-bg`), e
+    a lombada usava `-ink` sobre `X` → invisível. Lombada tem tokens
+    próprios (`--sp`) com a cor saturada do claro nos dois temas.
+185. **Validação de tela sem o GLPI**: HTML montado à mão com a estrutura do
+    Twig e o CSS real, renderizado no Chromium nos dois temas (1440 e 1900
+    px), pegou largura de barra, especificidade de link e cor de lombada
+    antes do teste de Claudio. PHP 8.3 instala no container (`php -l` e
+    `IntlDateFormatter` testados).
 
 ## 4. Decisões de arquitetura que já custaram caro
 

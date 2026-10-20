@@ -1,13 +1,14 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em **20/10/2026**, no fim da sessão de 19–20/10: **2ª rodada de
-> ajustes do uso real (PL-4 a PL-10) validada e commitada na homologação**
-> (CONTEXTO 3.34 a 3.42, achados 175 a 181). A produção segue na `v0.8.3`.
+> Gerado em **20/10/2026 (noite)**, no fim da sessão: **2ª rodada (PL-4 a
+> PL-10) + reskin "identidade petróleo" (UI-1 a UI-6) validados e commitados
+> na homologação** (CONTEXTO 3.34 a 3.43, achados 175 a 185). A produção
+> segue na `v0.8.3`.
 
 ## Estado
 
-- **Homologação: `c873357`** (master), sem tag. Tudo validado por Claudio.
+- **Homologação: `7466510`** (master), sem tag. Tudo validado por Claudio.
 - **Produção: `v0.8.3`** (`a71a149`, 08/10/2026).
 - Versão no `setup.php`: **0.8.3** — nenhum bloco da rodada mexeu no banco
   nem na versão (todos sem reinstalar).
@@ -41,9 +42,11 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.34 a 3.42 desta rodada,
-  achados até 181) e `docs/ROADMAP.md`, seções **"Ajustes do uso em
-  produção — 2ª rodada"** e **"Pós-produção"**.
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.34 a 3.43, achados
+  até 185) e `docs/ROADMAP.md`, seções **"Ajustes do uso em produção — 2ª
+  rodada"**, **"Identidade petróleo — reskin"** e **"Pós-produção"**.
+- **Mockup aprovado do reskin** (canvas, privado de Claudio; guardar em
+  `docs/` é o item 37): https://claude.ai/artifact/913HUCLPhLZtmhXozDktdK
 
 ## O que entrou na rodada (homologação, falta subir)
 
@@ -57,6 +60,10 @@
 | PL-8a | Tabela como no Word: cor/fundo/bordas por célula, botão direito, colar do Word | `2734581` |
 | PL-8b | Estilos de tabela 1 a 5 com personalização (cor livre, claro/escuro, bordas, listras) | `8856734` |
 | PL-10 | Correção do pulo para o início e do traço vertical (cursor falso) | `c873357` |
+| UI-1 + UI-2 | Casca petróleo (abas, sol/lua, tema por cookie, escuro na tela inteira, estante no escuro) e Painel igual ao mockup | `c08252e` |
+| UI-3 | Estante em grafite no claro; folha 1 do editor sem o título cinza | `1b00ce4` |
+| UI-4 | Logo da marca sobre cartão branco no escuro | `532edec` |
+| UI-6 | Tema escuro como padrão (UI-5 cancelado: página do documento sempre clara) | `7466510` |
 
 ## Próximo passo imediato: subida única `v0.8.4`
 
@@ -78,6 +85,11 @@
    - link público de um diagrama (fluxograma e organograma com foto);
    - Biblioteca: Setor → Categoria → Tipo; busca com Enter;
    - responsável com Auditor: Publicar direto num POP.
+   - **reskin**: Painel abre escuro numa janela anônima; sol → claro e
+     fica; Biblioteca com filtros na barra e estante legível nos dois temas;
+     Modelos e Configuração (logos legíveis); documento em edição sempre
+     claro, folha 1 sem o título cinza, folha 2 virando no mesmo bloco do
+     Visualizar.
 
 ## Depois da subida
 
@@ -92,8 +104,10 @@
   organograma vinculado sem fotos); (4) leitura comum em folhas?; (12)
   tabela/planilha maior que uma folha repetindo o cabeçalho. Novos desta
   rodada: (40) Importar `.docx` com cores de tabela; (41) guias tracejadas
-  na tabela sem bordas (só se incomodar); (37) guardar os mockups PL-8 e
-  PL-9 em `docs/`.
+  na tabela sem bordas (só se incomodar); (37) guardar os mockups PL-8,
+  PL-9 e do reskin em `docs/`. Do reskin: (42) decoração em traço no
+  escuro; (43) tema por usuário no servidor; (44) `migrate.html.twig` com o
+  cabeçalho antigo.
 
 ## Regras de trabalho (Claudio)
 
@@ -111,6 +125,9 @@
   codificar** (lição do PL-7: "quebra de página" era ver as folhas, não
   Ctrl+Enter). Mockup só quando a tela muda de verdade.
 - Modelo é dado da instalação, nunca semente do Install (achado 137).
+- **Reskin (20/10):** a logo (monograma C+) não muda; a estante mantém o
+  layout e as 3 fileiras; a página do documento fica sempre clara; o botão
+  de tema é sempre o último da barra; padrão escuro.
 
 ## Lembretes do container
 

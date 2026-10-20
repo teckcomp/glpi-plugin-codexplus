@@ -1216,10 +1216,11 @@
             var mt = geo.marginTop + geo.headerH, mb = geo.marginBottom + geo.footerH;
             clear(body);
             var list = blocks(body);
-            var head = bogus(doc, 'cx-sheet-head');
-            head.style.height = plan.heading + 'px';
-            head.textContent = title();
-            body.insertBefore(head, body.firstChild);
+            // UI-3 (Claudio, 20/10/2026): o título em cinza no topo da folha 1
+            // saiu — "aparece automático, não vejo necessidade". A CONTA
+            // continua a mesma: plan.heading segue reservado na medição do
+            // motor do PDF, então a folha 1 do editor fica mais curta na
+            // altura do título e vira no mesmo bloco do PDF.
             var last = plan.left.length - 1;
             plan.starts.forEach(function (idx, p) {
                 if (idx === null || !list[idx]) { return; }

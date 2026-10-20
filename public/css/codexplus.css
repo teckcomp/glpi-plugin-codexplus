@@ -2595,6 +2595,17 @@ a.cx-lib-plank:hover, a.cx-lib-plank:focus-visible { color: #fff; text-decoratio
 .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new a { flex-direction: column; justify-content: center; width: 96px; height: 150px;
     border: 1.5px dashed var(--cx-type-PSG); border-radius: 6px; background: var(--cx-surface); font-size: .8em; text-align: center; box-sizing: border-box; }
 
+/* ---- UI-3 (20/10/2026): a estante no tema CLARO em grafite, no lugar da
+   madeira #444441 do modelo C — mesmo layout, só a cor da tábua, dos
+   montantes e das prateleiras de categoria. Rolos e decoração ficam. ---- */
+html:not([data-codexplus-theme="dark"]) .cx-lib-plank { background: linear-gradient(#4A5563, #3B4754 40%, #303A47);
+    border-top: 1px solid #5B6775; border-bottom: 1px solid #1F2730; color: #F1F3F6; }
+html:not([data-codexplus-theme="dark"]) .cx-lib-plank span { color: #B8C0CA; }
+html:not([data-codexplus-theme="dark"]) .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-list {
+    background: repeating-linear-gradient(to bottom, transparent 0 164px, #4A5563 164px 166px, #3B4754 166px 190px); }
+html:not([data-codexplus-theme="dark"]) .cx-lib-niche::after { background: linear-gradient(90deg, #CFD6DD, #D9DEE4 45%, #C3CAD2);
+    border-left: 1px solid #E8ECF0; border-right: 1px solid #B5BDC6; box-sizing: border-box; }
+
 /* ---- UI-1c (Claudio, 20/10/2026): a estante no tema ESCURO, igual à prancha
    03 do mockup. O layout não muda — só madeira, montantes, rolos, lombadas e
    decoração ganham o perfil petróleo. Lombada publicada usa a cor SATURADA

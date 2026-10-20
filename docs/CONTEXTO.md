@@ -3161,6 +3161,39 @@ Pedido de Claudio (imagem 5 de 19/10/2026), mockup aprovado em 20/10/2026
   novo (coluna) virava 280 px de altura; `.cx-lib-field--search
   .cx-lib-search { flex: 0 0 auto }`.
 
+### 3.39 PL-8a — Tabela como no Word: formatação, botão direito, colar do Word (20/10/2026)
+
+Decisões de Claudio, 20/10/2026: estilos 1 a 5 do mockup "Codex+ PL-8 —
+Estilos de tabela" com personalização (PL-8b, a seguir); cor do cabeçalho
+na paleta **ou livre**; **tabela colada do Word mantém as cores**; "colunas
+com cores diferentes, pontilhados, etc."; botão direito com Linha, Coluna
+e Célula. Sem reinstalar.
+
+- **Dentro da tabela vale formatação** (`invalidStyles()`): a padronização
+  E1 tirava cor e fundo de tudo (`'*'`); agora `'*'` tira só fonte e
+  tamanho, e cor/fundo/`background` saem por elemento (`NO_COLOR_TAGS`: p,
+  span, títulos, listas…) — table, tr, td, th, col ficam de fora. Texto
+  dentro da célula continua padronizado (fonte, tamanho, cor no span).
+- **Propriedades da célula, linha e tabela** com a aba Avançado: fundo,
+  borda (Sólida, Pontilhada, Tracejada, Dupla, Nenhuma — `TABLE_BORDERS`),
+  cor da borda. Cores (`color_map`): paleta do Codex+ + azul-marinho,
+  grafite, branco, preto e tons claros, com **cor livre** no seletor.
+- **Botão direito na tabela** (`contextmenu: 'table'`; o GLPI desliga no
+  layout clássico): Célula, Linha, Coluna, Propriedades da tabela, Excluir.
+- **Colar** (`cleanPaste()` em `PastePreProcess`, achado 178): fora da
+  tabela nenhum estilo colado fica (como a E2); em table/tr/td/th/col ficam
+  cor, fundo, bordas (as quatro, estilo/espessura/cor), alinhamento e
+  tamanho; a cor do texto que o Word põe num span da célula sobe para a
+  célula. HTML colado lido num documento inerte (`DOMParser`).
+  `paste_webkit_styles: 'all'` (a limpeza é a nossa). Importar .docx
+  (mammoth) **não traz cores** — limite do mammoth.
+- **Word** (`codexplus-export.js`): cada célula leva o fundo (da célula, ou
+  da linha/seção/tabela), a cor do texto quando difere da tabela e as
+  quatro bordas, lidos do **estilo calculado** — vale para colado, para as
+  Propriedades e para as classes do PL-8b.
+- Tela, folhas do editor e PDF: estilo inline vence as regras de tabela do
+  `codexplus.css` e do `PRINT_CSS`, sem mudança.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -4027,6 +4060,13 @@ depender do comportamento errático de `position: fixed` na impressão.
     (`browser.new_page()` abre outro contexto, sem login).
 ### Os cinco seletores do PDF
 
+178. **Filtro de colar do TinyMCE 7 no Chrome** (`paste_webkit_styles` com
+    lista): remonta o estilo de QUALQUER elemento com
+    `serializeStyle(estilos, "span")` — as regras de `invalid_styles` do
+    span valem para a célula também (fundo da td sumia, borda ficava). E o
+    schema roda entre `PastePreProcess` e `PastePostProcess`: limpar no Pre.
+    O GLPI liga `paste_webkit_styles: 'all'` e desliga o `contextmenu` no
+    layout clássico (Html::initEditorSystem).
 `public/js/codexplus.js` remonta o documento para impressão a partir destes
 seletores. Desde a R3b3-2 eles existem em dois templates: `article.html.twig`
 (modelo antigo) e a visão de `document-form.html.twig` (modelo novo). **São interface, não decoração.** Renomear qualquer um quebra a

@@ -363,17 +363,56 @@
         });
     };
 
+    /* PL-8a (Claudio, 20/10/2026): a célula leva para o Word o que está nela
+       na tela — fundo (da célula, ou da linha/seção/tabela), cor do texto
+       quando difere da tabela, e as quatro bordas (estilo, espessura, cor).
+       Lê o estilo calculado: vale para estilo colado do Word, para as
+       Propriedades da célula e para as classes dos estilos de tabela. */
+    function cssHex(c) {
+        var m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(String(c || ''));
+        if (!m || (m[4] !== undefined && parseFloat(m[4]) === 0)) { return null; }
+        return [m[1], m[2], m[3]].map(function (n) { return ('0' + parseInt(n, 10).toString(16)).slice(-2); }).join('').toUpperCase();
+    }
+    function cellFill(td, table, win) {
+        for (var n = td; n && n !== table.parentNode; n = n.parentNode) {
+            var h = cssHex(win.getComputedStyle(n).backgroundColor);
+            if (h) { return h; }
+        }
+        return null;
+    }
+    function cellBorders(D, cs) {
+        var MAP = { solid: D.BorderStyle.SINGLE, dotted: D.BorderStyle.DOTTED, dashed: D.BorderStyle.DASHED,
+            double: D.BorderStyle.DOUBLE, none: D.BorderStyle.NONE, hidden: D.BorderStyle.NONE };
+        var out = {};
+        ['top', 'right', 'bottom', 'left'].forEach(function (side) {
+            var cap = side.charAt(0).toUpperCase() + side.slice(1);
+            var st = cs['border' + cap + 'Style'], w = parseFloat(cs['border' + cap + 'Width']) || 0;
+            if (!st || st === 'none' || st === 'hidden' || w === 0) {
+                out[side] = { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+                return;
+            }
+            out[side] = { style: MAP[st] || D.BorderStyle.SINGLE, size: Math.max(2, Math.round(w * 6)),
+                color: cssHex(cs['border' + cap + 'Color']) || 'D1D5DB' };
+        });
+        return out;
+    }
+
     Converter.prototype.table = function (el, ctx) {
         var D = this.D, self = this;
         var rows = [];
+        var win = (el.ownerDocument && el.ownerDocument.defaultView) || window;
+        var baseColor = cssHex(win.getComputedStyle(el).color);
         Array.prototype.forEach.call(el.rows, function (tr) {
             var cells = [];
             Array.prototype.forEach.call(tr.cells, function (td) {
                 var th = td.nodeName === 'TH';
                 var inner = [];
+                var cs = win.getComputedStyle(td);
+                var ink = cssHex(cs.color);
+                var tint = ink && ink !== baseColor ? { color: ink } : {};
                 // PL1: números da planilha à direita, como na tela e no PDF.
                 var num = (' ' + (td.className || '') + ' ').indexOf(' cx-sheet-num ') !== -1;
-                self.children(td, { fmt: Object.assign(self.blockFmt(td, {}), th ? { bold: true } : {}),
+                self.children(td, { fmt: Object.assign(self.blockFmt(td, {}), th ? { bold: true } : {}, tint),
                     para: num ? { alignment: D.AlignmentType.RIGHT } : {} }, inner);
                 if (!inner.length) { inner.push(new D.Paragraph({ children: [] })); }
                 var o = { children: inner, margins: { top: 60, bottom: 60, left: 100, right: 100 } };
@@ -384,6 +423,10 @@
                 if ((' ' + (tr.className || '') + ' ').indexOf(' cx-sheet-alt ') !== -1) {
                     o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'E6F1FB' };
                 }
+                // PL-8a: o fundo e as bordas que a célula tem na tela.
+                var fill = cellFill(td, el, win);
+                if (fill) { o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: fill }; }
+                o.borders = cellBorders(D, cs);
                 cells.push(new D.TableCell(o));
             });
             if (cells.length) { rows.push(new D.TableRow({ children: cells, tableHeader: tr.parentNode && tr.parentNode.nodeName === 'THEAD' })); }

@@ -866,6 +866,72 @@
         });
     }
 
+    /* PL-8a (Claudio, 20/10/2026): a padronização do E1 tira fonte, tamanho,
+       cor e fundo colados à mão — exceto DENTRO DA TABELA (table, linha,
+       célula, coluna), onde cor de fundo, cor do texto e bordas ficam, como
+       no Word, inclusive em tabela colada do Word. O TinyMCE soma a lista
+       de '*' com a de cada elemento: cor e fundo vão por elemento, fora da
+       tabela. Texto dentro da célula (span, p) continua padronizado. */
+    var NO_COLOR_TAGS = ['p', 'div', 'span', 'font', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ul', 'ol',
+        'dl', 'dt', 'dd', 'a', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del', 'ins', 'sub', 'sup',
+        'small', 'big', 'mark', 'code', 'pre', 'kbd', 'samp', 'blockquote', 'q', 'cite', 'abbr', 'label',
+        'section', 'article', 'header', 'footer', 'aside', 'nav', 'figure', 'figcaption', 'address', 'hr', 'img', 'caption'];
+    function invalidStyles() {
+        var o = { '*': 'font-family font-size' };
+        NO_COLOR_TAGS.forEach(function (t) { o[t] = 'color background-color background'; });
+        return o;
+    }
+    /* Tabela colada do Word: a cor do texto vem num span/p dentro da
+       célula (que vão perder a cor); sobe para a própria célula antes. */
+    function liftCellColors(root) {
+        Array.prototype.forEach.call(root.querySelectorAll ? root.querySelectorAll('td,th') : [], function (td) {
+            if (td.style && td.style.color) { return; }
+            var inner = td.querySelector('[style*="color"]');
+            var c = inner && inner.style ? inner.style.color : '';
+            if (c) { td.style.color = c; }
+        });
+    }
+    // PL-8a: o que fica do estilo colado — só em tabela, linha e célula.
+    var TABLE_TAGS = /^(TABLE|THEAD|TBODY|TFOOT|TR|TD|TH|COL|COLGROUP|CAPTION)$/;
+    var PASTE_TABLE_PROPS = ['color', 'background-color', 'text-align', 'vertical-align', 'width', 'height'];
+    ['top', 'right', 'bottom', 'left'].forEach(function (side) {
+        ['style', 'width', 'color'].forEach(function (k) { PASTE_TABLE_PROPS.push('border-' + side + '-' + k); });
+    });
+    /* Limpeza do colar (como a E2: estilo colado não fica), exceto na
+       tabela, onde ficam cor, fundo, bordas, alinhamento e tamanho; antes,
+       a cor do texto da célula sobe para a célula. Documento inerte
+       (DOMParser): nada do colado carrega nem executa aqui. */
+    function cleanPaste(html) {
+        var doc = new DOMParser().parseFromString('<body>' + String(html || '') + '</body>', 'text/html');
+        var body = doc.body;
+        liftCellColors(body);
+        Array.prototype.forEach.call(body.querySelectorAll('[style]'), function (el) {
+            if (!TABLE_TAGS.test(el.tagName)) { el.removeAttribute('style'); return; }
+            var keep = [];
+            PASTE_TABLE_PROPS.forEach(function (prop) {
+                var v = el.style.getPropertyValue(prop);
+                if (v && !/^(initial|inherit|unset|revert)$/.test(v)) { keep.push(prop + ': ' + v); }
+            });
+            if (keep.length) { el.setAttribute('style', keep.join('; ') + ';'); } else { el.removeAttribute('style'); }
+        });
+        return body.innerHTML;
+    }
+    var TABLE_BORDERS = [
+        { title: 'Sólida', value: 'solid' },
+        { title: 'Pontilhada', value: 'dotted' },
+        { title: 'Tracejada', value: 'dashed' },
+        { title: 'Dupla', value: 'double' },
+        { title: 'Nenhuma', value: 'none' }
+    ];
+    // Cores dos menus de cor da tabela: a paleta do Codex+ (texto/realce) +
+    // azul-marinho, grafite, branco e os tons claros; "cor livre" no seletor.
+    var TABLE_COLORS = [
+        '1F2D4F', 'Azul-marinho', '1F5FBF', 'Azul', '2E7D32', 'Verde', 'C62828', 'Vermelho',
+        'B45309', 'Laranja', '5F6B7A', 'Cinza', '374151', 'Grafite', 'FFFFFF', 'Branco',
+        'E6ECF7', 'Azul claro', 'E3F1E4', 'Verde claro', 'FBE4E4', 'Vermelho claro', 'FCEBD7', 'Laranja claro',
+        'F3F4F6', 'Cinza claro', 'D1D5DB', 'Cinza borda', '000000', 'Preto'
+    ];
+
     /* PL-4 (Claudio, 19/10/2026): a barra do editor acompanha a rolagem.
        Desconta o que fica preso no topo da página (o cabeçalho do GLPI é
        sticky só em tela larga, e a altura muda com o layout do menu):
@@ -909,7 +975,13 @@
         }
         // Texto colado ou importado não traz fonte, tamanho nem cor próprios
         // (cor incluída no E2, Claudio 22/09/2026).
-        cfg.paste_webkit_styles = 'none';
+        // PL-8a: no colar, passam só cor, fundo, bordas e alinhamento — e o
+        // invalid_styles tira cor e fundo de tudo que não é tabela (texto
+        // colado continua padronizado; tabela colada do Word fica colorida).
+        // (O filtro do próprio TinyMCE remonta o estilo de qualquer elemento
+        // com as regras do span e perdia o fundo da célula: fica desligado e
+        // a limpeza é a nossa, em PastePreProcess — cleanPaste().)
+        cfg.paste_webkit_styles = 'all';
         // Sem o plugin "image" do TinyMCE (janela Inserir/editar imagem). Colar e
         // arrastar imagem continuam: quem sobe é o glpi_upload_doc do GLPI.
         if (Array.isArray(cfg.plugins)) {
@@ -918,7 +990,20 @@
         if (typeof cfg.quickbars_insert_toolbar === 'string') {
             cfg.quickbars_insert_toolbar = cfg.quickbars_insert_toolbar.replace(/\bquickimage\b/, 'cxinsertimage');
         }
-        cfg.invalid_styles = { '*': 'font-family font-size color background-color' };
+        cfg.invalid_styles = invalidStyles();
+        // PL-8a (Claudio, 20/10/2026): tabela como no Word — cor por célula,
+        // linha ou coluna, borda pontilhada/tracejada/dupla e cor de borda,
+        // pelas Propriedades da célula/linha/tabela; botão direito na tabela
+        // com Linha, Coluna e Célula. Paleta do Codex+ + cor livre.
+        cfg.table_advtab = true;
+        cfg.table_cell_advtab = true;
+        cfg.table_row_advtab = true;
+        cfg.table_border_styles = TABLE_BORDERS;
+        cfg.color_map = TABLE_COLORS;
+        cfg.custom_colors = true;
+        if (layout === 'classic') {
+            cfg.contextmenu = 'table';
+        }
         if (layout === 'classic') {
             cfg.toolbar_sticky = true;
             cfg.toolbar_sticky_offset = topOffset();
@@ -934,6 +1019,10 @@
             }
             register(editor);
             guardSyntheticClicks(editor);
+            // PL-8a: limpeza do colar — tabela colada do Word fica colorida.
+            editor.on('PastePreProcess', function (e) {
+                if (e && typeof e.content === 'string' && !e.internal) { e.content = cleanPaste(e.content); }
+            });
             // PL-7b: o texto do documento sempre em folhas A4.
             if (layout === 'classic' && !isTpl) { sheetMode(editor); }
         };
@@ -1102,7 +1191,9 @@
         _currentType: currentType,
         _applyTools: applyTools,
         _placeholderHtml: placeholderHtml,
-        _phKinds: PH_KINDS
+        _phKinds: PH_KINDS,
+        _liftCellColors: liftCellColors,
+        _cleanPaste: cleanPaste
     };
 
     prepare(EDITOR_ID);

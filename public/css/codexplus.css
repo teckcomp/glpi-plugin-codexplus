@@ -3307,3 +3307,15 @@ html:not([data-codexplus-theme="dark"]) .cx-shell-btn .ti-sun { display: none; }
 .codexplus-app .codexplus-status { height: 22px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid transparent; }
 .codexplus-app .codexplus-status--rascunho { background: var(--cx-surface-1); color: var(--cx-ink-2); border-color: var(--cx-border); }
 .codexplus-app .codexplus-status--aprovacao { background: var(--cx-info-bg); color: var(--cx-info); }
+
+/* =========================================================================
+   26. MODELOS E CONFIGURAÇÃO (UI-4, 20/10/2026)
+   As duas telas já seguem os tokens; o que não segue é a LOGO da marca,
+   feita para papel branco: no escuro ela sumia sobre o petróleo. Fica num
+   cartão branco (na lista de marcas, na prévia da edição e no campo Marca do
+   documento). No claro nada muda.
+   ========================================================================= */
+html[data-codexplus-theme="dark"] .cx-brands-logo img,
+html[data-codexplus-theme="dark"] .cx-cfg-logo-preview img,
+html[data-codexplus-theme="dark"] .cx-docbrand-logo img {
+    background: #FFFFFF; padding: 4px 8px; border-radius: 4px; box-sizing: content-box; }

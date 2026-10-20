@@ -16,7 +16,7 @@
    1, aparador dentro do nicho e os diagramas do setor à direita como rolos
    de planta (até 3, papel quase preto #2A0A0E, etiqueta na cor do DIA).
    Variáveis: shelf (sectors, total, types, status), level (mode, sector,
-   category), niches, decor, new_url, doctypes, client_types, producer,
+   category), nav_sectors (PL-9: id, name, categories), niches, decor, new_url, doctypes, client_types, producer,
    can_templates, statuses, trash, me, q, situacao, tipo, meus, obsoletos,
    self, csrf, form_url.
    AP-1: d.situation = d.status, ou 'aprovadores' na 1ª etapa com aprovador
@@ -68,28 +68,73 @@
         subtitle: __('Biblioteca de documentos', 'codexplus'),
     } only %}
 
-    {% include '@codexplus/parts/nav.html.twig' with {
-        active: 'biblioteca', painel: producer,
-        modelos: producer and can_templates,
-        config: producer and can_config,
-    } only %}
+    {# PL-9 (Claudio, 20/10/2026, mockup aprovado): na linha das abas, à
+       direita, os filtros Setor, Categoria e Tipo de documento e a busca
+       geral; embaixo, só a situação (quem produz) e as caixas. Setor e
+       Categoria abrem a estante (o mesmo endereço do nicho); Tipo filtra na
+       hora, como os antigos chips de tipo (que saíram). #}
+    <div class="cx-lib-top">
+        {% include '@codexplus/parts/nav.html.twig' with {
+            active: 'biblioteca', painel: producer,
+            modelos: producer and can_templates,
+            config: producer and can_config,
+        } only %}
+        <div class="cx-lib-filters">
+            <label class="cx-lib-field">
+                <span>{{ __('Setor', 'codexplus') }}</span>
+                <select class="form-select" data-cx-lib-sector>
+                    <option value="">{{ __('Todos os setores', 'codexplus') }}</option>
+                    {% for ns in nav_sectors %}
+                        <option value="{{ ns.id }}"{{ level.sector and level.sector.id == ns.id ? ' selected' : '' }}>{{ ns.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="cx-lib-field">
+                <span>{{ __('Categoria', 'codexplus') }}</span>
+                <select class="form-select" data-cx-lib-cat>
+                    <option value="">{{ __('Todas as categorias', 'codexplus') }}</option>
+                    {% for ns in nav_sectors %}
+                        {% if not level.sector or level.sector.id == ns.id %}
+                            {% if not level.sector %}<optgroup label="{{ ns.name }}">{% endif %}
+                            {% for nc in ns.categories %}
+                                <option value="{{ ns.id }}:{{ nc.id }}"{{ level.category and level.sector.id == ns.id and level.category.id == nc.id ? ' selected' : '' }}>{{ nc.name }}</option>
+                            {% endfor %}
+                            {% if not level.sector %}</optgroup>{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="cx-lib-field">
+                <span>{{ __('Tipo de documento', 'codexplus') }}</span>
+                <select class="form-select" data-cx-lib-tsel>
+                    <option value="">{{ __('Todos', 'codexplus') }} ({{ shelf.total }})</option>
+                    {% for t, n in shelf.types %}
+                        <option value="{{ t }}"{{ tipo == t ? ' selected' : '' }}>{{ t }} ({{ n }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="cx-lib-field cx-lib-field--search">
+                <span id="cx-lib-q-label">{{ __('Buscar', 'codexplus') }}</span>
+                {% if cx_niche_mode %}
+                    {# B2b: nos nichos, Enter busca em toda a Biblioteca. #}
+                    <form class="cx-lib-search" method="get" action="{{ self }}" role="search">
+                        <i class="ti ti-search"></i>
+                        <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
+                               aria-labelledby="cx-lib-q-label">
+                        {% if obsoletos %}<input type="hidden" name="obsoletos" value="1">{% endif %}
+                    </form>
+                {% else %}
+                    <label class="cx-lib-search">
+                        <i class="ti ti-search"></i>
+                        <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
+                               aria-labelledby="cx-lib-q-label">
+                    </label>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="cx-lib-bar">
-        {% if cx_niche_mode %}
-            {# B2b: nos nichos, Enter busca em toda a Biblioteca. #}
-            <form class="cx-lib-search" method="get" action="{{ self }}" role="search">
-                <i class="ti ti-search"></i>
-                <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
-                       aria-label="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}">
-                {% if obsoletos %}<input type="hidden" name="obsoletos" value="1">{% endif %}
-            </form>
-        {% else %}
-            <label class="cx-lib-search">
-                <i class="ti ti-search"></i>
-                <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
-                       aria-label="{{ __('Buscar por título ou código', 'codexplus') }}">
-            </label>
-        {% endif %}
         {% if producer %}
             <div class="cx-lib-types" role="group" aria-label="{{ __('Filtrar por situação', 'codexplus') }}">
                 {% for k, label in statuses|merge({'todos': __('Todos', 'codexplus')}) %}
@@ -111,12 +156,6 @@
                 <button type="button" class="cx-lib-type" data-cx-lib-view="lista"><i class="ti ti-list"></i> {{ __('Lista', 'codexplus') }}</button>
             </div>
         {% endif %}
-        <div class="cx-lib-types{{ cx_niche_mode ? ' cx-lib-views' : '' }}" role="group" aria-label="{{ __('Filtrar por tipo', 'codexplus') }}">
-            <button type="button" class="cx-lib-type{{ tipo == '' or shelf.types[tipo] is not defined ? ' is-active' : '' }}" data-cx-lib-type="">{{ __('Todos', 'codexplus') }} <span>{{ shelf.total }}</span></button>
-            {% for t, n in shelf.types %}
-                <button type="button" class="cx-lib-type{{ tipo == t ? ' is-active' : '' }}" data-cx-lib-type="{{ t }}">{{ t }} <span>{{ n }}</span></button>
-            {% endfor %}
-        </div>
     </div>
 
     {# B2b: caminho do nível aberto. #}
@@ -267,8 +306,9 @@
     var MAX_FIC = 5; // B2b: fichários por nicho
     var MAX_DIA = 3; // B2c: rolos de planta por nicho (nível 1)
     var q = root.querySelector('[data-cx-lib-q]');
-    var tBtn = root.querySelector('[data-cx-lib-type].is-active');
-    var tipo = tBtn ? tBtn.getAttribute('data-cx-lib-type') : '';
+    // PL-9: tipo pelo filtro da linha das abas (antes, chips).
+    var tSel = root.querySelector('[data-cx-lib-tsel]');
+    var tipo = tSel ? tSel.value : '';
     // R5: situação (só para quem produz; leitor não tem os botões e vê só publicados).
     var stBtn = root.querySelector('[data-cx-lib-st].is-active');
     var st = stBtn ? stBtn.getAttribute('data-cx-lib-st') : '';
@@ -286,13 +326,15 @@
     // B2b: os links de nível levam os filtros junto (situação, tipo, só os meus).
     root.querySelectorAll('[data-cx-lib-nav]').forEach(function (a) { a.setAttribute('data-base', a.getAttribute('href')); });
     root.querySelectorAll('.cx-lib-niche[data-href]').forEach(function (n) { n.setAttribute('data-base', n.getAttribute('data-href')); });
-    function leva() {
+    function junta(b) {
         var p = [];
         if (st && st !== 'lixeira') { p.push('situacao=' + encodeURIComponent(st)); }
         if (tipo) { p.push('tipo=' + encodeURIComponent(tipo)); }
         if (mine && mine.checked) { p.push('meus=1'); }
         if (obs && obs.checked) { p.push('obsoletos=1'); }
-        function junta(b) { return p.length ? b + (b.indexOf('?') >= 0 ? '&' : '?') + p.join('&') : b; }
+        return p.length ? b + (b.indexOf('?') >= 0 ? '&' : '?') + p.join('&') : b;
+    }
+    function leva() {
         root.querySelectorAll('[data-cx-lib-nav]').forEach(function (a) { a.setAttribute('href', junta(a.getAttribute('data-base'))); });
         root.querySelectorAll('.cx-lib-niche[data-href]').forEach(function (n) { n.setAttribute('data-href', junta(n.getAttribute('data-base'))); });
     }
@@ -384,13 +426,29 @@
             aplica();
         });
     });
-    root.querySelectorAll('[data-cx-lib-type]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            tipo = b.getAttribute('data-cx-lib-type');
-            root.querySelectorAll('[data-cx-lib-type]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
-            aplica();
+    if (tSel) {
+        tSel.addEventListener('change', function () { tipo = tSel.value; aplica(); });
+    }
+    // PL-9: Setor e Categoria abrem a estante (o mesmo endereço do nicho),
+    // levando os filtros. Categoria vem como "setor:categoria".
+    var libUrl = '{{ self|e('js') }}';
+    var sSel = root.querySelector('[data-cx-lib-sector]');
+    var cSel = root.querySelector('[data-cx-lib-cat]');
+    if (sSel) {
+        sSel.addEventListener('change', function () {
+            window.location.href = junta(sSel.value === '' ? libUrl : libUrl + '?setor=' + encodeURIComponent(sSel.value));
         });
-    });
+    }
+    if (cSel) {
+        cSel.addEventListener('change', function () {
+            var v = cSel.value.split(':');
+            if (cSel.value === '') {
+                window.location.href = junta(sSel && sSel.value !== '' ? libUrl + '?setor=' + encodeURIComponent(sSel.value) : libUrl);
+            } else {
+                window.location.href = junta(libUrl + '?setor=' + encodeURIComponent(v[0]) + '&cat=' + encodeURIComponent(v[1]));
+            }
+        });
+    }
     aplica();
 })();
 </script>

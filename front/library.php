@@ -109,6 +109,14 @@ TemplateRenderer::getInstance()->display('@codexplus/library.html.twig', [
         'category' => $cat === null ? null : ['id' => $cat['id'], 'name' => $cat['name']],
     ],
     'niches'    => $niches,
+    // PL-9 (Claudio, 20/10/2026): filtros Setor e Categoria na linha das
+    // abas — todos os setores e categorias que a pessoa enxerga, em
+    // qualquer nível (o escopo acima é só o do nível aberto).
+    'nav_sectors' => array_map(static fn ($s) => [
+        'id'         => $s['id'],
+        'name'       => $s['name'],
+        'categories' => array_map(static fn ($c) => ['id' => $c['id'], 'name' => $c['name']], $s['categories']),
+    ], $shelf['sectors']),
     'decor'     => in_array($mode, ['setores', 'categorias'], true) ? Library::decor(count($niches), $sector === null ? 0 : $sector['id'] + 1) : [],
     // Novo documento na categoria aberta, já com a categoria preenchida.
     'new_url'   => ($mode === 'docs' && $cat['id'] > 0 && \GlpiPlugin\Codexplus\Document::canCreate())

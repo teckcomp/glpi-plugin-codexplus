@@ -2377,6 +2377,19 @@ button.cx-gd-pill--hist:focus-visible { outline: 2px solid #378add; outline-offs
    Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.
    ========================================================================= */
 .cx-lib-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0 20px; }
+/* PL-9 (Claudio, 20/10/2026): abas à esquerda; Setor, Categoria, Tipo e a
+   busca à direita, na mesma linha (a linha do filete das abas). Em tela
+   estreita os filtros descem para baixo das abas. */
+.cx-lib-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 10px 20px; border-bottom: 1px solid var(--cx-border); margin: 0 0 4px; }
+.cx-lib-top .codexplus-nav { border-bottom: 0; margin: 0; }
+.cx-lib-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding-bottom: 8px; }
+.cx-lib-field { display: flex; flex-direction: column; gap: 3px; margin: 0; font-size: .75em; color: var(--cx-muted); }
+.cx-lib-field > span { line-height: 1.2; }
+.cx-lib-field select { min-width: 150px; height: 38px; font-size: 1.15em; padding-top: 0; padding-bottom: 0; }
+.cx-lib-field--search { flex: 1 1 260px; }
+.cx-lib-field--search .cx-lib-search { flex: 0 0 auto; max-width: none; min-width: 260px; font-size: 1.15em; }
+.cx-lib-field--search .cx-lib-search input { height: 36px; }
 .cx-lib-search { display: flex; align-items: center; gap: 8px; flex: 1 1 280px; max-width: 480px;
     border: 1px solid var(--cx-border); border-radius: 8px; padding: 0 10px; background: var(--cx-surface); margin: 0; }
 .cx-lib-search input { border: 0; outline: 0; flex: 1; height: 38px; background: transparent; font: inherit; }

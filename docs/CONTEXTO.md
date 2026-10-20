@@ -3137,6 +3137,30 @@ chegou a ser feita e foi **descartada** por ele: só o editor em folhas,
 - Teste com GLPI real: 4 viradas de folha no editor = as 4 do Visualizar,
   bloco a bloco; digitar recalcula; salvar não leva nada das folhas.
 
+### 3.38 PL-9 — Biblioteca: filtros e busca na linha das abas (20/10/2026)
+
+Pedido de Claudio (imagem 5 de 19/10/2026), mockup aprovado em 20/10/2026
+(canvas "Codex+ PL-9 — Biblioteca", prancha Proposta). Sem reinstalar.
+
+- **Linha das abas** (`.cx-lib-top`): abas à esquerda; à direita **Setor**,
+  **Categoria**, **Tipo de documento** e a **busca geral**. Os chips de
+  tipo (DIA, DIV, DTC…) **saíram**: o tipo é só o select, com a contagem.
+  Embaixo (`.cx-lib-bar`) ficam a situação (quem produz), "Só os meus",
+  "Incluir obsoletos" (quem lê) e Estante/Lista, alinhados à esquerda.
+- **Setor e Categoria abrem a estante** (decisão de Claudio): o mesmo
+  endereço do nicho (`?setor=` / `&cat=`), levando situação, tipo e "só os
+  meus" (`junta()`). "Todos os setores" volta ao início, "Todas as
+  categorias" volta ao setor. Sem setor aberto, Categoria lista todas
+  agrupadas por setor (`optgroup`; valor `setor:categoria`); com setor, só
+  as dele. `nav_sectors` (front/library.php) = todos os setores e
+  categorias que a pessoa enxerga, em qualquer nível.
+- **Tipo** filtra na hora (`[data-cx-lib-tsel]`), como os chips faziam.
+- Busca: nos nichos, Enter busca em toda a Biblioteca (`?q=`); na estante
+  de uma categoria, filtra na hora (B2b, sem mudança).
+- Achado de CSS: `.cx-lib-search` tem `flex: 1 1 280px` — dentro do campo
+  novo (coluna) virava 280 px de altura; `.cx-lib-field--search
+  .cx-lib-search { flex: 0 0 auto }`.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

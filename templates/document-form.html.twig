@@ -792,7 +792,8 @@
             {% endif %}
 
             {% if can_publish_direct %}
-                {# P2: Proposta e Laudo — o responsável publica sem etapas. #}
+                {# P2: Proposta e Laudo — o responsável publica sem etapas. PL-5: nos
+                   outros tipos, o responsável com Auditor no perfil. #}
                 <form method="post" action="{{ self }}" class="cx-flow-row">
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
@@ -804,7 +805,14 @@
                             onclick="return confirm('{{ __('Publicar este documento? Depois de publicado, mudanças só por revisão.', 'codexplus')|e('js') }}');">
                         <i class="ti ti-world-upload"></i> {{ __('Publicar', 'codexplus') }}
                     </button>
-                    <span class="codexplus-form-hint">{{ __('Salve antes de publicar. Neste tipo o responsável publica direto, sem auditoria.', 'codexplus') }}</span>
+                    <span class="codexplus-form-hint">
+                        {% if flow == 'direct' %}
+                            {{ __('Salve antes de publicar. Neste tipo o responsável publica direto, sem auditoria.', 'codexplus') }}
+                        {% else %}
+                            {# PL-5: responsável com Auditor no perfil. #}
+                            {{ __('Salve antes de publicar. Você é o responsável e tem Auditor no perfil: pode publicar direto, sem as etapas. Para passar pelas etapas, use Enviar para validação.', 'codexplus') }}
+                        {% endif %}
+                    </span>
                 </form>
             {% endif %}
 

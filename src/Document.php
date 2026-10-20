@@ -249,6 +249,23 @@ class Document extends CommonDBTM
         return $me > 0 && (int) ($this->fields['users_id_owner'] ?? 0) === $me;
     }
 
+    /**
+     * PL-5 (Claudio, 19/10/2026): o responsável que tem Auditor no perfil
+     * ATIVO faz todos os papéis NESTE documento — publica direto, valida mesmo
+     * tendo montado ou aprovado a 1ª etapa, e pode ser também o auditor e o
+     * editor. Só nos documentos em que é o responsável.
+     */
+    public function isOwnerAuditor(): bool
+    {
+        return $this->isOwner() && self::bit(Rights::VALIDATE);
+    }
+
+    /** PL-5: tipo com aprovadores (DIA, DIV) e a lista não está vazia. */
+    public function hasApprovers(): bool
+    {
+        return $this->usesApprovers() && DocumentApprover::ids((int) ($this->fields['id'] ?? 0)) !== [];
+    }
+
     /** É o autor (quem criou)? */
     public function isAuthor(): bool
     {
@@ -355,7 +372,8 @@ class Document extends CommonDBTM
      *     (o responsável já aprova a etapa dele);
      *   - auditor não pode ser autor, editor nem revisor (responsável ≠
      *     auditor continua no envio), salvo em documento só de setor de
-     *     auditoria (A2).
+     *     auditoria (A2) e salvo quando o auditor é o próprio responsável
+     *     com Auditor no perfil (PL-5).
      */
     private function roleConflict(array $input, bool $novo): ?string
     {
@@ -391,7 +409,10 @@ class Document extends CommonDBTM
         }
         if ($auditor > 0 && in_array($auditor, $montou, true) && DocumentMeta::flowOf($doctype) === DocumentMeta::FLOW_FULL) {
             $soAuditoria = !$novo && $this->isAuditSectorOnly();
-            if (!$soAuditoria) {
+            // PL-5: o responsável com Auditor no perfil pode ser também o auditor.
+            $entidade    = (int) ($input['entities_id'] ?? $this->fields['entities_id'] ?? $_SESSION['glpiactive_entity'] ?? 0);
+            $donoAuditor = $auditor === $owner && in_array($owner, Rights::auditorUsers($entidade), true);
+            if (!$soAuditoria && !$donoAuditor) {
                 return sprintf(__('Quem montou o documento (autor, editor ou revisor) não pode ser o auditor: %s.', 'codexplus'), getUserName($auditor));
             }
         }
@@ -833,13 +854,21 @@ class Document extends CommonDBTM
         return $this->flow() !== DocumentMeta::FLOW_DIRECT && $this->canUpdateItem();
     }
 
-    /** Publicar direto (P2, Proposta e Laudo): o responsável, em rascunho. */
+    /**
+     * Publicar direto, em rascunho. P2: na Proposta e no Laudo, o responsável.
+     * PL-5: nos outros tipos, o responsável com Auditor no perfil — salvo
+     * quando o documento tem aprovadores (DIA, DIV): a etapa deles não se
+     * pula, nem pelo Super-Admin.
+     */
     public function canPublishDirect(): bool
     {
-        return $this->flow() === DocumentMeta::FLOW_DIRECT
-            && $this->status() === self::STATUS_DRAFT
-            && $this->checkEntity()
-            && (Rights::isSuperAdmin() || $this->isOwner()); // P3: sem o bit Aprovar
+        if ($this->status() !== self::STATUS_DRAFT || !$this->checkEntity()) {
+            return false;
+        }
+        if ($this->flow() === DocumentMeta::FLOW_DIRECT) {
+            return Rights::isSuperAdmin() || $this->isOwner(); // P3: sem o bit Aprovar
+        }
+        return $this->isOwnerAuditor() && !$this->hasApprovers();
     }
 
     /** 1ª etapa (P1): o responsável, com o bit Aprovar, aprova. */
@@ -870,6 +899,10 @@ class Document extends CommonDBTM
             return false;
         }
         if (Rights::isSuperAdmin()) {
+            return true;
+        }
+        // PL-5: o responsável com Auditor no perfil valida, sem as regras.
+        if ($this->isOwnerAuditor()) {
             return true;
         }
         return self::bit(Rights::VALIDATE)
@@ -1255,9 +1288,9 @@ class Document extends CommonDBTM
             if (!in_array($auditor, Rights::auditorUsers((int) $this->fields['entities_id']), true)) {
                 return $this->deny(__('O auditor escolhido não tem mais um perfil de auditor. Escolha outro.', 'codexplus'));
             }
-            if ($auditor === (int) ($this->fields['users_id_owner'] ?? 0) && !$this->isAuditSectorOnly()) {
-                return $this->deny(__('Responsável e auditor não podem ser a mesma pessoa (quem aprova não audita).', 'codexplus'));
-            }
+            // PL-5: responsável e auditor podem ser a mesma pessoa — o auditor
+            // escolhido já foi conferido acima na lista de quem tem Auditor no
+            // perfil (antes: "quem aprova não audita").
         }
         $extra = [];
         if ((int) $this->fields['revision'] > 0) {

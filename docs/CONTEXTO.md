@@ -3059,6 +3059,31 @@ PL-9 (ROADMAP, "Ajustes do uso em produção — 2ª rodada"). Sem reinstalar.
 - Ícones criados na instalação não entram: o fluxograma só desenha os
   Lucide embutidos (`_clean` descarta ícone solto).
 
+### 3.35 PL-5 — Responsável com Auditor faz todos os papéis (19/10/2026)
+
+Decisão de Claudio, 19/10/2026: quem tem **Auditor no perfil ativo** e é o
+**responsável** pelo documento faz todos os papéis **nesse documento**. Só
+onde é o responsável; nos outros, as regras da A1, A2 e P3 continuam.
+Sem reinstalar.
+
+- `Document::isOwnerAuditor()` = `isOwner()` + bit Auditar (8192) no perfil
+  ativo (quem tem dois perfis precisa estar no que tem o bit, como na A1).
+- **Publicar direto** (`canPublishDirect()`) em qualquer tipo, em rascunho.
+  Exceção: documento com aprovadores (DIA, DIV com a lista preenchida) —
+  a etapa dos aprovadores não se pula, nem pelo Super-Admin (A-2a). O
+  "Enviar para validação" continua disponível ao lado; o texto do botão
+  Publicar explica a diferença.
+- **Valida** a 2ª etapa (`canValidate()`) mesmo tendo montado ou aprovado a
+  1ª, e mesmo não sendo o auditor escolhido.
+- **Pode ser o auditor** do próprio documento: `roleConflict()` aceita
+  auditor = responsável que montou quando ele está em
+  `Rights::auditorUsers()`; o envio deixou de recusar "responsável e auditor
+  não podem ser a mesma pessoa" (o auditor escolhido já é conferido na lista
+  de quem tem Auditor no perfil). Para os outros, "quem montou não audita"
+  continua.
+- Harness com GLPI real (perfis com e sem Auditor, usuário com dois
+  perfis): 20 verificações, inclusive Publicar pela tela.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

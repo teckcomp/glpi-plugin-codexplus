@@ -768,8 +768,8 @@ para a produção pela tag no fim.
 
 | Bloco | Entrega | Situação |
 |---|---|---|
-| PL-4 | Barra do editor presa ao rolar; **link público no diagrama** (fotos do organograma pela rota do link) | pacote `codexplus-pl4-1` |
-| PL-5 | **Auditor que é o responsável** faz todos os papéis e publica direto (Claudio: só nos documentos em que é o responsável, com Auditor no perfil) | a fazer |
+| PL-4 | Barra do editor presa ao rolar; **link público no diagrama** (fotos do organograma pela rota do link) | ✅ `1f8ca8d` |
+| PL-5 | **Auditor que é o responsável** faz todos os papéis e publica direto (Claudio: só nos documentos em que é o responsável, com Auditor no perfil; aprovadores de DIA/DIV não se pulam) | pacote `codexplus-pl5-1` |
 | PL-6 | Realce com as **mesmas 5 cores fortes** do texto, texto branco automático; cor do texto ganha **Branco**; realces antigos continuam valendo nos gravados | a fazer |
 | PL-7 | **Quebra de página no padrão do Word** (Ctrl+Enter e botão; linha "Quebra de página" no editor; folha nova no Visualizar e no PDF) | a fazer |
 | PL-8 | **Tabela como no Word** (linhas e colunas uma a uma; cabeçalho escuro com texto branco) | aguarda 2 prints de Claudio |

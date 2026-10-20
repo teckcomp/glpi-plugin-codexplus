@@ -38,8 +38,8 @@
     /* UI-1 (Claudio, 20/10/2026) — identidade PETRÓLEO, a mesma casca do
        Task+ (16q) e do Painel IXC. Princípio: "o documento é o produto" —
        cromo em neutro, UMA cor de marca, cor semântica só para situação e
-       prazo. Dois temas: estes valores são o CLARO (padrão enquanto as
-       telas migram); o ESCURO redefine os mesmos nomes logo abaixo, sob
+       prazo. Dois temas: estes valores são o CLARO; o ESCURO (padrão desde o
+       UI-6, Claudio 20/10/2026) redefine os mesmos nomes logo abaixo, sob
        html[data-codexplus-theme="dark"]. Os nomes antigos (--cx-accent,
        --cx-surface-2…) foram mantidos para o CSS das seções seguintes
        continuar valendo; mudou só o valor. */
@@ -112,7 +112,7 @@
     --cx-mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* Tema ESCURO (padrão do Task+; aqui opcional até as telas migrarem).
+/* Tema ESCURO (padrão, como no Task+; o claro fica pelo botão sol/lua).
    Mesmos nomes, outros valores. html[data-…] vence :root por especificidade. */
 html[data-codexplus-theme="dark"] {
     --cx-accent:        #5FC3CD;

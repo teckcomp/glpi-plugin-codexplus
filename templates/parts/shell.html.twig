@@ -7,11 +7,12 @@
    O tema mora em <html data-codexplus-theme="light|dark">: o script abaixo
    lê o cookie ANTES de a área do plugin pintar (sem piscar); o
    codexplus-shell.js troca pelo botão e grava cookie + localStorage.
-   Padrão enquanto as telas migram: claro.
+   Padrão: ESCURO (UI-6, Claudio 20/10/2026), como no Task+; quem escolheu o
+   claro continua no claro pelo cookie.
    UI-1b: o bloco `slot` fica entre as abas e o botão de tema — a tela que
    precisa de filtros na linha do menu (Biblioteca, PL-9) usa `embed` em vez
    de `include` e preenche o bloco; as outras incluem e o bloco sai vazio. #}
-<script>(function(){var m=document.cookie.match(/(?:^|;\s*)codexplus_theme=(dark|light)/);document.documentElement.setAttribute('data-codexplus-theme',m?m[1]:'light');})();</script>
+<script>(function(){var m=document.cookie.match(/(?:^|;\s*)codexplus_theme=(dark|light)/);document.documentElement.setAttribute('data-codexplus-theme',m?m[1]:'dark');})();</script>
 <div class="cx-shell">
     {% include '@codexplus/parts/brand.html.twig' with {title: title, subtitle: subtitle} only %}
     {% include '@codexplus/parts/nav.html.twig' with {active: active, painel: painel, modelos: modelos, config: config} only %}

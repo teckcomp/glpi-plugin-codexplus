@@ -1,7 +1,8 @@
 /* Codex+ — casca (UI-1, 20/10/2026): troca de tema claro/escuro pelo botão
    sol/lua da barra, como no Task+ (shell.js 16q).
    O tema mora em <html data-codexplus-theme="light|dark">. Quem o põe ANTES
-   do paint é o script inline de parts/shell.html.twig (lê o cookie); aqui
+   do paint é o script inline de parts/shell.html.twig (lê o cookie; sem
+   cookie, ESCURO — UI-6); aqui
    só a troca: atributo na hora, cookie codexplus_theme (1 ano, caminho do
    GLPI) e cópia no localStorage. Sem endpoint e sem schema: a preferência
    é por navegador. Se um dia for por usuário no servidor, vira um

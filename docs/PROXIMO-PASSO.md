@@ -1,17 +1,16 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em 08/10/2026 (noite), depois da subida da **`v0.8.3`** para a
-> produção (PL-1, PL-2, PL-3a, PL-3b — CONTEXTO 3.29 a 3.33). Validação com
-> uso real segue até ~21/10/2026.
+> Gerado em **20/10/2026**, no fim da sessão de 19–20/10: **2ª rodada de
+> ajustes do uso real (PL-4 a PL-10) validada e commitada na homologação**
+> (CONTEXTO 3.34 a 3.42, achados 175 a 181). A produção segue na `v0.8.3`.
 
 ## Estado
 
-- Versão: **`0.8.3`**, tag **`v0.8.3`** (`a71a149`), **na homologação e na
-  produção**. Os commits de docs depois da tag não precisam de subida. Catálogo do mapa
-  de calor com o XV2-2X e os perfis de referência. Ação automática
-  `codexplusexpiry` ativa; notificações por e-mail **desligadas** na
-  homologação (Claudio: a Teckcomp não usa; pronto para terceiros).
+- **Homologação: `c873357`** (master), sem tag. Tudo validado por Claudio.
+- **Produção: `v0.8.3`** (`a71a149`, 08/10/2026).
+- Versão no `setup.php`: **0.8.3** — nenhum bloco da rodada mexeu no banco
+  nem na versão (todos sem reinstalar).
 - **Banco da homologação: `glpidb`** (achado 159) — consulta direta com
   `mysql "$DBN"`, nome tirado do `config/config_db.php`.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
@@ -42,70 +41,90 @@
   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
   grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
   do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.17 a 3.27, achados
-  até 171) e `docs/ROADMAP.md`, seções **"Reta final antes da produção"**,
-  **"Pós-produção"** e "Decisões pendentes → Da Reta final".
+- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.34 a 3.42 desta rodada,
+  achados até 181) e `docs/ROADMAP.md`, seções **"Ajustes do uso em
+  produção — 2ª rodada"** e **"Pós-produção"**.
+
+## O que entrou na rodada (homologação, falta subir)
+
+| Bloco | O que é | Commit |
+|---|---|---|
+| PL-4 | Barra do editor presa ao rolar; link público no diagrama (fotos pelo link) | `1f8ca8d` |
+| PL-5 | Responsável com Auditor no perfil faz todos os papéis e publica direto | `26d2d3c` |
+| PL-6 | Realce nas 5 cores fortes (texto branco); cor Branco; link público com cor | `f81470b` |
+| PL-7 | Editor sempre em folhas, a folha vira onde o PDF vira | `1410eaf` |
+| PL-9 | Biblioteca: Setor, Categoria, Tipo e busca na linha das abas | `97e0fbb` |
+| PL-8a | Tabela como no Word: cor/fundo/bordas por célula, botão direito, colar do Word | `2734581` |
+| PL-8b | Estilos de tabela 1 a 5 com personalização (cor livre, claro/escuro, bordas, listras) | `8856734` |
+| PL-10 | Correção do pulo para o início e do traço vertical (cursor falso) | `c873357` |
+
+## Próximo passo imediato: subida única `v0.8.4`
+
+1. **Homologação** (pacote pequeno da próxima sessão): versão **0.8.4** no
+   `setup.php` → `plugin:install --force --username=glpi codexplus` +
+   `plugin:activate codexplus` + `plugin:list | grep -i codexplus` →
+   conferência rápida → commit → **tag `v0.8.4`** + `git push --tags`.
+   (Sem mudança de banco; a reinstalação só registra a versão.)
+2. **Produção** (SSH porta 2022, `su -`): backup em `/root/backup` (banco +
+   pasta do plugin, conferido pelo nome e pelo `-- Dump completed`) →
+   `git fetch --tags && git checkout v0.8.4` → reinstalação (mesmos 3
+   comandos) → `cache:clear` + `systemctl restart apache2` → Ctrl+F5.
+3. **Conferência em produção** (um item por bloco):
+   - documento longo: folhas no editor, clicar em vários pontos (nada pula,
+     sem traço no meio de planilha/planta), setas atravessando a faixa;
+   - realce forte e cor Branco; link público de um texto com cor;
+   - tabela: botão direito, Propriedades da célula (cor e borda tracejada),
+     colar uma tabela do Word, Estilo 1 a 5 + Personalizar; PDF e Word;
+   - link público de um diagrama (fluxograma e organograma com foto);
+   - Biblioteca: Setor → Categoria → Tipo; busca com Enter;
+   - responsável com Auditor: Publicar direto num POP.
+
+## Depois da subida
+
+- **P-3a** — cadastros da homologação: começar por um **script de leitura**
+  nos dois servidores (usuários, grupos e o que existe de cada lado;
+  correspondência por login e nome de grupo).
+- **P-3b** — documentos escolhidos (lista com Claudio).
+- **P-4** — ponta a ponta na produção e ação automática de vencimento.
+- **Pós-produção** (ROADMAP), começando pelo que o usuário vê todo dia:
+  (1) marca d'água RASCUNHO fora da versão vigente; (2) Word sem histórico
+  e sem complementares; (3) PDF em cascata (RACI/cronograma como nota,
+  organograma vinculado sem fotos); (4) leitura comum em folhas?; (12)
+  tabela/planilha maior que uma folha repetindo o cabeçalho. Novos desta
+  rodada: (40) Importar `.docx` com cores de tabela; (41) guias tracejadas
+  na tabela sem bordas (só se incomodar); (37) guardar os mockups PL-8 e
+  PL-9 em `docs/`.
 
 ## Regras de trabalho (Claudio)
 
-- **Antes da produção, só a Reta final** (04/10, fim da noite): 12 blocos
-  + F-0. Todo o resto, inclusive a caça a bugs anotada, é Pós-produção.
-  Não puxar item da Pós-produção para dentro de um bloco da Reta final.
-- Acelerar: pacotes maiores quando o risco é baixo, mockup só quando a tela
-  muda de verdade.
-- Um pacote por bloco, validado antes, roteiro de teste e **commit antes do
-  pacote seguinte**. Clonar do GitHub no último commit antes de mexer
-  (achado 71).
+- **Feedback da produção tem prioridade sobre a Pós-produção.**
+- Tudo na **homologação primeiro**, um pacote por bloco, validado antes, com
+  roteiro de teste e **commit antes do pacote seguinte**; quando o conjunto
+  fecha, **uma subida só** para a produção pela tag.
+- Clonar do GitHub no último commit antes de mexer (achado 71). **Cuidado
+  com `git stash` + `git checkout -- .` no clone**: o pacote ainda não
+  commitado por Claudio some do clone — guardar a cópia do pacote antes.
 - **Validação no container** (achado 136): GLPI 11.0.6 real + MariaDB,
-  harness PHP com o Kernel, tela pelo `php -S` + Chromium (sem Chromium:
-  login por script numa sessão Python só, achado 154). **MariaDB e
-  `php -S` morrem entre comandos: subir no mesmo comando**; `cache:clear`
-  depois de trocar Twig (achado 140).
-- **Toda regra prometida no texto da entrega entra no harness** (achado 139).
-- **Modelo é dado da instalação, nunca semente do Install** (achado 137).
+  harness PHP com o Kernel, tela pelo `php -S` + Chromium (Playwright).
+  Toda regra prometida no texto da entrega entra no harness (achado 139).
+- Pedido ambíguo de tela: **confirmar com print ou mockup antes de
+  codificar** (lição do PL-7: "quebra de página" era ver as folhas, não
+  Ctrl+Enter). Mockup só quando a tela muda de verdade.
+- Modelo é dado da instalação, nunca semente do Install (achado 137).
 
-## Ordem da Reta final
+## Lembretes do container
 
-1. ~~**HV-1**~~ ✅ `7a54900` — aba Histórico + "incluir obsoletos" na Biblioteca
-2. ~~**AP-1**~~ ✅ `42a84c0` — aprovadores por versão + "Aguardando aprovadores" (0.7.10)
-3. ~~**MO-1**~~ ✅ `1f46cb7` — modelos por setor e categoria (0.7.11)
-4. ~~**MO-2**~~ ✅ `fd1db9b` — imagens e quadros viram marcadores nos modelos
-5. ~~**Q7c-1**~~ ✅ `b92a242` — primeira fase não sobe acima das soltas; tela cheia estica
-6. ~~**Q7c-2**~~ ✅ `b92a242` — histórico das marcações no balão do selo (0.7.12)
-7. ~~**Q5k**~~ ✅ `04ea10c` — texto solto com largura; "…" na mini-paleta; quebra pela largura real
-8. ~~**7a**~~ ✅ `e04c5d0` — ação automática diária e marcas (0.7.13)
-9. ~~**7b**~~ ✅ `7cc27fe` — notificação nativa (0.7.14)
-10. ~~**Q8**~~ ✅ `ada92f4`…`aef34d4` — mapa de calor Wi-Fi (Q8-5 → Pós-produção)
-11. ~~**Q5i-5**~~ → Pós-produção (06/10: o Mermaid pela IA já resolve)
-12. ~~**Q5i-6**~~ → Pós-produção (mesmo motivo)
-13. ~~**F-0**~~ ✅ tag `v0.8.0` — instalação do zero idêntica à homologação → **P-1 a P-4** (produção)
-
-## Regra para as próximas mudanças (Claudio, 08/10/2026)
-
-Tudo na **homologação primeiro**, um pacote por bloco com commit (sem tag)
-antes do pacote seguinte; quando o conjunto estiver validado, **uma subida
-só** para a produção pela tag final (backup → checkout da tag →
-reinstalação → conferência no navegador).
-
-## Próximo passo imediato
-
-**Validação em produção até ~21/10/2026** — Claudio usa o Codex+ 0.8.3 nas
-rotinas reais. O que surgir vira um novo conjunto PL-n (mesma regra acima).
-
-Depois da validação, como pós-produção: **P-3a** (cadastros da homologação;
-começar por um script de leitura nos dois servidores — usuários, grupos e o
-que existe de cada lado; correspondência por login e nome de grupo),
-**P-3b** (documentos escolhidos, lista com Claudio) e **P-4** (ponta a ponta
-e ação automática de vencimento). Em paralelo, a lista **Pós-produção** do
-ROADMAP (novos: (3) fotos no PDF em cascata, (38) limpeza de fotos sem uso,
-(39) seção de acesso anônimo no rascunho).
-
-Lembretes do container (achados 153, 154, 157, 158, 164, 168): `mysqld` por
-`setsid nohup` no mesmo comando; `php -S` com `< /dev/null`; parar
-servidor pelo PID salvo, **nunca** `pkill -f` com o padrão na linha; login
-por script numa sessão Python só, com `Referer` nos POST; jsdom não tem
-canvas (testar a grade). Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.
-Container novo pode precisar de `apt-get install php8.3-cli php8.3-mysql
-php8.3-mbstring php8.3-xml php8.3-curl php8.3-gd php8.3-intl php8.3-zip
-php8.3-bcmath php8.3-bz2 mariadb-server` (tirar o repositório do Node do
-`sources.list.d`, dá 403) e do GLPI 11.0.6 baixado do GitHub.
+Achados 153, 154, 157, 158, 164, 168, 175, 177, 179: `mysqld` por `setsid
+nohup` no mesmo comando; `php -S` com `< /dev/null` (e `setsid nohup … &`
+dentro de parênteses, senão o comando trava até o limite); parar servidor
+pelo PID salvo, **nunca** `pkill -f` com o padrão na linha; login por script
+numa sessão Python só, com `Referer` nos POST; jsdom não tem canvas.
+Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`; aba nova na mesma
+sessão = `context.new_page()`; TinyMCE 7 = `tinymce.get()`; token de teste
+gerado em Python (o shell é `sh`, sem `{1..48}`). Teste de "pulo" na tela:
+medir a posição NA TELA do bloco clicado antes e depois. Container novo pode
+precisar de `apt-get install php8.3-cli php8.3-mysql php8.3-mbstring
+php8.3-xml php8.3-curl php8.3-gd php8.3-intl php8.3-zip php8.3-bcmath
+php8.3-bz2 mariadb-server` (tirar o repositório do Node do
+`sources.list.d`, dá 403) e do GLPI 11.0.6 baixado do GitHub
+(`db:install … --allow-superuser`).

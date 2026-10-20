@@ -775,9 +775,21 @@ para a produção pela tag no fim.
 | PL-8a | Tabela como no Word: **cor, fundo e bordas (pontilhada, tracejada…) por célula, linha ou coluna**, cor livre; **botão direito** com Linha/Coluna/Célula; **colar do Word mantém as cores**; Word gerado com as cores | ✅ `2734581` |
 | PL-8b | Galeria dos **estilos 1 a 5** (mockup aprovado) com personalização: cor do cabeçalho (paleta ou livre), claro/escuro, linhas alternadas, bordas | ✅ `8856734` |
 | PL-9 | Biblioteca: **Setor, Categoria, Tipo e busca na linha das abas** (mockup aprovado); chips de tipo saem; Setor e Categoria abrem a estante | ✅ `97e0fbb` |
-| PL-10 | Correção: clicar no documento fazia ele **voltar ao início** (editor em folhas sem avisar o autoresize) e **traço vertical** (cursor falso do TinyMCE deslocado pela margem da folha) | pacote `codexplus-pl10-3` |
+| PL-10 | Correção: clicar no documento fazia ele **voltar ao início** (editor em folhas sem avisar o autoresize) e **traço vertical** (cursor falso do TinyMCE deslocado pela margem da folha) | ✅ `c873357` |
 
-Depois: subida única (`v0.8.4`), P-3a, P-3b, P-4, Pós-produção.
+**Rodada fechada em 20/10/2026** (homologação em `c873357`). Ordem
+combinada com Claudio para a próxima sessão:
+
+1. **Subida única `v0.8.4`** — versão no `setup.php` + tag na homologação;
+   produção: backup → `git fetch --tags && git checkout v0.8.4` →
+   reinstalação → `cache:clear` + restart → conferência (um item por bloco
+   PL-4 a PL-10; roteiro em docs/PROXIMO-PASSO.md).
+2. **P-3a** — cadastros da homologação (script de leitura nos dois
+   servidores; usuários e grupos por login e nome de grupo).
+3. **P-3b** — documentos escolhidos (lista com Claudio).
+4. **P-4** — ponta a ponta na produção e ação automática de vencimento.
+5. **Pós-produção**, começando pelos bugs que o usuário vê todo dia:
+   (1), (2), (3), (4) e (12).
 
 ## Pós-produção (Claudio, 04/10/2026)
 
@@ -859,7 +871,15 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 - (36) Barra do editor: com o botão Resumo, Importar, <> e Tela cheia foram
   para o "•••" em 1920 px — reordenar se incomodar
 - (37) Guardar os **mockups aprovados** em `docs/` (achado 116; hoje só os
-  de 4c a 4f, em `docs/etapas`)
+  de 4c a 4f, em `docs/etapas`). Entram os da 2ª rodada: PL-9 Biblioteca e
+  PL-8 Estilos de tabela (links na CONTEXTO 3.42)
+- (40) Importar `.docx` com as **cores da tabela** (o mammoth não lê
+  formatação de célula; hoje o caminho é copiar e colar do Word, PL-8a)
+- (41) Editor: guias tracejadas do TinyMCE na tabela "sem bordas" — só se
+  incomodar (não saem no PDF nem no Word)
+- Q5i-2b — importador Mermaid com "colunas pelo fluxo inteiro" (+
+  `flowchart TD` para jornadas longas): **parado** enquanto as raias por fase
+  atenderem (achado 181)
 
 **Observações (não são tarefa):**
 

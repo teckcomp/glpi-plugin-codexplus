@@ -2,6 +2,16 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **homologação em `c873357`** (20/10/2026) — **2ª rodada de ajustes
+> do uso real (PL-4 a PL-10) validada e commitada**: barra do editor presa,
+> link público no diagrama, responsável com Auditor faz todos os papéis,
+> realce nas cores fortes, **editor sempre em folhas**, **tabela como no
+> Word** (formatação por célula, botão direito, colar do Word, estilos 1 a 5
+> com personalização), filtros da Biblioteca na linha das abas, correções do
+> pulo para o início e do cursor falso. Seções 3.34 a 3.42; achados 175 a
+> 181. **Produção segue na `v0.8.3`.** Próximo: **subida única `v0.8.4`**
+> (docs/PROXIMO-PASSO.md).
+> Antes:
 > Estado: **`v0.8.3` em produção** desde **08/10/2026** (seção 3.33):
 > ajustes do uso real — PL-1 ("+" pelo direito Gerenciar, coluna Revisor /
 > Editor, Anotar), PL-2 (Leitura "Todos"), PL-3a/3b (foto no organograma,
@@ -3255,6 +3265,57 @@ bloco da folha; na faixa ou abaixo → começo da folha seguinte (pode ser a
 linha pulam o desenho (keydown com prioridade); `hideFakeCaret()` ao levar
 o cursor de volta ao texto.
 
+### 3.42 Fechamento da sessão de 19–20/10/2026 (2ª rodada PL)
+
+Pedidos de Claudio no uso real (19/10, prints da produção), todos
+"prioridade sobre a Pós-produção". Cada um virou um bloco na homologação,
+com pacote, roteiro e commit antes do seguinte:
+
+| Bloco | Commit | Seção |
+|---|---|---|
+| PL-4 — barra do editor presa; link público no diagrama | `1f8ca8d` | 3.34 |
+| PL-5 — responsável com Auditor faz todos os papéis | `26d2d3c` | 3.35 |
+| PL-6 — realce nas cores fortes do texto; cor Branco; link público com cor | `f81470b` | 3.36 |
+| PL-7 — editor sempre em folhas (Google Docs) | `1410eaf` | 3.37 |
+| PL-9 — Biblioteca: Setor, Categoria, Tipo e busca na linha das abas | `97e0fbb` | 3.38 |
+| PL-8a — tabela como no Word: formatação por célula, botão direito, colar do Word | `2734581` | 3.39 |
+| PL-8b — estilos de tabela 1 a 5 com personalização | `8856734` | 3.40 |
+| PL-10 — pulo para o início; traço vertical (cursor falso) | `c873357` | 3.41 |
+
+**Decisões de Claudio registradas nesta rodada** (não reabrir):
+
+- PL-5: vale **só no documento em que a pessoa é a responsável** e com
+  Auditor no **perfil ativo**; aprovadores de DIA/DIV não se pulam.
+- PL-6: realce = as 5 cores fortes do texto, texto branco automático; Branco
+  na cor do texto; realces antigos continuam nos gravados (fora do menu).
+- PL-7: "quebra de página" = **ver onde a folha 1 termina e a 2 começa**
+  (print do Google Docs), **sempre ligado**. A quebra manual (Ctrl+Enter,
+  `hr.cx-pagebreak`, pacote `codexplus-pl7-1`) foi feita e **descartada** —
+  não aplicar, não reabrir sem pedido.
+- PL-8: estilos **1 a 5** do mockup, com personalização (cor do cabeçalho na
+  paleta **ou livre**; claro/escuro; bordas; listras); **tabela colada do
+  Word mantém as cores**; cor por célula/coluna e bordas pontilhada/
+  tracejada; botão direito com Linha, Coluna e Célula.
+- PL-9: o mockup aprovado é **exatamente** a tela; chips de tipo saem (só o
+  select); Setor e Categoria **abrem a estante**.
+
+**Mockups aprovados** (canvas no claude.ai, privados do Claudio; guardar em
+`docs/` é o item (37) da Pós-produção):
+- PL-9 Biblioteca: https://claude.ai/artifact/UZwj1LrQFuEbLNUcpwFc91
+- PL-8 Estilos de tabela: https://claude.ai/artifact/9LhiW7Hf3LNut1un7fw4eH
+
+**Fora do código, na mesma sessão:** fluxogramas do Pessoas+ (admissão,
+desligamento, jornada) convertidos para Mermaid e importados no Codex+ —
+com raias por **ator** ficaram ilegíveis; com raias por **fase** (ator como
+cor e prefixo da forma) ficaram bons (achado 181). Arquivos
+`pessoasplus-*-por-fase-codex.md`. O Q5i-2b ("colunas pelo fluxo inteiro"
+no importador) fica parado enquanto o padrão por fase atender.
+
+**Limites conhecidos, anotados na Pós-produção:** Importar `.docx` não traz
+as cores da tabela (o mammoth não lê; copiar e colar traz); no editor, a
+tabela "sem bordas" mostra as guias tracejadas do TinyMCE (não saem no PDF
+nem no Word).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -4158,6 +4219,13 @@ Desde a 0.5.8, a linha de identificação da 1ª página vem de
 `#codexplus-print-config` (`buildIdentLine()`), não da raspagem de
 `.codexplus-doc-meta` — que trazia a contagem de visualizações.
 
+181. **Importador Mermaid (Q5i-2) e raias por ator**: a coluna é o caminho
+    mais longo DENTRO da raia e cada raia recomeça na coluna 1 (achado 103).
+    Fluxo com muitas ligações entre raias (cada forma alimentada por outra
+    raia) vira pilha na coluna 1 com uma linha vertical única. Para jornadas
+    longas: **raias por fase** e o ator como cor (`classDef`) + prefixo no
+    texto ("RH · …"). Raia por ator só funciona com trechos sequenciais
+    curtos em cada raia.
 Desde o E3 os mesmos seletores alimentam o **Word** (`codexplus-export.js`,
 botão `#codexplus-docx`), que lê a configuração por `window.CodexplusPrint`.
 

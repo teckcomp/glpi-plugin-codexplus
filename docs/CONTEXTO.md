@@ -3106,6 +3106,37 @@ cor do texto**, com o **texto branco automático**; a cor do texto ganha
   `codexplus-editor.js`, que a página pública não carregava. Agora carrega
   (sem `tinymce_editor_configs` ele só injeta as classes).
 
+### 3.37 PL-7 — Editor sempre em folhas, como o Google Docs (20/10/2026)
+
+Pedido de Claudio, 20/10/2026 (print do Google Docs): ver no editor onde a
+folha 1 termina e a 2 começa. A quebra manual (Ctrl+Enter, `hr.cx-pagebreak`)
+chegou a ser feita e foi **descartada** por ele: só o editor em folhas,
+**sempre ligado**. Sem reinstalar.
+
+- **Onde a folha vira vem do motor do PDF** (`codexplus.js`):
+  `CodexplusPrint.planBreaks(html, título)` monta o mesmo HTML da impressão
+  (`buildPrint({content, title})`, agora com origem opcional) num iframe
+  fora da tela, roda o mesmo `planPages()` e devolve `{starts, left, heading,
+  geo}` — índice do bloco do editor que abre cada folha (marcado com
+  `data-cxi` na cópia), px que sobram no fim de cada folha e altura do
+  título da 1ª. Uma medição por vez; pedido novo durante uma medição espera
+  e fica só o último. `typoCss()` = `PRINT_CSS` + tamanhos A−/A+.
+- **Editor** (`codexplus-editor.js`, `sheetMode()`, só o texto do documento,
+  não o de modelos): largura útil da folha (`geo.contentW`), margens da
+  folha, tipografia do PDF e fundo cinza. Desenhos `data-mce-bogus="all"`
+  `contenteditable=false` — `.cx-sheet-head` (título em cinza, altura do
+  `.cx-heading` do PDF) e `.cx-sheet-gap` (sobra da folha + margem de baixo
+  + faixa "Folha N" + margem de cima): o TinyMCE **não grava nada disso** e
+  o documento não fica "alterado" ao abrir. Recalcula 700 ms depois de
+  digitar, colar, desfazer ou mudar o título.
+- A separação **sempre cai entre blocos** (parágrafo, tabela, imagem), onde
+  o PDF vira a página — o Docs corta no meio do parágrafo; aqui o bloco
+  inteiro desce e sobra espaço no fim da folha.
+- A página de edição passa a ter `#codexplus-print-config` (marca, logo e
+  rodapé mudam a altura útil).
+- Teste com GLPI real: 4 viradas de folha no editor = as 4 do Visualizar,
+  bloco a bloco; digitar recalcula; salvar não leva nada das folhas.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3964,6 +3995,12 @@ depender do comportamento errático de `position: fixed` na impressão.
     editor.js antes do codexplus.js, senão sai sem cor nem A−/A+.
 ## 6. Contrato de código — não quebrar
 
+177. **Tema do GLPI no corpo do TinyMCE**: `:root:not([glpi-theme-dark="1"])
+    body.mce-content-body { background: transparent }` e padding lateral zerado
+    vencem `body.algo` — para desenhar no corpo do editor, `!important`.
+    `data-mce-bogus="all"` some do `getContent()` e não suja o `isDirty()`.
+    Playwright: aba nova para a mesma sessão = `context.new_page()`
+    (`browser.new_page()` abre outro contexto, sem login).
 ### Os cinco seletores do PDF
 
 `public/js/codexplus.js` remonta o documento para impressão a partir destes

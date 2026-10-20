@@ -761,15 +761,17 @@
      * Monta o HTML da impressão (o mesmo para o PDF e para a visão em folhas,
      * R7-2). null quando a página não tem documento de texto.
      */
-    function buildPrint() {
+    /* PL-7b: src = { content: Element, title: string } monta a partir do
+       texto do editor (que não está na página como .codexplus-content). */
+    function buildPrint(src) {
         var doc = document.getElementById('codexplus-doc');
-        if (!doc) {
+        if (!doc && !src) {
             return null;
         }
 
-        var titleEl = doc.querySelector('.codexplus-doc-title');
-        var content = doc.querySelector('.codexplus-content');
-        var title   = titleEl ? titleEl.textContent.trim() : 'Documento';
+        var titleEl = src ? null : doc.querySelector('.codexplus-doc-title');
+        var content = src ? src.content : doc.querySelector('.codexplus-content');
+        var title   = src ? (src.title || 'Documento') : (titleEl ? titleEl.textContent.trim() : 'Documento');
 
         if (!content) {
             return null;
@@ -806,7 +808,7 @@
 
         // Metadados: monta item a item para sair legível no PDF, em vez de
         // concatenar o textContent (que sai tudo grudado).
-        var metaEl = doc.querySelector('.codexplus-doc-meta');
+        var metaEl = doc ? doc.querySelector('.codexplus-doc-meta') : null;
         var meta   = buildIdentLine(cfg);
         if (!meta && metaEl) {
             var parts = [];
@@ -1158,7 +1160,93 @@
     // E3 (22/09/2026): a exportação em Word (codexplus-export.js) usa a
     // MESMA configuração, marcadores, linha de identificação e nome de
     // arquivo do PDF — fonte única, sem cópia das regras.
+    /**
+     * PL-7b (Claudio, 20/10/2026): editor sempre em folhas, como o Google
+     * Docs. Onde cada folha vira, pela MESMA regra do PDF: monta o mesmo HTML
+     * num iframe fora da tela, roda planPages() e devolve
+     *   { starts: [índice do bloco do editor que abre cada folha, da 2ª em
+     *     diante], left: [px que sobram no fim de cada folha], heading: altura
+     *     do título e identificação na 1ª folha, geo }.
+     * Uma medição por vez; pedido novo durante uma medição espera a vez e
+     * fica só o último.
+     */
+    var planFrame = null, planBusy = false, planNext = null;
+    function planBreaks(html, title) {
+        return new Promise(function (resolve, reject) {
+            planNext = { html: html, title: title, resolve: resolve, reject: reject };
+            runPlan();
+        });
+    }
+    function runPlan() {
+        if (planBusy || !planNext) { return; }
+        var job = planNext;
+        planNext = null;
+        planBusy = true;
+        var done = function (fn, arg) { planBusy = false; fn(arg); runPlan(); };
+        var holder = document.createElement('div');
+        holder.innerHTML = String(job.html || '');
+        Array.prototype.forEach.call(holder.children, function (el, i) { el.setAttribute('data-cxi', String(i)); });
+        var built;
+        try {
+            built = buildPrint({ content: holder, title: job.title });
+        } catch (err) {
+            done(job.reject, err);
+            return;
+        }
+        if (!built) { done(job.reject, new Error('sem documento')); return; }
+        if (!planFrame) {
+            planFrame = document.createElement('iframe');
+            planFrame.setAttribute('aria-hidden', 'true');
+            planFrame.setAttribute('tabindex', '-1');
+            planFrame.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;opacity:0;pointer-events:none;';
+            document.body.appendChild(planFrame);
+        }
+        planFrame.onload = function () {
+            var idoc = planFrame.contentDocument, win = planFrame.contentWindow;
+            waitImages(idoc, function () {
+                try {
+                    var stage = idoc.getElementById('cx-stage');
+                    var pages = planPages(idoc, stage, built.geo);
+                    var h = function (el) {
+                        var cs = win.getComputedStyle(el);
+                        return el.getBoundingClientRect().height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+                    };
+                    var starts = [], left = [], heading = 0;
+                    pages.forEach(function (pg, p) {
+                        var used = 0;
+                        pg.forEach(function (el) {
+                            used += h(el);
+                            if (el.classList.contains('cx-heading')) { heading = h(el); }
+                        });
+                        left.push(Math.max(0, Math.round(built.geo.contentH - used)));
+                        if (p > 0) {
+                            var first = null;
+                            for (var k = 0; k < pg.length && first === null; k++) {
+                                var a = pg[k].getAttribute('data-cxi');
+                                if (a !== null) { first = parseInt(a, 10); }
+                            }
+                            starts.push(first);
+                        }
+                    });
+                    done(job.resolve, { starts: starts, left: left, heading: Math.round(heading), geo: built.geo });
+                } catch (err) {
+                    done(job.reject, err);
+                }
+            });
+        };
+        planFrame.srcdoc = built.html;
+    }
+
+    /* PL-7b: a tipografia do PDF, para o editor medir igual (mesma largura,
+       mesma fonte, mesmas margens de bloco). */
+    function typoCss() {
+        return PRINT_CSS + editorSizeCss();
+    }
+
     window.CodexplusPrint = {
+        planBreaks: planBreaks,
+        typoCss: typoCss,
+        geometry: function () { return computeGeometry(getPrintConfig()); },
         config: getPrintConfig,
         markers: resolveMarkers,
         ident: buildIdentLine,

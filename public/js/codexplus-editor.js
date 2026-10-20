@@ -934,8 +934,110 @@
             }
             register(editor);
             guardSyntheticClicks(editor);
+            // PL-7b: o texto do documento sempre em folhas A4.
+            if (layout === 'classic' && !isTpl) { sheetMode(editor); }
         };
         return cfg;
+    }
+
+    /* PL-7b (Claudio, 20/10/2026): editor SEMPRE em folhas, como o Google
+       Docs — a folha 1 termina, uma faixa cinza, a folha 2 começa. Onde a
+       folha vira vem do motor do PDF (CodexplusPrint.planBreaks: mesmo HTML,
+       mesmo planPages()), então a separação na tela cai onde o PDF vira a
+       página — sempre entre blocos, nunca no meio de um parágrafo. O editor
+       usa a largura útil da folha e a tipografia do PDF, para medir igual.
+       Os desenhos (título da 1ª folha, faixas entre folhas) são
+       data-mce-bogus="all": o TinyMCE não grava nada disso. */
+    var SHEET_GAP = 28, SHEET_WAIT = 700;
+    function sheetMode(editor) {
+        var timer = null, geo = null;
+        var P = function () { return window.CodexplusPrint; };
+        function title() {
+            var el = document.querySelector('input[name="name"]');
+            return el && el.value ? el.value : 'Documento';
+        }
+        function bogus(doc, cls) {
+            var d = doc.createElement('div');
+            d.setAttribute('data-mce-bogus', 'all');
+            d.setAttribute('contenteditable', 'false');
+            d.className = cls;
+            return d;
+        }
+        function clear(body) {
+            Array.prototype.slice.call(body.querySelectorAll('.cx-sheet-gap,.cx-sheet-head')).forEach(function (el) {
+                el.parentNode.removeChild(el);
+            });
+        }
+        function blocks(body) {
+            return Array.prototype.filter.call(body.children, function (el) {
+                return el.getAttribute('data-mce-bogus') === null;
+            });
+        }
+        function paint(plan) {
+            var doc = editor.getDoc(), body = editor.getBody();
+            if (!doc || !body) { return; }
+            var mt = geo.marginTop + geo.headerH, mb = geo.marginBottom + geo.footerH;
+            clear(body);
+            var list = blocks(body);
+            var head = bogus(doc, 'cx-sheet-head');
+            head.style.height = plan.heading + 'px';
+            head.textContent = title();
+            body.insertBefore(head, body.firstChild);
+            var last = plan.left.length - 1;
+            plan.starts.forEach(function (idx, p) {
+                if (idx === null || !list[idx]) { return; }
+                var gap = bogus(doc, 'cx-sheet-gap');
+                var fill = (plan.left[p] || 0) + mb;
+                gap.style.height = (fill + SHEET_GAP + mt) + 'px';
+                var band = doc.createElement('div');
+                band.className = 'cx-sheet-band';
+                band.style.top = fill + 'px';
+                band.style.height = SHEET_GAP + 'px';
+                band.textContent = 'Folha ' + (p + 2);
+                gap.appendChild(band);
+                body.insertBefore(gap, list[idx]);
+            });
+            body.style.setProperty('padding-bottom', ((plan.left[last] || 0) + mb) + 'px', 'important');
+        }
+        function measure() {
+            timer = null;
+            if (!P() || !P().planBreaks || !editor.getBody()) { return; }
+            P().planBreaks(editor.getContent(), title()).then(paint, function (e) {
+                if (window.console) { console.warn('Codex+ (folhas):', e); }
+            });
+        }
+        function later() {
+            if (timer) { clearTimeout(timer); }
+            timer = setTimeout(measure, SHEET_WAIT);
+        }
+        editor.on('init', function () {
+            if (!P() || !P().planBreaks) { return; }
+            geo = P().geometry();
+            var doc = editor.getDoc(), mx = geo.marginX;
+            var mt = geo.marginTop + geo.headerH, mb = geo.marginBottom + geo.footerH;
+            var st = doc.createElement('style');
+            st.id = 'cx-sheet-css';
+            st.textContent = P().typoCss()
+                + 'html{background:#e9edf2;overflow-x:auto;}'
+                // !important: o tema do GLPI deixa o body do editor transparente
+                // e sem padding lateral, com seletores mais fortes.
+                + 'html body.cx-sheets{box-sizing:content-box!important;width:' + geo.contentW + 'px!important;'
+                + 'max-width:none!important;margin:16px auto!important;'
+                + 'padding-top:' + mt + 'px!important;padding-left:' + mx + 'px!important;padding-right:' + mx + 'px!important;'
+                + 'background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.18);min-height:' + geo.contentH + 'px;}'
+                + '.cx-sheet-head{color:#9aa3af;font:600 19pt/1.2 Arial,sans-serif;overflow:hidden;'
+                + 'border-bottom:2px solid #e5e7eb;box-sizing:border-box;user-select:none;cursor:default;}'
+                + '.cx-sheet-gap{position:relative;margin:0 -' + mx + 'px;user-select:none;cursor:default;}'
+                + '.cx-sheet-band{position:absolute;left:0;right:0;background:#e9edf2;'
+                + 'box-shadow:inset 0 4px 4px -3px rgba(0,0,0,.18),inset 0 -4px 4px -3px rgba(0,0,0,.18);'
+                + 'color:#8a94a3;font:11px/' + SHEET_GAP + 'px Arial,sans-serif;text-align:right;padding-right:10px;box-sizing:border-box;}';
+            doc.head.appendChild(st);
+            editor.getBody().classList.add('cx-sheets');
+            later();
+        });
+        editor.on('SetContent input change Undo Redo ExecCommand keyup', later);
+        var name = document.querySelector('input[name="name"]');
+        if (name) { name.addEventListener('input', later); }
     }
 
     /* GLPI 11.0.6 (Html::initEditorSystem): todo clique fora da barra de um

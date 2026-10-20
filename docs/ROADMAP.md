@@ -770,8 +770,8 @@ para a produção pela tag no fim.
 |---|---|---|
 | PL-4 | Barra do editor presa ao rolar; **link público no diagrama** (fotos do organograma pela rota do link) | ✅ `1f8ca8d` |
 | PL-5 | **Auditor que é o responsável** faz todos os papéis e publica direto (Claudio: só nos documentos em que é o responsável, com Auditor no perfil; aprovadores de DIA/DIV não se pulam) | ✅ `26d2d3c` |
-| PL-6 | Realce com as **mesmas 5 cores fortes** do texto, texto branco automático; cor do texto ganha **Branco**; realces antigos continuam valendo nos gravados; link público volta a ter cor | pacote `codexplus-pl6-1` |
-| PL-7 | **Quebra de página no padrão do Word** (Ctrl+Enter e botão; linha "Quebra de página" no editor; folha nova no Visualizar e no PDF) | a fazer |
+| PL-6 | Realce com as **mesmas 5 cores fortes** do texto, texto branco automático; cor do texto ganha **Branco**; realces antigos continuam valendo nos gravados; link público volta a ter cor | ✅ `f81470b` |
+| PL-7 | **Editor sempre em folhas** como o Google Docs (Claudio, 20/10/2026, com print): a folha vira onde o PDF vira; a quebra manual Ctrl+Enter foi descartada | pacote `codexplus-pl7-2` |
 | PL-8 | **Tabela como no Word** (linhas e colunas uma a uma; cabeçalho escuro com texto branco) | aguarda 2 prints de Claudio |
 | PL-9 | Biblioteca: busca e filtros Tipo / Setor / Categoria na linha das abas; chips de situação embaixo, alinhados | mockup antes |
 

@@ -2026,7 +2026,17 @@ div.cx-stat, div.cx-stat:hover { box-shadow: none; border-color: var(--cx-border
 .codexplus-content .cx-size-sm { font-size: calc(var(--cx-size-sm) * 1em); }
 .codexplus-content .cx-size-lg { font-size: calc(var(--cx-size-lg) * 1em); }
 /* E5: cor do texto e realce, paleta fixa (mesmos valores de PALETTE em
-   codexplus-editor.js, que alimenta o editor, o PDF e o Word). */
+   codexplus-editor.js, que alimenta o editor, o PDF e o Word). PL-6: realce
+   forte (mesmas cores do texto, texto branco) antes da cor do texto, para a
+   cor escolhida vencer o branco; cor Branco. */
+.codexplus-content .cx-bg-vermelho { background-color: #c62828; color: #fff; }
+.codexplus-content .cx-bg-laranja { background-color: #b45309; color: #fff; }
+.codexplus-content .cx-bg-verde { background-color: #2e7d32; color: #fff; }
+.codexplus-content .cx-bg-azul { background-color: #1f5fbf; color: #fff; }
+.codexplus-content .cx-bg-cinza { background-color: #5f6b7a; color: #fff; }
+.codexplus-content .cx-bg-vermelho a, .codexplus-content .cx-bg-laranja a, .codexplus-content .cx-bg-verde a,
+.codexplus-content .cx-bg-azul a, .codexplus-content .cx-bg-cinza a { color: inherit; }
+.codexplus-content .cx-fg-white { color: #fff; }
 .codexplus-content .cx-fg-red { color: #c62828; }
 .codexplus-content .cx-fg-orange { color: #b45309; }
 .codexplus-content .cx-fg-green { color: #2e7d32; }

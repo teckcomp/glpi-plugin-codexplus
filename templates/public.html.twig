@@ -91,6 +91,10 @@
     </main>
 {% endif %}
 {% if doc %}
+    {# PL-6: as cores (texto e realce) e os tamanhos A−/A+ das folhas e do PDF
+       vêm do codexplus-editor.js (sizeCss); sem ele, o link saía sem cor.
+       Sem a configuração do TinyMCE na página, ele só injeta as classes. #}
+    <script src="{{ root }}/plugins/codexplus/js/codexplus-editor.js?v={{ version }}"></script>
     <script src="{{ root }}/plugins/codexplus/js/codexplus.js?v={{ version }}"></script>
     {% if doc.diagram %}
         {# PL-4: os motores da leitura interna, na mesma ordem do setup.php. #}

@@ -3084,6 +3084,28 @@ Sem reinstalar.
 - Harness com GLPI real (perfis com e sem Auditor, usuário com dois
   perfis): 20 verificações, inclusive Publicar pela tela.
 
+### 3.36 PL-6 — Realce com as cores fortes do texto (19/10/2026)
+
+Decisão de Claudio, 19/10/2026: o realce usa **as mesmas 5 cores fortes da
+cor do texto**, com o **texto branco automático**; a cor do texto ganha
+**Branco** (para voltar ao branco sobre o realce). Sem reinstalar.
+
+- `PALETTE` (`codexplus-editor.js`, fonte única): `bg` = vermelho, laranja,
+  verde, azul, cinza (mesmos hex do `fg`, `text: #ffffff`), chaves em
+  português para não colidir com os antigos; `bgOld` = amarelo, verde, azul,
+  vermelho do E5 — **fora do menu**, mas continuam desenhando nos documentos
+  gravados (tela, folhas, PDF, Word) e o "Sem realce" também os tira.
+  `fg` ganha `white`.
+- Ordem no CSS (`colorCss()` e `codexplus.css`): realces antes da cor do
+  texto — com as duas classes no mesmo trecho, a cor escolhida vence o
+  branco. Link dentro de realce forte herda o branco.
+- Word (`codexplus-export.js`): realce antes da cor; o forte grava
+  `w:color FFFFFF` + `w:shd`, a cor escolhida vence.
+- **Correção junto** (achado 176): o link público saía **sem nenhuma cor**
+  nas folhas e no PDF, porque as classes vêm do `sizeCss()` do
+  `codexplus-editor.js`, que a página pública não carregava. Agora carrega
+  (sem `tinymce_editor_configs` ele só injeta as classes).
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -3936,6 +3958,10 @@ depender do comportamento errático de `position: fixed` na impressão.
     `tinymce.editors` (sumiu). No container, `printf 'a%.0s' {1..48}` não
     expande (o shell é `sh`): gerar token de teste em Python.
 
+176. **Folhas e PDF tiram as cores do `codexplus-editor.js`**
+    (`CodexplusEditor.sizeCss()`; `codexplus.js` devolve vazio sem ele).
+    Página fora do layout do GLPI (link público) precisa carregar o
+    editor.js antes do codexplus.js, senão sai sem cor nem A−/A+.
 ## 6. Contrato de código — não quebrar
 
 ### Os cinco seletores do PDF

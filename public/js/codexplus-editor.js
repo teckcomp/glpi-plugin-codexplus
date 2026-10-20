@@ -61,21 +61,42 @@
             { key: 'orange', label: 'Laranja',  hex: '#b45309' },
             { key: 'green',  label: 'Verde',    hex: '#2e7d32' },
             { key: 'blue',   label: 'Azul',     hex: '#1f5fbf' },
-            { key: 'gray',   label: 'Cinza',    hex: '#5f6b7a' }
+            { key: 'gray',   label: 'Cinza',    hex: '#5f6b7a' },
+            // PL-6 (Claudio, 19/10/2026): para voltar ao branco sobre realce.
+            { key: 'white',  label: 'Branco',   hex: '#ffffff' }
         ],
-        // Tons mais fortes (Claudio, 26/09/2026): os claros puxavam para o pastel.
+        // PL-6 (Claudio, 19/10/2026): o realce usa as mesmas 5 cores fortes do
+        // texto, com o texto branco automático (text). Chaves em português para
+        // não colidir com os realces antigos (bgOld).
         bg: [
+            { key: 'vermelho', label: 'Vermelho', hex: '#c62828', text: '#ffffff' },
+            { key: 'laranja',  label: 'Laranja',  hex: '#b45309', text: '#ffffff' },
+            { key: 'verde',    label: 'Verde',    hex: '#2e7d32', text: '#ffffff' },
+            { key: 'azul',     label: 'Azul',     hex: '#1f5fbf', text: '#ffffff' },
+            { key: 'cinza',    label: 'Cinza',    hex: '#5f6b7a', text: '#ffffff' }
+        ],
+        // Realces de antes do PL-6 (E5, tons de 26/09/2026): saem do menu, mas
+        // continuam desenhando nos documentos gravados, no PDF e no Word; o
+        // "Sem realce" também os tira.
+        bgOld: [
             { key: 'yellow', label: 'Amarelo',  hex: '#ffe45c' },
             { key: 'green',  label: 'Verde',    hex: '#a8dc9a' },
             { key: 'blue',   label: 'Azul',     hex: '#a9cdf7' },
             { key: 'red',    label: 'Vermelho', hex: '#f5a3a3' }
         ]
     };
+    // Ordem: realces antes da cor do texto — com as duas classes no mesmo
+    // trecho, a cor escolhida vence o branco automático.
     function colorCss() {
-        return PALETTE.fg.map(function (c) { return '.cx-fg-' + c.key + '{color:' + c.hex + ';}'; }).join('')
+        var print = '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+        return PALETTE.bgOld.map(function (c) {
+                return '.cx-bg-' + c.key + '{background-color:' + c.hex + ';' + print + '}';
+            }).join('')
             + PALETTE.bg.map(function (c) {
-                return '.cx-bg-' + c.key + '{background-color:' + c.hex + ';-webkit-print-color-adjust:exact;print-color-adjust:exact;}';
-            }).join('');
+                return '.cx-bg-' + c.key + '{background-color:' + c.hex + ';color:' + c.text + ';' + print + '}'
+                    + '.cx-bg-' + c.key + ' a{color:inherit;}';
+            }).join('')
+            + PALETTE.fg.map(function (c) { return '.cx-fg-' + c.key + '{color:' + c.hex + ';}'; }).join('');
     }
     // Blocos que recebem estilo e tamanho. Célula de tabela e item de lista
     // só recebem tamanho (não viram título nem nota).
@@ -545,9 +566,10 @@
         editor.on('PreInit', function () {
             editor.formatter.register('cxsize_sm', { inline: 'span', classes: 'cx-size-sm' });
             editor.formatter.register('cxsize_lg', { inline: 'span', classes: 'cx-size-lg' });
-            ['fg', 'bg'].forEach(function (k) {
+            ['fg', 'bg', 'bgOld'].forEach(function (k) {
+                var pre = k === 'bgOld' ? 'bg' : k;
                 PALETTE[k].forEach(function (c) {
-                    editor.formatter.register('cx' + k + '_' + c.key, { inline: 'span', classes: 'cx-' + k + '-' + c.key });
+                    editor.formatter.register('cx' + pre + '_' + c.key, { inline: 'span', classes: 'cx-' + pre + '-' + c.key });
                 });
             });
         });
@@ -557,7 +579,7 @@
         var applyColor = function (k, key) {
             editor.undoManager.transact(function () {
                 editor.focus();
-                PALETTE[k].forEach(function (c) { editor.formatter.remove('cx' + k + '_' + c.key); });
+                PALETTE[k].concat(k === 'bg' ? PALETTE.bgOld : []).forEach(function (c) { editor.formatter.remove('cx' + k + '_' + c.key); });
                 if (key) { editor.formatter.apply('cx' + k + '_' + key); }
             });
             editor.nodeChanged();

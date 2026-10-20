@@ -206,9 +206,16 @@
         if (hasClass(node, 'cx-size-sm')) { g.size = Math.round(BASE_HALF_PT * this.sz.sm); }
         if (hasClass(node, 'cx-size-lg')) { g.size = Math.round(BASE_HALF_PT * this.sz.lg); }
         // E5: cor e realce da paleta (a mesma do editor).
+        // PL-6: realce antes da cor — o forte põe o texto branco, e a cor
+        // escolhida no mesmo trecho vence; os realces antigos também valem.
         var pal = (window.CodexplusEditor && window.CodexplusEditor.palette) || { fg: [], bg: [] };
+        pal.bg.concat(pal.bgOld || []).forEach(function (c) {
+            if (hasClass(node, 'cx-bg-' + c.key)) {
+                g.mark = c.hex.slice(1).toUpperCase();
+                if (c.text) { g.color = c.text.slice(1).toUpperCase(); }
+            }
+        });
         pal.fg.forEach(function (c) { if (hasClass(node, 'cx-fg-' + c.key)) { g.color = c.hex.slice(1).toUpperCase(); } });
-        pal.bg.forEach(function (c) { if (hasClass(node, 'cx-bg-' + c.key)) { g.mark = c.hex.slice(1).toUpperCase(); } });
         if (tag === 'A' && node.getAttribute('href') && !/^#/.test(node.getAttribute('href'))) {
             g.link = true;
             var sub = [];

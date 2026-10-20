@@ -3194,6 +3194,36 @@ e Célula. Sem reinstalar.
 - Tela, folhas do editor e PDF: estilo inline vence as regras de tabela do
   `codexplus.css` e do `PRINT_CSS`, sem mudança.
 
+### 3.40 PL-8b — Estilos de tabela com personalização (20/10/2026)
+
+Decisão de Claudio, 20/10/2026: estilos **1 a 5** do mockup "Codex+ PL-8 —
+Estilos de tabela", com personalização de cor e estilo. Sem reinstalar.
+
+- **Onde:** botão **Estilo** na barra que aparece com o cursor na tabela
+  (`table_toolbar`) e **Estilo da tabela** no botão direito
+  (`contextmenu: 'table cxtblstyle'`). Menu: os 5 prontos, "Personalizar…"
+  e "Sem estilo".
+- **Modelo:** cada estilo = 3 escolhas em classes na tabela —
+  `cx-tbl-head-{dark|light|plain|line}`, `cx-tbl-b-{grid|rows|report|none}`
+  e `cx-tbl-stripes` — mais `cx-tbl`. 1 = escuro + grade; 2 = escuro +
+  grade + listras; 3 = cinza + grade; 4 = filete + sem bordas + listras;
+  5 = filete + relatório. **Personalizar** (diálogo) muda as três e a cor.
+- **Cor do cabeçalho na tabela:** `--cx-tbl-c` (paleta ou cor livre, no
+  `colorinput` do TinyMCE), `--cx-tbl-t` (tom claro, 14%) e `--cx-tbl-b`
+  (borda, 35%) calculados no JS (`hexMix`) — não `color-mix()`, que o
+  estilo calculado devolve como `color(srgb …)` e o Word não leria. Sem cor
+  escolhida = azul-marinho #1f2d4f (padrão no CSS, sem estilo inline). A
+  variável passa pelo TinyMCE e pela gravação do GLPI (testado).
+- **CSS uma fonte só** (`tableCss()` em `sizeCss()` e na página, como as
+  cores): editor, folhas, PDF, leitura e link público. Linha de cabeçalho =
+  `thead`, ou a 1ª linha quando não há `thead` (`:has()`). Formatação de
+  célula do PL-8a vence o estilo. No editor, `:not([data-cx-x])` só sobe a
+  precedência acima das guias tracejadas do TinyMCE (que continuam visíveis
+  no editor em "sem bordas", e não saem no PDF).
+- **Word:** lê o estilo calculado (PL-8a); filetes do estilo 5 ficam nas
+  células (o Word não lê borda da tabela); tabela com estilo não recebe o
+  cinza padrão no `th`.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo

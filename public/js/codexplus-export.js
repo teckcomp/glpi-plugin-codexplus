@@ -418,7 +418,9 @@
                 var o = { children: inner, margins: { top: 60, bottom: 60, left: 100, right: 100 } };
                 if (td.colSpan > 1) { o.columnSpan = td.colSpan; }
                 if (td.rowSpan > 1) { o.rowSpan = td.rowSpan; }
-                if (th) { o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'F3F4F6' }; }
+                // PL-8b: tabela com estilo leva só o que está na tela (o estilo
+                // "só filete" não tem fundo no cabeçalho).
+                if (th && !el.classList.contains('cx-tbl')) { o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'F3F4F6' }; }
                 // PL1: linhas alternadas da planilha com fundo azul claro.
                 if ((' ' + (tr.className || '') + ' ').indexOf(' cx-sheet-alt ') !== -1) {
                     o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: 'E6F1FB' };

@@ -192,7 +192,7 @@
         var s = sizes();
         // E5: as cores vão junto (o PDF só chama sizeCss()).
         return '.cx-size-sm{font-size:' + s.sm + 'em;}'
-            + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss()
+            + '.cx-size-lg{font-size:' + s.lg + 'em;}' + colorCss() + tableCss()
             // PL1: planilha — números à direita, total em destaque (PDF e tela).
             + '.cx-sheet-table{border-collapse:collapse;width:100%;}'
             + '.cx-sheet-table td,.cx-sheet-table th{border:1px solid #d3d9e0;padding:6px 8px;}'
@@ -827,6 +827,88 @@
         // Etapa 5b (Claudio, 04/10/2026): "segue POP de referência …" — insere
         // um link para outro documento do Codex+. Código e título se
         // atualizam sozinhos na leitura; ao salvar, o citado vira vinculado.
+        // PL-8b: Estilo da tabela — os 5 prontos, Personalizar… e Sem estilo.
+        var curTable = function () {
+            var n = editor.selection && editor.selection.getNode();
+            return n ? editor.dom.getParent(n, 'table') : null;
+        };
+        var applyLook = function (t, look) {
+            editor.undoManager.transact(function () {
+                Array.prototype.slice.call(t.classList).forEach(function (c) {
+                    if (c === 'cx-tbl' || c.indexOf('cx-tbl-') === 0) { t.classList.remove(c); }
+                });
+                t.style.removeProperty('--cx-tbl-c');
+                t.style.removeProperty('--cx-tbl-t');
+                t.style.removeProperty('--cx-tbl-b');
+                if (look) {
+                    t.classList.add('cx-tbl', 'cx-tbl-head-' + look.head, 'cx-tbl-b-' + look.borders);
+                    if (look.stripes) { t.classList.add('cx-tbl-stripes'); }
+                    var c = String(look.color || TBL_DEFAULT_COLOR).toLowerCase();
+                    if (c !== TBL_DEFAULT_COLOR) {
+                        t.style.setProperty('--cx-tbl-c', c);
+                        t.style.setProperty('--cx-tbl-t', hexMix(c, 0.14));
+                        t.style.setProperty('--cx-tbl-b', hexMix(c, 0.35));
+                    }
+                }
+                editor.dom.setAttrib(t, 'data-mce-style', t.getAttribute('style') || null);
+                if (!t.getAttribute('style')) { t.removeAttribute('style'); }
+                if (!t.getAttribute('class')) { t.removeAttribute('class'); }
+            });
+            editor.nodeChanged();
+        };
+        var customize = function () {
+            var t = curTable();
+            if (!t) { return; }
+            var cur = tableLook(t);
+            editor.windowManager.open({
+                title: 'Personalizar estilo da tabela',
+                body: { type: 'panel', items: [
+                    { type: 'colorinput', name: 'color', label: 'Cor do cabeçalho (paleta ou cor livre)' },
+                    { type: 'listbox', name: 'head', label: 'Cabeçalho', items: TBL_HEADS.map(function (h) { return { value: h[0], text: h[1] }; }) },
+                    { type: 'listbox', name: 'borders', label: 'Bordas', items: TBL_BORDERS.map(function (h) { return { value: h[0], text: h[1] }; }) },
+                    { type: 'checkbox', name: 'stripes', label: 'Linhas alternadas' }
+                ] },
+                initialData: { color: cur.color, head: cur.head, borders: cur.borders, stripes: cur.stripes },
+                buttons: [{ type: 'cancel', text: 'Cancelar' }, { type: 'submit', text: 'Aplicar', primary: true }],
+                onSubmit: function (api) {
+                    var d = api.getData();
+                    var c = /^#?[0-9a-f]{6}$/i.test(String(d.color || '').trim()) ? '#' + String(d.color).trim().replace('#', '') : TBL_DEFAULT_COLOR;
+                    applyLook(t, { head: d.head, borders: d.borders, stripes: !!d.stripes, color: c });
+                    api.close();
+                }
+            });
+        };
+        var styleItems = function () {
+            var t = curTable();
+            var cur = t ? tableLook(t) : null;
+            return TABLE_STYLES.map(function (st) {
+                return {
+                    type: 'togglemenuitem', text: st.label,
+                    active: !!(cur && cur.styled && cur.head === st.head && cur.borders === st.borders && cur.stripes === st.stripes),
+                    onAction: function () {
+                        var tt = curTable();
+                        if (tt) { applyLook(tt, { head: st.head, borders: st.borders, stripes: st.stripes, color: tableLook(tt).color }); }
+                    }
+                };
+            }).concat([
+                { type: 'separator' },
+                { type: 'menuitem', text: 'Personalizar…', onAction: customize },
+                { type: 'menuitem', text: 'Sem estilo', onAction: function () { var tt = curTable(); if (tt) { applyLook(tt, null); } } }
+            ]);
+        };
+        ui.addMenuButton('cxtblstyle', {
+            text: 'Estilo',
+            tooltip: 'Estilo da tabela',
+            fetch: function (cb) { cb(styleItems()); }
+        });
+        ui.addNestedMenuItem('cxtblstyle', {
+            text: 'Estilo da tabela',
+            getSubmenuItems: function () { return styleItems(); }
+        });
+        ui.addContextMenu('cxtblstyle', {
+            update: function (el) { return editor.dom.getParent(el, 'table') ? 'cxtblstyle' : ''; }
+        });
+
         ui.addButton('cxdocref', {
             text: 'Referência',
             tooltip: 'Citar outro documento do Codex+ (POP, Manual, Diagrama)',
@@ -916,6 +998,70 @@
         });
         return body.innerHTML;
     }
+    /* PL-8b (Claudio, 20/10/2026): estilos de tabela — os 5 do mockup
+       aprovado, cada um uma combinação de 3 escolhas que a pessoa pode
+       personalizar: cabeçalho (escuro, claro, cinza, só linha), bordas
+       (grade, horizontais, relatório, nenhuma) e linhas alternadas. A cor
+       do cabeçalho fica na tabela: --cx-tbl-c (e o tom claro, --cx-tbl-t,
+       calculado aqui, para o Word ler rgb). Formatação de célula (PL-8a)
+       vence o estilo. */
+    var TBL_DEFAULT_COLOR = '#1f2d4f';
+    var TABLE_STYLES = [
+        { key: 's1', label: '1 · Cabeçalho escuro', head: 'dark', borders: 'grid', stripes: false },
+        { key: 's2', label: '2 · Cabeçalho escuro listrado', head: 'dark', borders: 'grid', stripes: true },
+        { key: 's3', label: '3 · Grade simples', head: 'plain', borders: 'grid', stripes: false },
+        { key: 's4', label: '4 · Listrada sem grade', head: 'line', borders: 'none', stripes: true },
+        { key: 's5', label: '5 · Linhas horizontais', head: 'line', borders: 'report', stripes: false }
+    ];
+    var TBL_HEADS = [['dark', 'Escuro (texto branco)'], ['light', 'Claro (texto na cor)'], ['plain', 'Cinza'], ['line', 'Só um filete embaixo']];
+    var TBL_BORDERS = [['grid', 'Grade'], ['rows', 'Só horizontais'], ['report', 'Relatório (filetes em cima e embaixo)'], ['none', 'Nenhuma']];
+    function hexMix(hex, pct) {
+        var h = String(hex || '').replace('#', '');
+        if (!/^[0-9a-f]{6}$/i.test(h)) { h = TBL_DEFAULT_COLOR.slice(1); }
+        var out = [0, 2, 4].map(function (i) {
+            var c = parseInt(h.substr(i, 2), 16);
+            return ('0' + Math.round(c * pct + 255 * (1 - pct)).toString(16)).slice(-2);
+        });
+        return '#' + out.join('');
+    }
+    function tableCss() {
+        var T = 'table.cx-tbl';
+        var head = function (mode) {
+            // Acima das regras de borda (o filete do cabeçalho vence "sem bordas").
+            var t = T + '.cx-tbl-head-' + mode + ':not([data-cx-x]):not([data-cx-y])';
+            return t + '>thead>tr>*,' + t + ':not(:has(>thead))>tbody:first-of-type>tr:first-child>*';
+        };
+        // :not([data-cx-x]) só sobe a precedência: as guias tracejadas do
+        // TinyMCE (.mce-item-table:not([border]) td) ganhavam no editor.
+        var cells = function (cls) { return 'table.cx-tbl.' + cls + ':not([data-cx-x])>*>tr>*'; };
+        var pr = '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+        return T + '{--cx-tbl-c:' + TBL_DEFAULT_COLOR + ';--cx-tbl-t:' + hexMix(TBL_DEFAULT_COLOR, 0.14) + ';--cx-tbl-b:' + hexMix(TBL_DEFAULT_COLOR, 0.35) + ';border-collapse:collapse;width:100%;}'
+            + cells('cx-tbl-b-grid') + '{border:1px solid #d1d5db;}'
+            + cells('cx-tbl-b-rows') + '{border:0;border-bottom:1px solid #e5e7eb;}'
+            + cells('cx-tbl-b-none') + '{border:0;}'
+            + cells('cx-tbl-b-report') + '{border:0;border-bottom:1px solid #e5e7eb;}'
+            // Filetes grossos nas células (1ª e última linha), não na tabela:
+            // o Word só lê as bordas das células.
+            + 'table.cx-tbl.cx-tbl-b-report:not([data-cx-x])>thead>tr:first-child>*,table.cx-tbl.cx-tbl-b-report:not(:has(>thead))>tbody:first-of-type>tr:first-child>*{border-top:2px solid #1f2937;}'
+            + 'table.cx-tbl.cx-tbl-b-report:not([data-cx-x])>tbody:last-of-type>tr:last-child>*{border-bottom:2px solid #1f2937;}'
+            + 'table.cx-tbl-stripes>tbody>tr:nth-child(even)>*{background-color:#f3f5f8;' + pr + '}'
+            + head('dark') + '{background-color:var(--cx-tbl-c);color:#fff;font-weight:700;border-color:var(--cx-tbl-c);' + pr + '}'
+            + head('light') + '{background-color:var(--cx-tbl-t);color:var(--cx-tbl-c);font-weight:700;border-color:var(--cx-tbl-b);' + pr + '}'
+            + head('plain') + '{background-color:#f3f4f6;color:#1f2937;font-weight:700;' + pr + '}'
+            + head('line') + '{background-color:transparent;font-weight:700;border-bottom:2px solid var(--cx-tbl-c);}';
+    }
+    // Lê da tabela as 4 escolhas atuais (para marcar o menu e o diálogo).
+    function tableLook(t) {
+        var has = function (c) { return t.classList.contains(c); };
+        var pick = function (pairs, pre, dflt) {
+            for (var i = 0; i < pairs.length; i++) { if (has(pre + pairs[i][0])) { return pairs[i][0]; } }
+            return dflt;
+        };
+        var c = (t.style.getPropertyValue('--cx-tbl-c') || '').trim() || TBL_DEFAULT_COLOR;
+        return { styled: has('cx-tbl'), head: pick(TBL_HEADS, 'cx-tbl-head-', 'dark'), borders: pick(TBL_BORDERS, 'cx-tbl-b-', 'grid'),
+            stripes: has('cx-tbl-stripes'), color: c };
+    }
+
     var TABLE_BORDERS = [
         { title: 'Sólida', value: 'solid' },
         { title: 'Pontilhada', value: 'dotted' },
@@ -1002,8 +1148,10 @@
         cfg.color_map = TABLE_COLORS;
         cfg.custom_colors = true;
         if (layout === 'classic') {
-            cfg.contextmenu = 'table';
+            cfg.contextmenu = 'table cxtblstyle';
         }
+        // PL-8b: o Estilo na barra que aparece com o cursor na tabela.
+        cfg.table_toolbar = 'cxtblstyle | tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol';
         if (layout === 'classic') {
             cfg.toolbar_sticky = true;
             cfg.toolbar_sticky_offset = topOffset();
@@ -1204,7 +1352,7 @@
         if (!document.head || document.getElementById('cx-palette-css')) { return; }
         var st = document.createElement('style');
         st.id = 'cx-palette-css';
-        st.textContent = colorCss();
+        st.textContent = colorCss() + tableCss(); // PL-8b: estilos de tabela na leitura
         document.head.appendChild(st);
     })();
 })();

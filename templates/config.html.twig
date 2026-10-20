@@ -3,14 +3,12 @@
 
 <div class="codexplus-app">
 
-    {% include '@codexplus/parts/brand.html.twig' with {
+    {% include '@codexplus/parts/shell.html.twig' with {
         title: __('Codex+', 'codexplus'),
         subtitle: __('Configuração: marcas, PDF, clientes, revisão e mapa de calor', 'codexplus'),
-    } only %}
-
-    {% include '@codexplus/parts/nav.html.twig' with {
         active: 'config', painel: nav.painel, modelos: nav.modelos, config: true,
     } only %}
+
 
     {# M-1 (Claudio, 04/10/2026): marcas. Nome da empresa, logo, altura e
        cor são da marca; o documento sai com a marca padrão (no M-2, com a

@@ -3,14 +3,12 @@
 
 <div class="codexplus-app">
 
-    {% include '@codexplus/parts/brand.html.twig' with {
+    {% include '@codexplus/parts/shell.html.twig' with {
         title: __('Codex+', 'codexplus'),
         subtitle: __('Documentos controlados, procedimentos e diagramas institucionais', 'codexplus'),
-    } only %}
-
-    {% include '@codexplus/parts/nav.html.twig' with {
         active: 'modelos', painel: true, modelos: true, config: can_config,
     } only %}
+
 
     {% if mode == 'edit' %}
         {# ================= EDIÇÃO / CRIAÇÃO ================= #}

@@ -32,13 +32,56 @@ $docs = Dashboard::loadAllNew();
 
 $canCreate = Document::canCreate();
 
+$diagrams = Dashboard::getRecent(array_filter($docs, static fn ($d) => $d['doctype'] === 'DIA'), 6);
+if ($diagrams !== []) {
+    $kinds = [];
+    foreach ($DB->request([
+        'SELECT' => ['plugin_codexplus_documents_id', 'subtype'],
+        'FROM'   => \GlpiPlugin\Codexplus\Diagram::getTable(),
+        'WHERE'  => ['plugin_codexplus_documents_id' => array_map(static fn ($d) => (int) $d['id'], $diagrams)],
+    ]) as $row) {
+        $kinds[(int) $row['plugin_codexplus_documents_id']] = (string) $row['subtype'];
+    }
+    foreach ($diagrams as &$d) {
+        $k = $kinds[(int) $d['id']] ?? '';
+        $d['kind'] = in_array($k, ['fluxograma', 'cronograma', 'raci', 'organograma'], true) ? $k : 'organograma';
+    }
+    unset($d);
+}
+
+// UI-2: "Terça-feira, 20 de outubro" no idioma da sessão (intl é exigida pelo GLPI).
+$contextDate = '';
+try {
+    $fmt = new IntlDateFormatter(
+        str_replace('_', '-', (string) ($_SESSION['glpilanguage'] ?? 'pt_BR')),
+        IntlDateFormatter::FULL,
+        IntlDateFormatter::NONE,
+        date_default_timezone_get(),
+        IntlDateFormatter::GREGORIAN,
+        "EEEE, d 'de' MMMM"
+    );
+    $contextDate = (string) $fmt->format(time());
+    $contextDate = mb_strtoupper(mb_substr($contextDate, 0, 1)) . mb_substr($contextDate, 1);
+} catch (\Throwable $e) {
+    $contextDate = date('d/m/Y');
+}
+
 TemplateRenderer::getInstance()->display('@codexplus/dashboard.html.twig', [
     'counters'   => Dashboard::getCounters($docs),
     'by_type'    => Dashboard::getByType($docs),
     'attention'  => Dashboard::getAttention($docs),
     'recent'     => Dashboard::getRecent($docs, 8),
     // Etapa 9: os diagramas mais recentes, para o quadro "Diagramas".
-    'diagrams'   => Dashboard::getRecent(array_filter($docs, static fn ($d) => $d['doctype'] === 'DIA'), 6),
+    // UI-2: cada um leva o subtipo (coluna `subtype` da tabela de diagramas),
+    // para a miniatura em traço do quadro; sem linha, organograma.
+    'diagrams'   => $diagrams,
+    'diagram_total' => count(array_filter($docs, static fn ($d) => $d['doctype'] === 'DIA')),
+    // UI-2: linha de contexto sob a barra (data por extenso, total, entidade).
+    'context'    => [
+        'date'   => $contextDate,
+        'total'  => count($docs),
+        'entity' => (string) ($_SESSION['glpiactive_entity_name'] ?? ''),
+    ],
     'can_create' => $canCreate,
     // R3d-1: o que espera por quem está logado (gestor ou auditor).
     'pending'    => Dashboard::pendingForMe(),

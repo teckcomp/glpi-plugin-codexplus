@@ -9,18 +9,35 @@
 
 <div class="codexplus-app">
 
-    {% include '@codexplus/parts/brand.html.twig' with {
+    {% embed '@codexplus/parts/shell.html.twig' with {
         title: __('Codex+', 'codexplus'),
         subtitle: __('Documentos controlados, procedimentos e diagramas institucionais', 'codexplus'),
-    } only %}
+        active: 'painel', painel: true, modelos: not reader_only and can_templates, config: not reader_only and can_config,
+    } %}
+        {% block slot %}
+    <div class="cx-dash-actionbar">
+            {% if not reader_only %}
+            {# S1: a busca ainda é a da tela Documentos (modelo antigo) até a R5. #}
+            <form method="get" action="library.php" class="cx-dash-search">
+                <i class="ti ti-search"></i>
+                <input type="text" name="q"
+                       placeholder="{{ __('Buscar por título ou código…', 'codexplus') }}">
+            </form>
+            {% endif %}
+            {% if can_create %}
+                <a href="document.form.php?doctype=DIA" class="cx-btn">
+                    <i class="ti ti-sitemap"></i> {{ __('Novo diagrama', 'codexplus') }}
+                </a>
+                <a href="document.form.php" class="cx-btn cx-btn-primary">
+                    <i class="ti ti-plus"></i> {{ __('Novo documento', 'codexplus') }}
+                </a>
+            {% endif %}
+        </div>
+            {% endblock %}
+    {% endembed %}
 
     {# ============ ZONA A — navegação e ação ============ #}
     {# S1: no Self-Service não há Modelos nem Configuração. #}
-    {% include '@codexplus/parts/nav.html.twig' with {
-        active: 'painel', painel: true,
-        modelos: not reader_only and can_templates,
-        config: not reader_only and can_config,
-    } only %}
 
     {% if legacy_count > 0 %}
         {# R4: documentos ainda no modelo antigo (Base de Conhecimento). #}
@@ -34,23 +51,12 @@
         </div>
     {% endif %}
 
-    <div class="cx-dash-actionbar">
-        {% if not reader_only %}
-        {# S1: a busca ainda é a da tela Documentos (modelo antigo) até a R5. #}
-        <form method="get" action="library.php" class="cx-dash-search">
-            <i class="ti ti-search"></i>
-            <input type="text" name="q"
-                   placeholder="{{ __('Buscar por título ou código…', 'codexplus') }}">
-        </form>
-        {% endif %}
-        {% if can_create %}
-            <a href="document.form.php?doctype=DIA" class="cx-btn">
-                <i class="ti ti-sitemap"></i> {{ __('Novo diagrama', 'codexplus') }}
-            </a>
-            <a href="document.form.php" class="cx-btn cx-btn-primary">
-                <i class="ti ti-plus"></i> {{ __('Novo documento', 'codexplus') }}
-            </a>
-        {% endif %}
+
+    {# UI-2 (Claudio, 20/10/2026, mockup): contexto sob a barra. #}
+    <div class="cx-dash-context">
+        <h1>{{ __('Painel', 'codexplus') }}</h1>
+        <span class="cx-dash-context-meta">{{ context.date }} · {{ context.total }} {{ __('documentos', 'codexplus') }}{% if context.entity %} · {{ context.entity }}{% endif %}</span>
+        <span class="cx-dash-context-right">{{ __('Atualizado agora', 'codexplus') }}</span>
     </div>
 
     {# ============ Aguardando você (R3d-1) ============
@@ -100,7 +106,6 @@
 
             <div class="cx-stat">
                 <div class="cx-stat-head">
-                    <span class="cx-stat-chip cx-chip-accent"><i class="ti ti-circle-check"></i></span>
                     <span class="cx-stat-label">{{ __('Publicados', 'codexplus') }}</span>
                 </div>
                 <div class="cx-stat-value">{{ counters.publicados }}</div>
@@ -111,10 +116,9 @@
 
             <div class="cx-stat">
                 <div class="cx-stat-head">
-                    <span class="cx-stat-chip cx-chip-accent"><i class="ti ti-eye-check"></i></span>
                     <span class="cx-stat-label">{{ __('Em revisão', 'codexplus') }}</span>
                 </div>
-                <div class="cx-stat-value cx-stat-accent">{{ counters.emrevisao }}</div>
+                <div class="cx-stat-value">{{ counters.emrevisao }}</div>
                 <div class="cx-stat-context">
                     {% if counters.emrevisao > 0 %}
                         {{ __('aguardando validação', 'codexplus') }}
@@ -126,10 +130,9 @@
 
             <div class="cx-stat">
                 <div class="cx-stat-head">
-                    <span class="cx-stat-chip cx-chip-warn"><i class="ti ti-clock"></i></span>
                     <span class="cx-stat-label">{{ __('A vencer (30 d)', 'codexplus') }}</span>
                 </div>
-                <div class="cx-stat-value cx-stat-warn">{{ counters.avencer }}</div>
+                <div class="cx-stat-value{{ counters.avencer > 0 ? ' cx-stat-warn' : '' }}">{{ counters.avencer }}</div>
                 <div class="cx-stat-context">
                     {% if counters.proximo_dias is not null %}
                         {{ __('o mais próximo em', 'codexplus') }} {{ counters.proximo_dias }} {{ __('dia(s)', 'codexplus') }}
@@ -141,10 +144,9 @@
 
             <div class="cx-stat">
                 <div class="cx-stat-head">
-                    <span class="cx-stat-chip cx-chip-danger"><i class="ti ti-alert-triangle"></i></span>
                     <span class="cx-stat-label">{{ __('Vencidos', 'codexplus') }}</span>
                 </div>
-                <div class="cx-stat-value cx-stat-danger">{{ counters.vencidos }}</div>
+                <div class="cx-stat-value{{ counters.vencidos > 0 ? ' cx-stat-danger' : '' }}">{{ counters.vencidos }}</div>
                 <div class="cx-stat-context">
                     {% if counters.vencidos_tipo %}
                         {{ counters.vencidos_tipo_n }} {{ __('são', 'codexplus') }} {{ counters.vencidos_tipo }}
@@ -156,11 +158,10 @@
 
             <div class="cx-stat">
                 <div class="cx-stat-head">
-                    <span class="cx-stat-chip cx-chip-neutral"><i class="ti ti-pencil"></i></span>
                     <span class="cx-stat-label">{{ __('Rascunhos', 'codexplus') }}</span>
                 </div>
-                <div class="cx-stat-value cx-stat-neutral">{{ counters.rascunhos }}</div>
-                <div class="cx-stat-context">
+                <div class="cx-stat-value">{{ counters.rascunhos }}</div>
+                <div class="cx-stat-context{{ counters.rascunhos_parados > 0 ? ' cx-stat-context--warn' : '' }}">
                     {% if counters.rascunhos_parados > 0 %}
                         {{ counters.rascunhos_parados }} {{ __('parado(s) há 30 dias', 'codexplus') }}
                     {% else %}
@@ -196,7 +197,7 @@
                             <span class="cx-donut-label">{{ __('documentos', 'codexplus') }}</span>
                         </div>
                     </div>
-                    <ul class="cx-legend">
+                    <ul class="cx-legend cx-legend--2col">
                         {% for t in by_type %}
                             <li>
                                 <span class="cx-legend-row">
@@ -290,7 +291,7 @@
                             <span>
                                 <i class="ti ti-alert-triangle cx-ico-danger"></i>
                                 <span class="cx-card-item-name">{{ __('Revisão vencida', 'codexplus') }}</span>
-                                <span class="cx-card-item-count cx-count-danger">0</span>
+                                <span class="cx-card-item-count is-zero">0</span>
                             </span>
                         {% endif %}
                     </li>
@@ -298,14 +299,14 @@
                         <span>
                             <i class="ti ti-folder-off cx-ico-warn"></i>
                             <span class="cx-card-item-name">{{ __('Sem categoria', 'codexplus') }}</span>
-                            <span class="cx-card-item-count cx-count-warn">{{ attention.sem_categoria }}</span>
+                            <span class="cx-card-item-count{{ attention.sem_categoria > 0 ? ' cx-count-warn' : ' is-zero' }}">{{ attention.sem_categoria }}</span>
                         </span>
                     </li>
                     <li>
                         <span>
                             <i class="ti ti-user-off cx-ico-warn"></i>
                             <span class="cx-card-item-name">{{ __('Sem responsável', 'codexplus') }}</span>
-                            <span class="cx-card-item-count cx-count-warn">{{ attention.sem_responsavel }}</span>
+                            <span class="cx-card-item-count{{ attention.sem_responsavel > 0 ? ' cx-count-warn' : ' is-zero' }}">{{ attention.sem_responsavel }}</span>
                         </span>
                     </li>
                     {# Etapa 5 (5c): vínculos. Mesma linha com lista que abre. #}
@@ -334,7 +335,7 @@
                                 <span>
                                     <i class="ti {{ item.ico }} cx-ico-{{ item.cls }}"></i>
                                     <span class="cx-card-item-name">{{ item.label }}</span>
-                                    <span class="cx-card-item-count cx-count-{{ item.cls }}">0</span>
+                                    <span class="cx-card-item-count is-zero">0</span>
                                 </span>
                             {% endif %}
                         </li>
@@ -346,15 +347,25 @@
 
         {# ============ Diagramas (Etapa 9, 0.6.7) ============ #}
         <section class="cx-card cx-card-wide">
-            <h3 class="cx-card-title"><i class="ti ti-sitemap"></i> {{ __('Diagramas', 'codexplus') }}</h3>
+            <div class="cx-card-head">
+                <h3 class="cx-card-title">{{ __('Diagramas', 'codexplus') }}</h3>
+                {% if diagram_total > diagrams|length %}<a class="cx-card-more" href="library.php?tipo=DIA">{{ __('Ver os %d', 'codexplus')|format(diagram_total) }}</a>{% endif %}
+            </div>
             {% if diagrams is not empty %}
                 <div class="cx-diagram-grid">
                     {% for d in diagrams %}
                         <a class="cx-diagram-tile" href="document.form.php?id={{ d.id }}">
-                            <span class="cx-diagram-mini" aria-hidden="true">
-                                <i style="--lc: var(--cx-l-diretoria)"></i>
-                                <span><i style="--lc: var(--cx-l-gestao)"></i><i style="--lc: var(--cx-l-gestao)"></i></span>
-                                <span><i style="--lc: var(--cx-l-supervisao)"></i><i style="--lc: var(--cx-l-n2)"></i><i style="--lc: var(--cx-l-n1)"></i></span>
+                            <span class="cx-diagram-mini cx-diagram-mini--{{ d.kind }}" aria-hidden="true">
+                                {% if d.kind == 'cronograma' %}
+                                    <svg viewBox="0 0 160 56" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12h152M4 28h152M4 44h152"/><rect x="20" y="7" width="50" height="10" rx="2" class="cx-mini-fill"/><rect x="60" y="23" width="60" height="10" rx="2" class="cx-mini-fill"/><rect x="100" y="39" width="50" height="10" rx="2" class="cx-mini-fill"/></svg>
+                                {% elseif d.kind == 'raci' %}
+                                    <svg viewBox="0 0 160 56" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="152" height="44" rx="2"/><path d="M4 20h152M4 35h152M44 6v44M90 6v44"/></svg>
+                                {% elseif d.kind == 'fluxograma' %}
+                                    <svg viewBox="0 0 160 56" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="20" width="36" height="16" rx="2"/><path d="M62 20l18-8 18 8-18 8z"/><rect x="120" y="20" width="36" height="16" rx="2"/><path d="M40 28h22M98 28h22"/></svg>
+                                {% else %}
+                                    <svg viewBox="0 0 160 56" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="62" y="4" width="36" height="14" rx="2"/><rect x="20" y="38" width="36" height="14" rx="2"/><rect x="104" y="38" width="36" height="14" rx="2"/><path d="M80 18v10H38v10M80 28h42v10"/></svg>
+                                {% endif %}
+                            </span>
                             </span>
                             <span class="cx-diagram-meta">
                                 <span class="codexplus-code cx-code-chip cx-code-type-DIA">{{ d.code }}</span>
@@ -376,7 +387,10 @@
 
         {# ============ ZONA D — atualizados recentemente (tabela) ============ #}
         <section class="cx-card cx-card-wide">
-            <h3 class="cx-card-title">{{ __('Atualizados recentemente', 'codexplus') }}</h3>
+            <div class="cx-card-head">
+                <h3 class="cx-card-title">{{ __('Atualizados recentemente', 'codexplus') }}</h3>
+                <a class="cx-card-more" href="library.php?situacao=todos">{{ __('Abrir a Biblioteca', 'codexplus') }}</a>
+            </div>
 
             <table class="codexplus-table cx-recent-table cx-recent-table--new">
                 <thead>

@@ -35,44 +35,56 @@
    ========================================================================= */
 
 :root {
-    /* Marca — paleta do protótipo do organograma, aprovada como identidade
-       do Codex+ em 20/09/2026 (Claudio). */
-    --cx-accent:        #1f5fbf;
-    --cx-accent-strong: #174a94;
-    --cx-accent-soft:   #e4edfa;
+    /* UI-1 (Claudio, 20/10/2026) — identidade PETRÓLEO, a mesma casca do
+       Task+ (16q) e do Painel IXC. Princípio: "o documento é o produto" —
+       cromo em neutro, UMA cor de marca, cor semântica só para situação e
+       prazo. Dois temas: estes valores são o CLARO (padrão enquanto as
+       telas migram); o ESCURO redefine os mesmos nomes logo abaixo, sob
+       html[data-codexplus-theme="dark"]. Os nomes antigos (--cx-accent,
+       --cx-surface-2…) foram mantidos para o CSS das seções seguintes
+       continuar valendo; mudou só o valor. */
+    --cx-accent:        #0B5F6B;   /* marca (petróleo) */
+    --cx-accent-strong: #094C56;   /* hover da marca */
+    --cx-accent-soft:   #E3F0F1;   /* fundo suave da marca (aba ativa) */
+    --cx-accent-ink:    #063C44;   /* texto sobre --cx-accent-soft */
+    --cx-on-accent:     #FFFFFF;   /* texto sobre --cx-accent (botão primário) */
 
     /* Texto e superfícies */
-    --cx-text:      #17202d;
-    --cx-text-read: #17202d;
-    --cx-muted:     #5a6575;
-    --cx-faint:     #8e9aaa;
-    --cx-border:    #d3d9e0;
-    --cx-border-soft: #edf0f3;
-    --cx-surface:   #ffffff;
-    --cx-surface-1: #f6f8fa;
-    --cx-surface-2: #edf0f3;
+    --cx-text:      #16222E;
+    --cx-text-read: #17202d;       /* leitura do documento: papel branco nos dois temas */
+    --cx-ink-2:     #3B4754;
+    --cx-muted:     #6B7785;
+    --cx-faint:     #98A3AF;
+    --cx-border:    #D9DEE4;
+    --cx-border-soft: #E8ECF0;
+    --cx-page:      #F6F7F9;       /* fundo da área do plugin */
+    --cx-bar:       #EDF0F3;       /* barra do produto (casca) */
+    --cx-surface:   #FFFFFF;       /* cards */
+    --cx-surface-1: #F8F9FB;
+    --cx-surface-2: #EDF0F3;       /* canvas */
 
     /* Status — etiquetas, códigos e indicadores do Painel. */
-    --cx-ok:        #1b7a45;
-    --cx-ok-bg:     #e3f5e9;
-    --cx-warn:      #8a5500;
-    --cx-warn-bg:   #fbf0dc;
-    --cx-warn-mark: #d4940a;   /* preenchimento (donut); texto usa --cx-warn */
-    --cx-danger:    #b3261e;
-    --cx-danger-bg: #fbe4e2;
-    --cx-neutral:   #3f4a5a;
-    --cx-neutral-bg:#eef1f4;
+    --cx-ok:        #2F855A;
+    --cx-ok-bg:     #E4F3EA;
+    --cx-warn:      #B7791F;
+    --cx-warn-bg:   #FBF2DF;
+    --cx-warn-mark: #B7791F;   /* preenchimento (donut); texto usa --cx-warn */
+    --cx-danger:    #C0392B;
+    --cx-danger-bg: #FBE9E7;
+    --cx-info:      #1D6FD1;   /* "em atualização" */
+    --cx-info-bg:   #E4EEFB;
+    --cx-neutral:   #3B4754;
+    --cx-neutral-bg:#F1F3F6;
 
-    /* Tipos de documento (donut, chips de código). 0.6.5 */
-    --cx-type-POP: #1f5fbf;  --cx-type-POP-bg: #e4edfa;  --cx-type-POP-ink: #174a94;
-    --cx-type-PSG: #1f7f6c;  --cx-type-PSG-bg: #e0f2ee;  --cx-type-PSG-ink: #17624f;
-    --cx-type-MAN: #7a4fb5;  --cx-type-MAN-bg: #efe8f8;  --cx-type-MAN-ink: #5e3a92;
-    --cx-type-PRP: #c4860e;  --cx-type-PRP-bg: #fbf0dc;  --cx-type-PRP-ink: #8a5500;
-    --cx-type-DIA: #cf4b66;  --cx-type-DIA-bg: #fbe6eb;  --cx-type-DIA-ink: #a3304b;
-    /* Bloco T1 (24/09/2026): Laudo, Documentação Técnica, Documento Diverso */
-    --cx-type-LAU: #c2562f;  --cx-type-LAU-bg: #fbe9e2;  --cx-type-LAU-ink: #933c1c;
-    --cx-type-DTC: #4f7d1f;  --cx-type-DTC-bg: #eaf2dc;  --cx-type-DTC-ink: #3a5e14;
-    --cx-type-DIV: #6b6a64;  --cx-type-DIV-bg: #eeede8;  --cx-type-DIV-ink: #4a4944;
+    /* Tipos de documento (donut, chips de código) — tons do mockup UI-1. */
+    --cx-type-POP: #1D6FD1;  --cx-type-POP-bg: #E4EEFB;  --cx-type-POP-ink: #164F99;
+    --cx-type-PSG: #2F855A;  --cx-type-PSG-bg: #E4F3EA;  --cx-type-PSG-ink: #226442;
+    --cx-type-MAN: #6B4FBB;  --cx-type-MAN-bg: #EEEAF8;  --cx-type-MAN-ink: #523C91;
+    --cx-type-PRP: #B7791F;  --cx-type-PRP-bg: #FBF2DF;  --cx-type-PRP-ink: #8A5500;
+    --cx-type-DIA: #C2255C;  --cx-type-DIA-bg: #FBE6EC;  --cx-type-DIA-ink: #9A1C49;
+    --cx-type-LAU: #C0392B;  --cx-type-LAU-bg: #FBE9E7;  --cx-type-LAU-ink: #922A1F;
+    --cx-type-DTC: #0B5F6B;  --cx-type-DTC-bg: #E3F0F1;  --cx-type-DTC-ink: #063C44;
+    --cx-type-DIV: #6B7785;  --cx-type-DIV-bg: #F1F3F6;  --cx-type-DIV-ink: #4A5563;
 
     /* Níveis do organograma (Etapa 9), do protótipo aprovado. */
     --cx-l-diretoria:  #22314f;
@@ -83,9 +95,9 @@
     --cx-l-n1:         #2e86d1;
     --cx-l-noc:        #cf4b66;
 
-    /* Métrica */
-    --cx-radius:    10px;
-    --cx-radius-sm: 8px;
+    /* Métrica (UI-1: 8 px nos cards, 6 px nos controles, como no Task+) */
+    --cx-radius:    8px;
+    --cx-radius-sm: 6px;
     --cx-radius-pill: 20px;
     --cx-gap:       12px;
 
@@ -100,6 +112,43 @@
     --cx-mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Tema ESCURO (padrão do Task+; aqui opcional até as telas migrarem).
+   Mesmos nomes, outros valores. html[data-…] vence :root por especificidade. */
+html[data-codexplus-theme="dark"] {
+    --cx-accent:        #5FC3CD;
+    --cx-accent-strong: #82D4DC;
+    --cx-accent-soft:   #123E45;
+    --cx-accent-ink:    #D4F1F4;
+    --cx-on-accent:     #052E34;
+
+    --cx-text:      #E8F0F1;
+    --cx-ink-2:     #C3D3D6;
+    --cx-muted:     #86A0A5;
+    --cx-faint:     #5E767B;
+    --cx-border:    #2A4B52;
+    --cx-border-soft: #21414A;
+    --cx-page:      #0C1F24;
+    --cx-bar:       #122A30;
+    --cx-surface:   #193840;
+    --cx-surface-1: #1E4049;
+    --cx-surface-2: #122A30;
+
+    --cx-ok:        #62C48A;   --cx-ok-bg:     #163A2A;
+    --cx-warn:      #E3A93F;   --cx-warn-bg:   #3B2E12;   --cx-warn-mark: #E3A93F;
+    --cx-danger:    #EA7A66;   --cx-danger-bg: #43211C;
+    --cx-info:      #6FB1F5;   --cx-info-bg:   #15324D;
+    --cx-neutral:   #C3D3D6;   --cx-neutral-bg:#1E4049;
+
+    --cx-type-POP: #6FB1F5;  --cx-type-POP-bg: #15324D;  --cx-type-POP-ink: #6FB1F5;
+    --cx-type-PSG: #62C48A;  --cx-type-PSG-bg: #163A2A;  --cx-type-PSG-ink: #62C48A;
+    --cx-type-MAN: #A897E6;  --cx-type-MAN-bg: #2A2448;  --cx-type-MAN-ink: #A897E6;
+    --cx-type-PRP: #E3A93F;  --cx-type-PRP-bg: #3B2E12;  --cx-type-PRP-ink: #E3A93F;
+    --cx-type-DIA: #F08CA8;  --cx-type-DIA-bg: #43211C;  --cx-type-DIA-ink: #F08CA8;
+    --cx-type-LAU: #EA7A66;  --cx-type-LAU-bg: #43211C;  --cx-type-LAU-ink: #EA7A66;
+    --cx-type-DTC: #5FC3CD;  --cx-type-DTC-bg: #123E45;  --cx-type-DTC-ink: #5FC3CD;
+    --cx-type-DIV: #86A0A5;  --cx-type-DIV-bg: #1E4049;  --cx-type-DIV-ink: #C3D3D6;
+}
+
 /* =========================================================================
    2. BASE E NAVEGAÇÃO
    ========================================================================= */
@@ -107,6 +156,30 @@
 .codexplus-app {
     color: var(--cx-text);
     padding: 4px 0 24px;
+    /* UI-1: a área do plugin tem o fundo do tema; no claro quase não se nota,
+       no escuro é o que faz a tela inteira virar petróleo. Os campos do
+       core (input:not(.form-control), select) são pintados pelo CSS legado
+       do GLPI com --tblr-*; redefinir os tokens dele aqui faz os campos
+       seguirem o tema (lição do Task+, 16q-16). */
+    background: var(--cx-page);
+    --tblr-bg-forms: var(--cx-surface);
+    --tblr-body-color: var(--cx-text);
+    --tblr-border-color: var(--cx-border);
+}
+/* links de texto no escuro (o azul do GLPI some no petróleo); botões e abas têm cor própria */
+html[data-codexplus-theme="dark"] .codexplus-app :where(a:not(.cx-btn, .codexplus-btn, .codexplus-nav a, .cx-lib-spine, .cx-lib-roll, .cx-lib-plank)) { color: var(--cx-accent); } /* :where = especificidade baixa: regras de componente vencem */
+/* UI-1b (Claudio, 20/10/2026): escuro na TELA INTEIRA, não só no bloco do
+   plugin. O atributo data-codexplus-theme só existe nas páginas do Codex+
+   (é o shell que o põe), então o resto do GLPI não é tocado. O cabeçalho e
+   a trilha do GLPI ficam como estão (como no Task+). */
+html[data-codexplus-theme="dark"] body,
+html[data-codexplus-theme="dark"] .page-wrapper,
+html[data-codexplus-theme="dark"] .page-body,
+html[data-codexplus-theme="dark"] #page,
+html[data-codexplus-theme="dark"] main { background-color: var(--cx-page) !important; }
+html[data-codexplus-theme="dark"] .codexplus-app .form-control,
+html[data-codexplus-theme="dark"] .codexplus-app .form-select {
+    background-color: var(--cx-surface); color: var(--cx-text); border-color: var(--cx-border);
 }
 
 .codexplus-header { margin-bottom: 18px; }
@@ -181,13 +254,13 @@
 .codexplus-btn-primary {
     background: var(--cx-accent);
     border-color: var(--cx-accent);
-    color: #fff;
+    color: var(--cx-on-accent);
 }
 .codexplus-app .cx-btn-primary:hover,
 .codexplus-btn-primary:hover {
     background: var(--cx-accent-strong);
     border-color: var(--cx-accent-strong);
-    color: #fff;
+    color: var(--cx-on-accent);
 }
 
 /* Fantasma — ação secundária (Cancelar, Limpar) */
@@ -2376,12 +2449,16 @@ button.cx-gd-pill--hist:focus-visible { outline: 2px solid #378add; outline-offs
    21. BIBLIOTECA (bloco B1) — templates/library.html.twig
    Prateleira Setor → Categoria dos documentos publicados que a pessoa lê.
    ========================================================================= */
-.cx-lib-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0 20px; }
+.cx-lib-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 16px; } /* UI-1b: colada à barra */
 /* PL-9 (Claudio, 20/10/2026): abas à esquerda; Setor, Categoria, Tipo e a
    busca à direita, na mesma linha (a linha do filete das abas). Em tela
    estreita os filtros descem para baixo das abas. */
-.cx-lib-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
-    gap: 10px 20px; border-bottom: 1px solid var(--cx-border); margin: 0 0 4px; }
+/* UI-1b: os filtros da Biblioteca ficam no slot da casca (.cx-shell-slot), compactos */
+.cx-shell-slot .cx-lib-filters { padding-bottom: 0; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.cx-shell-slot .cx-lib-field select { min-width: 130px; height: 36px; font-size: 1.1em; }
+.cx-shell-slot .cx-lib-field--search { flex: 1 1 200px; }
+.cx-shell-slot .cx-lib-field--search .cx-lib-search { min-width: 200px; }
+.cx-shell-slot .cx-lib-field--search .cx-lib-search input { height: 34px; }
 .cx-lib-top .codexplus-nav { border-bottom: 0; margin: 0; }
 .cx-lib-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding-bottom: 8px; }
 .cx-lib-field { display: flex; flex-direction: column; gap: 3px; margin: 0; font-size: .75em; color: var(--cx-muted); }
@@ -2517,6 +2594,52 @@ a.cx-lib-plank:hover, a.cx-lib-plank:focus-visible { color: #fff; text-decoratio
 .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new { height: 164px; padding: 14px 0 0 8px; border: 0; box-sizing: border-box; }
 .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new a { flex-direction: column; justify-content: center; width: 96px; height: 150px;
     border: 1.5px dashed var(--cx-type-PSG); border-radius: 6px; background: var(--cx-surface); font-size: .8em; text-align: center; box-sizing: border-box; }
+
+/* ---- UI-1c (Claudio, 20/10/2026): a estante no tema ESCURO, igual à prancha
+   03 do mockup. O layout não muda — só madeira, montantes, rolos, lombadas e
+   decoração ganham o perfil petróleo. Lombada publicada usa a cor SATURADA
+   do tipo (a mesma do claro) com texto branco; rascunho fica transparente,
+   tracejado e escrito no tom claro do tipo. ---- */
+html[data-codexplus-theme="dark"] .cx-sp-POP { --sp: #1D6FD1; }
+html[data-codexplus-theme="dark"] .cx-sp-PSG { --sp: #2F855A; }
+html[data-codexplus-theme="dark"] .cx-sp-MAN { --sp: #6B4FBB; }
+html[data-codexplus-theme="dark"] .cx-sp-PRP { --sp: #B7791F; }
+html[data-codexplus-theme="dark"] .cx-sp-DIA { --sp: #C2255C; }
+html[data-codexplus-theme="dark"] .cx-sp-LAU { --sp: #C0392B; }
+html[data-codexplus-theme="dark"] .cx-sp-DTC { --sp: #0E7682; }
+html[data-codexplus-theme="dark"] .cx-sp-DIV { --sp: #6B7785; }
+html[data-codexplus-theme="dark"] .cx-lib-spine { color: #fff; }
+html[data-codexplus-theme="dark"] .cx-lib-spine.is-draft,
+html[data-codexplus-theme="dark"] .cx-lib-spine.is-draft:hover { background: transparent; border-color: var(--sp-ink); color: var(--sp-ink); }
+html[data-codexplus-theme="dark"] .cx-lib-spine.is-draft .cx-lib-dot { border-color: var(--sp-ink); background: transparent; }
+html[data-codexplus-theme="dark"] .cx-lib-dot--ok { background: var(--cx-ok); }
+/* tábua: duas tonalidades do canvas, filete em cima e sombra embaixo */
+html[data-codexplus-theme="dark"] .cx-lib-plank { background: linear-gradient(#17353C, #122A30 40%, #0E242A);
+    border-top: 1px solid #2A4B52; border-bottom: 1px solid #061519; color: #E8F0F1; }
+html[data-codexplus-theme="dark"] .cx-lib-plank span { color: #86A0A5; }
+html[data-codexplus-theme="dark"] .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-list {
+    background: repeating-linear-gradient(to bottom, transparent 0 164px, #17353C 164px 166px, #122A30 166px 190px); }
+/* montante: ardósia-petróleo com relevo */
+html[data-codexplus-theme="dark"] .cx-lib-niche::after { background: linear-gradient(90deg, #1E4049, #2A4B52 45%, #17353C);
+    border-left: 1px solid #2A4B52; border-right: 1px solid #0A1A1E; box-sizing: border-box; }
+html[data-codexplus-theme="dark"] .cx-lib-niche[data-href]:hover .cx-lib-niche-row { background: rgba(95, 195, 205, .06); }
+/* rolos de planta: petróleo escuro com reflexo; etiqueta rosa do DIA sobre fundo vinho */
+html[data-codexplus-theme="dark"] .cx-lib { --cx-roll: #0A1A1E; --cx-roll-top: #2A4B52; --cx-roll-line: #2A4B52; }
+html[data-codexplus-theme="dark"] .cx-lib-roll-body { background: linear-gradient(90deg, #0A1A1E, #1E4049 35%, #2A4B52 55%, #0A1A1E); }
+html[data-codexplus-theme="dark"] .cx-lib-roll-top { border-color: #5E767B; }
+html[data-codexplus-theme="dark"] .cx-lib-roll-band { background: #43211C; }
+html[data-codexplus-theme="dark"] .cx-lib-roll-band span { color: #F08CA8; }
+html[data-codexplus-theme="dark"] .cx-lib-roll.is-draft .cx-lib-roll-band { background: transparent; border-color: #F08CA8; }
+html[data-codexplus-theme="dark"] .cx-lib-roll.is-draft .cx-lib-roll-band span { color: #F08CA8; }
+html[data-codexplus-theme="dark"] .cx-lib-roll .cx-lib-dot { border-color: #2A4B52; }
+/* aparador e decoração: tons de linha (#5E767B) em vez das cores vivas */
+html[data-codexplus-theme="dark"] .cx-lib-bookend { filter: grayscale(1) brightness(1.6) opacity(.8); }
+html[data-codexplus-theme="dark"] .cx-lib-decor { filter: grayscale(.85) brightness(1.1) opacity(.55); }
+/* chips de situação e botão "+ Novo documento" */
+html[data-codexplus-theme="dark"] .cx-lib-type { background: transparent; color: var(--cx-ink-2); }
+html[data-codexplus-theme="dark"] .cx-lib-type.is-active { background: var(--cx-surface); color: var(--cx-text); border-color: var(--cx-accent); }
+html[data-codexplus-theme="dark"] .cx-lib-tag--warn { background: var(--cx-danger-bg); color: var(--cx-danger); }
+html[data-codexplus-theme="dark"] .cx-lib[data-view="estante"] .cx-lib-category .cx-lib-new a { background: transparent; }
 
 /* =========================================================================
    22. PLANILHA (bloco PL1) — public/js/codexplus-sheet.js
@@ -3010,3 +3133,166 @@ html.cx-board-open { overflow: hidden; }
     position: absolute; right: 4px; top: 2px; border: 0; background: transparent;
     font-size: 18px; line-height: 1; color: var(--cx-muted); cursor: pointer; padding: 4px 6px;
 }
+
+/* =========================================================================
+   24. CASCA DO PRODUTO (UI-1, 20/10/2026) — parts/shell.html.twig
+   Uma barra só: marca (brand.html.twig, intocada) · abas (nav.html.twig) ·
+   à direita, o botão de tema. Estilo da barra do Task+ (16q) e do Painel
+   IXC: cromo em neutro, a marca só na aba ativa e no primário.
+   ========================================================================= */
+
+.cx-shell {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px;
+    min-height: 60px; padding: 10px 12px 10px 14px; margin: 0 0 16px;
+    background: var(--cx-bar); border: 1px solid var(--cx-border);
+    border-radius: var(--cx-radius);
+}
+.cx-shell .codexplus-header.cx-brand {
+    margin: 0; gap: 10px; padding-right: 14px; height: 36px;
+    border-right: 1px solid var(--cx-border);
+}
+.cx-shell .cx-brand-mark { width: 34px; height: 34px; }
+.cx-shell .codexplus-header.cx-brand h2 { font-family: var(--cx-font); font-size: 15px; line-height: 1.1; letter-spacing: 0; }
+.cx-shell .codexplus-header.cx-brand span { font-size: 11px; line-height: 1.1; }
+
+/* abas como botões */
+.cx-shell .codexplus-nav { border-bottom: 0; margin: 0; gap: 6px; align-items: center; }
+.cx-shell .codexplus-nav a {
+    height: 36px; padding: 0 14px; margin: 0;
+    border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface); color: var(--cx-ink-2);
+    font-size: 13px; font-weight: 500;
+}
+.cx-shell .codexplus-nav a i { font-size: 16px; }
+.cx-shell .codexplus-nav a:hover { background: var(--cx-surface-1); color: var(--cx-text); border-color: var(--cx-border); }
+.cx-shell .codexplus-nav a.is-active {
+    background: var(--cx-accent-soft); border-color: var(--cx-accent);
+    color: var(--cx-accent-ink); font-weight: 600;
+}
+
+/* slot da tela (filtros da Biblioteca) — à direita, antes do botão de tema */
+.cx-shell-slot { margin-left: auto; display: flex; align-items: flex-end; min-width: 0; }
+.cx-shell-slot:empty { display: none; }
+.cx-shell-right { flex: 0 0 auto; }
+
+/* ações à direita */
+.cx-shell-right { margin-left: auto; display: flex; align-items: center; gap: 8px; align-self: center; }
+/* com slot preenchido, o slot é quem empurra; o botão de tema fica sempre por último (Claudio, 20/10) */
+.cx-shell-slot:not(:empty) + .cx-shell-right { margin-left: 0; }
+.cx-shell-btn {
+    width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface); color: var(--cx-ink-2); cursor: pointer; padding: 0;
+}
+.cx-shell-btn:hover { background: var(--cx-surface-1); color: var(--cx-text); }
+.cx-shell-btn:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: 2px; }
+.cx-shell-btn .ti { font-size: 18px; line-height: 1; }
+/* sol no escuro (= "ir para o claro"), lua no claro */
+html[data-codexplus-theme="dark"] .cx-shell-btn .ti-moon { display: none; }
+html:not([data-codexplus-theme="dark"]) .cx-shell-btn .ti-sun { display: none; }
+
+.cx-lib .cx-shell { margin-bottom: 10px; }
+@media (max-width: 900px) {
+    .cx-shell .codexplus-header.cx-brand { border-right: 0; padding-right: 0; }
+    .cx-shell .codexplus-nav { order: 3; flex-basis: 100%; overflow-x: auto; }
+}
+
+/* =========================================================================
+   25. PAINEL (UI-2, 20/10/2026) — prancha 01/02 do mockup "Nova identidade"
+   Mesmas classes de sempre; muda o estilo por trás: indicadores sem ícone
+   colorido (rótulo 11 px caixa alta, número 32 px neutro, cor só quando há
+   algo), roscas mais finas, legenda em duas colunas, atenção com pílula só
+   acima de zero, miniaturas dos diagramas em traço, chips de código em mono
+   com ponto de cor, tabela com cabeçalho em caixa alta.
+   ========================================================================= */
+
+/* barra: busca e botões dentro do slot da casca */
+.cx-shell-slot .cx-dash-actionbar { margin: 0; gap: 8px; align-items: center; }
+.cx-shell-slot .cx-dash-search { flex: 0 1 300px; min-width: 180px; height: 36px; padding: 0 12px; border-radius: var(--cx-radius-sm); background: var(--cx-page); }
+.cx-shell-slot .cx-dash-search input[type="text"] { padding: 0; font-size: 13px; }
+.cx-shell-slot .cx-dash-actionbar .cx-btn { height: 36px; padding: 0 14px; font-size: 13px; }
+.cx-shell-slot .cx-dash-actionbar .cx-btn-primary { font-weight: 600; }
+
+/* contexto sob a barra */
+.cx-dash-context { display: flex; align-items: baseline; gap: 12px; margin: 0 2px 14px; }
+.cx-dash-context h1 { margin: 0; font-family: var(--cx-font); font-size: 20px; font-weight: 600; color: var(--cx-text); }
+.cx-dash-context-meta { font-size: 13px; color: var(--cx-muted); }
+.cx-dash-context-right { margin-left: auto; font-size: 12px; color: var(--cx-muted); }
+
+/* indicadores */
+.codexplus-app .cx-stat { padding: 14px 16px; border-radius: var(--cx-radius); background: var(--cx-surface); border: 1px solid var(--cx-border); }
+.codexplus-app .cx-stat:hover { border-color: var(--cx-border); box-shadow: none; }
+.cx-stat-head { margin-bottom: 8px; }
+.codexplus-app .cx-stat-label { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--cx-muted); }
+.codexplus-app .cx-stat-value { font-family: var(--cx-font); font-size: 32px; font-weight: 600; line-height: 1; margin-top: 0; color: var(--cx-text); }
+.codexplus-app .cx-stat-value.cx-stat-warn { color: var(--cx-warn); }
+.codexplus-app .cx-stat-value.cx-stat-danger { color: var(--cx-danger); }
+.codexplus-app .cx-stat-context { margin-top: 6px; font-size: 12px; color: var(--cx-muted); }
+.codexplus-app .cx-stat-context--warn { color: var(--cx-warn); }
+
+/* cartões */
+.codexplus-app .cx-card { padding: 16px; }
+.codexplus-app .cx-card-title { font-family: var(--cx-font); font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--cx-muted); margin: 0 0 14px; }
+.codexplus-app .cx-card-head { align-items: center; margin-bottom: 14px; }
+.codexplus-app .cx-card-head .cx-card-title { margin: 0; }
+.codexplus-app .cx-card-more { font-size: 12px; }
+
+/* roscas */
+.codexplus-app .cx-donut { width: 120px; height: 120px; }
+.codexplus-app .cx-donut::after { inset: 18px; }
+.codexplus-app .cx-donut-value { font-family: var(--cx-font); font-size: 22px; }
+.codexplus-app .cx-donut-label { font-size: 10px; }
+.codexplus-app .cx-legend a, .codexplus-app .cx-legend span.cx-legend-row { font-size: 13px; color: var(--cx-ink-2); }
+.codexplus-app .cx-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+.codexplus-app .cx-legend-total { font-weight: 500; color: var(--cx-text); }
+.codexplus-app .cx-dot-emrevisao { background: var(--cx-info); }
+.codexplus-app .cx-dot-rascunho { background: var(--cx-border); }
+.cx-legend--2col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
+
+/* precisa de atenção: sem ícone, contagem à direita, pílula só acima de zero */
+.codexplus-app .cx-card-list .ti { display: none; }
+.codexplus-app .cx-card-list > li { padding: 10px 0; border-bottom: 1px solid var(--cx-border-soft); font-size: 13px; color: var(--cx-ink-2); }
+.codexplus-app .cx-card-list > li:last-child { border-bottom: 0; }
+.codexplus-app .cx-card-list > li > span, .codexplus-app .cx-overdue > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.codexplus-app .cx-card-item-count { font-weight: 500; }
+.codexplus-app .cx-card-item-count.is-zero { color: var(--cx-muted); }
+.codexplus-app .cx-card-item-count.cx-count-warn, .codexplus-app .cx-card-item-count.cx-count-danger {
+    display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; }
+.codexplus-app .cx-card-item-count.cx-count-warn { background: var(--cx-warn-bg); color: var(--cx-warn); }
+.codexplus-app .cx-card-item-count.cx-count-danger { background: var(--cx-danger-bg); color: var(--cx-danger); }
+
+/* diagramas: miniatura em traço, chip + título em duas linhas */
+.codexplus-app .cx-diagram-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .codexplus-app .cx-diagram-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .codexplus-app .cx-diagram-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.codexplus-app .cx-diagram-tile { padding: 12px; background: var(--cx-surface-2); border-color: var(--cx-border); }
+.codexplus-app .cx-diagram-tile:hover { border-color: var(--cx-accent); }
+.codexplus-app .cx-diagram-mini { padding: 0; color: var(--cx-faint); }
+.codexplus-app .cx-diagram-mini svg { width: 100%; height: 56px; display: block; }
+.codexplus-app .cx-diagram-mini .cx-mini-fill { fill: var(--cx-border); stroke: none; }
+.codexplus-app .cx-diagram-meta { flex-direction: column; align-items: flex-start; gap: 4px; }
+.codexplus-app .cx-diagram-name { font-size: 12px; font-weight: 400; color: var(--cx-ink-2); max-width: 100%; }
+
+/* chip de código: mono, fundo neutro, ponto na cor do tipo */
+.codexplus-app .cx-code-chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 4px;
+    font-family: var(--cx-mono); font-size: 12px; font-weight: 500; background: var(--cx-surface-1); color: var(--cx-text); white-space: nowrap; }
+.codexplus-app .cx-code-chip::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--cx-faint); flex: 0 0 auto; }
+.codexplus-app .cx-code-chip.cx-code-type-POP::before { background: var(--cx-type-POP); }
+.codexplus-app .cx-code-chip.cx-code-type-PSG::before { background: var(--cx-type-PSG); }
+.codexplus-app .cx-code-chip.cx-code-type-MAN::before { background: var(--cx-type-MAN); }
+.codexplus-app .cx-code-chip.cx-code-type-PRP::before { background: var(--cx-type-PRP); }
+.codexplus-app .cx-code-chip.cx-code-type-DIA::before { background: var(--cx-type-DIA); }
+.codexplus-app .cx-code-chip.cx-code-type-LAU::before { background: var(--cx-type-LAU); }
+.codexplus-app .cx-code-chip.cx-code-type-DTC::before { background: var(--cx-type-DTC); }
+.codexplus-app .cx-code-chip.cx-code-type-DIV::before { background: var(--cx-type-DIV); }
+.codexplus-app .cx-code-chip.cx-code-vencido { background: var(--cx-danger-bg); color: var(--cx-danger); }
+.codexplus-app .cx-code-chip.cx-code-avencer { background: var(--cx-warn-bg); color: var(--cx-warn); }
+
+/* tabela dos recentes */
+.codexplus-app .cx-recent-table th { font-size: 11px; letter-spacing: .06em; color: var(--cx-muted); padding: 10px 12px; border-bottom: 1px solid var(--cx-border); }
+.codexplus-app .cx-recent-table td { padding: 11px 12px; font-size: 13px; color: var(--cx-ink-2); border-bottom: 1px solid var(--cx-border-soft); }
+.codexplus-app .cx-recent-table td .codexplus-doc-link { font-weight: 500; color: var(--cx-text); }
+.codexplus-app .cx-recent-table tbody tr:hover td { background: var(--cx-surface-1); }
+.codexplus-app .codexplus-status { height: 22px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid transparent; }
+.codexplus-app .codexplus-status--rascunho { background: var(--cx-surface-1); color: var(--cx-ink-2); border-color: var(--cx-border); }
+.codexplus-app .codexplus-status--aprovacao { background: var(--cx-info-bg); color: var(--cx-info); }

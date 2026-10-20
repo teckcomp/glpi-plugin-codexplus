@@ -63,76 +63,74 @@
 {% set cx_niche_mode = level.mode in ['setores', 'categorias'] %}
 <div class="codexplus-app cx-lib" data-cx-lib data-view="estante" data-mode="{{ level.mode }}">
 
-    {% include '@codexplus/parts/brand.html.twig' with {
+    {% embed '@codexplus/parts/shell.html.twig' with {
         title: __('Codex+', 'codexplus'),
         subtitle: __('Biblioteca de documentos', 'codexplus'),
-    } only %}
+        active: 'biblioteca', painel: producer, modelos: producer and can_templates, config: producer and can_config,
+    } %}
+        {% block slot %}
+        <div class="cx-lib-filters">
+                <label class="cx-lib-field">
+                    <span>{{ __('Setor', 'codexplus') }}</span>
+                    <select class="form-select" data-cx-lib-sector>
+                        <option value="">{{ __('Todos os setores', 'codexplus') }}</option>
+                        {% for ns in nav_sectors %}
+                            <option value="{{ ns.id }}"{{ level.sector and level.sector.id == ns.id ? ' selected' : '' }}>{{ ns.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="cx-lib-field">
+                    <span>{{ __('Categoria', 'codexplus') }}</span>
+                    <select class="form-select" data-cx-lib-cat>
+                        <option value="">{{ __('Todas as categorias', 'codexplus') }}</option>
+                        {% for ns in nav_sectors %}
+                            {% if not level.sector or level.sector.id == ns.id %}
+                                {% if not level.sector %}<optgroup label="{{ ns.name }}">{% endif %}
+                                {% for nc in ns.categories %}
+                                    <option value="{{ ns.id }}:{{ nc.id }}"{{ level.category and level.sector.id == ns.id and level.category.id == nc.id ? ' selected' : '' }}>{{ nc.name }}</option>
+                                {% endfor %}
+                                {% if not level.sector %}</optgroup>{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="cx-lib-field">
+                    <span>{{ __('Tipo de documento', 'codexplus') }}</span>
+                    <select class="form-select" data-cx-lib-tsel>
+                        <option value="">{{ __('Todos', 'codexplus') }} ({{ shelf.total }})</option>
+                        {% for t, n in shelf.types %}
+                            <option value="{{ t }}"{{ tipo == t ? ' selected' : '' }}>{{ t }} ({{ n }})</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="cx-lib-field cx-lib-field--search">
+                    <span id="cx-lib-q-label">{{ __('Buscar', 'codexplus') }}</span>
+                    {% if cx_niche_mode %}
+                        {# B2b: nos nichos, Enter busca em toda a Biblioteca. #}
+                        <form class="cx-lib-search" method="get" action="{{ self }}" role="search">
+                            <i class="ti ti-search"></i>
+                            <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
+                                   aria-labelledby="cx-lib-q-label">
+                            {% if obsoletos %}<input type="hidden" name="obsoletos" value="1">{% endif %}
+                        </form>
+                    {% else %}
+                        <label class="cx-lib-search">
+                            <i class="ti ti-search"></i>
+                            <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
+                                   aria-labelledby="cx-lib-q-label">
+                        </label>
+                    {% endif %}
+                </div>
+            </div>
+        {% endblock %}
+    {% endembed %}
 
     {# PL-9 (Claudio, 20/10/2026, mockup aprovado): na linha das abas, à
        direita, os filtros Setor, Categoria e Tipo de documento e a busca
        geral; embaixo, só a situação (quem produz) e as caixas. Setor e
        Categoria abrem a estante (o mesmo endereço do nicho); Tipo filtra na
        hora, como os antigos chips de tipo (que saíram). #}
-    <div class="cx-lib-top">
-        {% include '@codexplus/parts/nav.html.twig' with {
-            active: 'biblioteca', painel: producer,
-            modelos: producer and can_templates,
-            config: producer and can_config,
-        } only %}
-        <div class="cx-lib-filters">
-            <label class="cx-lib-field">
-                <span>{{ __('Setor', 'codexplus') }}</span>
-                <select class="form-select" data-cx-lib-sector>
-                    <option value="">{{ __('Todos os setores', 'codexplus') }}</option>
-                    {% for ns in nav_sectors %}
-                        <option value="{{ ns.id }}"{{ level.sector and level.sector.id == ns.id ? ' selected' : '' }}>{{ ns.name }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label class="cx-lib-field">
-                <span>{{ __('Categoria', 'codexplus') }}</span>
-                <select class="form-select" data-cx-lib-cat>
-                    <option value="">{{ __('Todas as categorias', 'codexplus') }}</option>
-                    {% for ns in nav_sectors %}
-                        {% if not level.sector or level.sector.id == ns.id %}
-                            {% if not level.sector %}<optgroup label="{{ ns.name }}">{% endif %}
-                            {% for nc in ns.categories %}
-                                <option value="{{ ns.id }}:{{ nc.id }}"{{ level.category and level.sector.id == ns.id and level.category.id == nc.id ? ' selected' : '' }}>{{ nc.name }}</option>
-                            {% endfor %}
-                            {% if not level.sector %}</optgroup>{% endif %}
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </label>
-            <label class="cx-lib-field">
-                <span>{{ __('Tipo de documento', 'codexplus') }}</span>
-                <select class="form-select" data-cx-lib-tsel>
-                    <option value="">{{ __('Todos', 'codexplus') }} ({{ shelf.total }})</option>
-                    {% for t, n in shelf.types %}
-                        <option value="{{ t }}"{{ tipo == t ? ' selected' : '' }}>{{ t }} ({{ n }})</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <div class="cx-lib-field cx-lib-field--search">
-                <span id="cx-lib-q-label">{{ __('Buscar', 'codexplus') }}</span>
-                {% if cx_niche_mode %}
-                    {# B2b: nos nichos, Enter busca em toda a Biblioteca. #}
-                    <form class="cx-lib-search" method="get" action="{{ self }}" role="search">
-                        <i class="ti ti-search"></i>
-                        <input type="search" name="q" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar em toda a Biblioteca', 'codexplus') }}"
-                               aria-labelledby="cx-lib-q-label">
-                        {% if obsoletos %}<input type="hidden" name="obsoletos" value="1">{% endif %}
-                    </form>
-                {% else %}
-                    <label class="cx-lib-search">
-                        <i class="ti ti-search"></i>
-                        <input type="search" data-cx-lib-q value="{{ q }}" placeholder="{{ __('Buscar por título ou código', 'codexplus') }}"
-                               aria-labelledby="cx-lib-q-label">
-                    </label>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+
 
     <div class="cx-lib-bar">
         {% if producer %}

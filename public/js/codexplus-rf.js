@@ -76,6 +76,13 @@
         var a = hash2(i, j, s), b = hash2(i + 1, j, s), c = hash2(i, j + 1, s), d = hash2(i + 1, j + 1, s);
         return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
     }
+    /* PL-11 (Claudio, 22/10/2026): semente fixa do AP (a.seed, gravada no
+       quadro), para as manchas não mudarem ao redimensionar ou mover o AP.
+       AP sem semente: a fórmula antiga, pela posição (desenho de antes). */
+    function seedOf(a) {
+        if (a.seed !== undefined && a.seed !== null && isFinite(a.seed)) { return a.seed | 0; }
+        return (Math.round(a.x / 7) * 92821 + Math.round(a.y / 7) * 68917) | 0;
+    }
     function fbm(x, y, s) { return 0.65 * vnoise(x, y, s) + 0.35 * vnoise(x * 2.3 + 17.1, y * 2.3 + 5.7, s + 101); }
 
     /* Escala do Cambium (cores tiradas da legenda dos mapas da Teckcomp).
@@ -132,7 +139,7 @@
         var cols = Math.ceil(W / cellPx), rows = Math.ceil(H / cellPx), N = cols * rows;
         var segs = segments(input.walls);
         var aps = (input.aps || []).map(function (a) {
-            return { x: num(a.x, 0), y: num(a.y, 0), h: num(a.h, o.hAp), bands: a.bands || {} };
+            return { x: num(a.x, 0), y: num(a.y, 0), h: num(a.h, o.hAp), bands: a.bands || {}, seed: a.seed };
         });
         var per = aps.map(function (a) {
             var dist = new Float32Array(N), w0 = new Float32Array(N), w1 = new Float32Array(N), w2 = new Float32Array(N);
@@ -154,7 +161,7 @@
             var nz = null;
             if (o.vary > 0) {
                 nz = new Float32Array(N);
-                var seed = (Math.round(a.x / 7) * 92821 + Math.round(a.y / 7) * 68917) | 0, L = o.varyLen;
+                var seed = seedOf(a), L = o.varyLen;
                 for (var rr = 0, kk = 0; rr < rows; rr++) {
                     for (var cc = 0; cc < cols; cc++, kk++) {
                         nz[kk] = o.vary * 1.6 * fbm(((cc + 0.5) * cellPx / pxm) / L, ((rr + 0.5) * cellPx / pxm) / L, seed);

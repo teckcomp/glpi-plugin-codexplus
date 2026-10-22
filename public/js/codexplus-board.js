@@ -735,11 +735,14 @@
             var max = rfNum(x.max, 0, 36, 20);
             o.bands[b] = { on: true, max: max, tx: Math.min(max, rfNum(x.tx, 0, 36, max)), gain: rfNum(x.gain, -10, 20, 0) };
         });
+        // PL-11: semente das manchas ("Aspecto natural"), fixa no AP.
+        if (isFinite(parseInt(r.seed, 10))) { o.seed = parseInt(r.seed, 10) | 0; }
         return Object.keys(o.bands).length ? o : null;
     }
     /* Do catálogo para o AP: potência nasce com a máxima; altura mantém a do AP. */
     function rfFromModel(m, prev) {
         var o = { model: m.id, label: m.label, std: m.std || '', stdl: m.std_l || '', h: prev && prev.h ? prev.h : RF_H_DEFAULT, bands: {} };
+        if (prev && prev.seed !== undefined) { o.seed = prev.seed; }
         RF_BANDS.forEach(function (b) { var x = (m.bands || {})[b]; if (x) { o.bands[b] = { on: true, max: +x.tx, tx: +x.tx, gain: +x.gain }; } });
         return cleanRf(o);
     }
@@ -781,11 +784,25 @@
     function profFromCatalog(p) { return cleanProf({ name: p.name, gain: p.gain, bands: p.bands }); }
     /* Entrada do motor (CodexplusRF) a partir do quadro: AP no centro do ícone;
        paredes pela perda do material, mesmo com a camada de paredes escondida. */
+    function apSeed(cx, cy) { return (Math.round(cx / 7) * 92821 + Math.round(cy / 7) * 68917) | 0; }
+    /* PL-11: tamanho do ícone muda em volta do centro (como Ícone + / −). */
+    function iconResize(i, n) {
+        n = Math.max(24, Math.min(160, Math.round(n / 4) * 4));
+        i.x -= (n - i.size) / 2; i.y -= (n - i.size) / 2; i.size = n;
+        return i;
+    }
     function heatInputs(D) {
         var aps = [], walls = [];
         D.items.forEach(function (i) {
             if (i.t === 'icon' && i.icon === 'access-point' && i.rf) {
-                aps.push({ x: i.x + i.size / 2, y: i.y + i.size / 2, h: i.rf.h, label: i.label || '', bands: i.rf.bands, model: i.rf.label });
+                var cx = i.x + i.size / 2, cy = i.y + i.size / 2;
+                /* PL-11 (Claudio, 22/10/2026): a semente das manchas fica gravada
+                   no AP. Antes vinha da posição: aumentar o ícone (o centro anda)
+                   ou mover poucos px redesenhava o mapa inteiro e mudava a
+                   cobertura das Áreas. AP sem semente ganha a da posição de agora
+                   — o desenho que já estava no documento não muda ao abrir. */
+                if (i.rf.seed === undefined) { i.rf.seed = apSeed(cx, cy); }
+                aps.push({ x: cx, y: cy, h: i.rf.h, label: i.label || '', bands: i.rf.bands, model: i.rf.label, seed: i.rf.seed });
             } else if (i.t === 'wall') {
                 walls.push({ pts: i.pts, loss: (WALL_KINDS[i.mat] || WALL_KINDS[WALL_DEFAULT]).loss });
             }
@@ -4656,7 +4673,8 @@
             }
             if (k === 'shape' && it.t === 'shape') { changeShape(it, v); props.__snap = false; paint(); drawSel(); drawProps(); return; }
             var p = k.split('.');
-            if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
+            if (k === 'size' && it.t === 'icon') { iconResize(it, v); }
+            else if (p.length === 2) { it[p[0]][p[1]] = v; } else { it[k] = v; }
             if (it.t === 'shape' && k === 'text') { it.text = String(it.text).slice(0, 500); shapeFit(it); }
             if (it.t === 'shape' && k === 'mk') { shapeFit(it); }
             if ((it.t === 'shape' && k === 'fs') || (it.t === 'text' && k === 'px')) { it[k] = +v; if (it.t === 'shape') { shapeFit(it); } }
@@ -5366,7 +5384,9 @@
             }
             if (drag.k === 'rzi') {
                 var ic = get(drag.id);
-                ic.size = Math.max(24, Math.min(160, Math.round(Math.max(p.x - ic.x, p.y - ic.y) / 4) * 4));
+                // PL-11: a alça cresce o ícone em volta do centro.
+                var icx = ic.x + ic.size / 2, icy = ic.y + ic.size / 2;
+                iconResize(ic, 2 * Math.max(p.x - icx, p.y - icy));
                 paint();
                 drawSel(); return;
             }
@@ -5715,6 +5735,8 @@
                     var n = clone(o); n.id = uid(); ids[o.id] = n.id;
                     if (isPath(n)) { n.pts.forEach(function (q) { q.x += 20; q.y += 20; }); } else { n.x += 20; n.y += 20; }
                     if (n.g) { mapa[n.g] = mapa[n.g] || uid(); n.g = mapa[n.g]; }
+                    // PL-11: AP copiado ganha manchas próprias (semente nova ao calcular).
+                    if (n.rf) { delete n.rf.seed; }
                     D.items.push(n); novos.push(n.id);
                 });
                 // Ligação só vai junto se os dois ícones foram copiados.
@@ -5792,8 +5814,7 @@
                 if (!alvo.length) { return; }
                 snap();
                 alvo.forEach(function (i) {
-                    var n = Math.max(24, Math.min(160, i.size + (a === 'bigger' ? 8 : -8)));
-                    i.x -= (n - i.size) / 2; i.y -= (n - i.size) / 2; i.size = n;
+                    iconResize(i, i.size + (a === 'bigger' ? 8 : -8));
                 });
                 render();
             }
@@ -6378,5 +6399,5 @@
             setSel: function (ids) { sel = ids; render(); }, view: function () { return view; }, onKey: onKey, fromPlanta: fromPlanta, bg: function () { return bgUrl; }, heatGrid: function () { return heatGrid; }, heatUpdate: heatUpdate, niOpen: niOpen, mgOpen: mgOpen, ni: function () { return ni; } };
     }
 
-    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _cleanHeat: cleanHeat, _heatInputs: heatInputs, _heatLegendSvg: heatLegendSvg, _heatGridOf: heatGridOf, _heatCoverage: heatCoverage, _heatCoverageText: heatCoverageText, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
+    window.CodexplusBoard = { _linkOf: linkOf, _cleanLk: cleanLk, open: open, MODES: MODES, MINI: MINI, _nextShapeOf: nextShapeOf, SHAPES: SHAPES, SHAPE_GROUPS: SHAPE_GROUPS, _bbox: bbox, _coreBox: coreBox, FLOW_COLORS: FLOW_COLORS, PAL_HEX: PAL_HEX, FLOW_HEADS: FLOW_HEADS, _nearestT: nearestT, _roundedD: roundedD, _flowHead: flowHead, _shapeFit: shapeFit, _shapeSvg: shapeSvg, _wrapText: wrapText, _textW: textW, _anchor: anchor, _boardSvg: boardSvg, _clean: clean, _itemSvg: itemSvg, _linkSvg: linkSvg, _finder: finder, _nextCable: nextCable, _routePts: routePts, _routeD: routeD, _linkMeters: linkMeters, _linkText: linkText, _ductSvg: ductSvg, _ductMeters: ductMeters, WALL_KINDS: WALL_KINDS, _wallSvg: wallSvg, _wallMeters: wallMeters, _cleanRf: cleanRf, _rfFromModel: rfFromModel, _cleanHeat: cleanHeat, _heatInputs: heatInputs, _iconResize: iconResize, _apSeed: apSeed, _heatLegendSvg: heatLegendSvg, _heatGridOf: heatGridOf, _heatCoverage: heatCoverage, _heatCoverageText: heatCoverageText, _wifi: WIFI, _pngName: pngName, _setPxm: function (v) { PXM = v || PXM_DEFAULT; }, _toPng: toPng, _starter: starter, _apply: apply, _pngName: pngName, _readIo: readIo, _parseMermaid: parseMermaid, _orgToMermaid: orgToMermaid, _mermaidOrg: mermaidOrg, _mermaidBoard: mermaidBoard, _boardToMermaid: boardToMermaid, _materials: materials, _materialsHtml: materialsHtml, _legendEntries: legendEntries, _legendSvg: legendSvg, _legendOf: legendOf, _boardOfLegend: boardOfLegend, _libOf: libOf, _lib: LIB, _loadLibrary: loadLibrary, _removeBg: removeBg, _tint: tint };
 })();

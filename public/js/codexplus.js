@@ -1254,6 +1254,10 @@
     }
 
     function renderSheets(host) {
+        // PL-22: se as folhas demorarem demais, a leitura simples volta.
+        setTimeout(function () {
+            if (!host.classList.contains('is-ready')) { host.classList.add('cx-sheets-gaveup'); }
+        }, 20000);
         var built = buildPrint();
         if (!built) {
             host.parentNode && host.parentNode.removeChild(host);

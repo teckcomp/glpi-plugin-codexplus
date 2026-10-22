@@ -556,7 +556,7 @@
         if (!stage) {
             return 1;
         }
-        var pages = planPages(idoc, stage, geo);
+        var pages = planPages(idoc, stage, geo, { split: true });
         var total = pages.length;
         var frag  = idoc.createDocumentFragment();
         for (var p = 0; p < total; p++) {
@@ -573,8 +573,13 @@
      * montar nem trocar o <body> — o PDF composto pagina vários documentos
      * e numera tudo junto. Mesmas regras de sempre (ver layoutPages).
      */
-    function planPages(idoc, stage, geo) {
+    function planPages(idoc, stage, geo, popt) {
         var win = idoc.defaultView || window;
+        // PL-15a: partir parágrafo (por linhas), lista (por item) e tabela
+        // (por linha, repetindo o cabeçalho) quando não cabem no fim da folha.
+        // Ligado no PDF e nas folhas do Visualizar; o editor (planBreaks)
+        // continua sem partir até o PL-15b.
+        var SPLIT = !!(popt && popt.split);
 
         var blocks = Array.prototype.slice.call(stage.children);
         var n = blocks.length;
@@ -647,7 +652,7 @@
         // `excess` px de altura. 3c-0-3: antes só a maior encolhia, e um
         // parágrafo com duas fotos (separadas por Shift+Enter) não cabia
         // nunca (DTC0005). Mínimo de 35% do tamanho; abaixo disso, desiste.
-        function shrink(a, b, excess) {
+        function shrink(a, b, excess, minF) {
             var imgs = [], total = 0;
             for (var k = a; k <= b; k++) {
                 var list = blocks[k].querySelectorAll('img');
@@ -658,7 +663,7 @@
             }
             if (!total) { return false; }
             var f = (total - excess) / total;
-            if (f < 0.35) { return false; }
+            if (f < (minF || 0.35)) { return false; }
             for (var q = 0; q < imgs.length; q++) {
                 imgs[q][0].style.width = Math.floor(imgs[q][1] * f) + 'px';
                 imgs[q][0].style.height = 'auto';
@@ -666,6 +671,166 @@
             }
             for (var k2 = a; k2 <= b; k2++) { heights[k2] = outerH(blocks[k2]); }
             return true;
+        }
+
+
+        /* ---------- PL-15a: partir um bloco no ponto `room` (px) ---------- */
+        var BLOCK_IN = 'img,table,svg,canvas,iframe,video,.cx-board,.cx-board-legend,.cx-step,pre';
+        function contTop(el, room) {
+            // Linha-limite, em coordenadas da tela: o que passar dela não cabe.
+            // A margem de baixo do bloco também tem de caber na folha.
+            var cs = win.getComputedStyle(el);
+            return el.getBoundingClientRect().top + room - (parseFloat(cs.marginTop) || 0) - (parseFloat(cs.marginBottom) || 0) - 1;
+        }
+        function markCont(a, b) {
+            b.classList.add('cx-cont');
+            b.style.marginTop = '0';
+            b.removeAttribute('id');
+            a.classList.add('cx-cont-head');
+        }
+        // Parágrafo: parte na 1ª linha que não cabe; mínimo de 2 linhas em
+        // cada folha (sem linha viúva nem órfã).
+        function splitText(el, room) {
+            if (el.querySelector(BLOCK_IN)) { return null; }
+            var cs = win.getComputedStyle(el);
+            var lh = parseFloat(cs.lineHeight);
+            if (!(lh > 0)) { lh = (parseFloat(cs.fontSize) || 15) * 1.55; }
+            var r = el.getBoundingClientRect();
+            var top = r.top + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.borderTopWidth) || 0);
+            var bottom = r.bottom - (parseFloat(cs.paddingBottom) || 0) - (parseFloat(cs.borderBottomWidth) || 0);
+            var lines = Math.round((bottom - top) / lh);
+            if (lines < 4) { return null; }
+            var limit = contTop(el, room) - (parseFloat(cs.paddingBottom) || 0) - (parseFloat(cs.borderBottomWidth) || 0);
+            var fit = Math.floor((limit - top) / lh);
+            if (fit > lines - 2) { fit = lines - 2; }
+            if (fit < 2) { return null; }
+            var cut = top + fit * lh;          // y onde começa a 1ª linha que desce
+            // Começo de cada palavra, em ordem de leitura.
+            var words = [], walker = idoc.createTreeWalker(el, 4, null), node;
+            while ((node = walker.nextNode())) {
+                var t = node.nodeValue;
+                for (var c = 0; c < t.length; c++) {
+                    if (!/\s/.test(t.charAt(c)) && (c === 0 || /\s/.test(t.charAt(c - 1)))) { words.push([node, c]); }
+                }
+            }
+            if (words.length < 4) { return null; }
+            var rg = idoc.createRange();
+            function wordTop(k) {
+                rg.setStart(words[k][0], words[k][1]);
+                rg.setEnd(words[k][0], words[k][1] + 1);
+                var rr = rg.getClientRects();
+                return rr.length ? rr[0].top + rr[0].height / 2 : -1;
+            }
+            // 1ª palavra cujo meio fica abaixo do corte.
+            var lo = 1, hi = words.length - 1, at = -1;
+            while (lo <= hi) {
+                var mid = (lo + hi) >> 1, y = wordTop(mid);
+                if (y < 0) { return null; }
+                if (y >= cut) { at = mid; hi = mid - 1; } else { lo = mid + 1; }
+            }
+            if (at < 1) { return null; }
+            rg.setStart(words[at][0], words[at][1]);
+            rg.setEnd(el, el.childNodes.length);
+            var rest = el.cloneNode(false);
+            rest.appendChild(rg.extractContents());
+            el.parentNode.insertBefore(rest, el.nextSibling);
+            markCont(el, rest);
+            rest.style.textIndent = '0';
+            return rest;
+        }
+        // Lista: parte entre itens (pelo menos 1 item em cada folha).
+        function splitList(el, room) {
+            var items = Array.prototype.filter.call(el.children, function (x) { return x.tagName === 'LI'; });
+            if (items.length < 2 || items.length !== el.children.length) { return null; }
+            var limit = contTop(el, room), k = -1;
+            for (var q = 0; q < items.length; q++) {
+                if (items[q].getBoundingClientRect().bottom > limit) { k = q; break; }
+            }
+            if (k < 1) { return null; }
+            var rest = el.cloneNode(false);
+            for (var m = k; m < items.length; m++) { rest.appendChild(items[m]); }
+            if (el.tagName === 'OL') { rest.setAttribute('start', String((parseInt(el.getAttribute('start'), 10) || 1) + k)); }
+            el.parentNode.insertBefore(rest, el.nextSibling);
+            markCont(el, rest);
+            return rest;
+        }
+        // Tabela: parte entre linhas e repete o cabeçalho; as colunas ficam
+        // com a mesma largura nos dois pedaços.
+        function splitTable(el, room) {
+            if (el.querySelector('table')) { return null; }
+            var all = Array.prototype.slice.call(el.rows);
+            if (all.length < 3) { return null; }
+            var head = el.tHead ? Array.prototype.slice.call(el.tHead.rows) : [];
+            var body = all.filter(function (row) { return head.indexOf(row) < 0; });
+            var thRow = null;
+            if (!head.length) {
+                var first = body[0], allTh = first.cells.length > 0;
+                for (var c = 0; c < first.cells.length; c++) { if (first.cells[c].tagName !== 'TH') { allTh = false; } }
+                if (allTh) { thRow = first; body = body.slice(1); }
+            }
+            if (body.length < 2) { return null; }
+            var limit = contTop(el, room), k = -1;
+            for (var q = 0; q < body.length; q++) {
+                if (body[q].getBoundingClientRect().bottom > limit) { k = q; break; }
+            }
+            // Não parte no meio de célula mesclada (rowspan) que atravessa o corte.
+            while (k > 0) {
+                var cross = false;
+                for (var a = 0; a < k && !cross; a++) {
+                    for (var b = 0; b < body[a].cells.length; b++) {
+                        if (a + (body[a].cells[b].rowSpan || 1) > k) { cross = true; break; }
+                    }
+                }
+                if (!cross) { break; }
+                k--;
+            }
+            if (k < 1) { return null; }
+            // Larguras das colunas, de uma linha sem mesclagem.
+            var widths = null;
+            for (var w = 0; w < all.length && !widths; w++) {
+                var cells = all[w].cells, simple = cells.length > 0;
+                for (var v = 0; v < cells.length; v++) { if ((cells[v].colSpan || 1) > 1) { simple = false; } }
+                if (simple) { widths = Array.prototype.map.call(cells, function (x) { return x.getBoundingClientRect().width; }); }
+            }
+            var tw = el.getBoundingClientRect().width;
+            var rest = el.cloneNode(false);
+            if (widths) {
+                [el, rest].forEach(function (t) {
+                    var old = t.querySelector('colgroup');
+                    if (old) { old.parentNode.removeChild(old); }
+                    var cg = idoc.createElement('colgroup');
+                    widths.forEach(function (px) {
+                        var col = idoc.createElement('col');
+                        col.style.width = (px / tw * 100).toFixed(3) + '%';
+                        cg.appendChild(col);
+                    });
+                    t.insertBefore(cg, t.firstChild);
+                    t.style.tableLayout = 'fixed';
+                });
+            }
+            // Cabeçalho repetido leva data-cx-rep (é cópia, não conteúdo novo).
+            if (el.tHead) { var th2 = el.tHead.cloneNode(true); th2.setAttribute('data-cx-rep', '1'); rest.appendChild(th2); }
+            var tb = idoc.createElement('tbody');
+            if (thRow) { var tr2 = thRow.cloneNode(true); tr2.setAttribute('data-cx-rep', '1'); tb.appendChild(tr2); }
+            for (var m = k; m < body.length; m++) { tb.appendChild(body[m]); }
+            rest.appendChild(tb);
+            // tbody que ficou vazio sai.
+            Array.prototype.slice.call(el.tBodies).forEach(function (x) { if (!x.rows.length) { x.parentNode.removeChild(x); } });
+            el.parentNode.insertBefore(rest, el.nextSibling);
+            markCont(el, rest);
+            return rest;
+        }
+        function splitBlock(el, room) {
+            if (room < 24 || hasBoard(el) || isLegend(el)) { return null; }
+            var tag = el.tagName;
+            try {
+                if (tag === 'TABLE') { return splitTable(el, room); }
+                if (tag === 'UL' || tag === 'OL') { return splitList(el, room); }
+                if (tag === 'P' || tag === 'BLOCKQUOTE') { return splitText(el, room); }
+            } catch (err) {
+                return null;
+            }
+            return null;
         }
 
         var pages = [[]];
@@ -680,6 +845,18 @@
             }
             var j = groupEnd(i);
             var gh = sumH(i, j);
+            // PL-15a: não cabe no resto da folha → parte o último bloco do
+            // grupo (o título continua junto do começo do texto).
+            if (SPLIT && used + gh > capH) {
+                var room = capH - used - (j > i ? sumH(i, j - 1) : 0);
+                var rest = splitBlock(blocks[j], room);
+                if (rest) {
+                    blocks.splice(j + 1, 0, rest);
+                    heights.splice(j, 1, outerH(blocks[j]), outerH(rest));
+                    n++;
+                    gh = sumH(i, j);
+                }
+            }
             if (gh > capH) {
                 // Grupo maior que uma folha: tenta reduzir a imagem.
                 if (!shrink(i, j, gh - capH + 1)) {
@@ -689,9 +866,16 @@
                 }
                 gh = sumH(i, j);
             }
+            // PL-15a: imagem que quase cabe encolhe até 85% para não abrir folha.
+            if (SPLIT && !empty && (used + gh) > capH && shrink(i, j, used + gh - capH + 1, 0.85)) {
+                gh = sumH(i, j);
+            }
             if (!empty && (used + gh) > capH) {
                 pages.push([]);
                 used = 0;
+                // PL-15a: na folha nova o grupo é avaliado de novo (pode
+                // precisar partir de novo, agora com a folha inteira).
+                if (SPLIT) { continue; }
             }
             for (var k = i; k <= j; k++) {
                 pages[pages.length - 1].push(blocks[k]);
@@ -1218,7 +1402,7 @@
                     var st = Array.prototype.slice.call(idoc.querySelectorAll('.cx-stage'));
                     st.forEach(function (stage, i) {
                         var e = entries[i];
-                        var pages = planPages(idoc, stage, geo);
+                        var pages = planPages(idoc, stage, geo, { split: true });   // PL-15a
                         if (e.kind === 'repeat') {
                             // Repetido não ganha folha: no sumário, "ver página N".
                             plans.push({ e: e, pages: [], skip: true });

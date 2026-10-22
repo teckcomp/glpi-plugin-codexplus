@@ -831,6 +831,17 @@
     function register(editor) {
         // Linha nova criada a partir de um título nasce Parágrafo, mesmo quando
         // o TinyMCE repetiria o título (Enter no meio/fim com quebra dentro).
+        // PL-15b: Enter numa linha VAZIA de Nota/Atenção/Dica sai da caixa
+        // (a linha vira parágrafo comum), como na lista.
+        editor.on('keydown', function (e) {
+            if (e.keyCode !== 13 || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) { return; }
+            var p = editor.dom.getParent(editor.selection.getNode(), 'p');
+            if (!p || !p.classList || !p.classList.contains('cx-callout')) { return; }
+            if ((p.textContent || '').replace(/[\s\u00a0\u200b\ufeff]/g, '') || p.querySelector('img,table,span.cx-board')) { return; }
+            e.preventDefault();
+            editor.undoManager.transact(function () { dropClasses(p, STYLE_CLASSES); if (!p.className) { p.removeAttribute('class'); } });
+            editor.nodeChanged();
+        });
         editor.on('NewBlock', function (e) {
             var nb = e && e.newBlock;
             if (!nb || !/^H[1-6]$/.test(nb.nodeName)) { return; }
@@ -1618,6 +1629,35 @@
             editor.selection.collapse(!atEnd);
             return true;
         };
+        /* PL-15b (Claudio, 22/10/2026: "nos espaços não consigo criar linhas
+           novas"): depois de tabela, caixa (Nota/Atenção), quadro ou imagem não
+           há linha comum onde o cursor possa ficar. Clicar no espaço do fim da
+           folha ou descer com a seta cria uma linha comum logo abaixo do bloco
+           (só se já não houver uma vazia ali) e põe o cursor nela. */
+        var boxy = function (el) {
+            if (!el || el.nodeType !== 1) { return false; }
+            if (/^(TABLE|DIV|FIGURE|BLOCKQUOTE|PRE|HR|UL|OL)$/.test(el.nodeName)) { return el.nodeName !== 'UL' && el.nodeName !== 'OL'; }
+            if (el.classList.contains('cx-callout')) { return true; }
+            return !!el.querySelector('span.cx-board,span.cx-board-legend,img,table');
+        };
+        var blankP = function (el) {
+            return !!el && el.nodeName === 'P' && !el.className
+                && !(el.textContent || '').replace(/[\s\u00a0\u200b\ufeff]/g, '')
+                && !el.querySelector('img,table,span');
+        };
+        var lineAfter = function (blk) {
+            var nx = skipSib(blk, 1);
+            if (blankP(nx)) { return caretIn(nx, false); }
+            var p = null;
+            editor.undoManager.transact(function () {
+                p = editor.dom.create('p', {}, '<br data-mce-bogus="1">');
+                editor.dom.insertAfter(p, blk);
+            });
+            caretIn(p, false);
+            editor.nodeChanged();
+            later();
+            return true;
+        };
         var lastKey = 0;
         editor.on('keydown', function (e) { lastKey = e.keyCode; });
         // Setas ↑/↓ na primeira/última linha de um bloco cujo vizinho é um
@@ -1648,12 +1688,46 @@
                 if (up && cr.top - br.top > lh * 1.2) { return; }       // não está na 1ª linha
                 if (!up && br.bottom - cr.bottom > lh * 1.2) { return; } // não está na última
             }
+            // PL-15b: descer de tabela/caixa/quadro no fim da folha cria a linha
+            // comum logo abaixo dele (em vez de pular para a folha seguinte).
+            if (!up && boxy(blk)) {
+                e.preventDefault();
+                if (e.stopImmediatePropagation) { e.stopImmediatePropagation(); }
+                lineAfter(blk);
+                return;
+            }
             var alvo = up ? realBlock(sib, -1) : realBlock(sib, 1);
             if (!alvo) { return; }
             e.preventDefault();
             if (e.stopImmediatePropagation) { e.stopImmediatePropagation(); }
             caretIn(alvo, up);
             if (alvo.scrollIntoView) { editor.selection.scrollIntoView(); }
+        }, true);
+        // PL-15b: Backspace no começo da folha não junta com a folha de cima
+        // (juntar fazia o parágrafo de cima crescer e descer inteiro). Linha
+        // vazia some; com texto, o cursor só volta para o fim da folha de cima.
+        editor.on('keydown', function (e) {
+            if (e.keyCode !== 8 || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) { return; }
+            var rng = editor.selection.getRng(), body = editor.getBody();
+            if (!rng || !rng.collapsed || !body) { return; }
+            var blk = rng.startContainer;
+            while (blk && blk.parentNode !== body) { blk = blk.parentNode; }
+            if (!blk || blk.nodeType !== 1) { return; }
+            var sib = skipSib(blk, -1);
+            if (!sib || !deco(sib)) { return; }
+            var pre = editor.getDoc().createRange();
+            pre.setStart(blk, 0);
+            pre.setEnd(rng.startContainer, rng.startOffset);
+            if (pre.toString().replace(/[\u200b\ufeff]/g, '') !== '' || pre.cloneContents().querySelector('img,table')) { return; }
+            var cima = realBlock(sib, -1);
+            if (!cima) { return; }
+            e.preventDefault();
+            if (e.stopImmediatePropagation) { e.stopImmediatePropagation(); }
+            if (blankP(blk)) {
+                editor.undoManager.transact(function () { editor.dom.remove(blk); });
+                later();
+            }
+            caretIn(cima, true);
         }, true);
         editor.on('mousedown', function (e) {
             var g = deco(e.target);
@@ -1666,7 +1740,9 @@
             if (g.classList.contains('cx-sheet-head')) {
                 caretIn(realBlock(g, 1), false);
             } else if (acima) {
-                caretIn(realBlock(g, -1), true) || caretIn(realBlock(g, 1), false);
+                var antes = realBlock(g, -1);
+                // PL-15b: abaixo de tabela/caixa/quadro, uma linha comum nova.
+                if (boxy(antes)) { lineAfter(antes); } else { caretIn(antes, true) || caretIn(realBlock(g, 1), false); }
             } else {
                 caretIn(realBlock(g, 1), false) || caretIn(realBlock(g, -1), true);
             }

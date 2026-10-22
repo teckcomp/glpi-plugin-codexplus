@@ -1842,6 +1842,7 @@
                 if (!bgEl) { bgEl = dom.create('img', { 'class': 'cx-board-bg', alt: '' }); wrap.insertBefore(bgEl, main); }
                 ok = uploadImg(editor, bgEl, dataUrlToBlob(bg.url), 'cx-quadro-fundo-' + stamp + '.jpg') && ok;
             } else if (!bg && bgEl) {
+                // PL-18: só com bg === null (Tirar planta). { keep: true } mantém.
                 bgEl.parentNode.removeChild(bgEl);
             }
             ok = uploadImg(editor, main, png, 'cx-quadro-' + stamp + '.png') && ok;
@@ -1881,7 +1882,7 @@
        Janela do quadro
        ====================================================================== */
     function open(editor, node, mode, host) {
-        var raw = null, bgUrl = '', bgChanged = false;
+        var raw = null, bgUrl = '', bgChanged = false, bgFail = false;
         if (host) {
             // Q5a: quadro de um documento DIA (sem editor, sem planta de fundo).
             raw = host.data || null;
@@ -1898,9 +1899,25 @@
                 notify(editor, 'Salve o documento antes de editar este quadro de novo: a planta ainda está sendo enviada.', 'error');
                 return;
             }
-            ready = ready.then(function () { return urlToDataUrl(bgUrl); }).then(function (u) { bgUrl = u; }).catch(function () { bgUrl = ''; });
+            /* PL-18 (Claudio, 22/10/2026 — "a planta some"): antes, se a imagem da
+               planta não baixasse, o quadro abria sem ela em silêncio e o Salvar
+               quadro a apagava do documento (e gerava o desenho sem a planta).
+               Agora: não abre; só abre sem a planta se a pessoa escolher. */
+            ready = ready.then(function () { return urlToDataUrl(bgUrl); }).then(function (u) { bgUrl = u; }, function () { bgFail = true; });
         }
-        ready.then(function () { build(editor, node, clean(raw, mode), bgUrl, bgChanged, host || null); });
+        ready.then(function () {
+            if (bgFail) {
+                var sem = window.confirm('Não foi possível carregar a imagem da planta deste quadro.\n\n'
+                    + 'Cancelar (recomendado): o quadro não abre e a planta continua no documento. Recarregue a página (F5) e tente de novo.\n\n'
+                    + 'OK: abrir SEM a planta. Ao salvar o quadro, ele fica sem a planta.');
+                if (!sem) {
+                    notify(editor, 'O quadro não foi aberto e a planta continua no documento. Recarregue a página (F5) e tente de novo; se repetir, avise o suporte.', 'error');
+                    return;
+                }
+                bgUrl = '';
+            }
+            build(editor, node, clean(raw, mode), bgUrl, bgChanged, host || null, { bgDrop: bgFail });
+        });
     }
 
     /* ======================================================================
@@ -2691,8 +2708,11 @@
         } else { window.alert(text); }
     }
 
-    function build(editor, node, D, bgUrl, bgChanged, host) {
+    function build(editor, node, D, bgUrl, bgChanged, host, bopt) {
         var heatKeep = null;
+        // PL-18: a planta só sai do documento por escolha (Tirar planta, ou
+        // abrir sem a planta quando ela não carregou). Sem isso, fica.
+        var bgDrop = !!(bopt && bopt.bgDrop);
         // Q8-4b: controles da camada de cores (só no Mapa de calor).
         function heatBar() {
             // Q8-4b-3: perfil gravado no mapa que não está mais na lista: guardado
@@ -5860,7 +5880,7 @@
             }
             else if (a === 'bg') { pickBg(); }
             else if (a === 'rot') { rotate(); }
-            else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }
+            else if (a === 'bgdel') { snap(); bgUrl = ''; bgChanged = false; bgDrop = true; root.querySelector('[data-act="bgdel"]').hidden = true; root.querySelector('[data-act="rot"]').hidden = true; render(); }
             else if (a === 'png') { downloadPng(); }
             else if (a === 'imp') { xmShow(false); ioOpen(); }
             else if (a === 'exp') { xmShow(!xmOpen()); }
@@ -5975,7 +5995,7 @@
                 return (D.legend ? legendPng(D) : Promise.resolve(null)).then(function (lp) { return [png, lp]; });
             }).then(function (r) {
                 var png = r[0];
-                var ok = apply(editor, node, D, png, bgUrl ? { url: bgUrl, changed: bgChanged } : null, r[1]);
+                var ok = apply(editor, node, D, png, bgUrl ? { url: bgUrl, changed: bgChanged } : (bgDrop ? null : { keep: true }), r[1]);
                 if (!ok) { notify(editor, 'Área de envio de arquivos não encontrada: o quadro não será gravado.', 'error'); }
                 close();
             }).catch(function () {

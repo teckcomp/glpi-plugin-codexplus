@@ -921,6 +921,154 @@
         + 'body{padding:16px 0;}'
         + '.cx-page{margin:0 auto 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);}}';
 
+
+    /* =====================================================================
+       PL-19 (Claudio, 22/10/2026): zoom nas imagens na LEITURA.
+       Clique numa imagem do documento (folhas A4 do Visualizar/link público,
+       ou a leitura simples) abre a imagem por cima da página: cabe na tela,
+       roda do mouse ou + / − aproxima, duplo clique alterna caber/100%,
+       arrastar move, Esc / X / clique fora fecha. Na edição não vale (lá o
+       clique seleciona e o duplo clique abre o quadro).
+       ===================================================================== */
+    var ZOOM_MIN_PX = 48;
+    var ZOOM_CSS = '.cx-zoom{position:fixed;inset:0;z-index:2147483000;background:rgba(15,18,24,.88);overflow:hidden;touch-action:none;cursor:grab;}'
+        + '.cx-zoom.is-dragging{cursor:grabbing;}'
+        + '.cx-zoom-img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;max-height:none;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.5);user-select:none;-webkit-user-drag:none;}'
+        + '.cx-zoom-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1;display:flex;gap:6px;align-items:center;'
+        + 'padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.96);box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:default;font:14px/1.2 system-ui,sans-serif;color:#1f2937;}'
+        + '.cx-zoom-bar button{border:1px solid #d1d5db;background:#fff;color:#1f2937;border-radius:6px;padding:4px 10px;font:inherit;cursor:pointer;min-width:34px;}'
+        + '.cx-zoom-bar button:hover{background:#f3f4f6;}'
+        + '.cx-zoom-pct{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;}'
+        + '.cx-zoom-x{font-size:18px !important;line-height:1 !important;}';
+
+    function zoomOpen(src, alt) {
+        var d = document;
+        if (d.querySelector('.cx-zoom')) { return; }
+        if (!d.getElementById('cx-zoom-css')) {
+            var zc = d.createElement('style');
+            zc.id = 'cx-zoom-css';
+            zc.textContent = ZOOM_CSS;
+            (d.head || d.documentElement).appendChild(zc);
+        }
+        var box = d.createElement('div');
+        box.className = 'cx-zoom';
+        box.setAttribute('role', 'dialog');
+        box.setAttribute('aria-modal', 'true');
+        box.setAttribute('aria-label', 'Imagem ampliada');
+        box.innerHTML = '<div class="cx-zoom-bar">'
+            + '<button type="button" data-z="out" aria-label="Afastar">−</button>'
+            + '<span class="cx-zoom-pct" aria-live="polite"></span>'
+            + '<button type="button" data-z="in" aria-label="Aproximar">+</button>'
+            + '<button type="button" data-z="fit">Caber na tela</button>'
+            + '<button type="button" data-z="one">100%</button>'
+            + '<button type="button" data-z="close" class="cx-zoom-x" aria-label="Fechar">×</button>'
+            + '</div><img class="cx-zoom-img" alt="" draggable="false">';
+        var img = box.querySelector('.cx-zoom-img');
+        var pct = box.querySelector('.cx-zoom-pct');
+        img.alt = alt || '';
+        var st = { s: 1, x: 0, y: 0, fit: 1 }, drag = null, moved = false;
+        var oldOverflow = d.documentElement.style.overflow;
+
+        function paint() {
+            img.style.transform = 'translate(' + st.x + 'px,' + st.y + 'px) scale(' + st.s + ')';
+            pct.textContent = Math.round(st.s * 100) + '%';
+        }
+        function fitNow() {
+            var nw = img.naturalWidth || 1, nh = img.naturalHeight || 1;
+            var vw = box.clientWidth, vh = box.clientHeight - 56;
+            st.fit = Math.min(vw * 0.94 / nw, vh * 0.94 / nh, 2);
+            st.s = st.fit;
+            st.x = (vw - nw * st.s) / 2;
+            st.y = 56 + (vh - nh * st.s) / 2;
+            paint();
+        }
+        // Zoom mantendo fixo o ponto (cx, cy) da tela.
+        function zoomAt(ns, cx, cy) {
+            ns = Math.max(0.05, Math.min(8, ns));
+            st.x = cx - (cx - st.x) * (ns / st.s);
+            st.y = cy - (cy - st.y) * (ns / st.s);
+            st.s = ns;
+            paint();
+        }
+        function center() { return [box.clientWidth / 2, 56 + (box.clientHeight - 56) / 2]; }
+        function close() {
+            d.removeEventListener('keydown', onKey, true);
+            window.removeEventListener('resize', fitNow);
+            d.documentElement.style.overflow = oldOverflow;
+            if (box.parentNode) { box.parentNode.removeChild(box); }
+        }
+        function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); close(); }
+            else if (e.key === '+' || e.key === '=') { e.preventDefault(); var c = center(); zoomAt(st.s * 1.25, c[0], c[1]); }
+            else if (e.key === '-' || e.key === '_') { e.preventDefault(); var c2 = center(); zoomAt(st.s / 1.25, c2[0], c2[1]); }
+        }
+
+        box.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('[data-z]') : null;
+            if (b) {
+                var z = b.getAttribute('data-z'), c = center();
+                if (z === 'close') { close(); }
+                else if (z === 'in') { zoomAt(st.s * 1.25, c[0], c[1]); }
+                else if (z === 'out') { zoomAt(st.s / 1.25, c[0], c[1]); }
+                else if (z === 'fit') { fitNow(); }
+                else if (z === 'one') { zoomAt(1, c[0], c[1]); }
+                return;
+            }
+            // Clique no fundo (fora da imagem e da barra) fecha; arrastar não.
+            if (e.target === box && !moved) { close(); }
+        });
+        box.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            zoomAt(st.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
+        }, { passive: false });
+        img.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            if (Math.abs(st.s - st.fit) < 0.01) { zoomAt(1, e.clientX, e.clientY); } else { fitNow(); }
+        });
+        box.addEventListener('pointerdown', function (e) {
+            if (e.target.closest && e.target.closest('.cx-zoom-bar')) { return; }
+            drag = { px: e.clientX, py: e.clientY, x: st.x, y: st.y };
+            moved = false;
+            if (box.setPointerCapture) { try { box.setPointerCapture(e.pointerId); } catch (er) { /* sem captura */ } }
+        });
+        box.addEventListener('pointermove', function (e) {
+            if (!drag) { return; }
+            var dx = e.clientX - drag.px, dy = e.clientY - drag.py;
+            if (Math.abs(dx) + Math.abs(dy) > 3) { moved = true; box.classList.add('is-dragging'); }
+            st.x = drag.x + dx; st.y = drag.y + dy;
+            paint();
+        });
+        function endDrag() { drag = null; box.classList.remove('is-dragging'); setTimeout(function () { moved = false; }, 0); }
+        box.addEventListener('pointerup', endDrag);
+        box.addEventListener('pointercancel', endDrag);
+
+        d.addEventListener('keydown', onKey, true);
+        window.addEventListener('resize', fitNow);
+        d.documentElement.style.overflow = 'hidden';
+        d.body.appendChild(box);
+        img.onload = fitNow;
+        img.src = src;
+        if (img.complete && img.naturalWidth) { fitNow(); }
+        var x = box.querySelector('.cx-zoom-x');
+        if (x) { x.focus(); }
+    }
+
+    /** Liga o zoom nas imagens de `root` que estejam dentro de `scope`. */
+    function bindZoom(doc, scope) {
+        if (!doc || doc.__cxZoom) { return; }
+        doc.__cxZoom = true;
+        var css = doc.createElement('style');
+        css.textContent = scope + ' img{cursor:zoom-in;}';
+        (doc.head || doc.documentElement).appendChild(css);
+        doc.addEventListener('click', function (e) {
+            var t = e.target;
+            if (!t || t.tagName !== 'IMG' || !t.closest || !t.closest(scope)) { return; }
+            if (t.getBoundingClientRect().width < ZOOM_MIN_PX) { return; }
+            e.preventDefault();
+            zoomOpen(t.currentSrc || t.src, t.getAttribute('alt') || '');
+        });
+    }
+
     function renderSheets(host) {
         var built = buildPrint();
         if (!built) {
@@ -963,6 +1111,7 @@
                     var art = document.getElementById('codexplus-doc');
                     if (art) { art.classList.add('cx-sheets-hidden'); }
                     host.classList.add('is-ready');
+                    bindZoom(idoc, '.cx-page-content');   // PL-19
                     fit();
                     window.addEventListener('resize', fit);
                 });
@@ -1257,6 +1406,10 @@
         var sheets = document.querySelector('[data-cx-sheets]');
         if (sheets) {
             renderSheets(sheets);
+        }
+        // PL-19: leitura simples (sem folhas, ou antes delas ficarem prontas).
+        if (document.querySelector('.codexplus-content')) {
+            bindZoom(document, '.codexplus-content');
         }
         var btn = document.getElementById('codexplus-pdf');
         if (btn) {

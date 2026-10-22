@@ -11,8 +11,10 @@
 <div class="codexplus-app{{ can_edit ? ' cx-docpage--wide' : (is_diagram and diagram_kind in ['cronograma', 'raci'] ? ' cx-docpage--paisagem' : '') }}">
 
     <div class="codexplus-article-bar">
-        <a href="{{ glpi_root }}/plugins/codexplus/front/dashboard.php" class="codexplus-back">
-            <i class="ti ti-arrow-left"></i> {{ __('Codex+', 'codexplus') }}
+        {# PL-21 (Claudio, 22/10/2026): voltar leva à Biblioteca, de onde se
+           abre o documento — não ao Painel. #}
+        <a href="{{ glpi_root }}/plugins/codexplus/front/library.php" class="codexplus-back">
+            <i class="ti ti-arrow-left"></i> {{ __('Biblioteca', 'codexplus') }}
         </a>
         {% if not is_new %}
             <div class="cx-docform-ident">

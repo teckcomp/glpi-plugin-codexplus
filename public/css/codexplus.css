@@ -287,15 +287,27 @@ html[data-codexplus-theme="dark"] .codexplus-app .form-select {
     color: var(--cx-danger);
 }
 
+/* PL-20 (Claudio, 22/10/2026: "botão de retorno muito sem presença"):
+   o Voltar vira botão, do mesmo tamanho dos vizinhos (Duplicar, Editar),
+   com a cor de destaque para ser achado de primeira. */
 .codexplus-back {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--cx-muted);
-    text-decoration: none;
+    padding: 8px 14px;
+    border: 1px solid var(--cx-accent);
+    border-radius: var(--cx-radius-sm);
+    background: var(--cx-surface);
+    color: var(--cx-accent);
     font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .12s ease, color .12s ease;
 }
-.codexplus-back:hover { color: var(--cx-accent); }
+.codexplus-back .ti { font-size: 16px; }
+.codexplus-app .codexplus-back:hover, .codexplus-back:hover,
+.codexplus-app .codexplus-back:focus-visible, .codexplus-back:focus-visible { background: var(--cx-accent); color: #fff; text-decoration: none; }
 
 .codexplus-actions { display: flex; gap: 8px; }
 

@@ -393,7 +393,7 @@
 
 
     /* ---------------------------------------------------------------- */
-    /* Importar .docx e .md (bloco E2)                                   */
+    /* Importar Word .docx (bloco E2; PL-16: só Word, no padrão Codex+)  */
     /* ---------------------------------------------------------------- */
 
     // Pasta pública do plugin, deduzida do próprio script (achado 3: sem
@@ -403,8 +403,7 @@
         return sc && sc.src ? sc.src.replace(/\/js\/codexplus-editor\.js.*$/, '') : '';
     })();
     var LIBS = {
-        mammoth: '/lib/mammoth/mammoth.browser.min.js',
-        marked:  '/lib/marked/marked.umd.js'
+        mammoth: '/lib/mammoth/mammoth.browser.min.js'
     };
     var loading = {};
 
@@ -433,9 +432,10 @@
     /* HTML do arquivo -> padrão do Codex+: títulos deslocados um nível
        (o h1 é o título do documento), âncoras vazias do Word fora. Fonte,
        tamanho e cor saem pelo invalid_styles do editor. */
-    function normalize(html) {
+    function normalize(html, info) {
         var box = document.createElement('div');
         box.innerHTML = html;
+        decorate(box, info);   // PL-16
         var heads = Array.prototype.slice.call(box.querySelectorAll('h1,h2,h3,h4,h5,h6'));
         heads.forEach(function (h) {
             var n = parseInt(h.nodeName.substring(1), 10);
@@ -450,6 +450,313 @@
         return box.innerHTML;
     }
 
+
+    /* =================================================================
+       PL-16 (Claudio, 22/10/2026): Word importado no padrão do Codex+.
+       O mammoth traz a estrutura (títulos, listas, tabelas, imagens), mas
+       descarta cor, fundo de célula, largura de coluna, tamanho da imagem
+       e caixas. Aqui lemos o próprio .docx (document.xml e styles.xml):
+         - antes do mammoth: caixa com barra lateral (Importante, Regra de
+           ouro...) vira estilo marcador -> Atenção / Nota do Codex+; cor do
+           texto vira a cor mais próxima da paleta (cx-fg-*); preto e cinza
+           escuro ficam sem cor; Consolas vira texto comum;
+         - depois do mammoth, na mesma ordem do arquivo: fundo e alinhamento
+           das células (cores da tabela do Codex+), largura das colunas,
+           letra menor que o corpo -> A−, e largura das imagens.
+       Se a ordem não bater (arquivo fora do comum), aquela parte fica de
+       fora e o resto segue — nunca pior que antes.
+       ================================================================= */
+    var W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    var WP_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+
+    // ---- ZIP mínimo: lê o índice, abre só os XML que mudam, regrava ----
+    function zipEntries(buf) {
+        var b = new Uint8Array(buf), dv = new DataView(buf);
+        var e = b.length - 22;
+        while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) { e--; }
+        if (e < 0) { throw new Error('zip'); }
+        var count = dv.getUint16(e + 10, true), off = dv.getUint32(e + 16, true), out = [];
+        var dec = new TextDecoder('utf-8');
+        for (var i = 0; i < count; i++) {
+            if (dv.getUint32(off, true) !== 0x02014b50) { throw new Error('zip'); }
+            var method = dv.getUint16(off + 10, true), crc = dv.getUint32(off + 16, true);
+            var csize = dv.getUint32(off + 20, true), usize = dv.getUint32(off + 24, true);
+            var nlen = dv.getUint16(off + 28, true), xlen = dv.getUint16(off + 30, true), clen = dv.getUint16(off + 32, true);
+            var lho = dv.getUint32(off + 42, true);
+            var name = dec.decode(b.subarray(off + 46, off + 46 + nlen));
+            var start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+            out.push({ name: name, method: method, crc: crc, usize: usize, data: b.subarray(start, start + csize) });
+            off += 46 + nlen + xlen + clen;
+        }
+        return out;
+    }
+    function inflate(entry) {
+        if (entry.method === 0) { return Promise.resolve(entry.data); }
+        if (entry.method !== 8 || typeof DecompressionStream === 'undefined') { return Promise.reject(new Error('zip')); }
+        var ds = new Blob([entry.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return new Response(ds).arrayBuffer().then(function (a) { return new Uint8Array(a); });
+    }
+    var CRC_T = null;
+    function crc32(u) {
+        if (!CRC_T) {
+            CRC_T = new Uint32Array(256);
+            for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) { c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; } CRC_T[n] = c >>> 0; }
+        }
+        var x = 0xFFFFFFFF;
+        for (var i = 0; i < u.length; i++) { x = CRC_T[(x ^ u[i]) & 0xFF] ^ (x >>> 8); }
+        return (x ^ 0xFFFFFFFF) >>> 0;
+    }
+    // Regrava: entradas sem mudança vão como estavam (comprimidas); as
+    // alteradas vão sem compressão.
+    function zipBuild(entries) {
+        var enc = new TextEncoder(), parts = [], central = [], off = 0;
+        entries.forEach(function (en) {
+            var name = enc.encode(en.name), loc = new DataView(new ArrayBuffer(30));
+            loc.setUint32(0, 0x04034b50, true); loc.setUint16(4, 20, true); loc.setUint16(6, 0x0800, true);
+            loc.setUint16(8, en.method, true); loc.setUint32(14, en.crc, true);
+            loc.setUint32(18, en.data.length, true); loc.setUint32(22, en.usize, true); loc.setUint16(26, name.length, true);
+            var cen = new DataView(new ArrayBuffer(46));
+            cen.setUint32(0, 0x02014b50, true); cen.setUint16(4, 20, true); cen.setUint16(6, 20, true); cen.setUint16(8, 0x0800, true);
+            cen.setUint16(10, en.method, true); cen.setUint32(16, en.crc, true);
+            cen.setUint32(20, en.data.length, true); cen.setUint32(24, en.usize, true); cen.setUint16(28, name.length, true);
+            cen.setUint32(42, off, true);
+            parts.push(new Uint8Array(loc.buffer), name, en.data);
+            central.push(new Uint8Array(cen.buffer), name);
+            off += 30 + name.length + en.data.length;
+        });
+        var csize = central.reduce(function (t, u) { return t + u.length; }, 0);
+        var end = new DataView(new ArrayBuffer(22));
+        end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+        end.setUint32(12, csize, true); end.setUint32(16, off, true);
+        return new Blob(parts.concat(central, [new Uint8Array(end.buffer)])).arrayBuffer();
+    }
+
+    // ---- cores: a mais próxima da paleta do Codex+ ----
+    function rgbOf(hex) {
+        hex = String(hex || '').replace('#', '');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) { return null; }
+        return [parseInt(hex.substr(0, 2), 16), parseInt(hex.substr(2, 2), 16), parseInt(hex.substr(4, 2), 16)];
+    }
+    function dist(a, b) { var r = a[0] - b[0], g = a[1] - b[1], bl = a[2] - b[2]; return r * r * 2 + g * g * 4 + bl * bl * 3; }
+    function nearest(hex, list) {
+        var c = rgbOf(hex), best = null, bd = Infinity;
+        if (!c) { return null; }
+        list.forEach(function (it) { var d = dist(c, rgbOf(it.hex)); if (d < bd) { bd = d; best = it; } });
+        return best;
+    }
+    // Cor de texto: preto/grafite e "auto" ficam sem cor (é o texto normal).
+    function fgKeyOf(hex) {
+        var c = rgbOf(hex);
+        if (!c) { return null; }
+        var max = Math.max(c[0], c[1], c[2]), min = Math.min(c[0], c[1], c[2]);
+        if (max < 70) { return null; }                       // quase preto
+        if (min > 235) { return 'white'; }                    // branco
+        if (max - min < 24 && max < 130) { return null; }     // grafite = texto normal
+        var it = nearest(hex, PALETTE.fg.filter(function (x) { return x.key !== 'white'; }));
+        return it ? it.key : null;
+    }
+    function tableColorOf(hex) {
+        var list = [];
+        for (var i = 0; i < TABLE_COLORS.length; i += 2) { list.push({ hex: '#' + TABLE_COLORS[i] }); }
+        var it = nearest(hex, list);
+        return it ? it.hex.toLowerCase() : null;
+    }
+
+    function wKids(el, local) {
+        var out = [];
+        for (var n = el && el.firstChild; n; n = n.nextSibling) {
+            if (n.nodeType === 1 && n.namespaceURI === W_NS && n.localName === local) { out.push(n); }
+        }
+        return out;
+    }
+    function wKid(el, local) { return wKids(el, local)[0] || null; }
+    function wAttr(el, name) { return el ? el.getAttributeNS(W_NS, name) || el.getAttribute('w:' + name) || '' : ''; }
+    function setStyleRef(doc, parent, tag, val, before) {
+        var old = wKid(parent, tag);
+        if (old) { old.setAttributeNS(W_NS, 'w:val', val); return; }
+        var el = doc.createElementNS(W_NS, 'w:' + tag);
+        el.setAttributeNS(W_NS, 'w:val', val);
+        parent.insertBefore(el, before ? parent.firstChild : null);
+    }
+
+    /* Lê o .docx, marca caixas e cores para o mammoth e junta o que vai
+       ser aplicado depois (tabelas e imagens, na ordem do arquivo). */
+    function prepareDocx(buf) {
+        var entries = zipEntries(buf);
+        var docE = entries.filter(function (e) { return e.name === 'word/document.xml'; })[0];
+        var styE = entries.filter(function (e) { return e.name === 'word/styles.xml'; })[0];
+        if (!docE) { return Promise.reject(new Error('zip')); }
+        return Promise.all([inflate(docE), styE ? inflate(styE) : Promise.resolve(null)]).then(function (raw) {
+            var dec = new TextDecoder('utf-8'), parser = new DOMParser();
+            var doc = parser.parseFromString(dec.decode(raw[0]), 'application/xml');
+            var sty = raw[1] ? parser.parseFromString(dec.decode(raw[1]), 'application/xml') : null;
+            if (doc.getElementsByTagName('parsererror').length) { throw new Error('zip'); }
+            var info = { tables: [], images: [], bodySz: 0, usable: 0, notes: { callouts: 0, colors: 0 } };
+
+            // Letra do corpo: estilo Normal (ou padrão do documento).
+            if (sty) {
+                var normal = null;
+                Array.prototype.forEach.call(sty.getElementsByTagNameNS(W_NS, 'style'), function (st) {
+                    if (wAttr(st, 'styleId') === 'Normal') { normal = st; }
+                });
+                var szEl = normal ? normal.getElementsByTagNameNS(W_NS, 'sz')[0] : null;
+                if (!szEl) { szEl = sty.getElementsByTagNameNS(W_NS, 'docDefaults')[0]; szEl = szEl ? szEl.getElementsByTagNameNS(W_NS, 'sz')[0] : null; }
+                info.bodySz = szEl ? parseInt(wAttr(szEl, 'val'), 10) || 0 : 0;
+            }
+            // Largura útil da página (twips -> EMU), para o tamanho das imagens.
+            var sect = doc.getElementsByTagNameNS(W_NS, 'sectPr');
+            sect = sect[sect.length - 1];
+            if (sect) {
+                var pg = wKid(sect, 'pgSz'), mar = wKid(sect, 'pgMar');
+                var wTw = (parseInt(wAttr(pg, 'w'), 10) || 11906) - (parseInt(wAttr(mar, 'left'), 10) || 0) - (parseInt(wAttr(mar, 'right'), 10) || 0);
+                info.usable = wTw * 635;
+            }
+
+            // Caixas: parágrafo com barra à esquerda (Importante, Regra de ouro).
+            Array.prototype.forEach.call(doc.getElementsByTagNameNS(W_NS, 'p'), function (p) {
+                var ppr = wKid(p, 'pPr');
+                var bdr = ppr && wKid(ppr, 'pBdr'), left = bdr && wKid(bdr, 'left');
+                if (!left || wKid(ppr, 'numPr')) { return; }
+                var ps = wAttr(wKid(ppr, 'pStyle'), 'val');
+                if (/^(Heading|Title|Subtitle|List)/i.test(ps)) { return; }
+                var col = rgbOf(wAttr(left, 'color'));
+                var warn = col && col[0] > 150 && col[0] > col[1] * 1.6 && col[0] > col[2] * 1.6;
+                setStyleRef(doc, ppr, 'pStyle', warn ? 'CxAtencao' : 'CxNota', true);
+                info.notes.callouts++;
+            });
+            // Cor do texto: vira a cor da paleta (estilo de caractere marcador).
+            Array.prototype.forEach.call(doc.getElementsByTagNameNS(W_NS, 'r'), function (r) {
+                var rpr = wKid(r, 'rPr'), c = rpr && wKid(rpr, 'color');
+                if (!c || wKid(rpr, 'rStyle')) { return; }
+                var key = fgKeyOf(wAttr(c, 'val'));
+                if (!key) { return; }
+                setStyleRef(doc, rpr, 'rStyle', 'CxFg_' + key, true);
+                info.notes.colors++;
+            });
+
+            // Tabelas, na ordem do arquivo (a mesma do HTML do mammoth).
+            Array.prototype.forEach.call(doc.getElementsByTagNameNS(W_NS, 'tbl'), function (tbl) {
+                var grid = wKid(tbl, 'tblGrid');
+                var cols = grid ? wKids(grid, 'gridCol').map(function (g) { return parseInt(wAttr(g, 'w'), 10) || 0; }) : [];
+                var rows = [], sizes = {};
+                wKids(tbl, 'tr').forEach(function (tr) {
+                    var cells = [];
+                    wKids(tr, 'tc').forEach(function (tc) {
+                        var tcpr = wKid(tc, 'tcPr');
+                        var vm = tcpr && wKid(tcpr, 'vMerge');
+                        if (vm && wAttr(vm, 'val') !== 'restart') { return; }   // continuação de mesclagem
+                        var shd = tcpr && wKid(tcpr, 'shd');
+                        var fill = wAttr(shd, 'fill');
+                        var p0 = wKid(tc, 'p'), jc = p0 && wKid(p0, 'pPr') ? wAttr(wKid(wKid(p0, 'pPr'), 'jc'), 'val') : '';
+                        cells.push({ fill: /^[0-9a-f]{6}$/i.test(fill) ? fill : '', jc: jc });
+                    });
+                    rows.push(cells);
+                });
+                Array.prototype.forEach.call(tbl.getElementsByTagNameNS(W_NS, 'sz'), function (z) {
+                    var v = wAttr(z, 'val'); sizes[v] = (sizes[v] || 0) + 1;
+                });
+                var top = 0, sz = 0;
+                Object.keys(sizes).forEach(function (k) { if (sizes[k] > top) { top = sizes[k]; sz = parseInt(k, 10); } });
+                info.tables.push({ cols: cols, rows: rows, sz: sz });
+            });
+            // Imagens, na ordem: largura do Word.
+            Array.prototype.forEach.call(doc.getElementsByTagNameNS(W_NS, 'drawing'), function (dr) {
+                var ext = dr.getElementsByTagNameNS(WP_NS, 'extent')[0];
+                info.images.push(ext ? parseInt(ext.getAttribute('cx'), 10) || 0 : 0);
+            });
+            if (doc.getElementsByTagNameNS(W_NS, 'pict').length) { info.images = null; }  // formato antigo: não mexe
+
+            // Estilos marcadores precisam existir com nome, para o mapa do mammoth.
+            var changed = [{ name: 'word/document.xml', xml: doc }];
+            if (sty) {
+                var root = sty.documentElement;
+                var add = function (type, id) {
+                    var st = sty.createElementNS(W_NS, 'w:style');
+                    st.setAttributeNS(W_NS, 'w:type', type); st.setAttributeNS(W_NS, 'w:styleId', id);
+                    var nm = sty.createElementNS(W_NS, 'w:name'); nm.setAttributeNS(W_NS, 'w:val', id);
+                    st.appendChild(nm); root.appendChild(st);
+                };
+                add('paragraph', 'CxAtencao'); add('paragraph', 'CxNota');
+                PALETTE.fg.forEach(function (c) { add('character', 'CxFg_' + c.key); });
+                changed.push({ name: 'word/styles.xml', xml: sty });
+            }
+            var ser = new XMLSerializer(), enc = new TextEncoder();
+            var out = entries.map(function (en) {
+                var ch = changed.filter(function (c) { return c.name === en.name; })[0];
+                if (!ch) { return en; }
+                var u = enc.encode(ser.serializeToString(ch.xml));
+                return { name: en.name, method: 0, crc: crc32(u), usize: u.length, data: u };
+            });
+            return zipBuild(out).then(function (ab) { return { buf: ab, info: info }; });
+        });
+    }
+
+    var DOCX_IMPORT_MAP = [
+        "p[style-name='CxAtencao'] => p.cxi-attn:fresh",
+        "p[style-name='CxNota'] => p.cxi-note:fresh"
+    ].concat(PALETTE.fg.map(function (c) { return "r[style-name='CxFg_" + c.key + "'] => span.cx-fg-" + c.key; }));
+
+    /* Depois do mammoth: tabelas e imagens, na ordem do arquivo. */
+    function decorate(box, info) {
+        if (!info) { return; }
+        Array.prototype.forEach.call(box.querySelectorAll('p.cxi-attn'), function (p) { p.className = 'cx-callout cx-callout-attention'; });
+        Array.prototype.forEach.call(box.querySelectorAll('p.cxi-note'), function (p) { p.className = 'cx-callout cx-callout-note'; });
+
+        var tables = box.querySelectorAll('table');
+        if (tables.length === info.tables.length) {
+            Array.prototype.forEach.call(tables, function (t, i) {
+                var ti = info.tables[i], rows = t.rows;
+                if (rows.length !== ti.rows.length) { return; }
+                var total = ti.cols.reduce(function (a, b) { return a + b; }, 0);
+                if (total > 0 && ti.cols.length > 1) {
+                    var cg = document.createElement('colgroup');
+                    ti.cols.forEach(function (w) {
+                        var col = document.createElement('col');
+                        col.style.width = (w / total * 100).toFixed(1) + '%';
+                        cg.appendChild(col);
+                    });
+                    t.insertBefore(cg, t.firstChild);
+                }
+                var small = info.bodySz && ti.sz && ti.sz < info.bodySz;
+                Array.prototype.forEach.call(rows, function (tr, r) {
+                    var cells = tr.cells, ci = ti.rows[r];
+                    if (cells.length !== ci.length) { return; }
+                    Array.prototype.forEach.call(cells, function (td, c) {
+                        if (ci[c].fill && !/^(auto|ffffff)$/i.test(ci[c].fill)) {
+                            var hex = tableColorOf(ci[c].fill);
+                            if (hex && hex !== '#ffffff') { td.style.backgroundColor = hex; }
+                        }
+                        if (ci[c].jc === 'center' || ci[c].jc === 'right') { td.style.textAlign = ci[c].jc; }
+                    });
+                });
+                // Letra menor que o corpo no Word -> A− do Codex+.
+                if (small) {
+                    Array.prototype.forEach.call(t.querySelectorAll('td,th'), function (cell) {
+                        var blocks = cell.querySelectorAll('p,li');
+                        var targets = blocks.length ? Array.prototype.slice.call(blocks) : [cell];
+                        targets.forEach(function (el) {
+                            if (!el.firstChild || el.querySelector('table')) { return; }
+                            var sp = document.createElement('span');
+                            sp.className = 'cx-size-sm';
+                            while (el.firstChild) { sp.appendChild(el.firstChild); }
+                            el.appendChild(sp);
+                        });
+                    });
+                }
+            });
+        }
+        var imgs = box.querySelectorAll('img');
+        if (info.images && info.usable && imgs.length === info.images.length) {
+            Array.prototype.forEach.call(imgs, function (img, i) {
+                var f = info.images[i] / info.usable;
+                if (f > 0 && f < 0.96) {
+                    img.style.width = Math.max(5, Math.round(f * 1000) / 10) + '%';
+                    img.style.height = 'auto';
+                }
+            });
+        }
+    }
+
     var DOCX_STYLES = [
         "p[style-name='Title'] => h1:fresh",
         "p[style-name='Subtitle'] => h2:fresh"
@@ -457,19 +764,16 @@
 
     function convert(file) {
         var name = (file.name || '').toLowerCase();
-        if (/\.docx$/.test(name)) {
-            return loadLib('mammoth').then(function (m) {
-                return file.arrayBuffer().then(function (buf) {
-                    return m.convertToHtml({ arrayBuffer: buf }, { styleMap: DOCX_STYLES });
-                });
-            }).then(function (r) { return r.value; });
-        }
-        if (/\.(md|markdown)$/.test(name)) {
-            return loadLib('marked').then(function (mk) {
-                return file.text().then(function (txt) { return mk.parse(txt); });
+        if (/\.doc$/.test(name)) { return Promise.reject(new Error('doc')); }
+        if (!/\.docx$/.test(name)) { return Promise.reject(new Error('tipo')); }
+        return Promise.all([loadLib('mammoth'), file.arrayBuffer()]).then(function (a) {
+            var m = a[0], buf = a[1];
+            // PL-16: se a leitura do Word falhar, importa como antes.
+            return prepareDocx(buf).then(null, function () { return { buf: buf, info: null }; }).then(function (pre) {
+                return m.convertToHtml({ arrayBuffer: pre.buf }, { styleMap: DOCX_STYLES.concat(pre.info ? DOCX_IMPORT_MAP : []) })
+                    .then(function (r) { return { html: r.value, info: pre.info }; });
             });
-        }
-        return Promise.reject(new Error('tipo'));
+        });
     }
 
     function notify(editor, text, type) {
@@ -485,8 +789,8 @@
             notify(editor, 'A importação só vale com o corpo em branco. Para trazer um trecho, copie e cole.', 'error');
             return Promise.resolve(false);
         }
-        return convert(file).then(function (html) {
-            html = normalize(html);
+        return convert(file).then(function (res) {
+            var html = normalize(res.html, res.info);
             if (!html.replace(/<[^>]*>/g, '').trim() && !/<img/i.test(html)) {
                 notify(editor, 'O arquivo não tem conteúdo para importar.', 'error');
                 return false;
@@ -501,9 +805,11 @@
             notify(editor, 'Arquivo importado. As imagens são gravadas ao Salvar.', 'success');
             return true;
         }, function (err) {
-            notify(editor, err && err.message === 'tipo'
-                ? 'Formato não aceito. Use .docx (Word) ou .md (Markdown).'
-                : 'Não foi possível ler o arquivo. Se for .doc antigo, salve como .docx no Word.', 'error');
+            var msg = err && err.message;
+            notify(editor, msg === 'doc'
+                ? 'Arquivo .doc (Word antigo): abra no Word, use Salvar como > Documento do Word (.docx) e importe de novo.'
+                : (msg === 'tipo' ? 'Formato não aceito. Importe um documento do Word (.docx).'
+                    : 'Não foi possível ler o arquivo do Word. Abra no Word, salve de novo como .docx e tente outra vez.'), 'error');
             return false;
         });
     }
@@ -511,7 +817,7 @@
     function pickFile(editor) {
         var input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.docx,.md,.markdown';
+        input.accept = '.docx,.doc';
         input.style.display = 'none';
         input.addEventListener('change', function () {
             var f = input.files && input.files[0];
@@ -922,7 +1228,7 @@
 
         ui.addButton('cximport', {
             text: 'Importar',
-            tooltip: 'Importar .docx ou .md (só com o corpo em branco)',
+            tooltip: 'Importar documento do Word .docx (só com o corpo em branco)',
             onAction: function () { pickFile(editor); },
             onSetup: function (api) {
                 var upd = function () { api.setEnabled(isBlank(editor)); };
@@ -1424,6 +1730,9 @@
     }
 
     window.CodexplusEditor = {
+        _importDocx: function (buf) { return prepareDocx(buf); },   // PL-16 (testes)
+        _importDecorate: decorate,
+        _importMap: function () { return DOCX_STYLES.concat(DOCX_IMPORT_MAP); },
         prepare: prepare,
         contentCss: contentCss,
         sizeCss: sizeCss,

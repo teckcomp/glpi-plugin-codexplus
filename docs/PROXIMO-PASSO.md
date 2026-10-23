@@ -1,147 +1,70 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em **20/10/2026 (noite)**, no fim da sessão: **2ª rodada (PL-4 a
-> PL-10) + reskin "identidade petróleo" (UI-1 a UI-6) validados e commitados
-> na homologação** (CONTEXTO 3.34 a 3.43, achados 175 a 185). A produção
-> segue na `v0.8.3`.
+> Gerado em **23/10/2026**, no fim da **3ª rodada de ajustes** (PL-11 a
+> PL-22, validados e commitados na homologação). Próximo: **subida única
+> `v0.8.5`** para a produção.
 
 ## Estado
 
-- **Homologação: `7466510`** (master), sem tag. Tudo validado por Claudio.
-- **Produção: `v0.8.3`** (`a71a149`, 08/10/2026).
-- Versão no `setup.php`: **0.8.3** — nenhum bloco da rodada mexeu no banco
-  nem na versão (todos sem reinstalar).
-- **Banco da homologação: `glpidb`** (achado 159) — consulta direta com
-  `mysql "$DBN"`, nome tirado do `config/config_db.php`.
-- Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → **`su -`**
-  (achado 93); GLPI em `http://177.87.230.179:2077`. GLPI 11.0.6, PHP 8.4,
-  MariaDB 11.8. Repositório = `/var/www/html/glpi/plugins/codexplus`, como root.
-- **Produção: Debian 13, SSH porta 2022**, chave do PC "Analista Resolutto"
-  — **com aspas** (achado 174):
+- **Homologação:** master com a 3ª rodada; versão **0.8.5** no `setup.php`
+  (sem mudança de banco — a reinstalação só registra a versão).
+- **Produção:** `v0.8.4` (`5f362a8`, 20/10/2026).
+- Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → `su -`;
+  GLPI em `http://177.87.230.179:2077`. Repositório =
+  `/var/www/html/glpi/plugins/codexplus`, como root. Banco `glpidb`.
+- **Produção:** SSH porta 2022, chave com aspas:
   `ssh -i "%USERPROFILE%\.ssh\id_ed25519" -p 2022 resolutto@177.87.230.179`
-  + `su -`. Repositório em tag (`git describe --tags`); atualizar por
-  `git fetch --tags && git checkout <tag>` + reinstalação + `cache:clear` +
-  restart. Backup antes, em `/root/backup`, conferido pelo nome e pelo
-  `-- Dump completed`.
-- Envio do PC (cmd do Windows) — **sempre as duas linhas**, uma por PC
-  (achado 98):
-  ```
-  :: PC "Analista Resolutto"
-  scp -P 2078 "%USERPROFILE%\Documents\<pacote>.tar.gz" resolutto@177.87.230.179:/tmp
-  :: PC "Pc"
-  scp -P 2078 "%USERPROFILE%\Downloads\<pacote>.tar.gz" resolutto@177.87.230.179:/tmp
-  ```
-- Aplicar: `git status --short` **vazio**, `md5sum`, `tar xzf
-  /tmp/<pacote>.tar.gz -C /var/www/html/glpi/plugins`, `chown -R
-  www-data:www-data …/codexplus`, `grep -c` do token novo (achado 114).
-  Só JS/CSS: Ctrl+F5. PHP/Twig: `cache:clear` + `systemctl restart
-  apache2`. **Console sempre por** `su -s /bin/sh www-data -c "php
-  /var/www/html/glpi/bin/console …"` — `runuser` não está no PATH
-  (achado 149). Versão nova no `setup.php`: `plugin:install --force
-  --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list |
-  grep -i codexplus`. **Bloco de commit sempre começa com `cd` para a pasta
-  do plugin** (achado 127).
-- **Fonte da verdade: `docs/CONTEXTO.md`** (seções 3.34 a 3.43, achados
-  até 185) e `docs/ROADMAP.md`, seções **"Ajustes do uso em produção — 2ª
-  rodada"**, **"Identidade petróleo — reskin"** e **"Pós-produção"**.
-- **Mockup aprovado do reskin** (canvas, privado de Claudio; guardar em
-  `docs/` é o item 37): https://claude.ai/artifact/913HUCLPhLZtmhXozDktdK
+  + `su -`. Atualiza por tag. Backup antes, em `/root/backup`.
+- Envio do PC: nos dois PCs o navegador salva em **Downloads**:
+  `scp -P 2078 "%USERPROFILE%\Downloads\<pacote>.tar.gz" resolutto@177.87.230.179:/tmp`
+  (no cmd do Windows; o resto, no servidor).
+- Console: `su -s /bin/sh www-data -c "php /var/www/html/glpi/bin/console …"`.
+- Commits por arquivo (`git add <arquivos>`), para não levar junto pacote
+  ainda em teste.
 
-## O que entrou na rodada (homologação, falta subir)
+## O que entrou na 3ª rodada (homologação)
 
 | Bloco | O que é | Commit |
 |---|---|---|
-| PL-4 | Barra do editor presa ao rolar; link público no diagrama (fotos pelo link) | `1f8ca8d` |
-| PL-5 | Responsável com Auditor no perfil faz todos os papéis e publica direto | `26d2d3c` |
-| PL-6 | Realce nas 5 cores fortes (texto branco); cor Branco; link público com cor | `f81470b` |
-| PL-7 | Editor sempre em folhas, a folha vira onde o PDF vira | `1410eaf` |
-| PL-9 | Biblioteca: Setor, Categoria, Tipo e busca na linha das abas | `97e0fbb` |
-| PL-8a | Tabela como no Word: cor/fundo/bordas por célula, botão direito, colar do Word | `2734581` |
-| PL-8b | Estilos de tabela 1 a 5 com personalização (cor livre, claro/escuro, bordas, listras) | `8856734` |
-| PL-10 | Correção do pulo para o início e do traço vertical (cursor falso) | `c873357` |
-| UI-1 + UI-2 | Casca petróleo (abas, sol/lua, tema por cookie, escuro na tela inteira, estante no escuro) e Painel igual ao mockup | `c08252e` |
-| UI-3 | Estante em grafite no claro; folha 1 do editor sem o título cinza | `1b00ce4` |
-| UI-4 | Logo da marca sobre cartão branco no escuro | `532edec` |
-| UI-6 | Tema escuro como padrão (UI-5 cancelado: página do documento sempre clara) | `7466510` |
+| PL-11 | Mapa de calor: semente fixa por AP (manchas e % não mudam ao aumentar/mover pouco); tamanho do ícone pelo centro | `215f027` |
+| PL-18a | Planta do quadro só sai por escolha (download falhou → pergunta; antes apagava em silêncio) | `dc70f8d` |
+| PL-19 | Zoom nas imagens na leitura (clique, roda, arrastar, Esc) | `2d1ae3b` |
+| PL-15a | PDF parte parágrafo/lista/tabela (substituído pelo PL-15d) | `f72184d` |
+| PL-20 | Botão de voltar com presença | `04bea08` |
+| PL-16 | Importar Word no padrão do Codex+ (caixas, cores, fundo/largura de célula, A− nas tabelas, tamanho das imagens); sem `.md`; `.doc` pede salvar como `.docx` | `05e6458` |
+| PL-22 | Folha de espera no lugar da leitura simples enquanto as folhas montam | `77076ed` |
+| PL-21 | Voltar do documento leva à Biblioteca | `c9816bc` |
+| PL-15b-1 | Folhas no editor: clicar no espaço do fim da folha cria linha comum; ↓ saindo de tabela/caixa; Backspace no topo da folha não junta; Enter em caixa vazia sai | `8ebac0f` |
+| PL-15d | **Mesma paginação** no editor, Visualizar e PDF (vira entre blocos; só bloco maior que a folha é partido, e o editor acompanha a numeração) | `a149535` |
 
-## Próximo passo imediato: subida única `v0.8.4`
+Fora do repositório: `/root/cx-board-check.php` (PL-18b, diagnóstico só
+leitura de quadros sem planta, imagens órfãs e conteúdo vazio). Na
+homologação: 51 documentos, nenhum problema.
 
-1. **Homologação** (pacote pequeno da próxima sessão): versão **0.8.4** no
-   `setup.php` → `plugin:install --force --username=glpi codexplus` +
-   `plugin:activate codexplus` + `plugin:list | grep -i codexplus` →
-   conferência rápida → commit → **tag `v0.8.4`** + `git push --tags`.
-   (Sem mudança de banco; a reinstalação só registra a versão.)
-2. **Produção** (SSH porta 2022, `su -`): backup em `/root/backup` (banco +
-   pasta do plugin, conferido pelo nome e pelo `-- Dump completed`) →
-   `git fetch --tags && git checkout v0.8.4` → reinstalação (mesmos 3
-   comandos) → `cache:clear` + `systemctl restart apache2` → Ctrl+F5.
-3. **Conferência em produção** (um item por bloco):
-   - documento longo: folhas no editor, clicar em vários pontos (nada pula,
-     sem traço no meio de planilha/planta), setas atravessando a faixa;
-   - realce forte e cor Branco; link público de um texto com cor;
-   - tabela: botão direito, Propriedades da célula (cor e borda tracejada),
-     colar uma tabela do Word, Estilo 1 a 5 + Personalizar; PDF e Word;
-   - link público de um diagrama (fluxograma e organograma com foto);
-   - Biblioteca: Setor → Categoria → Tipo; busca com Enter;
-   - responsável com Auditor: Publicar direto num POP.
-   - **reskin**: Painel abre escuro numa janela anônima; sol → claro e
-     fica; Biblioteca com filtros na barra e estante legível nos dois temas;
-     Modelos e Configuração (logos legíveis); documento em edição sempre
-     claro, folha 1 sem o título cinza, folha 2 virando no mesmo bloco do
-     Visualizar.
+Decisões de Claudio nesta rodada: metragem em planta sem cota — não fazer;
+Word importado converte para o padrão Codex+; "o que vejo na tela é o que
+sai na impressora" (PL-15d) — marcação tracejada (PL-15c) rejeitada; leitura
+simples não fica como opção (só folhas, com a folha de espera).
 
-## Depois da subida
+## Subida `v0.8.5`
 
-- **P-3a** — cadastros da homologação: começar por um **script de leitura**
-  nos dois servidores (usuários, grupos e o que existe de cada lado;
-  correspondência por login e nome de grupo).
-- **P-3b** — documentos escolhidos (lista com Claudio).
-- **P-4** — ponta a ponta na produção e ação automática de vencimento.
-- **Pós-produção** (ROADMAP), começando pelo que o usuário vê todo dia:
-  (1) marca d'água RASCUNHO fora da versão vigente; (2) Word sem histórico
-  e sem complementares; (3) PDF em cascata (RACI/cronograma como nota,
-  organograma vinculado sem fotos); (4) leitura comum em folhas?; (12)
-  tabela/planilha maior que uma folha repetindo o cabeçalho. Novos desta
-  rodada: (40) Importar `.docx` com cores de tabela; (41) guias tracejadas
-  na tabela sem bordas (só se incomodar); (37) guardar os mockups PL-8,
-  PL-9 e do reskin em `docs/`. Do reskin: (42) decoração em traço no
-  escuro; (43) tema por usuário no servidor; (44) `migrate.html.twig` com o
-  cabeçalho antigo.
+1. **Homologação:** pacote com `setup.php` 0.8.5 → `plugin:install --force
+   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list`
+   → commit → tag `v0.8.5` + `git push --tags`.
+2. **Produção:** rodar o `cx-board-check.php` (antes de tudo, para ver se
+   já houve perda de planta) → backup (banco + pasta) → `git fetch --tags &&
+   git checkout v0.8.5` → reinstalação (os mesmos 3 comandos) →
+   `cache:clear` + `systemctl restart apache2` → Ctrl+F5.
+3. **Conferência em produção:** mapa de calor (aumentar AP não muda nada);
+   abrir quadro com planta; zoom na leitura; importar um Word; folhas do
+   editor = Visualizar = PDF; clicar no espaço do fim da folha; botão
+   Biblioteca; folha de espera.
 
-## Regras de trabalho (Claudio)
+## Fila depois da subida
 
-- **Feedback da produção tem prioridade sobre a Pós-produção.**
-- Tudo na **homologação primeiro**, um pacote por bloco, validado antes, com
-  roteiro de teste e **commit antes do pacote seguinte**; quando o conjunto
-  fecha, **uma subida só** para a produção pela tag.
-- Clonar do GitHub no último commit antes de mexer (achado 71). **Cuidado
-  com `git stash` + `git checkout -- .` no clone**: o pacote ainda não
-  commitado por Claudio some do clone — guardar a cópia do pacote antes.
-- **Validação no container** (achado 136): GLPI 11.0.6 real + MariaDB,
-  harness PHP com o Kernel, tela pelo `php -S` + Chromium (Playwright).
-  Toda regra prometida no texto da entrega entra no harness (achado 139).
-- Pedido ambíguo de tela: **confirmar com print ou mockup antes de
-  codificar** (lição do PL-7: "quebra de página" era ver as folhas, não
-  Ctrl+Enter). Mockup só quando a tela muda de verdade.
-- Modelo é dado da instalação, nunca semente do Install (achado 137).
-- **Reskin (20/10):** a logo (monograma C+) não muda; a estante mantém o
-  layout e as 3 fileiras; a página do documento fica sempre clara; o botão
-  de tema é sempre o último da barra; padrão escuro.
-
-## Lembretes do container
-
-Achados 153, 154, 157, 158, 164, 168, 175, 177, 179: `mysqld` por `setsid
-nohup` no mesmo comando; `php -S` com `< /dev/null` (e `setsid nohup … &`
-dentro de parênteses, senão o comando trava até o limite); parar servidor
-pelo PID salvo, **nunca** `pkill -f` com o padrão na linha; login por script
-numa sessão Python só, com `Referer` nos POST; jsdom não tem canvas.
-Playwright: `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`; aba nova na mesma
-sessão = `context.new_page()`; TinyMCE 7 = `tinymce.get()`; token de teste
-gerado em Python (o shell é `sh`, sem `{1..48}`). Teste de "pulo" na tela:
-medir a posição NA TELA do bloco clicado antes e depois. Container novo pode
-precisar de `apt-get install php8.3-cli php8.3-mysql php8.3-mbstring
-php8.3-xml php8.3-curl php8.3-gd php8.3-intl php8.3-zip php8.3-bcmath
-php8.3-bz2 mariadb-server` (tirar o repositório do Node do
-`sources.list.d`, dá 403) e do GLPI 11.0.6 baixado do GitHub
-(`db:install … --allow-superuser`).
+- PL-12a — Escala com traçado e caixa própria (no lugar do `prompt`).
+- PL-12b — Trazer a planta de outro Mapa de calor.
+- PL-13 — Botão "Abrir…" no quadro selecionado (além do duplo clique).
+- PL-14 — Salvar/Validar sem voltar ao topo.
+- Depois: P-3a/P-3b/P-4 e a Pós-produção (ROADMAP).

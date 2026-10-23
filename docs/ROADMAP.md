@@ -815,6 +815,29 @@ seguinte. Nada no banco nem no instalador.
 
 Homologação em `7466510`. Sobe junto com a 2ª rodada na `v0.8.4`.
 
+## Ajustes do uso em produção — 3ª rodada (22 e 23/10/2026) ✅ `v0.8.5`
+
+Feedback de Claudio no uso real (prints do mapa de calor, da planta, de dois
+manuais importados do Word e das folhas A4). Homologação primeiro, um pacote
+por bloco com commit; subida única pela tag `v0.8.5` (`ac2c447`).
+
+| Bloco | Entrega | Commit |
+|---|---|---|
+| PL-11 | Mapa de calor: semente fixa por AP — aumentar o ícone não muda nada; mover pouco muda pouco (antes 89% → 67% com 4 px); tamanho do ícone pelo centro | `215f027` |
+| PL-18a | Planta do quadro só sai por escolha: se o download falha, pergunta (antes o Salvar quadro a apagava em silêncio) | `dc70f8d` |
+| PL-18b | Script só leitura `/root/cx-board-check.php` (fora do repositório): quadro sem planta, quadro que sumiu (v2), imagem órfã ou sem vínculo, conteúdo vazio | — |
+| PL-19 | Zoom nas imagens na leitura | `2d1ae3b` |
+| PL-15a | PDF partindo parágrafo, lista e tabela — substituído pelo PL-15d | `f72184d` |
+| PL-20 / PL-21 | Botão de voltar com presença; leva à Biblioteca | `04bea08`, `c9816bc` |
+| PL-16 | Importar Word no padrão do Codex+ (caixas Atenção/Nota, cores da paleta, fundo e largura das células, A− nas tabelas, tamanho das imagens); sem `.md`; `.doc` pede salvar como `.docx` | `05e6458` |
+| PL-22 | Folha de espera no lugar da leitura simples enquanto as folhas montam | `77076ed` |
+| PL-15b-1 | Editor em folhas: clicar no espaço do fim da folha cria linha comum; ↓ saindo de tabela/caixa; Backspace no topo não junta; Enter em caixa vazia sai | `8ebac0f` |
+| PL-15d | **Mesma paginação** no editor, Visualizar e PDF ("o que vejo na tela é o que sai na impressora"); só bloco maior que a folha é partido, e o editor acompanha a numeração | `a149535` |
+
+Decisões: metragem em planta sem cota — não fazer; marcação tracejada no
+editor (PL-15c) — rejeitada; leitura simples não vira opção; Word importado
+converte para o padrão Codex+. Fila seguinte em docs/PROXIMO-PASSO.md.
+
 ## Pós-produção (Claudio, 04/10/2026)
 
 Tudo o que não entrou na Reta final. Atualizações já em produção, por
@@ -832,8 +855,8 @@ depois. Números da lista revisada de 04/10 entre parênteses.
   deitada em outros navegadores. Segue só interno (não no link público).
   **Desde o PL-3b:** o organograma vinculado sai sem as fotos (só os
   círculos) — embutir as do documento vinculado
-- (4) Leitura comum (sem Visualizar) ainda no formato antigo: decidir se
-  vira folhas também
+- ~~(4) Leitura comum (sem Visualizar) ainda no formato antigo~~ — decidido
+  na 3ª rodada: só folhas, com a folha de espera (PL-22)
 
 **Roadmap:**
 
@@ -859,8 +882,8 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 
 **PDF e marcas:**
 
-- (12) Partir planilha/tabela maior que uma folha, repetindo o cabeçalho
-  (hoje transborda — limite do 3c-0)
+- ~~(12) Partir planilha/tabela maior que uma folha, repetindo o cabeçalho~~
+  — feito no PL-15a/15d (só o bloco maior que a folha é partido)
 - (13) Lista do campo Marca com a logo dentro de cada opção (hoje ao lado)
 
 **Quadro (Planta e Topologia):**
@@ -897,8 +920,7 @@ depois. Números da lista revisada de 04/10 entre parênteses.
 - (37) Guardar os **mockups aprovados** em `docs/` (achado 116; hoje só os
   de 4c a 4f, em `docs/etapas`). Entram os da 2ª rodada: PL-9 Biblioteca e
   PL-8 Estilos de tabela (links na CONTEXTO 3.42)
-- (40) Importar `.docx` com as **cores da tabela** (o mammoth não lê
-  formatação de célula; hoje o caminho é copiar e colar do Word, PL-8a)
+- ~~(40) Importar `.docx` com as cores da tabela~~ — feito no PL-16
 - (41) Editor: guias tracejadas do TinyMCE na tabela "sem bordas" — só se
   incomodar (não saem no PDF nem no Word)
 - (42) Decoração dos nichos vazios **em traço** no escuro (hoje é a mesma

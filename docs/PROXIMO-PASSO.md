@@ -1,15 +1,15 @@
 # Codex+ — próximo passo
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
-> Gerado em **23/10/2026**, no fim da **3ª rodada de ajustes** (PL-11 a
-> PL-22, validados e commitados na homologação). Próximo: **subida única
-> `v0.8.5`** para a produção.
+> Gerado em **23/10/2026**, no fechamento da **3ª rodada de ajustes**
+> (PL-11 a PL-22). Homologação em `v0.8.5`; subida para a produção feita
+> nesta mesma sessão (roteiro abaixo). Fila pronta para a próxima sessão.
 
 ## Estado
 
-- **Homologação:** master com a 3ª rodada; versão **0.8.5** no `setup.php`
-  (sem mudança de banco — a reinstalação só registra a versão).
-- **Produção:** `v0.8.4` (`5f362a8`, 20/10/2026).
+- **Homologação:** tag **`v0.8.5`** (`ac2c447`); só documentação depois dela.
+- **Produção:** `v0.8.4` → **`v0.8.5`** nesta sessão (conferir com
+  `git describe --tags` na produção).
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → `su -`;
   GLPI em `http://177.87.230.179:2077`. Repositório =
   `/var/www/html/glpi/plugins/codexplus`, como root. Banco `glpidb`.
@@ -49,22 +49,57 @@ simples não fica como opção (só folhas, com a folha de espera).
 
 ## Subida `v0.8.5`
 
-1. **Homologação:** pacote com `setup.php` 0.8.5 → `plugin:install --force
-   --username=glpi codexplus` + `plugin:activate codexplus` + `plugin:list`
-   → commit → tag `v0.8.5` + `git push --tags`.
-2. **Produção:** rodar o `cx-board-check.php` (antes de tudo, para ver se
-   já houve perda de planta) → backup (banco + pasta) → `git fetch --tags &&
-   git checkout v0.8.5` → reinstalação (os mesmos 3 comandos) →
-   `cache:clear` + `systemctl restart apache2` → Ctrl+F5.
-3. **Conferência em produção:** mapa de calor (aumentar AP não muda nada);
-   abrir quadro com planta; zoom na leitura; importar um Word; folhas do
-   editor = Visualizar = PDF; clicar no espaço do fim da folha; botão
-   Biblioteca; folha de espera.
+- Homologação: **tag `v0.8.5` em `ac2c447`** (setup 0.8.5, Habilitado).
+  Sobra do PL-15c no `codexplus-editor.js` desfeita antes da tag.
+- **Produção:** roteiro (SSH porta 2022, `su -`):
+  1. `php /root/cx-board-check.php` (**v2**, md5 `3d3afd8dec2cfd94ae38adb6aa8a7b38`) antes
+     de mexer: retrato de planta sumida, **quadro inteiro sumido** e imagens
+     órfãs;
+  2. backup em `/root/backup` (`mysqldump --single-transaction` + tar da
+     pasta; conferir `-- Dump completed`);
+  3. `git fetch --tags && git checkout v0.8.5` → `plugin:install --force
+     --username=glpi codexplus` + `plugin:activate` + `plugin:list` →
+     `cache:clear` + `systemctl restart apache2` → Ctrl+F5;
+  4. conferência: mapa de calor (aumentar AP não muda nada), quadro com
+     planta (abrir, mexer, salvar), zoom, importar Word, folhas do editor =
+     Visualizar = PDF, espaço do fim da folha, botão Biblioteca, folha de
+     espera.
+- Avisar a equipe: na pergunta "Não foi possível carregar a imagem da
+  planta", responder **Cancelar** e recarregar; PDFs exportados de novo
+  podem ter outra paginação (igual à tela); Importar só aceita `.docx`.
 
-## Fila depois da subida
+## Fila pronta (próxima sessão), em ordem
 
-- PL-12a — Escala com traçado e caixa própria (no lugar do `prompt`).
-- PL-12b — Trazer a planta de outro Mapa de calor.
-- PL-13 — Botão "Abrir…" no quadro selecionado (além do duplo clique).
-- PL-14 — Salvar/Validar sem voltar ao topo.
-- Depois: P-3a/P-3b/P-4 e a Pós-produção (ROADMAP).
+1. **PL-18c — quadro inteiro que some** (Claudio, 23/10/2026: "perdi o
+   documento todo" = a topologia ou a planta inteira, não o documento).
+   Perda de dado: primeiro da fila. Começar pela saída do
+   `cx-board-check.php` v2 da produção (linhas "QUADRO SUMIU"; atenção: um
+   quadro apagado de propósito também aparece). Hipóteses a testar no
+   TinyMCE real: Delete/Backspace ao lado do quadro (bloco travado), colar
+   por cima, undo depois de salvar quadro, e o GLPI limpando o
+   `data-cx-board` ao gravar. Quando acontecer: **não salvar**, mandar o
+   código do documento e `tail -n 100 /var/www/html/glpi/files/_log/php-errors.log`.
+2. **PL-14** — Salvar/Validar sem voltar ao topo (restaurar a rolagem após
+   o envio; só JS).
+3. **PL-13** — Botão "Abrir planta/mapa/topologia" na barra flutuante do
+   quadro selecionado (além do duplo clique).
+4. **PL-12a** — Escala com traçado (linha seguindo o mouse, marcas A/B) e
+   caixa própria no lugar do `prompt`.
+5. **PL-12b** — "Trazer do Mapa de calor N" no Como começar (copia fundo,
+   escala, paredes, Áreas e APs com rádio e semente).
+6. **P-3a / P-3b / P-4** — cadastros, documentos escolhidos, ponta a ponta
+   na produção.
+7. **Pós-produção** (ROADMAP): (1) marca d'água RASCUNHO; (2) Word sem
+   histórico e complementares; (3) PDF em cascata; depois os demais.
+
+Fora da fila (decidido): metragem em planta sem cota; marcação tracejada
+no editor; leitura simples como opção; editor partindo bloco no meio
+(PL-15b-2).
+
+## Ferramentas de teste usadas nesta rodada (no contêiner do assistente)
+
+- Chromium (Playwright) com o `codexplus.js` real para comparar folhas do
+  editor (`planBreaks`) com o Visualizar, folha a folha.
+- **TinyMCE 7.9 via npm** com o `codexplus-editor.js` real e as folhas
+  desenhadas — testes de cursor, clique no espaço, setas, Backspace, Enter.
+- PHP 8.3 + MariaDB com banco montado para o `cx-board-check.php`.

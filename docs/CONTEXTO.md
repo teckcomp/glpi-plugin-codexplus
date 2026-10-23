@@ -2,6 +2,14 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.5` em produção** desde **23/10/2026** (seção 3.44) — **3ª
+> rodada de ajustes do uso real (PL-11 a PL-22)**: mapa de calor estável
+> (semente fixa por AP), planta que não some em silêncio, zoom na leitura,
+> importar Word no padrão do Codex+, botão Biblioteca, folha de espera,
+> espaço do fim da folha editável e **mesma paginação A4 no editor,
+> Visualizar e PDF**. Sem banco. Achados 186 a 197. Próximo: **PL-18c**
+> (quadro inteiro que some) e a fila de docs/PROXIMO-PASSO.md.
+> Antes:
 > Estado: **homologação em `7466510`** (20/10/2026, noite) — **reskin
 > "identidade petróleo" fechado** (UI-1 a UI-6, seção 3.43): casca única com
 > abas e botão sol/lua, tema claro/escuro por cookie (padrão escuro),
@@ -3405,6 +3413,96 @@ Achados da rodada (continuação da seção 5):
     px), pegou largura de barra, especificidade de link e cor de lombada
     antes do teste de Claudio. PHP 8.3 instala no container (`php -l` e
     `IntlDateFormatter` testados).
+
+### 3.44 3ª rodada de ajustes do uso real — PL-11 a PL-22 (`v0.8.5`, 22 e 23/10/2026)
+
+Feedback de Claudio com prints (mapa de calor, planta, folhas A4) e dois
+manuais reais do Word (Automatização T.I e Painel IXC). Um pacote por bloco,
+validado e commitado na homologação; subida única pela tag `v0.8.5`
+(`ac2c447`), produção atualizada e conferida em 23/10/2026 (backup em
+`/root/backup/glpi-2026-10-23-0940-antes-v085.sql` e
+`codexplus-2026-10-23-0940-antes-v085.tar.gz`). Docs em `3a2b863`.
+
+| Bloco | O que mudou | Commit |
+|---|---|---|
+| PL-11 | `rf.seed` gravado em cada AP (`cleanRf`, `rfFromModel`, `heatInputs`); `codexplus-rf.js` usa `a.seed` (AP sem semente: fórmula antiga pela posição — desenho salvo idêntico ao abrir); `iconResize()` muda o tamanho pelo centro (alça, barra e Ícone ±); Ctrl+D apaga a semente da cópia | `215f027` |
+| PL-18a | `open()`: download da planta falhou → `confirm` (Cancelar = não abre, aviso); `build(..., {bgDrop})`; `apply()` só remove o fundo com `bg === null` (Tirar planta ou OK); senão `{keep:true}` | `dc70f8d` |
+| PL-18b | `/root/cx-board-check.php` (fora do repositório, só SELECT): quadro sem planta, **quadro que sumiu** comparado à última revisão publicada (v2), imagem inexistente/na lixeira/fora do disco/sem vínculo/de outro documento, conteúdo vazio | — |
+| PL-19 | `bindZoom()` nas folhas (iframe) e na leitura simples; `zoomOpen()` no documento de cima, CSS embutido | `2d1ae3b` |
+| PL-15a | `planPages(…, {split})`: `splitText` (por linhas, 2 de cada lado), `splitList` (OL com `start`), `splitTable` (cabeçalho repetido com `data-cx-rep`, colgroup em %); `.cx-cont` nos pedaços | `f72184d` |
+| PL-20/21 | `.codexplus-back` vira botão; leva à Biblioteca (`library.php`) | `04bea08`, `c9816bc` |
+| PL-16 | Importar: lê o `.docx` (ZIP próprio com `DecompressionStream`, regrava sem comprimir os XML alterados), marca estilos `CxAtencao`/`CxNota`/`CxFg_<cor>` antes do mammoth e decora tabelas e imagens pela ordem do arquivo; sem `.md` | `05e6458` |
+| PL-22 | `body:has(.cx-sheets[data-cx-sheets]:not(.is-ready))` esconde a leitura simples; folha de espera; desiste em 20 s (`.cx-sheets-gaveup`) | `77076ed` |
+| PL-15b-1 | Folhas do editor: clique no espaço abaixo de tabela/caixa/quadro cria `<p>` comum (`lineAfter`); ↓ idem; Backspace no topo da folha não junta; Enter em caixa vazia sai da caixa | `8ebac0f` |
+| PL-15d | `split: 'oversize'` no PDF, no Visualizar e no `planBreaks` do editor: vira sempre entre blocos; só bloco maior que a folha é partido; folha que começa no meio do bloco grande vira `starts[p] = null` (sem faixa no editor) | `a149535` |
+
+Decisões de Claudio: metragem em planta sem cota — não fazer; marcação
+tracejada "No PDF, a folha N começa aqui" (PL-15c) — rejeitada, nunca
+commitada; editor partindo bloco no meio (PL-15b-2) — não fazer; leitura
+simples não vira opção; Word importado converte cores e trechos para o
+padrão Codex+ (Consolas vira texto comum, cor pela paleta); "o que vejo na
+tela é o que sai na impressora" (PDF em A4, retrato, tamanho real).
+
+Achados desta rodada:
+
+186. **Semente do ruído pela posição do AP** (`round(x/7)`) fazia o "Aspecto
+     natural" redesenhar o mapa inteiro com 4 px de movimento ou ao aumentar
+     o ícone (o centro andava): Área E01 ia de 89% a 67% (Bom → Atenção).
+     Com semente fixa: 89 → 89 → 90. Para AP antigo, a semente nasce da
+     posição de agora — mapa salvo abre igual.
+187. **`prepare()` do motor RF normaliza o AP e descartava campos extras**
+     (`seed` sumia antes do `seedOf`). Campo novo no AP tem de ser copiado
+     ali.
+188. **Planta = imagem separada do desenho**: o quadro guarda o fundo como
+     arquivo do GLPI e o PNG por cima; a leitura mostra só o último `img`
+     (a composição). O `catch` do download zerava o fundo e o Salvar quadro
+     apagava a planta e gerava o PNG sem ela — a "planta que some". Na
+     produção, 5 documentos sem planta antes da v0.8.5 (DTC0006, DTC0007,
+     DTC0008, LAU0001, DIV0003); planta precisa ser reenviada.
+189. **Teste de falha de download no Chrome**: DevTools → Network → botão
+     direito → "Block request URL", regra `*document.send.php*` (painel
+     "Request conditions"); lembrar de desligar — o quadro aparece escuro
+     com o bloqueio ligado.
+190. **mammoth descarta**: cor e fundo de célula, largura de coluna, cor de
+     texto, borda/fundo de parágrafo e tamanho de imagem. Solução sem
+     biblioteca nova: ler o `document.xml`, injetar estilos marcadores
+     (com nome no `styles.xml`, para o `styleMap` por `style-name`) e
+     decorar tabelas/imagens pela ordem (contagem diferente → pula a parte).
+191. **Diferença de folhas Word × Codex+ (12 × 17)** vem da tipografia da
+     casa (11,5 pt / 1,55 contra 10,5 pt / 1,15 do Word), não da
+     importação.
+192. **Partir parágrafo**: medir pela 1ª palavra cujo meio passa da linha de
+     corte (busca binária em `Range` de 1 caractere) e descontar a margem
+     de baixo do bloco — sem isso o pedaço não cabia e descia a folha.
+193. **Tabela partida perde a largura das colunas** (layout automático por
+     tabela): medir a linha sem mesclagem e gravar `colgroup` em % com
+     `table-layout: fixed` nos dois pedaços.
+194. **Editor e PDF só batem com a mesma conta**: o `planBreaks` precisa
+     usar o mesmo `split` do PDF; folha que começa dentro de bloco grande
+     não tem como ser desenhada no editor (fica `null`, sem faixa), mas a
+     numeração seguinte continua igual.
+195. **`body:has()` no CSS** resolve "esconder antes do script rodar" (a
+     leitura simples piscava 3–4 s com Ctrl+F5).
+196. **Pacote acumulado esquecido no servidor**: o PL-15c trazia dois
+     arquivos; o PL-15d substituiu só um e o `codexplus-editor.js` do 15c
+     ficou modificado — pego pelo `git status` antes da tag. Regra: commit
+     por arquivo (`git add <arquivos>`) e `git status` vazio antes de tag.
+197. **Download repetido no Windows vira `nome (1).ext`**: o `scp` mandou a
+     versão antiga do script (conferido pelo md5). Conferir sempre o md5 no
+     servidor; renomear o download novo.
+
+Ferramentas de teste no contêiner do assistente (repetir quando precisar):
+Chromium/Playwright com `codexplus.js` real (folhas do editor × Visualizar,
+folha a folha); **TinyMCE 7.9 via npm** com `codexplus-editor.js` real e as
+folhas desenhadas (cursor, cliques, setas, Backspace, Enter); jsdom para
+quadro/zoom; PHP 8.3 + MariaDB com banco montado para o diagnóstico.
+
+Contrato novo (não quebrar): `rf.seed` no JSON do AP; `.cx-cont` e
+`data-cx-rep` nas folhas (só na montagem, nunca gravados);
+`planPages(idoc, stage, geo, {split: true|'oversize'})`; `planBreaks()`
+devolve `starts` com `null` para folha dentro de bloco grande;
+`CodexplusEditor._importDocx/_importDecorate/_importMap` (testes);
+`CodexplusBoard._iconResize/_apSeed`.
 
 ## 4. Decisões de arquitetura que já custaram caro
 

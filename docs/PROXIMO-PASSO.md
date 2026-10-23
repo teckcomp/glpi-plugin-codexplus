@@ -2,14 +2,16 @@
 
 > Documento de passagem. Substituído a cada fechamento de sessão.
 > Gerado em **23/10/2026**, no fechamento da **3ª rodada de ajustes**
-> (PL-11 a PL-22). Homologação em `v0.8.5`; subida para a produção feita
-> nesta mesma sessão (roteiro abaixo). Fila pronta para a próxima sessão.
+> (PL-11 a PL-22). **Produção na `v0.8.5` desde 23/10/2026, conferida por
+> Claudio.** Fila pronta para a próxima sessão. Detalhes técnicos na
+> CONTEXTO 3.44 (achados 186 a 197).
 
 ## Estado
 
 - **Homologação:** tag **`v0.8.5`** (`ac2c447`); só documentação depois dela.
-- **Produção:** `v0.8.4` → **`v0.8.5`** nesta sessão (conferir com
-  `git describe --tags` na produção).
+- **Produção:** **`v0.8.5`** (`ac2c447`) desde 23/10/2026, conferida.
+  Backup antes: `/root/backup/glpi-2026-10-23-0940-antes-v085.sql` (621 MB,
+  sem gzip) e `codexplus-2026-10-23-0940-antes-v085.tar.gz`.
 - Homologação: `177.87.230.179`, SSH porta 2078, `resolutto` → `su -`;
   GLPI em `http://177.87.230.179:2077`. Repositório =
   `/var/www/html/glpi/plugins/codexplus`, como root. Banco `glpidb`.
@@ -67,6 +69,14 @@ simples não fica como opção (só folhas, com a folha de espera).
 - Avisar a equipe: na pergunta "Não foi possível carregar a imagem da
   planta", responder **Cancelar** e recarregar; PDFs exportados de novo
   podem ter outra paginação (igual à tela); Importar só aceita `.docx`.
+
+## Diagnóstico da produção (23/10/2026, antes da subida)
+
+`cx-board-check.php` v2: 47 documentos, 40 quadros, **nenhum "QUADRO
+SUMIU"** (só compara com revisão publicada). Sem planta: DTC0006 (mapas 2
+e 3), DTC0007 (plantas 1 e 2), DTC0008 (mapa 2), LAU0001 (plantas 1 e 2),
+DIV0003 (mapa 1). Pendente com Claudio: quais tinham planta (reenviar pelo
+"Enviar planta").
 
 ## Fila pronta (próxima sessão), em ordem
 

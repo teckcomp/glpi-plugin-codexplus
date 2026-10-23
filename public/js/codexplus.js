@@ -556,7 +556,7 @@
         if (!stage) {
             return 1;
         }
-        var pages = planPages(idoc, stage, geo, { split: true });
+        var pages = planPages(idoc, stage, geo, { split: 'oversize' });   // PL-15d
         var total = pages.length;
         var frag  = idoc.createDocumentFragment();
         for (var p = 0; p < total; p++) {
@@ -580,6 +580,11 @@
         // Ligado no PDF e nas folhas do Visualizar; o editor (planBreaks)
         // continua sem partir até o PL-15b.
         var SPLIT = !!(popt && popt.split);
+        /* PL-15d (Claudio, 23/10/2026): "o que vejo na tela é o que sai na
+           impressora" — o PDF e o Visualizar viram a folha no MESMO ponto do
+           editor (sempre entre blocos). Só o bloco maior que uma folha inteira
+           ainda é partido (senão não cabe no papel). split: 'oversize'. */
+        var SPLIT_ALL = SPLIT && popt.split !== 'oversize';
 
         var blocks = Array.prototype.slice.call(stage.children);
         var n = blocks.length;
@@ -847,7 +852,7 @@
             var gh = sumH(i, j);
             // PL-15a: não cabe no resto da folha → parte o último bloco do
             // grupo (o título continua junto do começo do texto).
-            if (SPLIT && used + gh > capH) {
+            if ((SPLIT_ALL && used + gh > capH) || (SPLIT && !SPLIT_ALL && empty && heights[j] > capH)) {
                 var room = capH - used - (j > i ? sumH(i, j - 1) : 0);
                 var rest = splitBlock(blocks[j], room);
                 if (rest) {
@@ -867,7 +872,7 @@
                 gh = sumH(i, j);
             }
             // PL-15a: imagem que quase cabe encolhe até 85% para não abrir folha.
-            if (SPLIT && !empty && (used + gh) > capH && shrink(i, j, used + gh - capH + 1, 0.85)) {
+            if (SPLIT_ALL && !empty && (used + gh) > capH && shrink(i, j, used + gh - capH + 1, 0.85)) {
                 gh = sumH(i, j);
             }
             if (!empty && (used + gh) > capH) {
@@ -875,7 +880,7 @@
                 used = 0;
                 // PL-15a: na folha nova o grupo é avaliado de novo (pode
                 // precisar partir de novo, agora com a folha inteira).
-                if (SPLIT) { continue; }
+                if (SPLIT_ALL || (SPLIT && heights[j] > capH)) { continue; }
             }
             for (var k = i; k <= j; k++) {
                 pages[pages.length - 1].push(blocks[k]);
@@ -1406,7 +1411,7 @@
                     var st = Array.prototype.slice.call(idoc.querySelectorAll('.cx-stage'));
                     st.forEach(function (stage, i) {
                         var e = entries[i];
-                        var pages = planPages(idoc, stage, geo, { split: true });   // PL-15a
+                        var pages = planPages(idoc, stage, geo, { split: 'oversize' });   // PL-15d
                         if (e.kind === 'repeat') {
                             // Repetido não ganha folha: no sumário, "ver página N".
                             plans.push({ e: e, pages: [], skip: true });
@@ -1543,7 +1548,9 @@
             waitImages(idoc, function () {
                 try {
                     var stage = idoc.getElementById('cx-stage');
-                    var pages = planPages(idoc, stage, built.geo);
+                    // PL-15d: a mesma conta do PDF (só parte bloco maior que
+                    // uma folha), para as folhas seguintes baterem com o PDF.
+                    var pages = planPages(idoc, stage, built.geo, { split: 'oversize' });
                     var h = function (el) {
                         var cs = win.getComputedStyle(el);
                         return el.getBoundingClientRect().height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
@@ -1558,6 +1565,9 @@
                         left.push(Math.max(0, Math.round(built.geo.contentH - used)));
                         if (p > 0) {
                             var first = null;
+                            // Folha que começa no meio de um bloco grande: no
+                            // editor ela fica dentro do bloco (sem faixa).
+                            if (pg[0] && pg[0].classList.contains('cx-cont')) { starts.push(null); return; }
                             for (var k = 0; k < pg.length && first === null; k++) {
                                 var a = pg[k].getAttribute('data-cxi');
                                 if (a !== null) { first = parseInt(a, 10); }

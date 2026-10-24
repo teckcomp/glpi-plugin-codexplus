@@ -57,3 +57,34 @@
 
     window.CodexplusShell = { theme: current, setTheme: apply };
 })();
+
+/* PL-31b (Claudio, 24/10/2026): botão "voltar ao topo" em todas as páginas do
+   Codex+ (as que têm .codexplus-app, inclusive o link público). Aparece
+   depois de rolar uma tela; some na tela cheia do editor. */
+(function () {
+    'use strict';
+    function boot() {
+        if (!document.querySelector('.codexplus-app') || document.querySelector('.cx-totop')) { return; }
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cx-totop';
+        btn.setAttribute('aria-label', 'Voltar ao topo');
+        btn.title = 'Voltar ao topo';
+        btn.innerHTML = '<i class="ti ti-arrow-up" aria-hidden="true"></i>';
+        btn.addEventListener('click', function () {
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+        });
+        document.body.appendChild(btn);
+        var tick = false;
+        function update() {
+            tick = false;
+            btn.classList.toggle('is-on', window.scrollY > window.innerHeight * 0.6);
+        }
+        window.addEventListener('scroll', function () {
+            if (!tick) { tick = true; window.requestAnimationFrame(update); }
+        }, { passive: true });
+        update();
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
+})();

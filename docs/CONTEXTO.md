@@ -2,6 +2,14 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.5` em produção**; **homologação com RV-1 (`c8ecce1`) +
+> PL-28 (aprovado por Claudio em 24/10/2026, commit a fazer)**. Seção 3.46:
+> **contrato da folha** — editor com régua geométrica do A4, PDF e
+> Visualizar como impressora (recorte contíguo, mesma conta `clipPlan`
+> nos dois lados), ¶ nas linhas vazias, Delete/Backspace sem apagar bloco
+> vizinho. Achados 208 a 218. Próximo: PL-29 (fundo de cabeçalho de tabela
+> na impressão), subida única `v0.8.6`, depois docs/PROXIMO-PASSO.md.
+> Antes:
 > Estado: **`v0.8.5` em produção** (23/10/2026). Sessão de 23/10 à noite
 > (seção 3.45, PL-23 a PL-27, folhas do editor) **encerrada sem commit de
 > código**: nenhuma das tentativas ficou aprovada por Claudio; homologação
@@ -3574,6 +3582,112 @@ Achados:
      layout do editor, testar com o CSS do tema do GLPI e a configuração
      real (`#codexplus-print-config` da página).
 
+### 3.46 Contrato da folha — RV-1 e PL-28 (24/10/2026) ✅ aprovado
+
+Sessão do dia inteiro, quinta tentativa da paginação. Começou com uma
+**reversão** e terminou com o comportamento fechado por escrito e validado
+por Claudio num documento importado do Word de 21 folhas.
+
+**RV-1 (`c8ecce1`)** — a pedido de Claudio, só POP/PSG/MAN voltaram ao
+estado anterior ao PL-7: saíram PL-7 (editor em folhas), PL-10 (correções
+das folhas), a parte do UI-3 no editor e PL-15a/15b-1/15d (PDF partindo
+blocos, Enter no fim da folha, paginação comum). Ficaram PL-8a/8b (tabelas),
+PL-16 (importar Word), PL-19 (zoom), PL-22 (folha de espera). Produção
+continuou na `v0.8.5` por decisão de Claudio (subida única depois).
+
+**O que deu errado nas quatro tentativas anteriores, dito de uma vez:** o
+motor do PDF tinha regras próprias (bloco que não cabe desce inteiro, título
+arrasta o parágrafo seguinte, linha vazia no fim/início da folha some,
+imagem encolhe para caber) e todas as tentativas faziam o editor **adivinhar**
+essas regras. O pl28-1 (régua geométrica) divergia nas linhas vazias que o
+PDF descartava; o pl28-2 (régua seguindo o `planPages` sobre o editor) batia
+ao pixel, mas mostrava no editor a "vida própria" do PDF — e Claudio
+rejeitou o princípio: **o PDF é só o modelo (A4, margens), não uma fonte de
+decisões**.
+
+**Contrato fechado com Claudio (vale daqui em diante):**
+
+1. O editor mostra a **régua** do modelo: folha branca de 794 px (A4 a
+   96 dpi) centralizada, pontilhado no verde do plugin nas margens, "Folha N"
+   na borda, faixa do cabeçalho no topo e, em cada virada, uma marca fina
+   "Área de quebra · N → N+1". Nada é inserido no texto; a régua é uma camada
+   filha do `<html>` do iframe, fora do `<body>`.
+2. O editor usa a **largura e a tipografia do PDF** (Arial 11,5 pt,
+   entrelinha 1,55, 9 px entre parágrafos, 674 px de texto), aplicadas com
+   `!important` por cima do tema do GLPI.
+3. **PDF e Visualizar são uma impressora**: o texto é diagramado uma vez e
+   cada folha é o **recorte contíguo** da anterior (`clipPlan`). Nada se
+   move, nada se perde, nada encolhe; linha vazia é conteúdo e imprime onde
+   está, inclusive no topo da folha seguinte.
+4. Único ajuste físico, igual nos dois lados: o corte sobe para o topo da
+   linha (de texto, de tabela, imagem ou **linha vazia**) que a marca
+   geométrica atravessaria; essa linha abre a folha seguinte. Nenhuma letra
+   sai cortada ao meio.
+5. **¶** em parágrafo e título vazios, só no editor (atributo
+   `data-mce-cxempty`, removido na gravação pelo serializer).
+6. **Delete/Backspace não apagam tabela, planilha, quadro, imagem ou marcador
+   como efeito colateral** de apagar a linha vizinha: linha vazia é removida
+   e o bloco vizinho fica selecionado; linha com texto, nada acontece.
+7. Opções descartadas por Claudio ao ver o resultado: pautas (linhas de
+   caderno) na faixa ou no texto; linha vazia com fundo tingido; faixa que
+   **não imprime** (pl28-3 — o manual importado perdeu imagem e linha no
+   PDF); régua que segue o `planPages` (pl28-2).
+
+**Pacotes:** pl28-1 (régua geométrica) → pl28-2 (régua pelo planPages) →
+pl28-3 (recorte, faixa não imprime) → pl28-4 (recorte contíguo, opção B) →
+pl28-5 (imagem e tabela medindo igual) → **pl28-6 (linha vazia indivisível)
+aprovado**. Arquivos: `public/js/codexplus.js`, `public/js/codexplus-editor.js`,
+`templates/document-form.html.twig`. Sem banco.
+
+**Escopo:** PDF e Visualizar do **documento de texto** (POP, PSG, MAN, PRP,
+LAU, DTC, DIV). PDF composto (Etapa 5d) e diagramas seguem com `planPages`.
+Word exportado não pagina (não muda).
+
+Achados:
+
+208. **Os achados 198, 205 e 206 tinham o diagnóstico certo e a saída
+     errada.** A saída não era o editor copiar o PDF, era o PDF parar de
+     decidir. Com o PDF como impressora, a régua geométrica do editor é
+     exata por construção.
+209. **Medir igual = mesma conta sobre o mesmo DOM.** `clipPlan()` recebe os
+     blocos já diagramados (body do editor ou palco do PDF) e devolve os
+     recortes; a conferência bloco a bloco (altura de cada filho de topo nos
+     dois lados) é o teste que fecha a divergência em uma rodada.
+210. **Tema do GLPI dentro do editor** (medido na homologação): Inter 14 px /
+     20 px, `p{margin-bottom:16px}`, `body{margin:15px;position:relative}`,
+     `h2{18.62px/28px}`, mais o **reboot do Bootstrap**:
+     `*{box-sizing:border-box}`, `img,svg{vertical-align:middle}`,
+     `tr,td,th{border-style:solid;border-width:0}`. Tudo precisa de
+     `!important` para a tipografia do PDF valer.
+211. **`vertical-align: middle` na imagem (reboot) tira 6,8 px por imagem**
+     em relação ao PDF (`baseline`). 14 imagens = 95 px = uma linha de tabela
+     a cada duas folhas. O PDF agora declara `vertical-align:baseline` e o
+     editor também.
+212. **Tabela media 1 px a menos no editor**; caixa explícita e idêntica nos
+     dois lados (`box-sizing`, `border-spacing:0`, `tr{border:0}`, borda de
+     `td/th` 1 px) resolveu.
+213. **`p{padding:0!important}` atropelava `.cx-callout` e `.cx-step`** (57 px
+     no editor contra 101 no PDF). Bloco especial do `PRINT_CSS` precisa da
+     regra equivalente em `rulerTypoCss()`.
+214. **Régua fora do `<body>`** (filha do `<html>` do iframe,
+     `pointer-events:none`): o TinyMCE não vê, não grava, não seleciona, e
+     nenhum dos bugs do PL-10 (cursor falso, pulo) voltou. `position:static`
+     no body continua necessário.
+215. **Atributo `data-mce-cxempty` + `serializer.addAttributeFilter` no
+     `PreInit`**: ¶ só na tela; `getContent()` sai com o mesmo tamanho do
+     original (confirma o achado 200).
+216. **Linha vazia precisa ser "átomo" também**: sem isso o corte caía no
+     meio dela e dava a impressão de texto cortado (a faixa fina sobre o ¶).
+217. **Chrome descarta fundo inline na impressão**: cabeçalho de tabela
+     importado do Word (`style="background-color:#1f2d4f"`) sai cinza no PDF;
+     só blocos com `print-color-adjust:exact` no CSS escapam. Já acontecia
+     antes do PL-28 → PL-29.
+218. **Método que funcionou**: contrato por escrito → mockup → medição no
+     GLPI real pelo console (CSS injetado e `getComputedStyle` de cada tipo
+     de bloco) → harness com esses valores → pacote → comparação bloco a
+     bloco. Comandos de medição na seção 3.46 do histórico do chat; vale
+     guardar como rotina para qualquer mudança de layout do editor.
+
 ## 4. Decisões de arquitetura que já custaram caro
 
 ### Por que as telas são próprias, e não CSS sobre o nativo
@@ -4491,6 +4605,17 @@ Elemento novo dentro de `#codexplus-doc` **não** entra no PDF
 automaticamente — o JS monta o HTML a partir dos seletores acima, não clona o
 contêiner inteiro.
 
+**Contrato da folha (PL-28, 24/10/2026 — ver 3.46).** No documento de texto,
+`layoutPages` é uma **impressora**: diagrama o texto uma vez (palco
+`#cx-stage`, largura `contentW`, `PRINT_CSS`) e recorta folhas contíguas com
+`clipPlan()`; nenhuma regra de "bloco inteiro desce", "título com o
+parágrafo", "linha vazia some" ou "imagem encolhe". A mesma `clipPlan()` roda
+no editor (`rulerMode`, codexplus-editor.js) sobre os filhos do `body`, por
+isso **toda regra de tipografia nova no `PRINT_CSS` precisa do par em
+`rulerTypoCss()`** (com `!important`, por cima do tema do GLPI), senão as
+alturas divergem e a régua deixa de bater. `planPages` continua só no PDF
+composto (Etapa 5d).
+
 ### Outras regras
 
 - Design tokens CSS com prefixo `--cx-`, declarados em `:root`. Os tamanhos
@@ -4576,10 +4701,10 @@ codexplus/
 │   └── config.form.php        configuração de marca e clientes
 ├── templates/                 Twig (library, migrate, document-form, parts/…)
 ├── public/                    CSS, JS e fonts/ (única pasta servida como estático)
-│   ├── js/codexplus.js        PDF (paginação manual)
+│   ├── js/codexplus.js        PDF e Visualizar: impressora por recorte (PL-28, clipPlan); planPages só no PDF composto
 │   ├── js/codexplus-org.js    motor do organograma (grafo)
 │   ├── js/codexplus-grid.js   cronograma e RACI (D1); com datas, fases, marcos, importar/exportar, tela cheia e situação (Q7b)
-│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2), sem salto de rolagem (J1)
+│   ├── js/codexplus-editor.js estilos, tamanhos, cor e realce, importar, botões (E1–E5), ferramentas por tipo (T2), sem salto de rolagem (J1); régua da folha, ¶ e proteção de blocos (PL-28)
 │   ├── js/codexplus-sheet.js  planilha no editor (PL1), edição no lugar e Parâmetros (3c-1), Resumo do investimento (3c-2)
 │   ├── js/codexplus-board.js  motor de quadro: Planta e Topologia (Q1), ligações, cabos e eletrocalha (Q2), PNG (Q2f), materiais e legenda (Q3), + Ícone (Q4); fluxograma: formas, BPMN, barra de estilo, ligação de fluxo, "+" rápido, alinhar (Q5b a Q5f); importar e exportar (cópia .json e Mermaid, Q5i)
 │   ├── js/codexplus-flow.js   fluxograma no documento DIA: leitura em SVG, abrir o motor, gravar, PNG e PDF (Q5a)

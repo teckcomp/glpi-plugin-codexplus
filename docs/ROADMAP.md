@@ -839,25 +839,37 @@ editor (PL-15c) — rejeitada; leitura simples não vira opção; Word importado
 converte para o padrão Codex+. Fila seguinte em docs/PROXIMO-PASSO.md.
 
 
-## Ajustes do uso em produção — 4ª rodada (pendente)
+## Ajustes do uso em produção — 4ª rodada (24/10/2026) — contrato da folha ✅
 
-Sessão de 23/10/2026 à noite sem nada aprovado (CONTEXTO 3.45). Itens,
-em ordem, cada um isolado:
+Sessão de 23/10 à noite sem nada aprovado (CONTEXTO 3.45); sessão de
+24/10 fechou o comportamento (CONTEXTO 3.46).
 
+- [x] **RV-1** `c8ecce1` — POP/PSG/MAN de volta ao estado anterior ao PL-7
+      (saem PL-7, PL-10, UI-3 do editor, PL-15a/15b-1/15d; ficam PL-8, PL-16,
+      PL-19, PL-22).
+- [x] **PL-28** (pl28-6, aprovado por Claudio; **commit a fazer**) — régua
+      geométrica do A4 no editor; PDF e Visualizar como impressora (recorte
+      contíguo, `clipPlan` compartilhado); ¶ nas linhas vazias; Delete e
+      Backspace não apagam bloco vizinho. Substitui o PL-27 e o
+      PL-25b-motor da lista anterior.
+- [ ] **PL-29** — `td, th` com `print-color-adjust: exact` no `PRINT_CSS`:
+      cabeçalho de tabela importado do Word sai cinza no PDF (achado 217).
+      Uma linha.
+- [ ] **Subida `v0.8.6`** — RV-1 + PL-28 (+ PL-29) para a produção, que
+      ainda está na `v0.8.5` com o editor em folhas.
 - [ ] **PL-25a** — botões de alinhamento (esquerda, centro, direita,
       justificar) na barra do editor. Uma linha no `customize()`.
-- [ ] **PL-25b-motor** — linha vazia com estilo de título não conta como
-      título no `planPages` (achado 202). Só `codexplus.js`.
 - [ ] **PL-24** — leitura: dados do documento e Histórico numa barra
       recolhível ("Mostrar dados"), lembrada no navegador.
-- [ ] **PL-27** — folhas no editor iguais ao PDF (guias pontilhadas no
-      verde do plugin, lacunas sombreadas, bloco que não cabe desce
-      inteiro), sem nada inserido no texto. Recomeçar pelo comportamento
-      escrito e mockup no GLPI real (achados 198, 206, 207).
 - [ ] **PL-26** — visual dos editores (documento e Modelos) no layout do
       plugin, com mockup antes.
+- [ ] **PL-28b** — PDF composto (Etapa 5d) e legenda/figura no mesmo molde
+      da impressora; hoje seguem com `planPages`.
+- [ ] Importação do Word: legenda ("Figura N –") vem separada da imagem
+      (parágrafo próprio) — avaliar manter junto.
 - [ ] Limpar as linhas vazias do MAN0006 (155) — à mão ou botão
       "Remover linhas vazias repetidas" sob comando.
+
 ## Pós-produção (Claudio, 04/10/2026)
 
 Tudo o que não entrou na Reta final. Atualizações já em produção, por

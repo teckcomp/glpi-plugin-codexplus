@@ -3088,6 +3088,13 @@ body:has(.cx-sheets[data-cx-sheets]:not(.is-ready):not(.cx-sheets-gaveup)) #code
    leitura (.cx-meta--hist). Lista em templates/parts/doc-history.html.twig. */
 .cx-meta[data-tab="historico"] .cx-docform-grid { display: none; }
 .cx-meta--hist { margin: 4px 0 16px; font-family: var(--cx-font); }
+/* PL-24 (Claudio, 24/10/2026): na leitura, dados + Histórico numa barra só,
+   oculta com botão de expandir e recolher (.cx-meta--read). Os painéis ficam
+   em .cx-meta-panels; aberto, a coluna Permissões segue ao lado. */
+.cx-meta--read { margin: 4px 0 16px; font-family: var(--cx-font); }
+.cx-meta.is-closed .cx-meta-panels { display: none !important; }
+.cx-meta--read[data-tab] .cx-docform-split--perm { display: grid; }
+.cx-meta--read .cx-meta-tab .ti { margin-right: 4px; }
 .cx-hist { max-height: 420px; overflow-y: auto; }
 .cx-hist-list { list-style: none; margin: 0; padding: 0; }
 .cx-hist-row { display: grid; grid-template-columns: 112px 18px minmax(0, 1fr); gap: 8px; align-items: baseline;
@@ -3354,3 +3361,23 @@ html[data-codexplus-theme="dark"] .cx-brands-logo img,
 html[data-codexplus-theme="dark"] .cx-cfg-logo-preview img,
 html[data-codexplus-theme="dark"] .cx-docbrand-logo img {
     background: #FFFFFF; padding: 4px 8px; border-radius: 4px; box-sizing: content-box; }
+
+/* PL-31a (Claudio, 24/10/2026): ações do fluxo na barra do topo, conforme a
+   etapa; cada uma abre a sua janelinha (dialog) com ajuda, campos e o
+   confirmar. O padding fica no formulário: clique na margem escura fecha. */
+.cx-wfbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.codexplus-article-bar { flex-wrap: wrap; }
+.cx-wf-dialogs { display: contents; }
+.cx-wf-dlg { padding: 0; border: 1px solid var(--cx-border); border-radius: 12px; width: min(520px, 92vw);
+    background: var(--cx-surface); color: var(--cx-text); box-shadow: 0 20px 50px rgba(15, 23, 42, .25); }
+.cx-wf-dlg::backdrop { background: rgba(15, 23, 42, .45); }
+.cx-wf-form.cx-flow-row { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin: 0; padding: 18px 20px; }
+.cx-wf-title { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--cx-accent); }
+.cx-wf-ask { margin: 0; }
+.cx-wf-dirty { margin: 0; padding: 8px 10px; border-radius: 8px; background: #fdecec; color: #8a1f1f; font-size: .92em; }
+.cx-wf-form .codexplus-form-hint { order: 5; margin: 0; }
+.cx-wf-foot { order: 9; display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.cx-wf-form .cx-flow-summary, .cx-wf-form textarea { flex: 0 0 auto; width: 100%; margin: 0; }
+.cx-wf-form.cx-flow-extend .cx-flow-extend-date input { width: 100%; }
+.cx-wf-form.cx-flow-extend .cx-flow-extend-reason { flex: 0 0 auto; }
+.cx-wf-foot button:disabled { opacity: .5; cursor: not-allowed; }

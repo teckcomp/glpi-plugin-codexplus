@@ -299,3 +299,85 @@
     }
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
 })();
+
+/* =========================================================================
+   PL-31a (Claudio, 24/10/2026): ações do fluxo na barra do topo
+   -------------------------------------------------------------------------
+   Cada botão [data-cx-wf-open] abre a sua janelinha (<dialog class=
+   "cx-wf-dlg">), com a ajuda, os campos daquele passo e o confirmar — os
+   mesmos formulários de antes, que o servidor confere igual. Enviar para
+   validação e Publicar ([data-cx-wf-save]) não salvam o texto: com alteração
+   não salva, a janelinha avisa e o confirmar fica desligado.
+   ========================================================================= */
+(function () {
+    'use strict';
+    var EDITOR_ID = 'codexplus-doc-content';
+    var changed = false;
+
+    function editForm() {
+        var ta = document.getElementById(EDITOR_ID);
+        return ta && ta.form ? ta.form : null;
+    }
+    function isDirty() {
+        if (changed) { return true; }
+        try {
+            var ed = window.tinymce && window.tinymce.get(EDITOR_ID);
+            if (ed && ed.isDirty()) { return true; }
+        } catch (e) { /* sem editor: só os campos */ }
+        return false;
+    }
+    function watch(form) {
+        var mark = function (e) {
+            // Os campos das janelinhas e da barra ficam fora do formulário de edição.
+            if (e && e.target && e.target.closest && e.target.closest('.cx-wf-dlg')) { return; }
+            changed = true;
+        };
+        form.addEventListener('input', mark);
+        form.addEventListener('change', mark);
+        if (window.jQuery) { window.jQuery(form).on('change', mark); }   // Select2 do GLPI
+        form.addEventListener('submit', function () { changed = false; });
+    }
+
+    function open(dlg) {
+        if (!dlg) { return; }
+        if (dlg.hasAttribute('data-cx-wf-save')) {
+            var dirty = isDirty();
+            var warn = dlg.querySelector('[data-cx-wf-dirty]');
+            if (warn) { warn.hidden = !dirty; }
+            Array.prototype.forEach.call(dlg.querySelectorAll('button[type=submit]'), function (b) { b.disabled = dirty; });
+        }
+        if (typeof dlg.showModal === 'function') { dlg.showModal(); } else { dlg.setAttribute('open', ''); }
+        var first = dlg.querySelector('textarea, input:not([type=hidden])');
+        if (first) { first.focus(); }
+    }
+    function close(dlg) {
+        if (!dlg) { return; }
+        if (typeof dlg.close === 'function') { dlg.close(); } else { dlg.removeAttribute('open'); }
+    }
+
+    function boot() {
+        var bar = document.querySelector('[data-cx-wfbar]');
+        if (!bar) { return; }
+        var form = editForm();
+        if (form) { watch(form); }
+        bar.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-cx-wf-open]');
+            if (b) { open(document.getElementById(b.getAttribute('data-cx-wf-open'))); }
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('.cx-wf-dlg'), function (dlg) {
+            dlg.addEventListener('click', function (e) {
+                if (e.target.closest('[data-cx-wf-close]') || e.target === dlg) { close(dlg); }
+            });
+            var f = dlg.querySelector('form');
+            if (f) {
+                f.addEventListener('submit', function () {
+                    // Evita duplo envio; a página recarrega com o resultado.
+                    setTimeout(function () {
+                        Array.prototype.forEach.call(f.querySelectorAll('button[type=submit]'), function (s) { s.disabled = true; });
+                    }, 0);
+                });
+            }
+        });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
+})();

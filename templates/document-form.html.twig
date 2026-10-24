@@ -94,6 +94,34 @@
                     </form>
                 {% endif %}
             </div>
+            {# PL-31a: ações do fluxo, conforme a etapa (janelinhas no fim da página). #}
+            {% if not is_new and not version.on and not preview and (can_submit or can_publish_direct or can_approve or can_sign|default(false) or can_validate or can_reject or can_obsolete
+                or can_open_revision or can_confirm_nochange or can_cancel_revision or can_extend_revision) %}
+                <div class="cx-wfbar" data-cx-wfbar>
+                    {% if can_submit %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-submit"><i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_publish_direct %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-publish"><i class="ti ti-world-upload"></i> {{ __('Publicar', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_sign|default(false) %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-sign"><i class="ti ti-circle-check"></i> {{ __('Aprovar', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_approve %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-approve"><i class="ti ti-circle-check"></i> {{ __('Aprovar e enviar ao auditor', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_validate %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-validate"><i class="ti ti-circle-check"></i> {{ __('Validar e publicar', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_reject %}<button type="button" class="codexplus-btn" data-cx-wf-open="cx-wf-reject"><i class="ti ti-arrow-back-up"></i> {{ __('Devolver para rascunho', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_open_revision %}<button type="button" class="codexplus-btn codexplus-btn-primary" data-cx-wf-open="cx-wf-open-revision"><i class="ti ti-pencil-plus"></i> {{ __('Abrir revisão', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_confirm_nochange %}<button type="button" class="codexplus-btn" data-cx-wf-open="cx-wf-nochange"><i class="ti ti-rosette-discount-check"></i> {{ __('Revisado sem alteração', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_extend_revision %}<button type="button" class="codexplus-btn" data-cx-wf-open="cx-wf-extend"><i class="ti ti-calendar-plus"></i> {{ revdue is not null and revdue.state == 'sem_prazo' ? __('Definir prazo', 'codexplus') : __('Prorrogar prazo', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_cancel_revision %}<button type="button" class="codexplus-btn cx-btn-danger-outline" data-cx-wf-open="cx-wf-cancel-revision"><i class="ti ti-arrow-back"></i> {{ __('Cancelar revisão', 'codexplus') }}</button>
+                    {% endif %}
+                    {% if can_obsolete %}<button type="button" class="codexplus-btn" data-cx-wf-open="cx-wf-obsolete"><i class="ti ti-archive"></i> {{ __('Tornar obsoleto', 'codexplus') }}</button>
+                    {% endif %}
+                </div>
+            {% endif %}
             {# R3b3-2: ler e exportar (texto; o diagrama tem PDF no próprio motor). #}
             <div class="codexplus-actions">
                 {% if can_edit %}
@@ -565,35 +593,13 @@
            ficam dentro, mas o PDF só lê título e .codexplus-content. #}
         <article class="codexplus-doc" id="codexplus-doc">
             <h1 class="cx-docform-view-title codexplus-doc-title">{{ name }}</h1>
-            {# HV-1 (Claudio, 04/10/2026): na leitura, a mesma barra dos dados,
-               recolhida, só com a aba Histórico. O PDF só lê o título e
-               .codexplus-content (CONTEXTO, seção 6): esta barra fica fora. #}
-            {% if history.show %}
-                {% set cx_last = history.rows|first %}
-                <div class="cx-meta cx-meta--hist" data-cx-meta data-new="0" data-missing="0"
-                     data-default-tab="historico" data-store="cx-hist-open"
-                     data-label-open="{{ __('Ocultar histórico', 'codexplus') }}" data-label-closed="{{ __('Mostrar histórico', 'codexplus') }}">
-                    <div class="cx-meta-bar">
-                        <i class="ti ti-history cx-meta-ico"></i>
-                        <span class="cx-meta-item">{{ __('Histórico', 'codexplus') }}</span>
-                        {% if cx_last %}
-                            <span class="cx-meta-item"><span>{{ __('Última alteração', 'codexplus') }}</span>
-                                {{ cx_last.date|date('d/m/Y H:i') }}{% if cx_last.user %} · {{ cx_last.user }}{% endif %}</span>
-                        {% endif %}
-                        <button type="button" class="codexplus-btn cx-meta-toggle" data-cx-meta-toggle aria-expanded="false">
-                            <i class="ti ti-chevron-down"></i> {{ __('Mostrar histórico', 'codexplus') }}
-                        </button>
-                    </div>
-                    <div class="cx-meta-tabs" role="tablist">
-                        <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="historico"><i class="ti ti-history"></i> {{ __('Histórico', 'codexplus') }}</button>
-                    </div>
-                    <div class="cx-docform-split">
-                        <div data-cx-tab="historico">
-                            {% include '@codexplus/parts/doc-history.html.twig' with {history: history} only %}
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+            {# PL-24 (Claudio, 24/10/2026): na leitura, dados do documento,
+               auditor, revisão periódica, permissões e Histórico numa barra só,
+               oculta, com botão de expandir e recolher (lembrado no navegador,
+               chave cx-read-open). Mesmo JS da edição (codexplus-meta.js). O PDF
+               só lê o título e .codexplus-content (CONTEXTO, seção 6). No
+               Visualizar (preview) os dados ficam como antes. #}
+            {% set cx_dados %}
             {# preview: janela "Visualizar e PDF" — só o documento, sem
                revisão periódica, Permissões nem fluxo (Claudio, 25/09/2026). #}
             <div class="cx-docform-split{{ perm.show and not preview ? ' cx-docform-split--perm' : '' }}">
@@ -601,7 +607,7 @@
             <div class="cx-docform-roles">
                 <span><strong>{{ __('Categorias', 'codexplus') }}:</strong> {{ category_names ? category_names|join(', ') : '—' }}</span>
                 <span><strong>{{ __('Setor', 'codexplus') }}:</strong> {{ sector_names ? sector_names|join(', ') : '—' }}</span>
-                <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name }}</span>
+                <span><strong>{{ __('Autor', 'codexplus') }}:</strong> {{ author_name ?: '—' }}</span>
                 <span><strong>{{ __('Responsável', 'codexplus') }}:</strong> {{ owner_name ?: '—' }}</span>
                 {% if signers_line|default('') %}
                     <span><strong>{{ __('Aprovadores', 'codexplus') }}:</strong> {{ signers_line }}</span>
@@ -648,6 +654,44 @@
                 {% include '@codexplus/parts/doc-permissions.html.twig' with {perm: perm, id: id, csrf_token: csrf_token, anon: anon} only %}
             {% endif %}
             </div>
+            {% endset %}
+            {% if preview %}
+                {{ cx_dados }}
+            {% else %}
+                {% set cx_last = history.show ? history.rows|first : null %}
+                <div class="cx-meta cx-meta--read" data-cx-meta data-new="0" data-missing="0"
+                     data-default-tab="dados" data-store="cx-read-open"
+                     data-label-open="{{ __('Ocultar dados', 'codexplus') }}" data-label-closed="{{ __('Mostrar dados', 'codexplus') }}">
+                    <div class="cx-meta-bar">
+                        <i class="ti ti-file-info cx-meta-ico"></i>
+                        <span class="cx-meta-item"><span>{{ __('Responsável', 'codexplus') }}</span> {{ owner_name ?: '—' }}</span>
+                        {% if status == 'publicado' and validator_name %}
+                            <span class="cx-meta-item"><span>{{ __('Validado por', 'codexplus') }}</span> {{ validator_name }}{% if date_validated %}, {{ date_validated|date('d/m/Y') }}{% endif %}</span>
+                        {% endif %}
+                        {% if cx_last %}
+                            <span class="cx-meta-item"><span>{{ __('Última alteração', 'codexplus') }}</span>
+                                {{ cx_last.date|date('d/m/Y H:i') }}{% if cx_last.user %} · {{ cx_last.user }}{% endif %}</span>
+                        {% endif %}
+                        <button type="button" class="codexplus-btn cx-meta-toggle" data-cx-meta-toggle aria-expanded="false">
+                            <i class="ti ti-chevron-down"></i> {{ __('Mostrar dados', 'codexplus') }}
+                        </button>
+                    </div>
+                    <div class="cx-meta-tabs" role="tablist">
+                        <button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="dados"><i class="ti ti-file-info"></i> {{ __('Dados do documento', 'codexplus') }}</button>
+                        {% if history.show %}<button type="button" role="tab" class="cx-meta-tab" data-cx-tab-btn="historico"><i class="ti ti-history"></i> {{ __('Histórico', 'codexplus') }}</button>{% endif %}
+                    </div>
+                    <div class="cx-meta-panels">
+                        <div data-cx-tab="dados">
+                            {{ cx_dados }}
+                        </div>
+                        {% if history.show %}
+                            <div data-cx-tab="historico">
+                                {% include '@codexplus/parts/doc-history.html.twig' with {history: history} only %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
             {% if is_diagram and diagram_kind == 'fluxograma' %}
                 <script type="application/json" id="cx-flow-data">{{ diagram_json|raw }}</script>
                 <div class="cx-docform-diagram" data-cx-flow data-editable="0" data-sign="{{ signers_line|default('') ? __('Aprovadores', 'codexplus') ~ ': ' ~ signers_line : '' }}" data-source="cx-flow-data"
@@ -768,14 +812,20 @@
         </section>
     {% endif %}
 
-    {# ================= FLUXO ================= #}
+    {# ================= FLUXO =================
+       PL-31a (Claudio, 24/10/2026): os botões do fluxo ficam na barra do
+       topo (cx-wfbar, conforme a etapa); cada um abre a sua janelinha com a
+       ajuda, os campos daquele passo e o confirmar. Os formulários e o que
+       eles enviam são os de antes (public/js/codexplus-docform.js). #}
     {% if not is_new and not version.on and not preview and (can_submit or can_publish_direct or can_approve or can_sign|default(false) or can_validate or can_reject or can_obsolete
         or can_open_revision or can_confirm_nochange or can_cancel_revision or can_extend_revision) %}
-        <section class="cx-flow">
-            <h3 class="cx-card-title">{{ __('Fluxo do documento', 'codexplus') }}</h3>
+        <div class="cx-wf-dialogs" data-cx-wf-dialogs>
 
             {% if can_submit %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-submit" aria-labelledby="cx-wf-submit-t" data-cx-wf-save>
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-submit-t">{{ __('Enviar para validação', 'codexplus') }}</h3>
+                    <p class="cx-wf-dirty" data-cx-wf-dirty hidden><i class="ti ti-alert-triangle"></i> {{ __('Há alterações não salvas no documento. Feche esta janela e clique em Salvar antes; o que não foi salvo não vai junto.', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     {% if revision_no > 0 %}
@@ -783,9 +833,12 @@
                         <textarea name="revision_summary" rows="2" class="form-control cx-flow-summary" required
                                   placeholder="{{ __('Resumo do que mudou nesta revisão (obrigatório)', 'codexplus') }}"></textarea>
                     {% endif %}
-                    <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="submit_validation" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-send"></i> {{ __('Enviar para validação', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">
                         {% if flow == 'one' %}
                             {{ __('Salve antes de enviar. Vai ao responsável, que aprova e publica; nesse meio-tempo o documento fica travado.', 'codexplus') }}
@@ -794,22 +847,29 @@
                         {% endif %}
                     </span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_publish_direct %}
                 {# P2: Proposta e Laudo — o responsável publica sem etapas. PL-5: nos
                    outros tipos, o responsável com Auditor no perfil. #}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-publish" aria-labelledby="cx-wf-publish-t" data-cx-wf-save>
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-publish-t">{{ __('Publicar', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Publicar este documento? Depois de publicado, mudanças só por revisão.', 'codexplus') }}</p>
+                    <p class="cx-wf-dirty" data-cx-wf-dirty hidden><i class="ti ti-alert-triangle"></i> {{ __('Há alterações não salvas no documento. Feche esta janela e clique em Salvar antes; o que não foi salvo não vai junto.', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     {% if revision_no > 0 %}
                         <textarea name="revision_summary" rows="2" class="form-control cx-flow-summary" required
                                   placeholder="{{ __('Resumo do que mudou nesta revisão (obrigatório)', 'codexplus') }}"></textarea>
                     {% endif %}
-                    <button type="submit" name="publish_direct" value="1" class="codexplus-btn codexplus-btn-primary"
-                            onclick="return confirm('{{ __('Publicar este documento? Depois de publicado, mudanças só por revisão.', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="publish_direct" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-world-upload"></i> {{ __('Publicar', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">
                         {% if flow == 'direct' %}
                             {{ __('Salve antes de publicar. Neste tipo o responsável publica direto, sem auditoria.', 'codexplus') }}
@@ -819,47 +879,68 @@
                         {% endif %}
                     </span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_open_revision %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-open-revision" aria-labelledby="cx-wf-open-revision-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-open-revision-t">{{ __('Abrir revisão', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Abrir a revisão seguinte? O documento volta a rascunho; os leitores continuam vendo a versão publicada até a nova ser validada.', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
-                    <button type="submit" name="open_revision" value="1" class="codexplus-btn codexplus-btn-primary"
-                            onclick="return confirm('{{ __('Abrir a revisão seguinte? O documento volta a rascunho; os leitores continuam vendo a versão publicada até a nova ser validada.', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="open_revision" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-pencil-plus"></i> {{ __('Abrir revisão', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('Cria a próxima revisão para editar. A publicada segue no ar até a nova passar pelo responsável e pelo auditor.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_confirm_nochange %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-nochange" aria-labelledby="cx-wf-nochange-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-nochange-t">{{ __('Revisado sem alteração', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Confirmar que o documento foi revisado e continua correto? A janela de revisão será renovada a partir de hoje.', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
-                    <button type="submit" name="confirm_nochange" value="1" class="codexplus-btn"
-                            onclick="return confirm('{{ __('Confirmar que o documento foi revisado e continua correto? A janela de revisão será renovada a partir de hoje.', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="confirm_nochange" value="1" class="codexplus-btn">
                         <i class="ti ti-rosette-discount-check"></i> {{ __('Revisado sem alteração', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('Renova a janela sem criar nova revisão e sem passar pelo auditor.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_cancel_revision %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-cancel-revision" aria-labelledby="cx-wf-cancel-revision-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-cancel-revision-t">{{ __('Cancelar revisão', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Cancelar esta revisão? Tudo o que mudou nela será descartado e o documento volta à versão publicada.', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
-                    <button type="submit" name="cancel_revision" value="1" class="codexplus-btn cx-btn-danger-outline"
-                            onclick="return confirm('{{ __('Cancelar esta revisão? Tudo o que mudou nela será descartado e o documento volta à versão publicada.', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="cancel_revision" value="1" class="codexplus-btn cx-btn-danger-outline">
                         <i class="ti ti-arrow-back"></i> {{ __('Cancelar revisão', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('Descarta a revisão em andamento.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_extend_revision %}
                 {# R6-b: prorrogar (ou definir) o prazo, com motivo. #}
-                <form method="post" action="{{ self }}" class="cx-flow-row cx-flow-extend">
+                <dialog class="cx-wf-dlg" id="cx-wf-extend" aria-labelledby="cx-wf-extend-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row cx-flow-extend">
+                    <h3 class="cx-wf-title" id="cx-wf-extend-t">{{ revdue is not null and revdue.state == 'sem_prazo' ? __('Definir prazo', 'codexplus') : __('Prorrogar prazo', 'codexplus') }}</h3>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     <label class="cx-flow-extend-date">
@@ -869,78 +950,112 @@
                     </label>
                     <input type="text" name="extend_reason" required maxlength="500" class="form-control cx-flow-extend-reason"
                            placeholder="{{ __('Motivo (obrigatório)', 'codexplus') }}">
-                    <button type="submit" name="extend_revision" value="1" class="codexplus-btn">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="extend_revision" value="1" class="codexplus-btn">
                         <i class="ti ti-calendar-plus"></i>
                         {{ revdue is not null and revdue.state == 'sem_prazo' ? __('Definir prazo', 'codexplus') : __('Prorrogar prazo', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('O motivo fica registrado na página da revisão.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_sign|default(false) %}
                 {# A-2a: aprovador do diagrama. Devolver é o formulário de baixo. #}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-sign" aria-labelledby="cx-wf-sign-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-sign-t">{{ __('Aprovar', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Aprovar este documento como aprovador?', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
-                    <button type="submit" name="signer_approve" value="1" class="codexplus-btn codexplus-btn-primary"
-                            onclick="return confirm('{{ __('Aprovar este documento como aprovador?', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="signer_approve" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-circle-check"></i> {{ __('Aprovar', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('Etapa dos aprovadores: depois do último, vai ao responsável e ao auditor.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_approve %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-approve" aria-labelledby="cx-wf-approve-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-approve-t">{{ __('Aprovar e enviar ao auditor', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Aprovar e enviar ao auditor responsável?', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     <textarea name="approval_comment" rows="2" class="form-control"
                               placeholder="{{ __('Observação para o auditor (opcional)', 'codexplus') }}"></textarea>
-                    <button type="submit" name="manager_approve" value="1" class="codexplus-btn codexplus-btn-primary"
-                            onclick="return confirm('{{ __('Aprovar e enviar ao auditor responsável?', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="manager_approve" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-circle-check"></i> {{ __('Aprovar e enviar ao auditor', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('1ª etapa: aprovação do responsável.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_validate %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-validate" aria-labelledby="cx-wf-validate-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-validate-t">{{ __('Validar e publicar', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Validar e publicar este documento?', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     <textarea name="approval_comment" rows="2" class="form-control"
                               placeholder="{{ __('Observação da auditoria (opcional)', 'codexplus') }}"></textarea>
-                    <button type="submit" name="approve" value="1" class="codexplus-btn codexplus-btn-primary"
-                            onclick="return confirm('{{ __('Validar e publicar este documento?', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="approve" value="1" class="codexplus-btn codexplus-btn-primary">
                         <i class="ti ti-circle-check"></i> {{ __('Validar e publicar', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                     <span class="codexplus-form-hint">{{ __('2ª etapa: validação do auditor responsável.', 'codexplus') }}</span>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_reject %}
-                <form method="post" action="{{ self }}" class="cx-flow-row cx-flow-reject">
+                <dialog class="cx-wf-dlg" id="cx-wf-reject" aria-labelledby="cx-wf-reject-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row cx-flow-reject">
+                    <h3 class="cx-wf-title" id="cx-wf-reject-t">{{ __('Devolver para rascunho', 'codexplus') }}</h3>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
                     <textarea name="validation_comment" rows="2" class="form-control" required
                               placeholder="{{ __('O que corrigir (obrigatório)', 'codexplus') }}"></textarea>
-                    <button type="submit" name="reject" value="1" class="codexplus-btn">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="reject" value="1" class="codexplus-btn">
                         <i class="ti ti-arrow-back-up"></i> {{ __('Devolver para rascunho', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                 </form>
+                </dialog>
             {% endif %}
 
             {% if can_obsolete %}
-                <form method="post" action="{{ self }}" class="cx-flow-row">
+                <dialog class="cx-wf-dlg" id="cx-wf-obsolete" aria-labelledby="cx-wf-obsolete-t">
+                <form method="post" action="{{ self }}" class="cx-wf-form cx-flow-row">
+                    <h3 class="cx-wf-title" id="cx-wf-obsolete-t">{{ __('Tornar obsoleto', 'codexplus') }}</h3>
+                    <p class="cx-wf-ask">{{ __('Tornar este documento obsoleto?', 'codexplus') }}</p>
                     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="id" value="{{ id }}">
-                    <button type="submit" name="obsolete" value="1" class="codexplus-btn"
-                            onclick="return confirm('{{ __('Tornar este documento obsoleto?', 'codexplus')|e('js') }}');">
+                    <div class="cx-wf-foot">
+                        <button type="button" class="codexplus-btn" data-cx-wf-close>{{ __('Voltar', 'codexplus') }}</button>
+                        <button type="submit" name="obsolete" value="1" class="codexplus-btn">
                         <i class="ti ti-archive"></i> {{ __('Tornar obsoleto', 'codexplus') }}
-                    </button>
+                        </button>
+                    </div>
                 </form>
+                </dialog>
             {% endif %}
-        </section>
+        </div>
     {% endif %}
 
     {# R7: formulário do link anônimo, fora do formulário de edição (a

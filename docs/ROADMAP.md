@@ -838,6 +838,26 @@ Decisões: metragem em planta sem cota — não fazer; marcação tracejada no
 editor (PL-15c) — rejeitada; leitura simples não vira opção; Word importado
 converte para o padrão Codex+. Fila seguinte em docs/PROXIMO-PASSO.md.
 
+
+## Ajustes do uso em produção — 4ª rodada (pendente)
+
+Sessão de 23/10/2026 à noite sem nada aprovado (CONTEXTO 3.45). Itens,
+em ordem, cada um isolado:
+
+- [ ] **PL-25a** — botões de alinhamento (esquerda, centro, direita,
+      justificar) na barra do editor. Uma linha no `customize()`.
+- [ ] **PL-25b-motor** — linha vazia com estilo de título não conta como
+      título no `planPages` (achado 202). Só `codexplus.js`.
+- [ ] **PL-24** — leitura: dados do documento e Histórico numa barra
+      recolhível ("Mostrar dados"), lembrada no navegador.
+- [ ] **PL-27** — folhas no editor iguais ao PDF (guias pontilhadas no
+      verde do plugin, lacunas sombreadas, bloco que não cabe desce
+      inteiro), sem nada inserido no texto. Recomeçar pelo comportamento
+      escrito e mockup no GLPI real (achados 198, 206, 207).
+- [ ] **PL-26** — visual dos editores (documento e Modelos) no layout do
+      plugin, com mockup antes.
+- [ ] Limpar as linhas vazias do MAN0006 (155) — à mão ou botão
+      "Remover linhas vazias repetidas" sob comando.
 ## Pós-produção (Claudio, 04/10/2026)
 
 Tudo o que não entrou na Reta final. Atualizações já em produção, por

@@ -2,6 +2,11 @@
 
 > Documento de entrada. Quem for dar andamento ao plugin deve ler este
 > arquivo **antes** de abrir qualquer código.
+> Estado: **`v0.8.5` em produção** (23/10/2026). Sessão de 23/10 à noite
+> (seção 3.45, PL-23 a PL-27, folhas do editor) **encerrada sem commit de
+> código**: nenhuma das tentativas ficou aprovada por Claudio; homologação
+> volta ao `41f74a8`. Achados 198 a 207. Próximo: docs/PROXIMO-PASSO.md.
+> Antes:
 > Estado: **`v0.8.5` em produção** desde **23/10/2026** (seção 3.44) — **3ª
 > rodada de ajustes do uso real (PL-11 a PL-22)**: mapa de calor estável
 > (semente fixa por AP), planta que não some em silêncio, zoom na leitura,
@@ -3503,6 +3508,71 @@ Contrato novo (não quebrar): `rf.seed` no JSON do AP; `.cx-cont` e
 devolve `starts` com `null` para folha dentro de bloco grande;
 `CodexplusEditor._importDocx/_importDecorate/_importMap` (testes);
 `CodexplusBoard._iconResize/_apSeed`.
+
+### 3.45 Folhas no editor, 4ª tentativa — PL-23 a PL-27 (23/10/2026, noite) — NÃO aprovado
+
+Pedido de Claudio (prints do MAN0011 e do MAN0006 "Teste de paginação 1020",
+id 55 na homologação): o editor em folhas da `v0.8.5` "ficou pior" — texto
+pulando entre folhas, 2–3 Enters criavam folha nova, folha com 2–3× o
+tamanho, sem botões de alinhamento. Pacotes entregues **um a um, nenhum
+commitado** (homologação volta ao `41f74a8` no fechamento):
+
+| Pacote | Ideia | Por que não ficou |
+|---|---|---|
+| pl23a-1/-2 | Folha contínua; faixas verdes FIXAS a cada A4 só no fundo (CSS); + botões de alinhamento (PL-25a) | Faixa fixa é geometria: o PDF vira entre blocos e cada folha com sobra desloca as seguintes — da metade do documento em diante o texto "na faixa" do editor não era o que descia no PDF |
+| pl24-1 | Leitura: dados do documento + Histórico numa barra recolhível ("Mostrar dados") | Não chegou a ser avaliado à parte — pode voltar sozinho |
+| pl25b-1 | ¶ nas linhas vazias; editor não cria linha sozinho; **motor: linha vazia com estilo de título não é título** | A correção do motor é boa (achado 202); o resto foi junto do que não ficou |
+| pl25c-1 | Linha da área 17 px mais alta (folga 8 + margem 9) | Remendo do mesmo problema da faixa fixa |
+| pl25d-1 | Faixas fixas saem; marca "Folha N" exata (planBreaks) desenhada por cima | Exata, mas a "folha" anda com o texto — Claudio: "está só piorando" |
+| pl27-1 | Folhas fixas atrás do texto (área pontilhada + lacunas verdes); o bloco que não cabe é empurrado por margem em atributo `data-mce-*` (sem elemento no texto), conta no próprio editor (regra do planPages) | Viradas iguais às do PDF no teste (14/14 e 15/15), mas no GLPI real: título cortado ("RIA DE LINK…") e linhas vazias somindo/ocupando área — Claudio desistiu |
+
+Decisões de Claudio na sessão (valem para a próxima): o editor **não pode
+ter "vida própria"** (não cria nem apaga linha que ele não pediu); o
+Visualizar e o PDF têm de ser o reflexo exato do editor; guias na **cor do
+plugin** (não a da marca), pontilhadas, área = corte exato do PDF, lacunas
+de cabeçalho/rodapé sombreadas; aceitou que o parágrafo que não cabe desce
+inteiro; das "funções do Word" só a separação de folhas é problema (tabela
+por célula, estilos, colar com cor e importar .docx ficam); quer botões de
+alinhamento; quer o visual dos editores no layout do plugin (PL-26, não
+feito); na leitura, dados do documento recolhíveis (PL-24).
+
+Achados:
+
+198. **Faixa fixa no editor contínuo não representa a virada do PDF.** O
+     PDF vira entre blocos e deixa sobra; o editor contínuo não tem a sobra.
+     A diferença soma folha a folha. Só há dois jeitos exatos: o editor
+     empurrar o texto (folhas de verdade) ou marcar a virada calculada.
+199. **Autoresize do TinyMCE regrava `min-height: inherit` no body** a cada
+     ajuste — altura mínima tem de ir numa folha de estilo do iframe.
+200. **Atributo `data-mce-*` próprio É gravado pelo TinyMCE** (só os
+     internos somem). Para não gravar: `editor.serializer.addAttributeFilter`
+     no `PreInit`. Com o filtro, não suja `isDirty()` nem o desfazer.
+201. **`<p>&nbsp;</p>` vira `<p><br data-mce-bogus></p>` no editor**: um
+     `::after` em linha dobra a altura (o br quebra) — marca fora do fluxo
+     (`position:absolute`).
+202. **Linha vazia com estilo de título (`<h2>&nbsp;</h2>`) era tratada como
+     título** no `planPages` e arrastava as linhas vazias seguintes para o
+     topo da folha nova (buraco de ~600 px no MAN0006, folha 5). Correção de
+     4 linhas no `isHeadingLike` (`if (isBlank(el)) return false;`) —
+     **vale reaplicar sozinha**.
+203. **MAN0006 tinha 155 linhas vazias** em grupos de 7 a 14 antes dos
+     títulos — resto da briga com o editor antigo (Enter para empurrar o
+     título para a folha seguinte). O PDF mostra fielmente; precisam ser
+     apagadas no documento.
+204. **`planBreaks` atende só o último pedido**: duas chamadas ao mesmo
+     tempo e a primeira promessa nunca resolve (teste travou). E imagem de
+     host inacessível segura o `waitImages` — nos testes, trocar `src`.
+205. **Motor do PDF desconta 8 px de folga (`capH`) e conta a margem de
+     baixo do último bloco** — a "área útil" visual é 17 px maior que a
+     capacidade real.
+206. **Ritmo da sessão**: seis abordagens numa noite, cada uma corrigindo o
+     sintoma da anterior, foi pior que nenhuma. Próxima tentativa: fechar o
+     comportamento por escrito com Claudio, mockup lado a lado editor ×
+     Visualizar no GLPI real (não só no harness) e um pacote.
+207. **Harness ≠ GLPI real**: o pl27 passou 14/14 no harness (TinyMCE 7.9
+     puro) e quebrou no GLPI (título cortado). Antes de entregar mudança de
+     layout do editor, testar com o CSS do tema do GLPI e a configuração
+     real (`#codexplus-print-config` da página).
 
 ## 4. Decisões de arquitetura que já custaram caro
 

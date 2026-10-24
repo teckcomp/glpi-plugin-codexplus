@@ -495,6 +495,9 @@
                        carregar codexplus-editor.js; a chamada aqui garante, antes
                        do script do GLPI que inicia o editor. #}
                     <script>window.CodexplusEditor && window.CodexplusEditor.prepare('codexplus-doc-content');</script>
+                    {# PL-28: a régua do editor mede a folha com a marca do documento
+                       (logo, rodapé), como o PDF. Na leitura este script fica no artigo. #}
+                    <script type="application/json" id="codexplus-print-config">{{ print_config|raw }}</script>
                     {{ widgets.content|raw }}
                     <div class="codexplus-form-hint">
                         {{ __('Cole ou arraste imagens direto no texto. Para anexar arquivos (planilhas, PDFs, fotos), use a área de arquivos abaixo do editor. Tudo é gravado ao clicar em Salvar.', 'codexplus') }}

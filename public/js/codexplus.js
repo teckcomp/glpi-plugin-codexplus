@@ -126,7 +126,11 @@
         + '.cx-print-history .cx-h-who{width:150px;}'
         + 'td,th{border:1px solid #d1d5db;padding:6px;font-size:10.5pt;}'
         + 'th{background:#f3f4f6;}'
-        + 'img{max-width:100%;height:auto;}'
+        // PL-28: caixa e alinhamento explícitos, para o editor (que vive sob o
+        // reboot do Bootstrap do GLPI) medir igual ao PDF.
+        + 'table,thead,tbody,tfoot,tr,td,th{box-sizing:border-box;}table{border-spacing:0;}'
+        + 'thead,tbody,tfoot,tr{border:0;}'
+        + 'img{max-width:100%;height:auto;vertical-align:baseline;}'
         + 'ul,ol{margin:0 0 9px;padding-left:22px;}'
         + 'pre,code{background:#f6f8fa;border-radius:4px;font-size:10pt;}'
         + 'pre{padding:8px;white-space:pre-wrap;page-break-inside:avoid;}'
@@ -332,6 +336,11 @@
             // o desenho.
             + '#cx-stage>div,#cx-stage>p,#cx-stage>blockquote,.cx-stage>div,.cx-stage>p,.cx-stage>blockquote,'
             + '.cx-page-content>div,.cx-page-content>p,.cx-page-content>blockquote{display:flow-root;}'
+            // PL-28: recorte da folha — o texto inteiro, deslocado, dentro de uma
+            // janela da altura da área branca; o mesmo flow-root do palco.
+            + '.cx-page-content--clip{overflow:hidden;position:relative;}'
+            + '.cx-clip{width:' + geo.contentW + 'px;}'
+            + '.cx-clip>div,.cx-clip>p,.cx-clip>blockquote{display:flow-root;}'
             // 0.5.8: cabeçalho corrido aprovado em 19/09/2026 — título
             // pequeno de um lado, logo do outro, filete embaixo. Altura fixa
             // (capacidade de página constante, achado 17); excesso cortado.
@@ -556,11 +565,28 @@
         if (!stage) {
             return 1;
         }
-        var pages = planPages(idoc, stage, geo);
-        var total = pages.length;
+        // PL-28: impressora. Cada folha é o recorte da área branca
+        // correspondente do texto diagramado (ver clipPlan). O planPages
+        // antigo continua só no PDF composto (Etapa 5d).
+        var win = idoc.defaultView || window;
+        var blocks = Array.prototype.slice.call(stage.children);
+        var sr = stage.getBoundingClientRect();
+        var plan = clipPlan(blocks, sr.top, sr.height, geo);
+        try { win.__cxClipPlan = plan; } catch (e) { /* só para conferência no console */ }
+        var total = plan.length;
+        var html = stage.innerHTML;
         var frag  = idoc.createDocumentFragment();
         for (var p = 0; p < total; p++) {
-            frag.appendChild(buildPageEl(idoc, cfg, geo, pages[p], p, total));
+            var page = buildPageEl(idoc, cfg, geo, [], p, total);
+            var content = page.querySelector('.cx-page-content');
+            content.classList.add('cx-page-content--clip');
+            content.style.height = Math.max(0, plan[p].end - plan[p].start) + 'px';
+            var clip = idoc.createElement('div');
+            clip.className = 'cx-clip';
+            clip.style.marginTop = (-plan[p].start) + 'px';
+            clip.innerHTML = html;
+            content.appendChild(clip);
+            frag.appendChild(page);
         }
 
         idoc.body.innerHTML = '';
@@ -1311,11 +1337,163 @@
     // E3 (22/09/2026): a exportação em Word (codexplus-export.js) usa a
     // MESMA configuração, marcadores, linha de identificação e nome de
     // arquivo do PDF — fonte única, sem cópia das regras.
+    /* =====================================================================
+       PL-28 (Claudio, 24/10/2026): CONTRATO DA FOLHA.
+       O PDF é o MODELO geométrico (A4, margens, cabeçalho, rodapé), e só.
+       - O editor desenha, por cima do texto e sem mover nada, a régua
+         desse modelo: as margens, o início de cada folha e a marca de
+         quebra ("área de quebra de página"). O plugin não move, não corta,
+         não arrasta, não encolhe: linha vazia é conteúdo e imprime onde
+         está, inclusive no topo da folha seguinte.
+       - O PDF e o Visualizar são uma IMPRESSORA: a folha N é o RECORTE da
+         área branca N, pixel por pixel, do mesmo texto diagramado com a
+         mesma largura e a mesma tipografia do editor (layoutPages).
+       - A folha seguinte começa exatamente onde a anterior terminou
+         (impressora): nada fica de fora. Único ajuste físico, igual nos
+         dois lados: o corte sobe para o topo da linha (de texto, de tabela,
+         imagem) que a marca geométrica atravessaria, para nenhuma letra
+         sair cortada ao meio; essa linha abre a folha seguinte.
+       clipPlan() é a conta compartilhada: recebe os blocos já diagramados
+       (do editor ou do palco do PDF) e devolve os recortes.
+       ===================================================================== */
+    function rulerTypoCss() {
+        var S = 'body.cx-ruler';
+        return S + '{font-family:Arial,Helvetica,sans-serif!important;font-size:11.5pt!important;line-height:1.55!important;color:#1f2937!important;}'
+            + S + ' h1,' + S + ' h2,' + S + ' h3,' + S + ' h4{line-height:1.55!important;font-weight:700!important;}'
+            + S + ' h2{font-size:14pt!important;margin:18px 0 8px!important;}'
+            + S + ' h3{font-size:12pt!important;margin:14px 0 6px!important;}'
+            + S + ' h4{font-size:11.5pt!important;margin:12px 0 6px!important;}'
+            + S + ' p{margin:0 0 9px!important;padding:0!important;}'
+            // mesmos blocos especiais do PRINT_CSS (a regra de <p> acima não pode vencê-los)
+            + S + ' .cx-callout{margin:0 0 12px!important;padding:9px 12px!important;border-left-width:4px!important;}'
+            + S + ' .cx-step{margin:0 0 12px!important;padding:9px 12px!important;}'
+            + S + ' .cx-sheet,' + S + ' .cx-board-legend{margin:0 0 12px!important;}'
+            + S + ' ul,' + S + ' ol{margin:0 0 9px!important;padding-left:22px!important;}'
+            + S + ' li{margin:0!important;padding:0!important;}'
+            + S + ' table{margin:0 0 12px!important;border-spacing:0!important;border-collapse:collapse!important;}'
+            + S + ' table,' + S + ' thead,' + S + ' tbody,' + S + ' tfoot,' + S + ' tr,' + S + ' td,' + S + ' th{box-sizing:border-box!important;}'
+            + S + ' thead,' + S + ' tbody,' + S + ' tfoot,' + S + ' tr{border:0!important;}'
+            + S + ' td,' + S + ' th{padding:6px!important;font-size:10.5pt!important;line-height:1.55!important;border-width:1px!important;border-style:solid!important;}'
+            // o reboot do Bootstrap põe vertical-align:middle na imagem; o PDF usa baseline (6,8 px a mais)
+            + S + ' img{max-width:100%!important;height:auto!important;vertical-align:baseline!important;}'
+            + S + ' pre,' + S + ' code{font-size:10pt!important;}'
+            // mesma regra do palco do PDF: margem do filho fica dentro do bloco
+            + S + '>div,' + S + '>p,' + S + '>blockquote{display:flow-root;}';
+    }
+
+    /* Geometria + altura do título da folha 1 (medido com o CSS do PDF). */
+    function rulerInfo(title) {
+        var cfg = getPrintConfig();
+        var geo = computeGeometry(cfg);
+        var meta = cfg.brand.footer_show ? '' : buildIdentLine(cfg);
+        var t = (title || cfg.document.title || 'Documento').replace(/</g, '&lt;');
+        var heading = '<div class="cx-heading"><h1 class="cx-print-title' + (cfg.brand.title_upper ? ' cx-print-title--upper' : '') + '">'
+            + t + '</h1><div class="cx-print-meta">' + String(meta).replace(/</g, '&lt;') + '</div></div>';
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+            + PRINT_CSS + brandCss(cfg) + editorSizeCss() + buildPageCss(geo)
+            + '</style></head><body><div id="cx-stage">' + heading + '</div></body></html>';
+        return new Promise(function (ok) {
+            var f = document.createElement('iframe');
+            f.setAttribute('aria-hidden', 'true');
+            f.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:400px;border:0;opacity:0;';
+            f.onload = function () {
+                var h = 0;
+                try {
+                    var d = f.contentDocument, el = d.querySelector('.cx-heading');
+                    var cs = d.defaultView.getComputedStyle(el);
+                    h = el.getBoundingClientRect().height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+                } catch (e) { h = 0; }
+                if (f.parentNode) { f.parentNode.removeChild(f); }
+                ok({ geo: geo, heading: h, typoCss: rulerTypoCss(), gap: clipGap(geo) });
+            };
+            f.srcdoc = html;
+            document.body.appendChild(f);
+        });
+    }
+
+    /* Lacuna entre duas áreas brancas: rodapé + margens + cabeçalho. */
+    function clipGap(geo) {
+        return geo.marginBottom + geo.footerH + geo.marginTop + geo.headerH;
+    }
+
+    /* Retângulos indivisíveis (linhas de texto, linhas de tabela, imagens,
+       quadros) dos blocos que cruzam a altura y, relativos a `origin`. */
+    function atomsAt(blocks, origin, y) {
+        var out = [];
+        function push(r) {
+            var t = r.top - origin, b = r.bottom - origin;
+            if (b - t > 0.5 && t < y && b > y) { out.push([t, b]); }
+        }
+        for (var i = 0; i < blocks.length; i++) {
+            var el = blocks[i], br = el.getBoundingClientRect();
+            if (br.bottom - origin <= y || br.top - origin >= y) { continue; }
+            var before = out.length;
+            var atomic = el.querySelectorAll('tr,img,svg,canvas,iframe,video,.cx-board,.cx-ph');
+            for (var a = 0; a < atomic.length; a++) { push(atomic[a].getBoundingClientRect()); }
+            if (/^(IMG|SVG|HR)$/.test(el.tagName)) { push(br); }
+            var doc = el.ownerDocument;
+            var walker = doc.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+            var node;
+            while ((node = walker.nextNode())) {
+                if (!node.nodeValue) { continue; }
+                var rng = doc.createRange();
+                rng.selectNodeContents(node);
+                var rects = rng.getClientRects();
+                for (var k = 0; k < rects.length; k++) { push(rects[k]); }
+            }
+            // Linha vazia (parágrafo ou título sem texto) também é indivisível:
+            // o corte não passa pelo meio dela (Claudio, 24/10/2026).
+            if (out.length === before) { push(br); }
+        }
+        return out;
+    }
+
+    /**
+     * Recortes das folhas. `blocks`: blocos de topo já diagramados (editor:
+     * filhos do body sem os internos do TinyMCE; PDF: filhos do palco).
+     * `origin`: altura (clientRect) onde começa a conta — no PDF o topo do
+     * palco (o título é o primeiro bloco); no editor, o topo do texto menos
+     * a altura reservada ao título. `totalH`: altura do conteúdo a partir de
+     * origin. Devolve [{start, end}] em px relativos a origin, contíguos:
+     * start[n+1] === end[n].
+     */
+    function clipPlan(blocks, origin, totalH, geo) {
+        var cap = geo.contentH;
+        var pages = [];
+        var y = 0, guard = 0;
+        function snapUp(v) {
+            for (var n = 0; n < 4; n++) {
+                var at = atomsAt(blocks, origin, v);
+                if (!at.length) { return v; }
+                var top = v;
+                for (var i = 0; i < at.length; i++) { if (at[i][0] < top) { top = at[i][0]; } }
+                if (top >= v) { return v; }
+                v = top;
+            }
+            return v;
+        }
+        while (guard++ < 500) {
+            var end = y + cap;
+            if (end >= totalH) { pages.push({ start: y, end: end }); break; }
+            var e = snapUp(end);
+            if (e <= y + 1) { e = end; }   // um só átomo maior que a folha: corta mesmo assim
+            pages.push({ start: y, end: e });
+            // Opção B (Claudio, 24/10/2026): impressora de verdade — a folha
+            // seguinte começa exatamente onde esta terminou. Nada fica de fora.
+            y = e;
+            if (y >= totalH) { break; }
+        }
+        return pages;
+    }
+
     window.CodexplusPrint = {
         config: getPrintConfig,
         markers: resolveMarkers,
         ident: buildIdentLine,
-        fileTitle: fileTitle
+        fileTitle: fileTitle,
+        ruler: rulerInfo,        // PL-28
+        clipPlan: clipPlan,      // PL-28
+        gap: clipGap             // PL-28
     };
 
     document.addEventListener('DOMContentLoaded', function () {

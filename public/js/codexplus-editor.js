@@ -1477,8 +1477,219 @@
             editor.on('PastePreProcess', function (e) {
                 if (e && typeof e.content === 'string' && !e.internal) { e.content = cleanPaste(e.content); }
             });
+            // PL-28: régua da folha e proteção dos blocos (só o documento).
+            if (layout === 'classic' && !isTpl) {
+                guardBlockDelete(editor);
+                // Diagrama imprime em folha deitada e por outro caminho: sem régua.
+                if (currentType(editor) !== 'DIA') { rulerMode(editor); }
+            }
         };
         return cfg;
+    }
+
+    /* =====================================================================
+       PL-28 (Claudio, 24/10/2026): RÉGUA da folha dentro do editor.
+
+       Contrato (ver o cabeçalho PL-28 em codexplus.js):
+       - o texto NÃO é movido, cortado nem alterado: a régua é uma camada
+         desenhada por cima, fora do <body> do editor (filha do <html> do
+         iframe), então o TinyMCE não a vê, não a grava e não a seleciona;
+       - o corpo do editor passa a ter a largura e a tipografia do PDF
+         (com !important, por cima do CSS do tema do GLPI — achado 207),
+         para a diagramação ser a mesma do palco do PDF;
+       - área branca = imprime; faixa sombreada = não imprime; onde cada uma
+         começa e termina vem de CodexplusPrint.clipPlan, a MESMA conta que
+         o PDF e o Visualizar usam para recortar as folhas;
+       - pontilhado no verde do plugin nas margens, "Folha N" na borda,
+         parágrafo/título vazio marcado com ¶ (atributo data-mce-*, removido
+         na gravação pelo serializer).
+       ===================================================================== */
+    var RULER_COLOR = '#0B5F6B', RULER_TINT = 'rgba(11,95,107,.09)', RULER_SHEET_GAP = 16;
+    var EMPTY_TAGS = { P: 1, H1: 1, H2: 1, H3: 1, H4: 1, DIV: 1 };
+    function rulerMode(editor) {
+        var P = function () { return window.CodexplusPrint; };
+        var info = null, timer = null, ro = null;
+        function title() {
+            var el = document.querySelector('input[name="name"]');
+            return el && el.value ? el.value : '';
+        }
+        function doc() { return editor.getDoc(); }
+        function body() { return editor.getBody(); }
+        function isInternal(el) { return el.getAttribute('data-mce-bogus') !== null; }
+        function overlay() {
+            var d = doc();
+            if (!d) { return null; }
+            var ov = d.getElementById('cx-ruler');
+            if (!ov) {
+                ov = d.createElement('div');
+                ov.id = 'cx-ruler';
+                ov.setAttribute('contenteditable', 'false');
+                ov.setAttribute('aria-hidden', 'true');
+                d.documentElement.appendChild(ov);
+            }
+            return ov;
+        }
+        function markEmpty(b) {
+            var kids = b.children;
+            for (var i = 0; i < kids.length; i++) {
+                var el = kids[i];
+                if (!EMPTY_TAGS[el.tagName] || isInternal(el)) { continue; }
+                var txt = (el.textContent || '').replace(/[\u00a0\ufeff\s]/g, '');
+                var vazio = !txt && !el.querySelector('img,table,svg,hr,iframe,video,.cx-board,.cx-sheet,.cx-ph');
+                if (vazio) { el.setAttribute('data-mce-cxempty', '1'); }
+                else if (el.hasAttribute('data-mce-cxempty')) { el.removeAttribute('data-mce-cxempty'); }
+            }
+        }
+        function paint() {
+            timer = null;
+            var d = doc(), b = body(), ov = overlay();
+            if (!d || !b || !ov || !info || !P() || !P().clipPlan) { return; }
+            markEmpty(b);
+            var g = info.geo, win = d.defaultView, cs = win.getComputedStyle(b);
+            var padTop = parseFloat(cs.paddingTop) || 0;
+            var curPad = parseFloat(cs.paddingBottom) || 0;
+            var rect = b.getBoundingClientRect();
+            var left = rect.left + (win.pageXOffset || 0);
+            var top = rect.top + (win.pageYOffset || 0);
+            var blocks = Array.prototype.filter.call(b.children, function (el) { return !isInternal(el); });
+            // Origem da conta = topo do texto menos o título da folha 1 (no
+            // PDF o título é o primeiro bloco do palco).
+            var origin = rect.top + padTop - info.heading;
+            var contentBottom = rect.height - curPad;              // fim do texto, relativo ao body
+            var totalH = contentBottom - padTop + info.heading;    // relativo a origin
+            var plan = [{ start: 0, end: g.contentH }];
+            try { plan = P().clipPlan(blocks, origin, totalH, g); } catch (err) { if (window.console) { console.warn('Codex+ (régua):', err); } }
+            var toBody = padTop - info.heading;   // origin -> coordenadas do body/overlay
+            var h = '', W = g.pageW, L = g.marginX, R = g.pageW - g.marginX;
+            h += '<div class="cx-ruler-v" style="left:' + L + 'px"></div><div class="cx-ruler-v" style="left:' + R + 'px"></div>';
+            h += '<div class="cx-ruler-band" style="top:0;height:' + padTop + 'px"></div>';
+            for (var p = 0; p < plan.length; p++) {
+                var t = Math.max(padTop, plan[p].start + toBody), e = plan[p].end + toBody;
+                h += '<div class="cx-ruler-tag" style="top:' + (t + 3) + 'px">Folha ' + (p + 1) + '</div>';
+                if (p === 0) { h += '<div class="cx-ruler-h" style="top:' + t + 'px"></div>'; }
+                if (p + 1 < plan.length) {
+                    // Opção B: a folha seguinte começa onde esta termina; a marca é
+                    // uma faixa fina sobre a linha do corte, só para orientação.
+                    h += '<div class="cx-ruler-cut" style="top:' + (e - 4) + 'px">'
+                        + '<span title="Área de quebra de página: fim da folha ' + (p + 1) + ', início da folha ' + (p + 2) + '">Área de quebra · ' + (p + 1) + ' → ' + (p + 2) + '</span></div>';
+                } else {
+                    h += '<div class="cx-ruler-h" style="top:' + e + 'px"></div>';
+                }
+            }
+            // Fim da folha branca = fim da última área + rodapé + margem.
+            var last = plan[plan.length - 1];
+            var wantPad = Math.max(last.end + toBody, contentBottom) + g.marginBottom + g.footerH - contentBottom;
+            if (Math.abs(wantPad - curPad) > 1) {
+                b.style.setProperty('padding-bottom', Math.round(wantPad) + 'px', 'important');
+            }
+            var totalBody = contentBottom + wantPad;
+            ov.style.cssText = 'position:absolute;left:' + Math.round(left) + 'px;top:' + Math.round(top) + 'px;width:' + W + 'px;height:' + Math.round(totalBody) + 'px;pointer-events:none;z-index:1;';
+            ov.innerHTML = h;
+        }
+        function later() {
+            if (timer) { clearTimeout(timer); }
+            timer = setTimeout(paint, 80);
+        }
+        // O atributo do ¶ é só de tela: sai na gravação (getContent).
+        editor.on('PreInit', function () {
+            editor.serializer.addAttributeFilter('data-mce-cxempty', function (nodes, name) {
+                for (var i = 0; i < nodes.length; i++) { nodes[i].attr(name, null); }
+            });
+        });
+        editor.on('init', function () {
+            if (!P() || !P().ruler) { return; }
+            P().ruler(title()).then(function (r) {
+                info = r;
+                var d = doc(), g = r.geo;
+                var mt = g.marginTop + g.headerH + r.heading;
+                var st = d.createElement('style');
+                st.id = 'cx-ruler-css';
+                st.textContent = r.typoCss
+                    + 'html{background:#e9edf2!important;overflow-x:auto;}'
+                    // !important: o tema do GLPI dá ao body do editor margem de 15 px,
+                    // position:relative e fundo transparente, com seletores próprios.
+                    + 'html body.cx-ruler{box-sizing:content-box!important;width:' + g.contentW + 'px!important;'
+                    + 'max-width:none!important;min-height:' + g.contentH + 'px;margin:' + RULER_SHEET_GAP + 'px auto!important;'
+                    + 'padding-top:' + mt + 'px!important;padding-left:' + g.marginX + 'px!important;padding-right:' + g.marginX + 'px!important;'
+                    + 'background:#fff!important;position:static!important;box-shadow:0 1px 4px rgba(0,0,0,.18);}'
+                    + 'body.cx-ruler [data-mce-cxempty]::before{content:"\\00b6";color:' + RULER_COLOR + ';opacity:.55;'
+                    + 'font:normal 11.5pt/1.55 Arial,sans-serif;position:absolute;margin-left:-16px;pointer-events:none;}'
+                    + '#cx-ruler .cx-ruler-v{position:absolute;top:0;bottom:0;border-left:1px dotted ' + RULER_COLOR + ';opacity:.7;}'
+                    + '#cx-ruler .cx-ruler-h{position:absolute;left:0;right:0;border-top:1px dotted ' + RULER_COLOR + ';opacity:.7;}'
+                    + '#cx-ruler .cx-ruler-band{position:absolute;left:0;right:0;background:' + RULER_TINT + ';}'
+                    + '#cx-ruler .cx-ruler-cut{position:absolute;left:0;right:0;height:8px;background:' + RULER_TINT + ';'
+                    + 'border-top:1px dotted ' + RULER_COLOR + ';border-bottom:1px dotted ' + RULER_COLOR + ';box-sizing:border-box;}'
+                    + '#cx-ruler .cx-ruler-cut span{position:absolute;right:4px;top:-8px;font:10px/1 Arial,sans-serif;color:' + RULER_COLOR + ';'
+                    + 'background:rgba(255,255,255,.95);border:1px dotted ' + RULER_COLOR + ';border-radius:10px;padding:3px 7px;white-space:nowrap;}'
+                    + '#cx-ruler .cx-ruler-tag{position:absolute;right:4px;width:' + (g.marginX - 8) + 'px;text-align:right;font:10px/1 Arial,sans-serif;color:' + RULER_COLOR + ';opacity:.9;}';
+                d.head.appendChild(st);
+                body().classList.add('cx-ruler');
+                if (d.defaultView.ResizeObserver) {
+                    ro = new d.defaultView.ResizeObserver(later);
+                    ro.observe(body());
+                }
+                d.defaultView.addEventListener('resize', later);
+                paint();
+            });
+        });
+        editor.on('SetContent input change Undo Redo ExecCommand keyup NodeChange', later);
+        var name = document.querySelector('input[name="name"]');
+        if (name) {
+            name.addEventListener('change', function () {
+                if (!P() || !P().ruler) { return; }
+                P().ruler(title()).then(function (r) {
+                    info = r;
+                    var d = doc();
+                    body().style.setProperty('padding-top', (r.geo.marginTop + r.geo.headerH + r.heading) + 'px', 'important');
+                    paint();
+                });
+            });
+        }
+    }
+
+    /* PL-28: Delete e Backspace não apagam tabela, planilha, quadro, imagem
+       ou marcador como efeito colateral de apagar a linha vizinha (a causa
+       do "documento deformou" e irmã do PL-18c). Regra: com o cursor no
+       início de um bloco cujo vizinho de cima é um desses (Backspace), ou
+       no fim de um bloco cujo vizinho de baixo é um desses (Delete):
+       - linha vazia: ela mesma é removida e o bloco vizinho fica
+         selecionado (apagar linha puxa o texto, como pedido);
+       - linha com texto: nada acontece.
+       Apagar o bloco de propósito continua igual: selecionar e Delete. */
+    var PROTECTED = 'table,.cx-sheet,.cx-board,.cx-board-legend,.cx-sum,.cx-ph,img,hr,svg';
+    function guardBlockDelete(editor) {
+        function isProtected(el) {
+            return !!el && el.nodeType === 1 && (el.matches(PROTECTED) || !!el.querySelector(PROTECTED));
+        }
+        function isEmptyBlock(el) {
+            return !!el && !(el.textContent || '').replace(/[\u00a0\ufeff\s]/g, '') && !el.querySelector(PROTECTED);
+        }
+        function atEdge(rng, block, start) {
+            var r = rng.cloneRange();
+            if (start) { r.setStart(block, 0); } else { r.setEnd(block, block.childNodes.length); }
+            return !r.toString().replace(/[\u00a0\ufeff\s]/g, '');
+        }
+        editor.on('keydown', function (e) {
+            if (e.keyCode !== 8 && e.keyCode !== 46) { return; }
+            var rng = editor.selection.getRng();
+            if (!rng || !rng.collapsed) { return; }
+            var b = editor.getBody();
+            var node = rng.startContainer.nodeType === 1 ? rng.startContainer : rng.startContainer.parentNode;
+            var block = node;
+            while (block && block.parentNode !== b) { block = block.parentNode; }
+            if (!block || block === b || isProtected(block)) { return; }
+            var back = e.keyCode === 8;
+            var sib = back ? block.previousElementSibling : block.nextElementSibling;
+            if (!isProtected(sib) || !atEdge(rng, block, back)) { return; }
+            e.preventDefault();
+            if (isEmptyBlock(block)) {
+                editor.undoManager.transact(function () {
+                    block.parentNode.removeChild(block);
+                    editor.selection.select(sib);
+                });
+                editor.nodeChanged();
+            }
+        });
     }
 
     /* GLPI 11.0.6 (Html::initEditorSystem): todo clique fora da barra de um
